@@ -35,11 +35,11 @@ func listenUDP() {
 
 	udp, err := net.ResolveUDPAddr("udp", *listenAddr)
 	if err != nil {
-		log.Fatalln("Error: ", err)
+		log.Fatalln("Error:", err)
 	}
 	conn, err := net.ListenUDP("udp", udp)
 	if err != nil {
-		log.Fatalln("Error: ", err)
+		log.Fatalln("Error:", err)
 	}
 	defer conn.Close()
 
@@ -47,7 +47,7 @@ func listenUDP() {
 		buf := make([]byte, 1024)
 		nr, rm, err := conn.ReadFromUDP(buf)
 		if err != nil {
-			log.Println("Error: ", err)
+			log.Println("Error:", err)
 			return
 		}
 
@@ -60,15 +60,15 @@ func listenUDP() {
 			
 			msg, err = stun.NewMessage(req)
 			if err != nil {
-				log.Println("Error: drop packet: %s", err)
+				log.Println("Error: drop packet:", err)
 				return
 			}
-				
+
 			msg.Print("request") // request
 			
 			msg, err = msg.ProcessUDP(r)
 			if err != nil {
-				log.Println("Error: proc failure: %s", err)
+				log.Println("Error: proc failure:", err)
 				return
 			}
 
@@ -77,7 +77,7 @@ func listenUDP() {
 			resp := msg.Buffer()
 			_, err = conn.WriteToUDP(resp, r)
 			if err != nil {
-				log.Println("Error: write failure: %s", err)
+				log.Println("Error: write failure:", err)
 			}
 		}(buf[:nr], rm)
 	}

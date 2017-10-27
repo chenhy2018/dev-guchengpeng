@@ -16,10 +16,11 @@ const (
 	STUN_MSG_TYPE_ENCODING_MASK  = 0x0110   // 0b 0000 0001 0001 0000
 
 	STUN_MSG_METHOD_BINDING      = 0x0001
-	STUN_MSG_BINDING_REQUEST     = 0x0000
-	STUN_MSG_BINDING_INDICATION  = 0x0010
-	STUN_MSG_BINDING_SUCCESS     = 0x0100
-	STUN_MSG_BINDING_ERROR       = 0x0110
+
+	STUN_MSG_REQUEST             = 0x0000
+	STUN_MSG_INDICATION          = 0x0010
+	STUN_MSG_SUCCESS             = 0x0100
+	STUN_MSG_ERROR               = 0x0110
 )
 
 const (
@@ -35,6 +36,15 @@ const (
 	STUN_ATTR_SOFTWARE          = 0x8022
 	STUN_ATTR_ALTERNATE_SERVER  = 0x8023
 	STUN_ATTR_FINGERPRINT       = 0x8028
+)
+
+const (
+	STUN_ERR_TRY_ALTERNATE      = 300
+	STUN_ERR_BAD_REQUEST        = 400
+	STUN_ERR_UNAUTHORIZED       = 401
+	STUN_ERR_UNKNOWN_ATTRIBUTE  = 420
+	STUN_ERR_STALE_NONCE        = 438
+	STUN_ERR_SERVER_ERROR       = 500
 )
 
 type attribute struct {
@@ -53,6 +63,7 @@ type Message struct {
 	transactionID     []byte
 	attributes        []attribute
 }
+
 
 func (this *Message) Buffer() []byte {
 
@@ -82,18 +93,62 @@ func (this *Message) Buffer() []byte {
 	return payload
 }
 
-func (this *Message) ProcessUDP(r *net.UDPAddr) (*Message, error) {
+func (this *Message) newErrorMessage(code int, reason string) (*Message, error) {
 
-	if this.isBindingRequest() {
-		return this.doBindingRequest(r)
+	msg := &Message{}
+
+	// generate a new error response message
+	msg.transactionID = append(msg.transactionID, this.transactionID...)
+	msg.method = this.method
+	msg.encoding = STUN_MSG_ERROR
+	msg.methodName, msg.encodingName = parseMessageType(msg.method, msg.encoding)
+
+	// add error code attribute
+	msg.attributes = []attribute{}
+	len := msg.addAttrErrorCode(code, reason)
+	msg.length = len
+
+	return msg, nil
+}
+
+func (this *Message) addAttrErrorCode(code int, reason string) int {
+
+/*
+       0                   1                   2                   3
+       0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+      +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+      |           Reserved, should be 0         |Class|     Number    |
+      +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+      |      Reason Phrase (variable)                                ..
+      +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+*/
+
+	attr := attribute{}
+	attr.typevalue = STUN_ATTR_ERROR_CODE
+	attr.typename = parseAttributeType(attr.typevalue)
+
+	// padding to 4 bytes
+	rs := []byte(reason)
+	rslen := len(rs)
+	if rslen % 4 != 0 {
+		rslen += 4 - rslen % 4
 	}
+	attr.length = 4 + rslen
 
-	return nil, nil
+	// fill in the value
+	attr.value = make([]byte, attr.length)
+	hd := int(code / 100)
+	attr.value[2] = byte(hd)
+	attr.value[3] = byte(code - hd * 100)
+	copy(attr.value[4:], rs)
+
+	this.attributes = append(this.attributes, attr)
+	return 4 + len(attr.value)
 }
 
 func (this *Message) isBindingRequest() bool {
 
-	return (this.method | this.encoding) == (STUN_MSG_METHOD_BINDING | STUN_MSG_BINDING_REQUEST)
+	return (this.method | this.encoding) == (STUN_MSG_METHOD_BINDING | STUN_MSG_REQUEST)
 }
 
 func (this *Message) doBindingRequest(r *net.UDPAddr) (*Message, error) {
@@ -103,15 +158,25 @@ func (this *Message) doBindingRequest(r *net.UDPAddr) (*Message, error) {
 	msg.transactionID = append(msg.transactionID, this.transactionID...)
 
 	// add xor port and address
-	len := msg.addXorMappedAddr(r)
+	len := msg.addAttrXorMappedAddr(r)
 
 	msg.length = len
-	msg.encoding = STUN_MSG_BINDING_SUCCESS
+	msg.encoding = STUN_MSG_SUCCESS
 	msg.methodName, msg.encodingName = parseMessageType(msg.method, msg.encoding)
 	return msg, nil
 }
 
-func (this *Message) addXorMappedAddr(r *net.UDPAddr) int {
+func (this *Message) addAttrXorMappedAddr(r *net.UDPAddr) int {
+
+/*
+      0                   1                   2                   3
+      0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+     +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+     |x x x x x x x x|    Family     |         X-Port                |
+     +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+     |                X-Address (Variable)
+     +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+*/
 
 	attr := attribute{}
 	attr.typevalue = STUN_ATTR_XOR_MAPPED_ADDR
@@ -151,22 +216,6 @@ func (this *Message) addXorMappedAddr(r *net.UDPAddr) int {
 	return 4 + len(attr.value)
 }
 
-func (this *Message) Print(title string) {
-
-	str := fmt.Sprintf("========== %s ==========\n", title)
-	str += fmt.Sprintf("method=%s %s, length=%d bytes\n", this.methodName, this.encodingName, this.length)
-	str += fmt.Sprintf("  transactionID=")
-	for _, v := range this.transactionID {
-		str += fmt.Sprintf("0x%02x ", v)
-	}
-	str += "\n"
-	str += fmt.Sprintf("  attributes:\n")
-	for _, v := range this.attributes {
-		str += fmt.Sprintf("    type=0x%04x(%s), len=%d, value=%v\n", v.typevalue, v.typename, v.length, v.value)
-	}
-	fmt.Println(str)
-}
-
 func NewMessage(buf []byte) (*Message, error) {
 
 	if err := checkMessage(buf); err != nil {
@@ -201,10 +250,9 @@ func NewMessage(buf []byte) (*Message, error) {
 		msg.attributes = append(msg.attributes, attr)
 
 		// padding for 4 bytes per attribute item
+		i += len + 4
 		if len % 4 != 0 {
-			i += len + (4 - len % 4) + 4
-		} else {
-			i += len + 4
+			i += 4 - len % 4
 		}
 	}
 
@@ -237,37 +285,19 @@ func checkMessage(buf []byte) error {
 	return nil
 }
 
-func parseMessageType(method, encoding uint16) (m string, e string) {
+func (this *Message) Print(title string) {
 
-	switch (method) {
-	case STUN_MSG_METHOD_BINDING:
-		m = "binding"
-		switch (encoding) {
-		case STUN_MSG_BINDING_REQUEST: e = "request"
-		case STUN_MSG_BINDING_INDICATION: e = "indication"
-		case STUN_MSG_BINDING_SUCCESS: e = "success_response"
-		case STUN_MSG_BINDING_ERROR: e = "error_response"
-		}
-	default:
-		m = "user"
+	str := fmt.Sprintf("========== %s ==========\n", title)
+	str += fmt.Sprintf("method=%s %s, length=%d bytes\n", this.methodName, this.encodingName, this.length)
+	str += fmt.Sprintf("  transactionID=")
+	for _, v := range this.transactionID {
+		str += fmt.Sprintf("0x%02x ", v)
 	}
-	return
+	str += "\n"
+	str += fmt.Sprintf("  attributes:\n")
+	for _, v := range this.attributes {
+		str += fmt.Sprintf("    type=0x%04x(%s), len=%d, value=%v\n", v.typevalue, v.typename, v.length, v.value)
+	}
+	fmt.Println(str)
 }
 
-func parseAttributeType(db uint16) string {
-
-	switch (db) {
-	case STUN_ATTR_MAPPED_ADDR: return "MAPPED-ADDRESS"
-	case STUN_ATTR_USERNAME: return "USERNAME"
-	case STUN_ATTR_MESSAGE_INTEGRITY: return "MESSAGE-INTEGRITY"
-	case STUN_ATTR_ERROR_CODE: return "ERROR-CODE"
-	case STUN_ATTR_UNKNOWN_ATTR: return "UNKNOWN-ATTRIBUTES"
-	case STUN_ATTR_REALM: return "REALM"
-	case STUN_ATTR_NONCE: return "NONCE"
-	case STUN_ATTR_XOR_MAPPED_ADDR: return "XOR-MAPPED-ADDRESS"
-	case STUN_ATTR_SOFTWARE: return "SOFTWARE"
-	case STUN_ATTR_ALTERNATE_SERVER: return "ALTERNATE-SERVER"
-	case STUN_ATTR_FINGERPRINT: return "FINGERPRINT"
-	}
-	return "RESERVED"
-}
