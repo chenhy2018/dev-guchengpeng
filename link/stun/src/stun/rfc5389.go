@@ -3,7 +3,6 @@ package stun
 import (
 	"fmt"
 	"encoding/binary"
-	"net"
 )
 
 const (
@@ -146,12 +145,22 @@ func (this *Message) addAttrErrorCode(code int, reason string) int {
 	return 4 + len(attr.value)
 }
 
+func (this *Message) isRequest() bool {
+
+	return this.encoding == STUN_MSG_REQUEST
+}
+
+func (this *Message) isIndication() bool {
+
+	return this.encoding == STUN_MSG_INDICATION
+}
+
 func (this *Message) isBindingRequest() bool {
 
 	return (this.method | this.encoding) == (STUN_MSG_METHOD_BINDING | STUN_MSG_REQUEST)
 }
 
-func (this *Message) doBindingRequest(r *net.UDPAddr) (*Message, error) {
+func (this *Message) doBindingRequest(r *address) (*Message, error) {
 
 	msg := &Message{}
 	msg.method = STUN_MSG_METHOD_BINDING
@@ -166,20 +175,10 @@ func (this *Message) doBindingRequest(r *net.UDPAddr) (*Message, error) {
 	return msg, nil
 }
 
-func (this *Message) addAttrXorMappedAddr(r *net.UDPAddr) int {
-
-/*
-      0                   1                   2                   3
-      0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
-     +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-     |x x x x x x x x|    Family     |         X-Port                |
-     +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-     |                X-Address (Variable)
-     +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-*/
+func (this *Message) addAttrAddr(r *address, typeval uint16) int {
 
 	attr := attribute{}
-	attr.typevalue = STUN_ATTR_XOR_MAPPED_ADDR
+	attr.typevalue = typeval
 	attr.typename = parseAttributeType(attr.typevalue)
 
 	if r.IP.To4() == nil {
@@ -214,6 +213,21 @@ func (this *Message) addAttrXorMappedAddr(r *net.UDPAddr) int {
 
 	this.attributes = append(this.attributes, attr)
 	return 4 + len(attr.value)
+}
+
+func (this *Message) addAttrXorMappedAddr(r *address) int {
+
+/*
+      0                   1                   2                   3
+      0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+     +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+     |x x x x x x x x|    Family     |         X-Port                |
+     +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+     |                X-Address (Variable)
+     +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+*/
+
+	return this.addAttrAddr(r, STUN_ATTR_XOR_MAPPED_ADDR)
 }
 
 func NewMessage(buf []byte) (*Message, error) {
@@ -301,3 +315,12 @@ func (this *Message) Print(title string) {
 	fmt.Println(str)
 }
 
+func (this *Message) findAttr(typevalue uint16) *attribute {
+
+	for _, attr := range this.attributes {
+		if attr.typevalue == typevalue {
+			return &attr
+		}
+	}
+	return nil
+}

@@ -1,24 +1,60 @@
 package stun
 
 import (
-	"log"
 	"net"
 )
+
+const (
+	NET_UDP = 0x0
+	NET_TCP = 0x1
+	NET_TLS = 0x2
+)
+
+type address struct {
+	IP      net.IP
+	Port    int
+	Proto   byte
+}
 
 // -------------------------------------------------------------------------------------------------
 
 func (this *Message) ProcessUDP(r *net.UDPAddr) (*Message, error) {
 
-	if this.isBindingRequest() {
-		return this.doBindingRequest(r)
+	addr := &address{
+		IP:   r.IP,
+		Port: r.Port,
+		Proto: NET_UDP,
+	}
+	return this.process(addr)
+}
+
+func (this *Message) process(r *address) (*Message, error) {
+
+	// special handlers
+	switch this.method | this.encoding {
+	case STUN_MSG_METHOD_ALLOCATE | STUN_MSG_REQUEST: return this.doAllocationRequest(r)
+	case STUN_MSG_METHOD_BINDING | STUN_MSG_REQUEST: return this.doBindingRequest(r)
 	}
 
-	if this.isAllocationRequest() {
-		return this.doAllocationRequest()
+	if this.isRequest() {
+		// common requests
+		alloc, msg, err := this.generalRequestCheck(r)
+		if err != nil {
+			return msg, err
+		}
+
+		switch this.method {
+		case STUN_MSG_METHOD_REFRESH: return this.doRefreshRequest(alloc)
+		}
+
+		return this.newErrorMessage(STUN_ERR_BAD_REQUEST, "not support")
+
+	} else if this.isIndication() {
+		// indications
+		return nil, nil
 	}
 
-	log.Println("Warn: STUN message not supported")
-	return this.newErrorMessage(STUN_ERR_BAD_REQUEST, "not support")
+	return nil, nil // drop
 }
 
 func parseMessageType(method, encoding uint16) (m string, e string) {
@@ -62,7 +98,7 @@ func parseAttributeType(db uint16) string {
 	case STUN_ATTR_LIFETIME: return "LIFETIME"
 	case STUN_ATTR_XOR_PEER_ADDR: return "XOR-PEER-ADDRESS"
 	case STUN_ATTR_DATA: return "DATA"
-	case STUN_ATTR_XOR_RELAYED_ADDR: return "XOR-RELAYED_ADDRESS"
+	case STUN_ATTR_XOR_RELAYED_ADDR: return "XOR-RELAYED-ADDRESS"
 	case STUN_ATTR_EVENT_PORT: return "EVEN-PORT"
 	case STUN_ATTR_REQUESTED_TRAN: return "REQUESTED-TRANSPORT"
 	case STUN_ATTR_DONT_FRAGMENT: return "DONT-FRAGMENT"

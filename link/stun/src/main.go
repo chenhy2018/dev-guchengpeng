@@ -5,15 +5,16 @@ import (
 	"net"
 	"log"
 	"stun"
+	"conf"
 )
 
 var (
-	listenAddr = flag.String("addr", ":3478", "udp server binding address")
 	help = flag.Bool("h", false, "print usage")
 )
 
 func init() {
-
+	conf.Args.IP = flag.String("ip", "127.0.0.1", "udp server binding IP address")
+	conf.Args.Port = flag.String("port", "3478", "specific port to bind")
 	flag.Parse()
 }
 
@@ -33,7 +34,7 @@ func main() {
 
 func listenUDP() {
 
-	udp, err := net.ResolveUDPAddr("udp", *listenAddr)
+	udp, err := net.ResolveUDPAddr("udp", *conf.Args.IP + ":" + *conf.Args.Port)
 	if err != nil {
 		log.Fatalln("Error:", err)
 	}
@@ -65,11 +66,15 @@ func listenUDP() {
 			}
 
 			msg.Print("request") // request
-			
+
 			msg, err = msg.ProcessUDP(r)
 			if err != nil {
 				log.Println("Error: proc failure:", err)
 				return
+			}
+
+			if msg == nil {
+				return // no response
 			}
 
 			msg.Print("response") // response
