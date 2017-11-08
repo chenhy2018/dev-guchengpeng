@@ -5,15 +5,16 @@ import (
 	"encoding/binary"
 	"conf"
 	"net"
-	"log"
 	"time"
 	"sync"
 )
 
 const (
-	TURN_MAX_LIFETIME            = 60
+	TURN_MAX_LIFETIME            = 600
 	TURN_SRV_MIN_PORT            = 49152
 	TURN_SRV_MAX_PORT            = 65535
+	TURN_PERM_LIFETIME           = 300   // this is fixed (https://tools.ietf.org/html/rfc5766#section-8)
+	TURN_PERM_LIMIT              = 10
 )
 
 const (
@@ -99,6 +100,10 @@ type allocation struct {
 	// relayed transport address
 	relay       address
 
+	// permission list
+	perms       map[string]time.Time
+	permsLck    *sync.Mutex
+
 	// server
 	server      *relayserver
 }
@@ -116,7 +121,7 @@ var (
 
 func keygen(r *address) string {
 
-	return string(r.Proto) + ":" + string(r.IP) + ":" + string(r.Port)
+	return fmt.Sprintf("%d:%s:%d", r.Proto, r.IP.String(), r.Port)
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -130,6 +135,26 @@ func (this *Message) generalRequestCheck(r *address) (*allocation, *Message, err
 		return nil, msg, err
 	}
 	return alloc, nil, nil
+}
+
+func (this *Message) doCreatePermRequest(alloc *allocation) (*Message, error) {
+
+	addrs, err := this.getAttrXorPeerAddresses()
+	if err != nil {
+		return this.newErrorMessage(STUN_ERR_BAD_REQUEST, "peer addresses: " + err.Error())
+	}
+
+	if err := alloc.addPerms(addrs); err != nil {
+		return this.newErrorMessage(STUN_ERR_INSUFFICIENT_CAP, err.Error())
+	}
+
+	msg := &Message{}
+	msg.method = this.method
+	msg.encoding = STUN_MSG_SUCCESS
+	msg.methodName, msg.encodingName = parseMessageType(msg.method, msg.encoding)
+	msg.transactionID = append(msg.transactionID, this.transactionID...)
+
+	return msg, nil
 }
 
 func (this *Message) doRefreshRequest(alloc *allocation) (*Message, error) {
@@ -161,8 +186,9 @@ func (this *Message) doAllocationRequest(r *address) (msg *Message, err error) {
 	// TODO 1. long-term credential
 
 	// 2. find existing allocations
-	if _, ok := allocPool.find(keygen(r)); ok {
-		return this.newErrorMessage(STUN_ERR_ALLOC_MISMATCH, "allocation already exists")
+	alloc, err := newAllocation(r)
+	if err != nil {
+		return this.newErrorMessage(STUN_ERR_ALLOC_MISMATCH, err.Error())
 	}
 
 	// 3. check allocation
@@ -173,7 +199,7 @@ func (this *Message) doAllocationRequest(r *address) (msg *Message, err error) {
 	// 4. TODO handle DONT-FRAGMENT attribute
 
 	// 5. get reservation token
-	t, err := this.getAttrReservToken()
+	alloc.token, err = this.getAttrReservToken()
 	if err == nil {
 		return this.newErrorMessage(STUN_ERR_INSUFFICIENT_CAP, "RESERVATION-TOKEN is not supported")
 	}
@@ -183,13 +209,6 @@ func (this *Message) doAllocationRequest(r *address) (msg *Message, err error) {
 	// 7. TODO check quota
 
 	// 8. TODO handle ALTERNATE attribute
-
-	// init allocation struct
-	alloc := &allocation{
-		key:      keygen(r),
-		source:   *r,
-		token:    t,
-	}
 
 	// set lifetime
 	lifetime, err := this.getAttrLifetime()
@@ -219,12 +238,12 @@ func (this *Message) checkAllocation() error {
 // same as XOR_MAPPED_ADDRESS
 func (this *Message) addAttrXorRelayedAddr(r *address) int {
 
-	return this.addAttrAddr(r, STUN_ATTR_XOR_RELAYED_ADDR)
+	return this.addAttrXorAddr(r, STUN_ATTR_XOR_RELAYED_ADDR)
 }
 
 func (this *Message) addAttrLifetime(t uint32) int {
 
-	attr := attribute{}
+	attr := &attribute{}
 	attr.typevalue = STUN_ATTR_LIFETIME
 	attr.typename = parseAttributeType(attr.typevalue)
 	attr.length = 4
@@ -254,6 +273,26 @@ func (this *Message) getAttrLifetime() (uint32, error) {
 	return 0, fmt.Errorf("not found")
 }
 
+func (this *Message) getAttrXorPeerAddresses() ([]*address, error) {
+
+	results := []*address{}
+
+	list := this.findAttrAll(STUN_ATTR_XOR_PEER_ADDR)
+	if len(list) == 0 {
+		return nil, fmt.Errorf("not found")
+	}
+
+	for _, attr := range list {
+		addr, err := this.getAttrXorAddr(attr)
+		if err != nil {
+			return nil, fmt.Errorf("value invalid: %s", err)
+		}
+		results = append(results, addr)
+	}
+
+	return results, nil
+}
+
 func (this *Message) replyAllocationRequest(alloc *allocation) (*Message, error) {
 
 	msg := &Message{}
@@ -269,6 +308,21 @@ func (this *Message) replyAllocationRequest(alloc *allocation) (*Message, error)
 }
 
 // -------------------------------------------------------------------------------------------------
+
+func newAllocation(r *address) (*allocation, error) {
+
+	key := keygen(r)
+	if _, ok := allocPool.find(key); ok {
+		return nil, fmt.Errorf("allocation already exists")
+	}
+
+	return &allocation{
+		key:      key,
+		source:   *r,
+		perms:    map[string]time.Time{},
+		permsLck: &sync.Mutex{},
+	}, nil
+}
 
 func (alloc *allocation) save() error {
 
@@ -334,6 +388,36 @@ func (alloc *allocation) getRestLife() (int, error) {
 	}
 }
 
+func (alloc *allocation) addPerms(addrs []*address) (err error) {
+
+	err = nil
+	now := time.Now()
+
+	alloc.permsLck.Lock()
+	defer alloc.permsLck.Unlock()
+
+	// clear expired permissions
+	for ip, expiry := range alloc.perms {
+		if now.After(expiry) {
+			delete(alloc.perms, ip)
+		}
+	}
+
+	// add/refresh permission entry
+	for _, addr := range addrs {
+		key := addr.IP.String()
+		if _, ok := alloc.perms[key]; !ok {
+			// check maximum capacity of permissions
+			if len(alloc.perms) >= TURN_PERM_LIMIT {
+				err = fmt.Errorf("maximum permissions reached")
+			}
+		}
+		alloc.perms[key] = now.Add(time.Second * time.Duration(TURN_PERM_LIFETIME))
+	}
+
+	return err
+}
+
 // -------------------------------------------------------------------------------------------------
 
 func newRelay(alloc *allocation) *relayserver {
@@ -362,13 +446,11 @@ func (svr *relayserver) bind() (p int, _ error) {
 
 		udp, err := net.ResolveUDPAddr("udp", addr)
 		if err != nil {
-			log.Println("Error:" + addr + "not available: " + err.Error())
 			continue
 		}
 
 		svr.conn, err = net.ListenUDP("udp", udp)
 		if err != nil {
-			log.Println("Error: could not listen" + addr + err.Error())
 			continue
 		}
 

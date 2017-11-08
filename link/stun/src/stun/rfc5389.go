@@ -1,8 +1,10 @@
 package stun
 
 import (
+	"net"
 	"fmt"
 	"encoding/binary"
+	"util/dbg"
 )
 
 const (
@@ -60,7 +62,7 @@ type Message struct {
 	encoding          uint16
 	length            int
 	transactionID     []byte
-	attributes        []attribute
+	attributes        []*attribute
 }
 
 
@@ -103,7 +105,7 @@ func (this *Message) newErrorMessage(code int, reason string) (*Message, error) 
 	msg.methodName, msg.encodingName = parseMessageType(msg.method, msg.encoding)
 
 	// add error code attribute
-	msg.attributes = []attribute{}
+	msg.attributes = []*attribute{}
 	len := msg.addAttrErrorCode(code, reason)
 	msg.length = len
 
@@ -122,7 +124,7 @@ func (this *Message) addAttrErrorCode(code int, reason string) int {
       +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 */
 
-	attr := attribute{}
+	attr := &attribute{}
 	attr.typevalue = STUN_ATTR_ERROR_CODE
 	attr.typename = parseAttributeType(attr.typevalue)
 
@@ -175,9 +177,37 @@ func (this *Message) doBindingRequest(r *address) (*Message, error) {
 	return msg, nil
 }
 
-func (this *Message) addAttrAddr(r *address, typeval uint16) int {
+func (this *Message) getAttrXorAddr(attr *attribute) (addr *address, err error) {
 
-	attr := attribute{}
+	fm := attr.value[1]
+
+	xport := binary.BigEndian.Uint16(attr.value[2:])
+	port := xport ^ (STUN_MSG_MAGIC_COOKIE >> 16)
+
+	if fm == 0x01 {
+		xip := binary.BigEndian.Uint32(attr.value[4:])
+		ip := xip ^ STUN_MSG_MAGIC_COOKIE
+		bytes := make([]byte, 4)
+		binary.BigEndian.PutUint32(bytes[0:], ip)
+		ip4 := net.IPv4(bytes[0], bytes[1], bytes[2], bytes[3]).To4()
+		if ip4 == nil {
+			return nil, fmt.Errorf("invalid IPv4")
+		}
+
+		return &address{
+			IP:   ip4,
+			Port: int(port),
+		}, nil
+	} else if fm == 0x02 {
+		return nil, fmt.Errorf("peer could not be IPv6")
+	} else {
+		return nil, fmt.Errorf("invalid address")
+	}
+}
+
+func (this *Message) addAttrXorAddr(r *address, typeval uint16) int {
+
+	attr := &attribute{}
 	attr.typevalue = typeval
 	attr.typename = parseAttributeType(attr.typevalue)
 
@@ -227,7 +257,7 @@ func (this *Message) addAttrXorMappedAddr(r *address) int {
      +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 */
 
-	return this.addAttrAddr(r, STUN_ATTR_XOR_MAPPED_ADDR)
+	return this.addAttrXorAddr(r, STUN_ATTR_XOR_MAPPED_ADDR)
 }
 
 func NewMessage(buf []byte) (*Message, error) {
@@ -251,7 +281,7 @@ func NewMessage(buf []byte) (*Message, error) {
 
 	// get attributes
 	for i := 0; i < msg.length; {
-		attr := attribute{}
+		attr := &attribute{}
 
 		// first 2 bytes are Type and Length
 		attr.typevalue = binary.BigEndian.Uint16(buf[20+i:])
@@ -310,7 +340,8 @@ func (this *Message) Print(title string) {
 	str += "\n"
 	str += fmt.Sprintf("  attributes:\n")
 	for _, v := range this.attributes {
-		str += fmt.Sprintf("    type=0x%04x(%s), len=%d, value=%v\n", v.typevalue, v.typename, v.length, v.value)
+		str += fmt.Sprintf("    type=0x%04x(%s), len=%d, value=%s\n",
+			v.typevalue, v.typename, v.length, dbg.DumpMem(v.value, 0))
 	}
 	fmt.Println(str)
 }
@@ -319,8 +350,19 @@ func (this *Message) findAttr(typevalue uint16) *attribute {
 
 	for _, attr := range this.attributes {
 		if attr.typevalue == typevalue {
-			return &attr
+			return attr
 		}
 	}
 	return nil
+}
+
+func (this *Message) findAttrAll(typevalue uint16) []*attribute {
+
+	list := []*attribute{}
+	for _, attr := range this.attributes {
+		if attr.typevalue == typevalue {
+			list = append(list, attr)
+		}
+	}
+	return list
 }

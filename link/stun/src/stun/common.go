@@ -33,7 +33,7 @@ func (this *Message) process(r *address) (*Message, error) {
 	// special handlers
 	switch this.method | this.encoding {
 	case STUN_MSG_METHOD_ALLOCATE | STUN_MSG_REQUEST: return this.doAllocationRequest(r)
-	case STUN_MSG_METHOD_BINDING | STUN_MSG_REQUEST: return this.doBindingRequest(r)
+	case STUN_MSG_METHOD_BINDING | STUN_MSG_REQUEST:  return this.doBindingRequest(r)
 	}
 
 	if this.isRequest() {
@@ -44,7 +44,8 @@ func (this *Message) process(r *address) (*Message, error) {
 		}
 
 		switch this.method {
-		case STUN_MSG_METHOD_REFRESH: return this.doRefreshRequest(alloc)
+		case STUN_MSG_METHOD_REFRESH:      return this.doRefreshRequest(alloc)
+		case STUN_MSG_METHOD_CREATE_PERM:  return this.doCreatePermRequest(alloc)
 		}
 
 		return this.newErrorMessage(STUN_ERR_BAD_REQUEST, "not support")
