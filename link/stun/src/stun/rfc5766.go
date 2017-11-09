@@ -7,6 +7,7 @@ import (
 	"net"
 	"time"
 	"sync"
+	"util/dbg"
 )
 
 const (
@@ -15,6 +16,7 @@ const (
 	TURN_SRV_MAX_PORT            = 65535
 	TURN_PERM_LIFETIME           = 300   // this is fixed (https://tools.ietf.org/html/rfc5766#section-8)
 	TURN_PERM_LIMIT              = 10
+	TURN_CHANN_EXPIRY            = 600   // this is defined (https://tools.ietf.org/html/rfc5766#page-38)
 )
 
 const (
@@ -25,6 +27,10 @@ const (
 )
 
 const  (
+	MSG_TYPE_MASK                = 0xc0
+	MSG_TYPE_STUN_MSG            = 0x00
+	MSG_TYPE_CHANNELDATA         = 0x40
+
 	STUN_MSG_METHOD_ALLOCATE     = 0x0003
 	STUN_MSG_METHOD_REFRESH      = 0x0004
 	STUN_MSG_METHOD_SEND         = 0x0006
@@ -34,7 +40,7 @@ const  (
 )
 
 const (
-	STUN_ATTR_CHANNEL_NUMBER     = 0x000C
+	STUN_ATTR_CHANNEL_NUMBER     = 0x000c
 	STUN_ATTR_LIFETIME           = 0x000d
 	STUN_ATTR_XOR_PEER_ADDR      = 0x0012
 	STUN_ATTR_DATA               = 0x0013
@@ -106,6 +112,29 @@ type allocation struct {
 
 	// server
 	server      *relayserver
+
+	// channels
+	channels    map[string]*channel
+	chanLck     *sync.Mutex
+}
+
+type channel struct {
+	// channel number
+	number      uint16
+
+	// expiry time
+	expiry      time.Time
+
+	// peer address
+	peer        *address
+}
+
+type channelData struct {
+	// channel number
+	channel     uint16
+
+	// data payload
+	data        []byte
 }
 
 var (
@@ -131,10 +160,42 @@ func (this *message) generalRequestCheck(r *address) (*allocation, *message, err
 
 	alloc, ok := allocPool.find(keygen(r))
 	if !ok {
-		msg, err := this.newErrorMessage(STUN_ERR_ALLOC_MISMATCH, "allocation not found")
-		return nil, msg, err
+		msg := this.newErrorMessage(STUN_ERR_ALLOC_MISMATCH, "allocation not found")
+		return nil, msg, fmt.Errorf("allocation not found")
 	}
 	return alloc, nil, nil
+}
+
+func (this *message) doChanBindRequest(alloc *allocation) (*message, error) {
+
+	channel, err := this.getAttrChanNumber()
+	if err != nil {
+		return this.newErrorMessage(STUN_ERR_BAD_REQUEST, "invalid CHANNEL-BIND request: " + err.Error()), nil
+	}
+
+	addr, err := this.getAttrXorPeerAddress()
+	if err != nil {
+		return this.newErrorMessage(STUN_ERR_BAD_REQUEST, "invalid CHANNEL-BIND request: " + err.Error()), nil
+	}
+
+	if channel < 0x4000 || channel > 0x7ffe {
+		return this.newErrorMessage(STUN_ERR_BAD_REQUEST, "invalid channel number"), nil
+	}
+
+	if err := alloc.addChan(channel, addr); err != nil {
+		return this.newErrorMessage(STUN_ERR_INSUFFICIENT_CAP, "CHANNEL-BIND: " + err.Error()), nil
+	}
+
+	// refresh permissions for the peer
+	alloc.addPerm(addr)
+
+	msg := &message{}
+	msg.method = this.method
+	msg.encoding = STUN_MSG_SUCCESS
+	msg.methodName, msg.encodingName = parseMessageType(msg.method, msg.encoding)
+	msg.transactionID = append(msg.transactionID, this.transactionID...)
+
+	return msg, nil
 }
 
 func (this *message) doSendIndication(alloc *allocation) {
@@ -158,22 +219,18 @@ func (this *message) doSendIndication(alloc *allocation) {
 		return
 	}
 
-	r := &net.UDPAddr{
-		IP:   addr.IP,
-		Port: addr.Port,
-	}
-	alloc.server.sendToPeer(r, data)
+	alloc.server.sendToPeer(addr, data)
 }
 
 func (this *message) doCreatePermRequest(alloc *allocation) (*message, error) {
 
 	addrs, err := this.getAttrXorPeerAddresses()
 	if err != nil {
-		return this.newErrorMessage(STUN_ERR_BAD_REQUEST, "peer addresses: " + err.Error())
+		return this.newErrorMessage(STUN_ERR_BAD_REQUEST, "peer addresses: " + err.Error()), nil
 	}
 
 	if err := alloc.addPerms(addrs); err != nil {
-		return this.newErrorMessage(STUN_ERR_INSUFFICIENT_CAP, err.Error())
+		return this.newErrorMessage(STUN_ERR_INSUFFICIENT_CAP, err.Error()), nil
 	}
 
 	msg := &message{}
@@ -216,12 +273,12 @@ func (this *message) doAllocationRequest(r *address) (msg *message, err error) {
 	// 2. find existing allocations
 	alloc, err := newAllocation(r)
 	if err != nil {
-		return this.newErrorMessage(STUN_ERR_ALLOC_MISMATCH, err.Error())
+		return this.newErrorMessage(STUN_ERR_ALLOC_MISMATCH, err.Error()), nil
 	}
 
 	// 3. check allocation
 	if err = this.checkAllocation(); err != nil {
-		return this.newErrorMessage(STUN_ERR_BAD_REQUEST, "invalid alloc req: " + err.Error())
+		return this.newErrorMessage(STUN_ERR_BAD_REQUEST, "invalid alloc req: " + err.Error()), nil
 	}
 
 	// 4. TODO handle DONT-FRAGMENT attribute
@@ -229,7 +286,7 @@ func (this *message) doAllocationRequest(r *address) (msg *message, err error) {
 	// 5. get reservation token
 	alloc.token, err = this.getAttrReservToken()
 	if err == nil {
-		return this.newErrorMessage(STUN_ERR_INSUFFICIENT_CAP, "RESERVATION-TOKEN is not supported")
+		return this.newErrorMessage(STUN_ERR_INSUFFICIENT_CAP, "RESERVATION-TOKEN is not supported"), nil
 	}
 
 	// 6. TODO get even port
@@ -248,7 +305,7 @@ func (this *message) doAllocationRequest(r *address) (msg *message, err error) {
 	// save allocation and reply to the client
 	err = alloc.save()
 	if err != nil {
-		return this.newErrorMessage(STUN_ERR_SERVER_ERROR, "alloc failed: " + err.Error())
+		return this.newErrorMessage(STUN_ERR_SERVER_ERROR, "alloc failed: " + err.Error()), nil
 	}
 	return this.replyAllocationRequest(alloc)
 }
@@ -314,6 +371,27 @@ func (this *message) getAttrData() ([]byte, error) {
 	}
 
 	return attr.value, nil
+}
+
+func (this *message) getAttrChanNumber() (uint16, error) {
+
+	attr := this.findAttr(STUN_ATTR_CHANNEL_NUMBER)
+	if attr == nil {
+		return 0, fmt.Errorf("not found")
+	}
+
+	if len(attr.value) != 4 {
+		return 0, fmt.Errorf("invalid CHANNEL-NUMBER attribute")
+	}
+
+	ch := binary.BigEndian.Uint16(attr.value[0:])
+	rffu := binary.BigEndian.Uint16(attr.value[2:])
+
+	if rffu != 0 {
+		return 0, fmt.Errorf("invalid CHANNEL-NUMBER attribute: RFFU is not zero")
+	}
+
+	return ch, nil
 }
 
 func (this *message) getAttrXorPeerAddress() (*address, error) {
@@ -395,6 +473,8 @@ func newAllocation(r *address) (*allocation, error) {
 		source:   *r,
 		perms:    map[string]time.Time{},
 		permsLck: &sync.Mutex{},
+		channels: map[string]*channel{},
+		chanLck:  &sync.Mutex{},
 	}, nil
 }
 
@@ -492,6 +572,11 @@ func (alloc *allocation) addPerms(addrs []*address) (err error) {
 	return err
 }
 
+func (alloc *allocation) addPerm(addr *address) (err error) {
+
+	return alloc.addPerms([]*address{addr})
+}
+
 func (alloc *allocation) checkPerms(addr *address) error {
 
 	key := addr.IP.String()
@@ -505,6 +590,72 @@ func (alloc *allocation) checkPerms(addr *address) error {
 	}
 
 	return nil
+}
+
+func (alloc *allocation) addChan(ch uint16, addr *address) error {
+
+	alloc.chanLck.Lock()
+	defer alloc.chanLck.Unlock()
+
+	now := time.Now()
+
+	// clean expired channels
+	for index, channel := range alloc.channels {
+		if now.After(channel.expiry) {
+			delete(alloc.channels, index)
+		}
+	}
+
+	// if the channel already exists and the address is matched just refresh the timer
+	if channel, ok := alloc.channels[addr.IP.String()]; ok {
+		if channel.number == ch {
+			channel.expiry = now.Add(time.Second * time.Duration(TURN_CHANN_EXPIRY))
+			return nil
+		}
+		return fmt.Errorf("channel already in use")
+	}
+
+	// check if there is a dup channel number
+	for _, channel := range alloc.channels {
+		if channel.number == ch {
+			return fmt.Errorf("channel number already in use")
+		}
+	}
+
+	alloc.channels[addr.IP.String()] = &channel{
+		number: ch,
+		expiry: now.Add(time.Second * time.Duration(TURN_CHANN_EXPIRY)),
+		peer:   addr,
+	}
+
+	return nil
+}
+
+func (alloc *allocation) findChan(num uint16) (*address, error) {
+
+	alloc.chanLck.Lock()
+	defer alloc.chanLck.Unlock()
+
+	for _, channel := range alloc.channels {
+		if channel.number == num && time.Now().Before(channel.expiry){
+			return channel.peer, nil
+		}
+	}
+
+	return nil, fmt.Errorf("channel unbound or expired")
+}
+
+func (alloc *allocation) findChanByPeer(peer *address) (uint16, error) {
+
+	alloc.chanLck.Lock()
+	defer alloc.chanLck.Unlock()
+
+	ch, ok := alloc.channels[peer.IP.String()]
+	if !ok {
+		return 0, fmt.Errorf("not found")
+	}
+
+	return ch.number, nil
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -570,7 +721,7 @@ func (svr *relayserver) spawn() error {
 			defer svr.wg.Done()
 			defer svr.conn.Close()
 
-			for ;; {
+			for {
 				buf := make([]byte, 1024)
 				nr, rm, err := svr.conn.ReadFromUDP(buf)
 				if err != nil {
@@ -615,7 +766,12 @@ func (svr *relayserver) kill() {
 	svr.wg.Wait()
 }
 
-func (svr *relayserver) sendToPeer(r *net.UDPAddr, data []byte) {
+func (svr *relayserver) sendToPeer(addr *address, data []byte) {
+
+	r := &net.UDPAddr{
+		IP:   addr.IP,
+		Port: addr.Port,
+	}
 
 	go func(r *net.UDPAddr, data []byte) {
 
@@ -649,9 +805,8 @@ func (svr *relayserver) sendToClient(peer *net.UDPAddr, data []byte) {
 			return
 		}
 
-		if false {
-			// TODO channel bind
-		} else {
+		var buf []byte
+		if ch, err := svr.allocRef.findChanByPeer(paddr); err != nil {
 			// send data indication
 			msg := &message{}
 			msg.method = STUN_MSG_METHOD_DATA
@@ -661,16 +816,20 @@ func (svr *relayserver) sendToClient(peer *net.UDPAddr, data []byte) {
 			binary.BigEndian.PutUint64(msg.transactionID[0:], uint64(time.Now().UnixNano()))
 			msg.length += msg.addAttrXorPeerAddr(paddr)
 			msg.length += msg.addAttrData(data)
+			buf = msg.buffer()
+		} else {
+			chdata := newChannelData(ch, data)
+			buf = chdata.buffer()
+		}
 
-			// get client address from allocation
-			r := &net.UDPAddr{
-				IP:   svr.allocRef.source.IP,
-				Port: svr.allocRef.source.Port,
-			}
+		// get client address from allocation
+		r := &net.UDPAddr{
+			IP:   svr.allocRef.source.IP,
+			Port: svr.allocRef.source.Port,
+		}
 
-			if err := sendUDP(r, msg.buffer()); err != nil {
-				return
-			}
+		if err := sendUDP(r, buf); err != nil {
+			return
 		}
 	}(svr, peer, data)
 }
@@ -716,4 +875,72 @@ func (pool *turnpool) nextPort() (p int) {
 		pool.availPort++
 	}
 	return
+}
+
+// -------------------------------------------------------------------------------------------------
+
+func newChannelData(channel uint16, data []byte) *channelData {
+
+	return &channelData{
+		channel: channel,
+		data:    data,
+	}
+}
+
+func getChannelData(buf []byte) (*channelData, error) {
+
+	if len(buf) < 4 {
+		return nil, fmt.Errorf("channelData too short")
+	}
+
+	num := binary.BigEndian.Uint16(buf[0:])
+	if num >= 0x8000 {
+		return nil, fmt.Errorf("invalid channel number")
+	}
+
+	// there may be paddings according to https://tools.ietf.org/html/rfc5766#section-11.5
+	length := binary.BigEndian.Uint16(buf[2:])
+	return &channelData{
+		channel: num,
+		data:    buf[4:4+length],
+	}, nil
+}
+
+func (ch *channelData) transport(addr *address) {
+
+	alloc, ok := allocPool.find(keygen(addr))
+	if !ok {
+		return
+	}
+
+	peer, err := alloc.findChan(ch.channel)
+	if err != nil {
+		return
+	}
+
+	alloc.server.sendToPeer(peer, ch.data)
+}
+
+func (ch *channelData) buffer() []byte {
+
+	payload := make([]byte, 4)
+
+	// channel number
+	binary.BigEndian.PutUint16(payload[0:], ch.channel)
+
+	// length
+	binary.BigEndian.PutUint16(payload[2:], uint16(len(ch.data)))
+
+	// append application data
+	payload = append(payload, ch.data...)
+
+	return payload
+}
+
+func (ch *channelData) print(title string) {
+
+	str := fmt.Sprintf("========== %s ==========\n", title)
+	str += fmt.Sprintf("channel=0x%04x, length=%d bytes\n", ch.channel, len(ch.data))
+	str += fmt.Sprintf("%s\n", dbg.DumpMem(ch.data, 16))
+	fmt.Println(str)
 }

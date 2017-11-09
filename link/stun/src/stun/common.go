@@ -44,36 +44,79 @@ func ListenUDP(ip, port string) error {
 
 		go func(req []byte, r *net.UDPAddr) {
 
-			msg := &message{}
-			var err error
+			addr := &address{
+				IP:   r.IP,
+				Port: r.Port,
+				Proto: NET_UDP,
+			}
 
-			// dbg.PrintMem(req, 8)
-
-			msg, err = newMessage(req)
-			if err != nil {
+			resp := process(req, addr)
+			if resp == nil {
 				return
 			}
 
-			msg.print("request") // request
-
-			msg, err = msg.processUDP(r)
-			if err != nil {
-				return
-			}
-
-			if msg == nil {
-				return // no response
-			}
-
-			msg.print("response") // response
-
-			resp := msg.buffer()
 			_, err = udpConn.WriteToUDP(resp, r)
 			if err != nil {
 				return
 			}
 		}(buf[:nr], rm)
 	}
+}
+
+func process(req []byte, addr *address) []byte {
+
+	if len(req) == 0 {
+		return nil
+	}
+
+	switch req[0] & MSG_TYPE_MASK {
+	case MSG_TYPE_STUN_MSG:
+		// handle stun messages
+		return processStunMessage(req, addr)
+	case MSG_TYPE_CHANNELDATA:
+		// handle channelData
+		processChannelData(req, addr)
+	}
+
+	return nil
+}
+
+func processStunMessage(req []byte, addr *address) []byte {
+
+	// dbg.PrintMem(req, 8)
+
+	msg, err := getMessage(req)
+	if err != nil {
+		return nil
+	}
+
+	msg.print("request") // request
+
+	msg, err = msg.process(addr)
+	if err != nil {
+		return nil
+	}
+
+	if msg == nil {
+		return nil // no response
+	}
+
+	msg.print("response") // response
+
+	resp := msg.buffer()
+	return resp
+}
+
+func processChannelData(req []byte, addr *address) {
+
+	data, err := getChannelData(req)
+	if err != nil {
+		return
+	}
+
+	data.print("channel-data")
+
+	data.transport(addr)
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -90,16 +133,6 @@ func sendUDP(r *net.UDPAddr, data []byte) error {
 	}
 
 	return nil
-}
-
-func (this *message) processUDP(r *net.UDPAddr) (*message, error) {
-
-	addr := &address{
-		IP:   r.IP,
-		Port: r.Port,
-		Proto: NET_UDP,
-	}
-	return this.process(addr)
 }
 
 func (this *message) process(r *address) (*message, error) {
@@ -120,9 +153,10 @@ func (this *message) process(r *address) (*message, error) {
 		switch this.method {
 		case STUN_MSG_METHOD_REFRESH:      return this.doRefreshRequest(alloc)
 		case STUN_MSG_METHOD_CREATE_PERM:  return this.doCreatePermRequest(alloc)
+		case STUN_MSG_METHOD_CHANNEL_BIND: return this.doChanBindRequest(alloc)
 		}
 
-		return this.newErrorMessage(STUN_ERR_BAD_REQUEST, "not support")
+		return this.newErrorMessage(STUN_ERR_BAD_REQUEST, "not support"), nil
 
 	} else if this.isIndication() {
 		switch this.method {

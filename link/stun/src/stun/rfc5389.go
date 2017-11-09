@@ -94,7 +94,7 @@ func (this *message) buffer() []byte {
 	return payload
 }
 
-func (this *message) newErrorMessage(code int, reason string) (*message, error) {
+func (this *message) newErrorMessage(code int, reason string) (*message) {
 
 	msg := &message{}
 
@@ -109,7 +109,7 @@ func (this *message) newErrorMessage(code int, reason string) (*message, error) 
 	len := msg.addAttrErrorCode(code, reason)
 	msg.length = len
 
-	return msg, nil
+	return msg
 }
 
 func (this *message) addAttrErrorCode(code int, reason string) int {
@@ -262,7 +262,7 @@ func (this *message) addAttrXorMappedAddr(r *address) int {
 	return this.addAttrXorAddr(r, STUN_ATTR_XOR_MAPPED_ADDR)
 }
 
-func newMessage(buf []byte) (*message, error) {
+func getMessage(buf []byte) (*message, error) {
 
 	if err := checkMessage(buf); err != nil {
 		return nil, fmt.Errorf("invalid stun msg: %s", err)
