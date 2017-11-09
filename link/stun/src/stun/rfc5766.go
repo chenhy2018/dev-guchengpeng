@@ -127,7 +127,7 @@ func keygen(r *address) string {
 // -------------------------------------------------------------------------------------------------
 
 // general behavior
-func (this *Message) generalRequestCheck(r *address) (*allocation, *Message, error) {
+func (this *message) generalRequestCheck(r *address) (*allocation, *message, error) {
 
 	alloc, ok := allocPool.find(keygen(r))
 	if !ok {
@@ -137,7 +137,35 @@ func (this *Message) generalRequestCheck(r *address) (*allocation, *Message, err
 	return alloc, nil, nil
 }
 
-func (this *Message) doCreatePermRequest(alloc *allocation) (*Message, error) {
+func (this *message) doSendIndication(alloc *allocation) {
+
+	addr, err := this.getAttrXorPeerAddress()
+	if err != nil {
+		// TODO: fmt.Errorf("peer address: %s", err)
+		return
+	}
+
+	data, err := this.getAttrData()
+	if err != nil {
+		// TODO: fmt.Errorf("no data")
+		return
+	}
+
+	// TODO handle DONT-FRAGMENT
+
+	if err := alloc.checkPerms(addr); err != nil {
+		// TODO: fmt.Errorf("denied")
+		return
+	}
+
+	r := &net.UDPAddr{
+		IP:   addr.IP,
+		Port: addr.Port,
+	}
+	alloc.server.sendToPeer(r, data)
+}
+
+func (this *message) doCreatePermRequest(alloc *allocation) (*message, error) {
 
 	addrs, err := this.getAttrXorPeerAddresses()
 	if err != nil {
@@ -148,7 +176,7 @@ func (this *Message) doCreatePermRequest(alloc *allocation) (*Message, error) {
 		return this.newErrorMessage(STUN_ERR_INSUFFICIENT_CAP, err.Error())
 	}
 
-	msg := &Message{}
+	msg := &message{}
 	msg.method = this.method
 	msg.encoding = STUN_MSG_SUCCESS
 	msg.methodName, msg.encodingName = parseMessageType(msg.method, msg.encoding)
@@ -157,9 +185,9 @@ func (this *Message) doCreatePermRequest(alloc *allocation) (*Message, error) {
 	return msg, nil
 }
 
-func (this *Message) doRefreshRequest(alloc *allocation) (*Message, error) {
+func (this *message) doRefreshRequest(alloc *allocation) (*message, error) {
 
-	msg := &Message{}
+	msg := &message{}
 	msg.method = this.method
 	msg.encoding = STUN_MSG_SUCCESS
 	msg.methodName, msg.encodingName = parseMessageType(msg.method, msg.encoding)
@@ -181,7 +209,7 @@ func (this *Message) doRefreshRequest(alloc *allocation) (*Message, error) {
 	return msg, nil
 }
 
-func (this *Message) doAllocationRequest(r *address) (msg *Message, err error) {
+func (this *message) doAllocationRequest(r *address) (msg *message, err error) {
 
 	// TODO 1. long-term credential
 
@@ -225,7 +253,7 @@ func (this *Message) doAllocationRequest(r *address) (msg *Message, err error) {
 	return this.replyAllocationRequest(alloc)
 }
 
-func (this *Message) checkAllocation() error {
+func (this *message) checkAllocation() error {
 
 	// check req tran attr
 	if this.findAttr(STUN_ATTR_REQUESTED_TRAN) == nil {
@@ -235,13 +263,37 @@ func (this *Message) checkAllocation() error {
 	return nil
 }
 
-// same as XOR_MAPPED_ADDRESS
-func (this *Message) addAttrXorRelayedAddr(r *address) int {
+func (this *message) addAttrData(data []byte) int {
+
+	attr := &attribute{}
+	attr.typevalue = STUN_ATTR_DATA
+	attr.typename = parseAttributeType(attr.typevalue)
+	attr.length = len(data)
+
+	// paddings
+	total := attr.length
+	if total % 4 != 0 {
+		total += 4 - total % 4
+	}
+
+	attr.value = make([]byte, total)
+	copy(attr.value[0:], data)
+
+	this.attributes = append(this.attributes, attr)
+	return 4 + len(attr.value)
+}
+
+func (this *message) addAttrXorRelayedAddr(r *address) int {
 
 	return this.addAttrXorAddr(r, STUN_ATTR_XOR_RELAYED_ADDR)
 }
 
-func (this *Message) addAttrLifetime(t uint32) int {
+func (this *message) addAttrXorPeerAddr(r *address) int {
+
+	return this.addAttrXorAddr(r, STUN_ATTR_XOR_PEER_ADDR)
+}
+
+func (this *message) addAttrLifetime(t uint32) int {
 
 	attr := &attribute{}
 	attr.typevalue = STUN_ATTR_LIFETIME
@@ -254,26 +306,48 @@ func (this *Message) addAttrLifetime(t uint32) int {
 	return 8 // fixed 4 bytes
 }
 
-func (this *Message) getAttrReservToken() ([]byte, error) {
+func (this *message) getAttrData() ([]byte, error) {
+
+	attr := this.findAttr(STUN_ATTR_DATA)
+	if attr == nil {
+		return nil, fmt.Errorf("not found")
+	}
+
+	return attr.value, nil
+}
+
+func (this *message) getAttrXorPeerAddress() (*address, error) {
+
+	attr := this.findAttr(STUN_ATTR_XOR_PEER_ADDR)
+	if attr == nil {
+		return nil, fmt.Errorf("not found")
+	}
+
+	return this.getAttrXorAddr(attr)
+}
+
+func (this *message) getAttrReservToken() ([]byte, error) {
 
 	attr := this.findAttr(STUN_ATTR_RESERVATION_TOKEN)
-	if attr != nil {
-		return attr.value, nil
+	if attr == nil {
+		return nil, fmt.Errorf("not found")
 	}
-	return nil, fmt.Errorf("not found")
+
+	return attr.value, nil
 }
 
-func (this *Message) getAttrLifetime() (uint32, error) {
+func (this *message) getAttrLifetime() (uint32, error) {
 
 	attr := this.findAttr(STUN_ATTR_LIFETIME)
-	if attr != nil {
-		lifetime := binary.BigEndian.Uint32(attr.value)
-		return lifetime, nil
+	if attr == nil {
+		return 0, fmt.Errorf("not found")
 	}
-	return 0, fmt.Errorf("not found")
+
+	lifetime := binary.BigEndian.Uint32(attr.value)
+	return lifetime, nil
 }
 
-func (this *Message) getAttrXorPeerAddresses() ([]*address, error) {
+func (this *message) getAttrXorPeerAddresses() ([]*address, error) {
 
 	results := []*address{}
 
@@ -293,9 +367,9 @@ func (this *Message) getAttrXorPeerAddresses() ([]*address, error) {
 	return results, nil
 }
 
-func (this *Message) replyAllocationRequest(alloc *allocation) (*Message, error) {
+func (this *message) replyAllocationRequest(alloc *allocation) (*message, error) {
 
-	msg := &Message{}
+	msg := &message{}
 	msg.method = STUN_MSG_METHOD_ALLOCATE
 	msg.encoding = STUN_MSG_SUCCESS
 	msg.methodName, msg.encodingName = parseMessageType(msg.method, msg.encoding)
@@ -418,6 +492,21 @@ func (alloc *allocation) addPerms(addrs []*address) (err error) {
 	return err
 }
 
+func (alloc *allocation) checkPerms(addr *address) error {
+
+	key := addr.IP.String()
+	item, ok := alloc.perms[key]
+	if !ok {
+		return fmt.Errorf("permission not exists")
+	}
+
+	if time.Now().After(item) {
+		return fmt.Errorf("permission expired")
+	}
+
+	return nil
+}
+
 // -------------------------------------------------------------------------------------------------
 
 func newRelay(alloc *allocation) *relayserver {
@@ -473,26 +562,26 @@ func (svr *relayserver) spawn() error {
 	go func(svr *relayserver) {
 
 		// read from UDP socket
-		dch := make(chan []byte) // data channel
 		ech := make(chan error)  // error channel
 
 		// spawn listening thread
 		svr.wg.Add(1)
-		go func(conn *net.UDPConn, wg *sync.WaitGroup, dch chan []byte, ech chan error) {
-			defer wg.Done()
-			defer conn.Close()
+		go func(svr *relayserver, ech chan error) {
+			defer svr.wg.Done()
+			defer svr.conn.Close()
 
 			for ;; {
 				buf := make([]byte, 1024)
-				nr, _, err := conn.ReadFromUDP(buf)
+				nr, rm, err := svr.conn.ReadFromUDP(buf)
 				if err != nil {
 					ech <- err
 					break
-				} else {
-					dch <- buf[:nr]
 				}
+
+				// send to client
+				svr.sendToClient(rm, buf[:nr])
 			}
-		}(svr.conn, svr.wg, dch, ech)
+		}(svr, ech)
 
 		// poll fds
 		timer := time.NewTimer(time.Second * time.Duration(svr.allocRef.lifetime))
@@ -505,8 +594,6 @@ func (svr *relayserver) spawn() error {
 				}
 				svr.conn.SetDeadline(time.Now())
 				svr.allocRef.removeFromPool()
-			case <-dch:
-				// TODO
 			case <-ech:
 				quit = true
 			}
@@ -526,6 +613,66 @@ func (svr *relayserver) kill() {
 	defer svr.svrLck.Unlock()
 	svr.conn.SetDeadline(time.Now())
 	svr.wg.Wait()
+}
+
+func (svr *relayserver) sendToPeer(r *net.UDPAddr, data []byte) {
+
+	go func(r *net.UDPAddr, data []byte) {
+
+		if svr.conn == nil {
+			return
+		}
+
+		if svr.status != TURN_RELAY_LISTENING {
+			// fmt.Errorf("send error: server status: %d", svr.status)
+			return
+		}
+
+		_, err := svr.conn.WriteToUDP(data, r)
+		if err != nil {
+			// fmt.Errorf("send error: %s", err)
+			return
+		}
+	}(r, data)
+}
+
+func (svr *relayserver) sendToClient(peer *net.UDPAddr, data []byte) {
+
+	go func(svr *relayserver, peer *net.UDPAddr, data []byte) {
+
+		// look up permissions
+		paddr := &address{
+			IP:    peer.IP,
+			Port:  peer.Port,
+		}
+		if err := svr.allocRef.checkPerms(paddr); err != nil {
+			return
+		}
+
+		if false {
+			// TODO channel bind
+		} else {
+			// send data indication
+			msg := &message{}
+			msg.method = STUN_MSG_METHOD_DATA
+			msg.encoding = STUN_MSG_INDICATION
+			msg.methodName, msg.encodingName = parseMessageType(msg.method, msg.encoding)
+			msg.transactionID = make([]byte, 12)
+			binary.BigEndian.PutUint64(msg.transactionID[0:], uint64(time.Now().UnixNano()))
+			msg.length += msg.addAttrXorPeerAddr(paddr)
+			msg.length += msg.addAttrData(data)
+
+			// get client address from allocation
+			r := &net.UDPAddr{
+				IP:   svr.allocRef.source.IP,
+				Port: svr.allocRef.source.Port,
+			}
+
+			if err := sendUDP(r, msg.buffer()); err != nil {
+				return
+			}
+		}
+	}(svr, peer, data)
 }
 
 // -------------------------------------------------------------------------------------------------

@@ -55,7 +55,7 @@ type attribute struct {
 	value             []byte
 }
 
-type Message struct {
+type message struct {
 	methodName        string
 	encodingName      string
 	method            uint16
@@ -66,7 +66,7 @@ type Message struct {
 }
 
 
-func (this *Message) Buffer() []byte {
+func (this *message) buffer() []byte {
 
 	payload := make([]byte, 20)
 
@@ -94,9 +94,9 @@ func (this *Message) Buffer() []byte {
 	return payload
 }
 
-func (this *Message) newErrorMessage(code int, reason string) (*Message, error) {
+func (this *message) newErrorMessage(code int, reason string) (*message, error) {
 
-	msg := &Message{}
+	msg := &message{}
 
 	// generate a new error response message
 	msg.transactionID = append(msg.transactionID, this.transactionID...)
@@ -112,7 +112,7 @@ func (this *Message) newErrorMessage(code int, reason string) (*Message, error) 
 	return msg, nil
 }
 
-func (this *Message) addAttrErrorCode(code int, reason string) int {
+func (this *message) addAttrErrorCode(code int, reason string) int {
 
 /*
        0                   1                   2                   3
@@ -130,14 +130,16 @@ func (this *Message) addAttrErrorCode(code int, reason string) int {
 
 	// padding to 4 bytes
 	rs := []byte(reason)
-	rslen := len(rs)
-	if rslen % 4 != 0 {
-		rslen += 4 - rslen % 4
+	attr.length = 4 + len(rs)
+
+	// add paddings
+	total := attr.length
+	if total % 4 != 0 {
+		total += 4 - total % 4
 	}
-	attr.length = 4 + rslen
 
 	// fill in the value
-	attr.value = make([]byte, attr.length)
+	attr.value = make([]byte, total) // including paddings
 	hd := int(code / 100)
 	attr.value[2] = byte(hd)
 	attr.value[3] = byte(code - hd * 100)
@@ -147,24 +149,24 @@ func (this *Message) addAttrErrorCode(code int, reason string) int {
 	return 4 + len(attr.value)
 }
 
-func (this *Message) isRequest() bool {
+func (this *message) isRequest() bool {
 
 	return this.encoding == STUN_MSG_REQUEST
 }
 
-func (this *Message) isIndication() bool {
+func (this *message) isIndication() bool {
 
 	return this.encoding == STUN_MSG_INDICATION
 }
 
-func (this *Message) isBindingRequest() bool {
+func (this *message) isBindingRequest() bool {
 
 	return (this.method | this.encoding) == (STUN_MSG_METHOD_BINDING | STUN_MSG_REQUEST)
 }
 
-func (this *Message) doBindingRequest(r *address) (*Message, error) {
+func (this *message) doBindingRequest(r *address) (*message, error) {
 
-	msg := &Message{}
+	msg := &message{}
 	msg.method = STUN_MSG_METHOD_BINDING
 	msg.transactionID = append(msg.transactionID, this.transactionID...)
 
@@ -177,7 +179,7 @@ func (this *Message) doBindingRequest(r *address) (*Message, error) {
 	return msg, nil
 }
 
-func (this *Message) getAttrXorAddr(attr *attribute) (addr *address, err error) {
+func (this *message) getAttrXorAddr(attr *attribute) (addr *address, err error) {
 
 	fm := attr.value[1]
 
@@ -205,7 +207,7 @@ func (this *Message) getAttrXorAddr(attr *attribute) (addr *address, err error) 
 	}
 }
 
-func (this *Message) addAttrXorAddr(r *address, typeval uint16) int {
+func (this *message) addAttrXorAddr(r *address, typeval uint16) int {
 
 	attr := &attribute{}
 	attr.typevalue = typeval
@@ -245,7 +247,7 @@ func (this *Message) addAttrXorAddr(r *address, typeval uint16) int {
 	return 4 + len(attr.value)
 }
 
-func (this *Message) addAttrXorMappedAddr(r *address) int {
+func (this *message) addAttrXorMappedAddr(r *address) int {
 
 /*
       0                   1                   2                   3
@@ -260,13 +262,13 @@ func (this *Message) addAttrXorMappedAddr(r *address) int {
 	return this.addAttrXorAddr(r, STUN_ATTR_XOR_MAPPED_ADDR)
 }
 
-func NewMessage(buf []byte) (*Message, error) {
+func newMessage(buf []byte) (*message, error) {
 
 	if err := checkMessage(buf); err != nil {
 		return nil, fmt.Errorf("invalid stun msg: %s", err)
 	}
 
-	msg := &Message{}
+	msg := &message{}
 
 	// get method and encoding
 	msg.method = binary.BigEndian.Uint16(buf[0:]) & STUN_MSG_TYPE_METHOD_MASK
@@ -329,7 +331,7 @@ func checkMessage(buf []byte) error {
 	return nil
 }
 
-func (this *Message) Print(title string) {
+func (this *message) print(title string) {
 
 	str := fmt.Sprintf("========== %s ==========\n", title)
 	str += fmt.Sprintf("method=%s %s, length=%d bytes\n", this.methodName, this.encodingName, this.length)
@@ -346,7 +348,7 @@ func (this *Message) Print(title string) {
 	fmt.Println(str)
 }
 
-func (this *Message) findAttr(typevalue uint16) *attribute {
+func (this *message) findAttr(typevalue uint16) *attribute {
 
 	for _, attr := range this.attributes {
 		if attr.typevalue == typevalue {
@@ -356,7 +358,7 @@ func (this *Message) findAttr(typevalue uint16) *attribute {
 	return nil
 }
 
-func (this *Message) findAttrAll(typevalue uint16) []*attribute {
+func (this *message) findAttrAll(typevalue uint16) []*attribute {
 
 	list := []*attribute{}
 	for _, attr := range this.attributes {

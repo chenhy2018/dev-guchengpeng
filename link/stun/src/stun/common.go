@@ -2,6 +2,7 @@ package stun
 
 import (
 	"net"
+	"fmt"
 )
 
 const (
@@ -16,9 +17,82 @@ type address struct {
 	Proto   byte
 }
 
+var (
+	udpConn  *net.UDPConn
+)
+
 // -------------------------------------------------------------------------------------------------
 
-func (this *Message) ProcessUDP(r *net.UDPAddr) (*Message, error) {
+func ListenUDP(ip, port string) error {
+
+	udp, err := net.ResolveUDPAddr("udp", ip + ":" + port)
+	if err != nil {
+		return fmt.Errorf("resolve UDP: %s", err)
+	}
+	udpConn, err = net.ListenUDP("udp", udp)
+	if err != nil {
+		return fmt.Errorf("listen UDP: %s", err)
+	}
+	defer udpConn.Close()
+
+	for {
+		buf := make([]byte, 1024)
+		nr, rm, err := udpConn.ReadFromUDP(buf)
+		if err != nil {
+			return fmt.Errorf("read UDP: %s", err)
+		}
+
+		go func(req []byte, r *net.UDPAddr) {
+
+			msg := &message{}
+			var err error
+
+			// dbg.PrintMem(req, 8)
+
+			msg, err = newMessage(req)
+			if err != nil {
+				return
+			}
+
+			msg.print("request") // request
+
+			msg, err = msg.processUDP(r)
+			if err != nil {
+				return
+			}
+
+			if msg == nil {
+				return // no response
+			}
+
+			msg.print("response") // response
+
+			resp := msg.buffer()
+			_, err = udpConn.WriteToUDP(resp, r)
+			if err != nil {
+				return
+			}
+		}(buf[:nr], rm)
+	}
+}
+
+// -------------------------------------------------------------------------------------------------
+
+func sendUDP(r *net.UDPAddr, data []byte) error {
+
+	if udpConn == nil {
+		return fmt.Errorf("connection not ready")
+	}
+
+	_, err := udpConn.WriteToUDP(data, r)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (this *message) processUDP(r *net.UDPAddr) (*message, error) {
 
 	addr := &address{
 		IP:   r.IP,
@@ -28,7 +102,7 @@ func (this *Message) ProcessUDP(r *net.UDPAddr) (*Message, error) {
 	return this.process(addr)
 }
 
-func (this *Message) process(r *address) (*Message, error) {
+func (this *message) process(r *address) (*message, error) {
 
 	// special handlers
 	switch this.method | this.encoding {
@@ -36,13 +110,13 @@ func (this *Message) process(r *address) (*Message, error) {
 	case STUN_MSG_METHOD_BINDING | STUN_MSG_REQUEST:  return this.doBindingRequest(r)
 	}
 
-	if this.isRequest() {
-		// common requests
-		alloc, msg, err := this.generalRequestCheck(r)
-		if err != nil {
-			return msg, err
-		}
+	// general check
+	alloc, msg, err := this.generalRequestCheck(r)
+	if err != nil {
+		return msg, err
+	}
 
+	if this.isRequest() {
 		switch this.method {
 		case STUN_MSG_METHOD_REFRESH:      return this.doRefreshRequest(alloc)
 		case STUN_MSG_METHOD_CREATE_PERM:  return this.doCreatePermRequest(alloc)
@@ -51,7 +125,11 @@ func (this *Message) process(r *address) (*Message, error) {
 		return this.newErrorMessage(STUN_ERR_BAD_REQUEST, "not support")
 
 	} else if this.isIndication() {
-		// indications
+		switch this.method {
+		case STUN_MSG_METHOD_SEND: this.doSendIndication(alloc)
+		}
+
+		// for an indication, drop silently
 		return nil, nil
 	}
 
