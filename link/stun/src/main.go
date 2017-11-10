@@ -4,6 +4,7 @@ import (
 	"flag"
 	"conf"
 	"stun"
+	"sync"
 )
 
 var (
@@ -24,8 +25,26 @@ func main() {
 		return
 	}
 
+	wg := &sync.WaitGroup{}
+
 	// start listening
-	stun.ListenUDP(*conf.Args.IP, *conf.Args.Port)
+	wg.Add(2)
+
+	go func(wg *sync.WaitGroup) {
+		defer wg.Done()
+		for {
+			stun.ListenUDP(*conf.Args.IP, *conf.Args.Port)
+		}
+	}(wg)
+
+	go func (wg *sync.WaitGroup) {
+		defer wg.Done()
+		for {
+			stun.ListenTCP(*conf.Args.IP, *conf.Args.Port)
+		}
+	}(wg)
+
+	wg.Wait()
 
 	return
 }

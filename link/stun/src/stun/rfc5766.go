@@ -818,17 +818,12 @@ func (svr *relayserver) sendToClient(peer *net.UDPAddr, data []byte) {
 			msg.length += msg.addAttrData(data)
 			buf = msg.buffer()
 		} else {
+			// send channel data
 			chdata := newChannelData(ch, data)
 			buf = chdata.buffer()
 		}
 
-		// get client address from allocation
-		r := &net.UDPAddr{
-			IP:   svr.allocRef.source.IP,
-			Port: svr.allocRef.source.Port,
-		}
-
-		if err := sendUDP(r, buf); err != nil {
+		if err := sendTo(&svr.allocRef.source, buf); err != nil {
 			return
 		}
 	}(svr, peer, data)

@@ -3,6 +3,8 @@ package stun
 import (
 	"net"
 	"fmt"
+	"sync"
+	"time"
 )
 
 const (
@@ -11,17 +13,116 @@ const (
 	NET_TLS = 0x2
 )
 
+const (
+	TCP_MAX_TIMEOUT    = 300
+)
+
 type address struct {
 	IP      net.IP
 	Port    int
 	Proto   byte
 }
 
+type tcpPool struct {
+	conns   map[string]*net.TCPConn
+	lck     *sync.Mutex
+}
+
 var (
 	udpConn  *net.UDPConn
+	tcpConns = &tcpPool{
+		conns: map[string]*net.TCPConn{},
+		lck:   &sync.Mutex{},
+	}
 )
 
 // -------------------------------------------------------------------------------------------------
+
+func (pool *tcpPool) get(addr *address) *net.TCPConn {
+
+	pool.lck.Lock()
+	defer pool.lck.Unlock()
+	if val, ok := pool.conns[keygen(addr)]; !ok {
+		return nil
+	} else {
+		return val
+	}
+}
+
+func (pool *tcpPool) set(addr *address, conn *net.TCPConn) {
+
+	pool.lck.Lock()
+	defer pool.lck.Unlock()
+	pool.conns[keygen(addr)] = conn
+}
+
+func (pool *tcpPool) del(addr *address) {
+
+	pool.lck.Lock()
+	defer pool.lck.Unlock()
+	delete(pool.conns, keygen(addr))
+}
+
+// -------------------------------------------------------------------------------------------------
+
+func ListenTCP(ip, port string) error {
+
+	tcp, err := net.ResolveTCPAddr("tcp4", ip + ":" + port)
+	if err != nil {
+		return fmt.Errorf("resolve TCP: %s", err)
+	}
+	l, err := net.ListenTCP("tcp", tcp)
+	if err != nil {
+		return fmt.Errorf("listen TCP: %s", err)
+	}
+	defer l.Close()
+
+	for {
+		tcpConn, err := l.AcceptTCP()
+		if err != nil {
+			return fmt.Errorf("TCP accept: %s", err)
+		}
+
+		go func(conn *net.TCPConn) {
+
+			rm, _ := net.ResolveTCPAddr(conn.RemoteAddr().Network(), conn.RemoteAddr().String())
+			addr := &address{
+				IP:    rm.IP,
+				Port:  rm.Port,
+				Proto: NET_TCP,
+			}
+
+			defer tcpConns.del(addr)
+			defer conn.Close()
+			tcpConns.set(addr, conn)
+
+			for {
+				conn.SetDeadline(time.Now().Add(time.Second * time.Duration(TCP_MAX_TIMEOUT)))
+
+				buf := make([]byte, 1024)
+				len, err := conn.Read(buf)
+
+				if err != nil {
+					return
+				}
+
+				go func(req []byte, r *net.TCPAddr) {
+
+
+					resp := process(req, addr)
+					if resp == nil {
+						return
+					}
+
+					_, err := conn.Write(resp)
+					if err != nil {
+						return
+					}
+				}(buf[:len], rm)
+			}
+		}(tcpConn)
+	}
+}
 
 func ListenUDP(ip, port string) error {
 
@@ -121,7 +222,12 @@ func processChannelData(req []byte, addr *address) {
 
 // -------------------------------------------------------------------------------------------------
 
-func sendUDP(r *net.UDPAddr, data []byte) error {
+func sendUDP(addr *address, data []byte) error {
+
+	r := &net.UDPAddr{
+		IP:   addr.IP,
+		Port: addr.Port,
+	}
 
 	if udpConn == nil {
 		return fmt.Errorf("connection not ready")
@@ -132,6 +238,32 @@ func sendUDP(r *net.UDPAddr, data []byte) error {
 		return err
 	}
 
+	return nil
+}
+
+func sendTCP(r *address, data []byte) error {
+
+	conn := tcpConns.get(r)
+	if conn == nil {
+		return fmt.Errorf("tcp connection not found")
+	}
+
+	_, err := conn.Write(data)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func sendTo(addr *address, data []byte) error {
+
+	switch addr.Proto {
+	case NET_UDP:
+		return sendUDP(addr, data)
+	case NET_TCP:
+		return sendTCP(addr, data)
+	}
 	return nil
 }
 
