@@ -2,18 +2,18 @@ package main
 
 import (
 	"flag"
-	"net"
-	"log"
+	"conf"
 	"stun"
+	"sync"
 )
 
 var (
-	listenAddr = flag.String("addr", ":3478", "udp server binding address")
 	help = flag.Bool("h", false, "print usage")
 )
 
 func init() {
-
+	conf.Args.IP = flag.String("ip", "127.0.0.1", "udp server binding IP address")
+	conf.Args.Port = flag.String("port", "3478", "specific port to bind")
 	flag.Parse()
 }
 
@@ -25,60 +25,27 @@ func main() {
 		return
 	}
 
+	wg := &sync.WaitGroup{}
+
 	// start listening
-	listenUDP()
+	wg.Add(2)
+
+	go func(wg *sync.WaitGroup) {
+		defer wg.Done()
+		for {
+			stun.ListenUDP(*conf.Args.IP, *conf.Args.Port)
+		}
+	}(wg)
+
+	go func (wg *sync.WaitGroup) {
+		defer wg.Done()
+		for {
+			stun.ListenTCP(*conf.Args.IP, *conf.Args.Port)
+		}
+	}(wg)
+
+	wg.Wait()
 
 	return
 }
 
-func listenUDP() {
-
-	udp, err := net.ResolveUDPAddr("udp", *listenAddr)
-	if err != nil {
-		log.Fatalln("Error: ", err)
-	}
-	conn, err := net.ListenUDP("udp", udp)
-	if err != nil {
-		log.Fatalln("Error: ", err)
-	}
-	defer conn.Close()
-
-	for {
-		buf := make([]byte, 1024)
-		nr, rm, err := conn.ReadFromUDP(buf)
-		if err != nil {
-			log.Println("Error: ", err)
-			return
-		}
-
-		go func(req []byte, r *net.UDPAddr) {
-
-			msg := &stun.Message{}
-			var err error
-
-			// dbg.PrintMem(req, 8)
-			
-			msg, err = stun.NewMessage(req)
-			if err != nil {
-				log.Println("Error: drop packet: %s", err)
-				return
-			}
-				
-			msg.Print("request") // request
-			
-			msg, err = msg.ProcessUDP(r)
-			if err != nil {
-				log.Println("Error: proc failure: %s", err)
-				return
-			}
-
-			msg.Print("response") // response
-
-			resp := msg.Buffer()
-			_, err = conn.WriteToUDP(resp, r)
-			if err != nil {
-				log.Println("Error: write failure: %s", err)
-			}
-		}(buf[:nr], rm)
-	}
-}
