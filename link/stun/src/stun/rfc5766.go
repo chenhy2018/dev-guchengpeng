@@ -895,6 +895,10 @@ func getChannelData(buf []byte) (*channelData, error) {
 
 	// there may be paddings according to https://tools.ietf.org/html/rfc5766#section-11.5
 	length := binary.BigEndian.Uint16(buf[2:])
+	if 4 + length > len(buf) {
+		return nil, fmt.Errorf("channelData length is too large")
+	}
+
 	return &channelData{
 		channel: num,
 		data:    buf[4:4+length],
