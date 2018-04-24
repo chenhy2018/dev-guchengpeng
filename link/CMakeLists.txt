@@ -1,6 +1,9 @@
-cmake_minimum_required (VERSION 2.8)
-
-project (linking)
-
-add_subdirectory(stun)
+include(ExternalProject)
+ExternalProject_Add(stun
+        SOURCE_DIR stun
+        BUILD_COMMAND make
+        CONFIGURE_COMMAND ""
+        INSTALL_COMMAND ""
+        BUILD_IN_SOURCE 1
+)
 
