@@ -1,4 +1,4 @@
-GOPATH := $(PWD):$(GOPATH)
+export GOPATH := $(PWD):$(GOPATH)
 
 all:
 	cd ./src && make
