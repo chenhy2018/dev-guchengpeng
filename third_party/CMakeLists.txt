@@ -16,6 +16,16 @@ ExternalProject_Add(x264
         BUILD_IN_SOURCE 1
 )
 
+SET(FDKAAC_PREFIX_PATH "${CMAKE_CURRENT_SOURCE_DIR}/fdkaac-0.1.6")
+include(ExternalProject)
+ExternalProject_Add(fdkaac
+        SOURCE_DIR fdkaac-0.1.6
+        CONFIGURE_COMMAND ./autogen.sh COMMAND ./configure --program-prefix=${FDKAAC_PREFIX_PATH}/prefix --libdir=${FDKAAC_PREFIX_PATH}/prefix --includedir=${FDKAAC_PREFIX_PATH}/prefix --bindir=${FDKAAC_PREFIX_PATH}/prefix
+        BUILD_COMMAND make
+        INSTALL_COMMAND make install
+        BUILD_IN_SOURCE 1
+)
+
 include(ExternalProject)
 ExternalProject_Add(ffmpeg
         SOURCE_DIR ffmpeg-4.0
