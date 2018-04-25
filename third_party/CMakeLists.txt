@@ -18,7 +18,7 @@ ExternalProject_Add(ffmpeg
 
 include(ExternalProject)
 ExternalProject_Add(librtmp
-        SOURCE_DIR rtmpdump-2.3
+        SOURCE_DIR rtmpdump-2.4
         CONFIGURE_COMMAND ""
         BUILD_COMMAND make
         INSTALL_COMMAND ""

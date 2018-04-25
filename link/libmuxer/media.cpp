@@ -617,8 +617,8 @@ int AvFilter::Reset(IN const std::shared_ptr<MediaFrame>& _pFrame)
         }
 
         // alloc filters and filter graph
-        AVFilter *pBufferSrc  = avfilter_get_by_name("buffer");
-        AVFilter *pBufferSink = avfilter_get_by_name("buffersink");
+        const AVFilter *pBufferSrc  = avfilter_get_by_name("buffer");
+        const AVFilter *pBufferSink = avfilter_get_by_name("buffersink");
         AVFilterInOut *pOutputs = avfilter_inout_alloc();
         AVFilterInOut *pInputs  = avfilter_inout_alloc();
         pFilterGraph_ = avfilter_graph_alloc();
@@ -773,8 +773,8 @@ int TextRender::Reset(IN const std::string& _font, IN int _nSize, IN int _nColor
         }
 
         // alloc filters and filter graph
-        AVFilter *pBufferSrc  = avfilter_get_by_name("buffer");
-        AVFilter *pBufferSink = avfilter_get_by_name("buffersink");
+        const AVFilter *pBufferSrc  = avfilter_get_by_name("buffer");
+        const AVFilter *pBufferSink = avfilter_get_by_name("buffersink");
         AVFilterInOut *pOutputs = avfilter_inout_alloc();
         AVFilterInOut *pInputs  = avfilter_inout_alloc();
         pFilterGraph_ = avfilter_graph_alloc();
