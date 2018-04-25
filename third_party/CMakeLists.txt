@@ -8,6 +8,15 @@ ExternalProject_Add(pjsip
 )
 
 include(ExternalProject)
+ExternalProject_Add(x264
+        SOURCE_DIR x264
+        BUILD_COMMAND make
+        CONFIGURE_COMMAND ./configure --enable-shared --enable-static --disable-opencl --libdir=./prefix --includedir=./prefix --prefix=./prefix
+        INSTALL_COMMAND make install
+        BUILD_IN_SOURCE 1
+)
+
+include(ExternalProject)
 ExternalProject_Add(ffmpeg
         SOURCE_DIR ffmpeg-4.0
         CONFIGURE_COMMAND ./configure  --bindir=./bin --datadir=./data --docdir=./doc --libdir=./lib --shlibdir=./shlib --incdir=./include --disable-manpages --enable-gpl --enable-version3 --enable-shared --enable-static --enable-openssl --enable-nonfree --enable-avresample
