@@ -486,7 +486,7 @@ int IceStartNegotiation(IN IceInstance* _pInstance)
 	return 0;
 }
 
-int IceSendData(IN IceInstance* _pInstance, IN unsigned _nComponentId, IN const char* _pData, IN size_t _nSize)
+int IceSendToPeer(IN IceInstance* _pInstance, IN unsigned _nComponentId, IN const char* _pData, IN size_t _nSize)
 {
 	if (_pInstance == NULL) {
 		return -1;

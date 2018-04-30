@@ -14,6 +14,7 @@
 #define MAX_TURN_HOST_SIZE  128
 #define MAX_TURN_USR_SIZE   64
 #define MAX_TURN_PWD_SIZE   64
+#define MAX_ICE_USRPWD_SIZE 80
 
 typedef struct IceInstance IceInstance;
 typedef struct IceOptions IceOptions;
@@ -55,8 +56,8 @@ struct IceInstance
 	/* will be filled after session is encoded */
 	struct LocalInfo
 	{
-		char                 ufrag[80];
-		char                 password[80];
+		char                 ufrag[MAX_ICE_USRPWD_SIZE];
+		char                 password[MAX_ICE_USRPWD_SIZE];
 		unsigned             nCandidateCount;
 		pj_ice_sess_cand     candidates[PJ_ICE_ST_MAX_CAND];
 	} local;
@@ -64,8 +65,8 @@ struct IceInstance
 	/* remote info */
 	struct RemoteInfo
 	{
-		char                     ufrag[80];
-		char                     password[80];
+		char                     ufrag[MAX_ICE_USRPWD_SIZE];
+		char                     password[MAX_ICE_USRPWD_SIZE];
 		unsigned                 nComponentCount;
 		unsigned                 nCandidateCount;
 		pj_ice_sess_cand         candidates[PJ_ICE_ST_MAX_CAND];
