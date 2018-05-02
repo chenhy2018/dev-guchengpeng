@@ -185,6 +185,27 @@ func (this *message) generalRequestCheck(r *address) (*allocation, *message, err
 		msg := this.newErrorMessage(STUN_ERR_ALLOC_MISMATCH, "allocation not found")
 		return nil, msg, fmt.Errorf("allocation not found")
 	}
+
+	// indications in TURN are never authenticated, return success now
+	if this.isIndication() {
+		return alloc, nil, nil
+	}
+
+	// long-term credential
+	if code, err := this.checkCredential(); err != nil {
+		return nil, this.newErrorMessage(code, err.Error()), fmt.Errorf("credential failed")
+	}
+
+	// check username and nocne, according to rfc5766, username could not change since allocate
+	// is created
+	username, _, _, _, _ := this.getCredential()
+	if alloc.username != username {
+		msg := this.newErrorMessage(STUN_ERR_WRONG_CRED, "username or password error")
+		return nil, msg, fmt.Errorf("credential failed")
+	}
+
+	// TODO nonce is expired
+
 	return alloc, nil, nil
 }
 
@@ -216,6 +237,11 @@ func (this *message) doChanBindRequest(alloc *allocation) (*message, error) {
 	msg.encoding = STUN_MSG_SUCCESS
 	msg.methodName, msg.encodingName = parseMessageType(msg.method, msg.encoding)
 	msg.transactionID = append(msg.transactionID, this.transactionID...)
+
+	// add integrity attribute
+	if err := msg.addIntegrity(alloc.username); err != nil {
+		return this.newErrorMessage(STUN_ERR_WRONG_CRED, err.Error()), nil
+	}
 
 	return msg, nil
 }
@@ -261,6 +287,11 @@ func (this *message) doCreatePermRequest(alloc *allocation) (*message, error) {
 	msg.methodName, msg.encodingName = parseMessageType(msg.method, msg.encoding)
 	msg.transactionID = append(msg.transactionID, this.transactionID...)
 
+	// add integrity attribute
+	if err := msg.addIntegrity(alloc.username); err != nil {
+		return this.newErrorMessage(STUN_ERR_WRONG_CRED, err.Error()), nil
+	}
+
 	return msg, nil
 }
 
@@ -272,6 +303,14 @@ func (this *message) doRefreshRequest(alloc *allocation) (*message, error) {
 	msg.methodName, msg.encodingName = parseMessageType(msg.method, msg.encoding)
 	msg.transactionID = append(msg.transactionID, this.transactionID...)
 
+	// add integrity attribute
+	addIntegrity := func() (*message, error) {
+		if err := msg.addIntegrity(alloc.username); err != nil {
+			return this.newErrorMessage(STUN_ERR_WRONG_CRED, err.Error()), nil
+		}
+		return msg, nil
+	}
+
 	// get lifetime attribute from stun message
 	lifetime, err := this.getAttrLifetime()
 	if err != nil {
@@ -280,12 +319,14 @@ func (this *message) doRefreshRequest(alloc *allocation) (*message, error) {
 		if lifetime == 0 {
 			alloc.free()
 			msg.length += msg.addAttrLifetime(0)
-			return msg, nil
+
+			return addIntegrity()
 		}
 	}
 	alloc.refresh(lifetime)
 	msg.length += msg.addAttrLifetime(alloc.lifetime)
-	return msg, nil
+
+	return addIntegrity()
 }
 
 func (this *message) doAllocationRequest(r *address) (msg *message, err error) {
