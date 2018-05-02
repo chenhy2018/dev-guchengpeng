@@ -97,6 +97,7 @@ func (this *message) buffer() []byte {
 	return payload
 }
 
+// this function is only used to compute message integrity value
 func (this *message) bufferExIntegrityAttr() []byte {
 
 	payload := make([]byte, 20)
@@ -113,17 +114,14 @@ func (this *message) bufferExIntegrityAttr() []byte {
 	// this message length should reflect actual bytes above attribute MESSAGE_INTEGRITY
 	msgLen := 0
 
-	// if integrity is not found, stun msg len + 24, which reserved for MESSAGE_INTEGRITY
-	integrityFound := false
-
 	// append attributes
 	for _, attr := range this.attributes {
 
-		// message-integrity attribute should not be included in integrity computing
-		// while its attribute length should be counted in stun message length
+		// fall out of for loop when this message already contains attribute message integrity
+		// otherwise we compute the whole message length, anyway we need involve 24 byte length
+		// of integrity attr to compute the integrity value
+
 		if attr.typevalue == STUN_ATTR_MESSAGE_INTEGRITY {
-			integrityFound = true
-			msgLen += 4 + attr.length
 			break
 		}
 
@@ -136,9 +134,9 @@ func (this *message) bufferExIntegrityAttr() []byte {
 		msgLen += 4 + attr.length
 	}
 
-	if !integrityFound {
-		msgLen += 24
-	}
+	// message-integrity attribute should not be included in integrity computing
+	// while its attribute length should be counted in stun message length
+	msgLen += 24
 
 	// message length
 	binary.BigEndian.PutUint16(payload[2:], uint16(msgLen))
