@@ -131,7 +131,9 @@ func (this *message) bufferExIntegrityAttr() []byte {
 		payload = append(payload, bytes...)
 		payload = append(payload, attr.value...)
 
-		msgLen += 4 + attr.length
+		// notice: because of paddings inside attr
+		// sometimes len(attr.value) is not equal to attr.length
+		msgLen += 4 + len(attr.value)
 	}
 
 	// message-integrity attribute should not be included in integrity computing
@@ -284,7 +286,7 @@ func (this *message) getAttrStringValue(typevalue uint16) (string, error) {
 		return "", fmt.Errorf("not found")
 	}
 
-	return string(attr.value), nil
+	return string(attr.value[0:attr.length]), nil
 }
 
 func (this *message) addAttrXorAddr(r *address, typeval uint16) int {
@@ -438,23 +440,24 @@ func getMessage(buf []byte) (*message, error) {
 	for i := 0; i < msg.length; {
 		attr := &attribute{}
 
+		// TODO check attr length which could overflow
+
 		// first 2 bytes are Type and Length
 		attr.typevalue = binary.BigEndian.Uint16(buf[20+i:])
 		attr.typename = parseAttributeType(attr.typevalue)
 		len := int(binary.BigEndian.Uint16(buf[20+i+2:]))
 		attr.length = len
 
-		// TODO check attr length which could overflow
-
 		// following bytes are attributes
+		if len % 4 != 0 {
+			// buffer should include padding bytes while attr.length does not
+			len += 4 - len % 4
+		}
 		attr.value = append(attr.value, buf[20+i+4:20+i+4+len]...)
 		msg.attributes = append(msg.attributes, attr)
 
 		// padding for 4 bytes per attribute item
 		i += len + 4
-		if len % 4 != 0 {
-			i += 4 - len % 4
-		}
 	}
 
 	return msg, nil
@@ -475,7 +478,7 @@ func checkMessage(buf []byte) error {
 	// check STUN message length
 	msgLen := int(binary.BigEndian.Uint16(buf[2:]))
 	if msgLen + 20 != len(buf) {
-		return fmt.Errorf("msg length is not correct: len=%d, actual=%d", msgLen, len(buf))
+		return fmt.Errorf("msg length is not correct: len=%d, actual=%d", msgLen, len(buf) - 20)
 	}
 
 	// STUN message is always padded to a multiple of 4 bytes
