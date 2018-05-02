@@ -202,6 +202,10 @@ func processStunMessage(req []byte, addr *address) []byte {
 		return nil // no response
 	}
 
+	if msg.isIndication() {
+		return nil
+	}
+
 	msg.print("response") // response
 
 	resp := msg.buffer()
@@ -276,9 +280,9 @@ func (this *message) process(r *address) (*message, error) {
 	}
 
 	// general check
-	alloc, msg, err := this.generalRequestCheck(r)
-	if err != nil {
-		return msg, err
+	alloc, msg := this.generalRequestCheck(r)
+	if alloc == nil {
+		return msg, nil
 	}
 
 	if this.isRequest() {
