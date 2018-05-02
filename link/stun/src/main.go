@@ -14,6 +14,7 @@ var (
 func init() {
 	conf.Args.IP = flag.String("ip", "127.0.0.1", "udp server binding IP address")
 	conf.Args.Port = flag.String("port", "3478", "specific port to bind")
+	conf.Args.Realm = flag.String("realm", "link.org", "used for long-term cred for TURN")
 	flag.Parse()
 }
 

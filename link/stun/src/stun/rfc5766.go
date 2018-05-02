@@ -3,6 +3,8 @@ package stun
 import (
 	"fmt"
 	"encoding/binary"
+	"crypto/md5"
+	"math/rand"
 	"conf"
 	"net"
 	"time"
@@ -17,6 +19,9 @@ const (
 	TURN_PERM_LIFETIME           = 300   // this is fixed (https://tools.ietf.org/html/rfc5766#section-8)
 	TURN_PERM_LIMIT              = 10
 	TURN_CHANN_EXPIRY            = 600   // this is defined (https://tools.ietf.org/html/rfc5766#page-38)
+
+	TURN_USERNAME                = "root"
+	TURN_PASSWORD                = "root"
 )
 
 const (
@@ -116,6 +121,9 @@ type allocation struct {
 	// channels
 	channels    map[string]*channel
 	chanLck     *sync.Mutex
+
+	// nonce
+	nonce       string
 }
 
 type channel struct {
@@ -151,6 +159,18 @@ var (
 func keygen(r *address) string {
 
 	return fmt.Sprintf("%d:%s:%d", r.Proto, r.IP.String(), r.Port)
+}
+
+func genNonce(length int) string {
+
+	const dictionary = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+
+	str := make([]byte, length)
+	for i := range str {
+		str[i] = dictionary[rand.Int63() % int64(len(dictionary))]
+	}
+
+	return string(str)
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -268,7 +288,16 @@ func (this *message) doRefreshRequest(alloc *allocation) (*message, error) {
 
 func (this *message) doAllocationRequest(r *address) (msg *message, err error) {
 
-	// TODO 1. long-term credential
+	// 1. long-term credential
+	if this.isFirstAllocReq() {
+		// handle first alloc request
+		return this.replyAllocUnauth()
+	}
+	// handle subsequent alloc request
+	code, err := this.checkCredential()
+	if err != nil {
+		return this.newErrorMessage(code, err.Error()), nil
+	}
 
 	// 2. find existing allocations
 	alloc, err := newAllocation(r)
@@ -308,6 +337,53 @@ func (this *message) doAllocationRequest(r *address) (msg *message, err error) {
 		return this.newErrorMessage(STUN_ERR_SERVER_ERROR, "alloc failed: " + err.Error()), nil
 	}
 	return this.replyAllocationRequest(alloc)
+}
+
+func (this *message) isFirstAllocReq() bool {
+
+	// if alloc request carries both REALM and NONCE, we think this is a subsequent request
+	_, err1 := this.getAttrRealm()
+	_, err2 := this.getAttrNonce()
+	if err1 == nil && err2 == nil {
+		return false;
+	}
+	return true;
+}
+
+func (this *message) checkCredential() (code int, err error) {
+
+	// get username realm nonce integrity
+	var username, realm string
+
+	if username, err = this.getAttrUsername(); err != nil {
+		return STUN_ERR_BAD_REQUEST, fmt.Errorf("missing USERNAME attribute")
+	}
+	if realm, err = this.getAttrRealm(); err != nil {
+		return STUN_ERR_BAD_REQUEST, fmt.Errorf("missing REALM attribute")
+	}
+	if _, err = this.getAttrNonce(); err != nil {
+		return STUN_ERR_BAD_REQUEST, fmt.Errorf("missing NONCE attribute")
+	}
+	if _, err = this.getAttrMsgIntegrity(); err != nil {
+		return STUN_ERR_BAD_REQUEST, fmt.Errorf("missing MESSAGE-INTEGRITY attribute")
+	}
+
+	// check realm
+	if realm != *conf.Args.Realm {
+		return STUN_ERR_WRONG_CRED, fmt.Errorf("realm mismatch")
+	}
+
+	if username == "" {
+		return STUN_ERR_WRONG_CRED, fmt.Errorf("username is empty")
+	}
+
+	// check username and password
+	key := md5.Sum([]byte(TURN_USERNAME + ":" + *conf.Args.Realm + ":" + TURN_PASSWORD))
+	if err = this.checkIntegrity(string(key[0:16])); err != nil {
+		return STUN_ERR_WRONG_CRED, fmt.Errorf("username or password error")
+	}
+
+	return 0, nil
 }
 
 func (this *message) checkAllocation() error {
@@ -455,6 +531,23 @@ func (this *message) replyAllocationRequest(alloc *allocation) (*message, error)
 	msg.length += msg.addAttrXorRelayedAddr(&alloc.relay)
 	msg.length += msg.addAttrLifetime(alloc.lifetime)
 	msg.length += msg.addAttrXorMappedAddr(&alloc.source)
+
+	key := md5.Sum([]byte(TURN_USERNAME + ":" + *conf.Args.Realm + ":" + TURN_PASSWORD))
+	msg.length += msg.addAttrMsgIntegrity(string(key[0:16]))
+
+	return msg, nil
+}
+
+func (this *message) replyAllocUnauth() (*message, error) {
+
+	msg := &message{}
+	msg.method = STUN_MSG_METHOD_ALLOCATE
+	msg.encoding = STUN_MSG_ERROR
+	msg.methodName, msg.encodingName = parseMessageType(msg.method, msg.encoding)
+	msg.transactionID = append(msg.transactionID, this.transactionID...)
+	msg.length += msg.addAttrErrorCode(STUN_ERR_UNAUTHORIZED, "missing long-term credential")
+	msg.length += msg.addAttrRealm(*conf.Args.Realm)
+	msg.length += msg.addAttrNonce(genNonce(STUN_NONCE_LENGTH))
 
 	return msg, nil
 }

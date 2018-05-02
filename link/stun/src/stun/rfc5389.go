@@ -4,12 +4,15 @@ import (
 	"net"
 	"fmt"
 	"encoding/binary"
+	"crypto/hmac"
+	"crypto/sha1"
 	"util/dbg"
 )
 
 const (
 	STUN_MSG_HEADER_SIZE  = 20
 	STUN_MSG_MAGIC_COOKIE = 0x2112A442
+	STUN_NONCE_LENGTH     = 32              // < 128, https://tools.ietf.org/html/rfc5389#section-15.8
 )
 
 const (
@@ -72,7 +75,7 @@ func (this *message) buffer() []byte {
 
 	// message type
 	binary.BigEndian.PutUint16(payload[0:], uint16(this.method | this.encoding))
-	
+
 	// message length
 	binary.BigEndian.PutUint16(payload[2:], uint16(this.length))
 
@@ -90,6 +93,55 @@ func (this *message) buffer() []byte {
 		payload = append(payload, bytes...)
 		payload = append(payload, attr.value...)
 	}
+
+	return payload
+}
+
+func (this *message) bufferExIntegrityAttr() []byte {
+
+	payload := make([]byte, 20)
+
+	// message type
+	binary.BigEndian.PutUint16(payload[0:], uint16(this.method | this.encoding))
+
+	// put magic cookie
+	binary.BigEndian.PutUint32(payload[4:], uint32(STUN_MSG_MAGIC_COOKIE))
+
+	// put transaction ID
+	copy(payload[8:], this.transactionID)
+
+	// this message length should reflect actual bytes above attribute MESSAGE_INTEGRITY
+	msgLen := 0
+
+	// if integrity is not found, stun msg len + 24, which reserved for MESSAGE_INTEGRITY
+	integrityFound := false
+
+	// append attributes
+	for _, attr := range this.attributes {
+
+		// message-integrity attribute should not be included in integrity computing
+		// while its attribute length should be counted in stun message length
+		if attr.typevalue == STUN_ATTR_MESSAGE_INTEGRITY {
+			integrityFound = true
+			msgLen += 4 + attr.length
+			break
+		}
+
+		bytes := make([]byte, 4)
+		binary.BigEndian.PutUint16(bytes[0:], attr.typevalue)
+		binary.BigEndian.PutUint16(bytes[2:], uint16(attr.length))
+		payload = append(payload, bytes...)
+		payload = append(payload, attr.value...)
+
+		msgLen += 4 + attr.length
+	}
+
+	if !integrityFound {
+		msgLen += 24
+	}
+
+	// message length
+	binary.BigEndian.PutUint16(payload[2:], uint16(msgLen))
 
 	return payload
 }
@@ -207,6 +259,36 @@ func (this *message) getAttrXorAddr(attr *attribute) (addr *address, err error) 
 	}
 }
 
+func (this *message) getAttrRealm() (string, error) {
+
+	return this.getAttrStringValue(STUN_ATTR_REALM)
+}
+
+func (this *message) getAttrNonce() (string, error) {
+
+	return this.getAttrStringValue(STUN_ATTR_NONCE)
+}
+
+func (this *message) getAttrUsername() (string, error) {
+
+	return this.getAttrStringValue(STUN_ATTR_USERNAME)
+}
+
+func (this *message) getAttrMsgIntegrity() (string, error) {
+
+	return this.getAttrStringValue(STUN_ATTR_MESSAGE_INTEGRITY)
+}
+
+func (this *message) getAttrStringValue(typevalue uint16) (string, error) {
+
+	attr := this.findAttr(typevalue)
+	if attr == nil {
+		return "", fmt.Errorf("not found")
+	}
+
+	return string(attr.value), nil
+}
+
 func (this *message) addAttrXorAddr(r *address, typeval uint16) int {
 
 	attr := &attribute{}
@@ -262,6 +344,79 @@ func (this *message) addAttrXorMappedAddr(r *address) int {
 	return this.addAttrXorAddr(r, STUN_ATTR_XOR_MAPPED_ADDR)
 }
 
+func (this *message) addAttrRealm(realm string) int {
+
+	attr := &attribute{}
+	attr.typevalue = STUN_ATTR_REALM
+	attr.typename = parseAttributeType(attr.typevalue)
+
+	// realm should be less than 128 characters
+	if len(realm) > 128 {
+		realm = realm[0:128]
+	}
+	attr.length = len(realm)
+
+	// paddings
+	total := attr.length
+	if total % 4 != 0 {
+		total += 4 - total % 4
+	}
+
+	attr.value = make([]byte, total)
+	copy(attr.value[0:], []byte(realm))
+
+	this.attributes = append(this.attributes, attr)
+	return 4 + len(attr.value)
+}
+
+func (this *message) addAttrNonce(nonce string) int {
+
+	attr := &attribute{}
+	attr.typevalue = STUN_ATTR_NONCE
+	attr.typename = parseAttributeType(attr.typevalue)
+	attr.length = len(nonce)
+
+	// nonce should be less than 128 characters
+	if len(nonce) > 128 {
+		nonce = nonce[0:128]
+	}
+	attr.length = len(nonce)
+
+	// paddings
+	total := attr.length
+	if total % 4 != 0 {
+		total += 4 - total % 4
+	}
+
+	attr.value = make([]byte, total)
+	copy(attr.value[0:], []byte(nonce))
+
+	this.attributes = append(this.attributes, attr)
+	return 4 + len(attr.value)
+}
+
+func (this *message) addAttrMsgIntegrity(key string) int {
+
+	attr := &attribute{}
+	attr.typevalue = STUN_ATTR_MESSAGE_INTEGRITY
+	attr.typename = parseAttributeType(attr.typevalue)
+	attr.length = 20
+
+	// refer to https://tools.ietf.org/html/rfc5389#section-15.4
+
+	// msg length should include integrity attribute
+	hash := this.computeIntegrity(key)
+
+	// copy hash result to attribute body
+	attr.value = make([]byte, len(hash))
+	copy(attr.value[0:], hash)
+
+	// add to attribute array
+	this.attributes = append(this.attributes, attr)
+
+	return 4 + len(attr.value)
+}
+
 func getMessage(buf []byte) (*message, error) {
 
 	if err := checkMessage(buf); err != nil {
@@ -290,6 +445,8 @@ func getMessage(buf []byte) (*message, error) {
 		attr.typename = parseAttributeType(attr.typevalue)
 		len := int(binary.BigEndian.Uint16(buf[20+i+2:]))
 		attr.length = len
+
+		// TODO check attr length which could overflow
 
 		// following bytes are attributes
 		attr.value = append(attr.value, buf[20+i+4:20+i+4+len]...)
@@ -367,4 +524,27 @@ func (this *message) findAttrAll(typevalue uint16) []*attribute {
 		}
 	}
 	return list
+}
+
+func (this *message) computeIntegrity(key string) string {
+
+	// hmac, use sha1
+	mac := hmac.New(sha1.New, []byte(key))
+	mac.Write(this.bufferExIntegrityAttr())
+	return string(mac.Sum(nil))
+}
+
+func (this *message) checkIntegrity(key string) error {
+
+	integrity, err := this.getAttrMsgIntegrity()
+	if err != nil {
+		return fmt.Errorf("missing MESSAGE-INTEGRITY attribute")
+	}
+
+	hash := this.computeIntegrity(key)
+
+	if hash != integrity {
+		return fmt.Errorf("wrong message integrity")
+	}
+	return nil
 }
