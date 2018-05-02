@@ -3,7 +3,6 @@ package stun
 import (
 	"fmt"
 	"encoding/binary"
-	"crypto/md5"
 	"math/rand"
 	"conf"
 	"net"
@@ -124,6 +123,9 @@ type allocation struct {
 
 	// nonce
 	nonce       string
+
+	// username
+	username    string
 }
 
 type channel struct {
@@ -289,7 +291,8 @@ func (this *message) doRefreshRequest(alloc *allocation) (*message, error) {
 func (this *message) doAllocationRequest(r *address) (msg *message, err error) {
 
 	// 1. long-term credential
-	if this.isFirstAllocReq() {
+	username, _, _, _, err := this.getCredential()
+	if err != nil {
 		// handle first alloc request
 		return this.replyAllocUnauth()
 	}
@@ -324,6 +327,9 @@ func (this *message) doAllocationRequest(r *address) (msg *message, err error) {
 
 	// 8. TODO handle ALTERNATE attribute
 
+	// set longterm-credential username
+	alloc.username = username
+
 	// set lifetime
 	lifetime, err := this.getAttrLifetime()
 	if err != nil {
@@ -337,53 +343,6 @@ func (this *message) doAllocationRequest(r *address) (msg *message, err error) {
 		return this.newErrorMessage(STUN_ERR_SERVER_ERROR, "alloc failed: " + err.Error()), nil
 	}
 	return this.replyAllocationRequest(alloc)
-}
-
-func (this *message) isFirstAllocReq() bool {
-
-	// if alloc request carries both REALM and NONCE, we think this is a subsequent request
-	_, err1 := this.getAttrRealm()
-	_, err2 := this.getAttrNonce()
-	if err1 == nil && err2 == nil {
-		return false;
-	}
-	return true;
-}
-
-func (this *message) checkCredential() (code int, err error) {
-
-	// get username realm nonce integrity
-	var username, realm string
-
-	if username, err = this.getAttrUsername(); err != nil {
-		return STUN_ERR_BAD_REQUEST, fmt.Errorf("missing USERNAME attribute")
-	}
-	if realm, err = this.getAttrRealm(); err != nil {
-		return STUN_ERR_BAD_REQUEST, fmt.Errorf("missing REALM attribute")
-	}
-	if _, err = this.getAttrNonce(); err != nil {
-		return STUN_ERR_BAD_REQUEST, fmt.Errorf("missing NONCE attribute")
-	}
-	if _, err = this.getAttrMsgIntegrity(); err != nil {
-		return STUN_ERR_BAD_REQUEST, fmt.Errorf("missing MESSAGE-INTEGRITY attribute")
-	}
-
-	// check realm
-	if realm != *conf.Args.Realm {
-		return STUN_ERR_WRONG_CRED, fmt.Errorf("realm mismatch")
-	}
-
-	if username == "" {
-		return STUN_ERR_WRONG_CRED, fmt.Errorf("username is empty")
-	}
-
-	// check username and password
-	key := md5.Sum([]byte(TURN_USERNAME + ":" + *conf.Args.Realm + ":" + TURN_PASSWORD))
-	if err = this.checkIntegrity(string(key[0:16])); err != nil {
-		return STUN_ERR_WRONG_CRED, fmt.Errorf("username or password error")
-	}
-
-	return 0, nil
 }
 
 func (this *message) checkAllocation() error {
@@ -532,8 +491,10 @@ func (this *message) replyAllocationRequest(alloc *allocation) (*message, error)
 	msg.length += msg.addAttrLifetime(alloc.lifetime)
 	msg.length += msg.addAttrXorMappedAddr(&alloc.source)
 
-	key := md5.Sum([]byte(TURN_USERNAME + ":" + *conf.Args.Realm + ":" + TURN_PASSWORD))
-	msg.length += msg.addAttrMsgIntegrity(string(key[0:16]))
+	// add integrity attribute
+	if err := msg.addIntegrity(alloc.username); err != nil {
+		return this.newErrorMessage(STUN_ERR_WRONG_CRED, err.Error()), nil
+	}
 
 	return msg, nil
 }

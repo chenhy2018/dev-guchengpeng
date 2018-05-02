@@ -7,6 +7,7 @@ import (
 	"crypto/hmac"
 	"crypto/sha1"
 	"util/dbg"
+	"conf"
 )
 
 const (
@@ -261,29 +262,29 @@ func (this *message) getAttrXorAddr(attr *attribute) (addr *address, err error) 
 
 func (this *message) getAttrRealm() (string, error) {
 
-	return this.getAttrStringValue(STUN_ATTR_REALM)
+	return this.getAttrStringValue(STUN_ATTR_REALM, "REALM")
 }
 
 func (this *message) getAttrNonce() (string, error) {
 
-	return this.getAttrStringValue(STUN_ATTR_NONCE)
+	return this.getAttrStringValue(STUN_ATTR_NONCE, "NONCE")
 }
 
 func (this *message) getAttrUsername() (string, error) {
 
-	return this.getAttrStringValue(STUN_ATTR_USERNAME)
+	return this.getAttrStringValue(STUN_ATTR_USERNAME, "USERNAME")
 }
 
 func (this *message) getAttrMsgIntegrity() (string, error) {
 
-	return this.getAttrStringValue(STUN_ATTR_MESSAGE_INTEGRITY)
+	return this.getAttrStringValue(STUN_ATTR_MESSAGE_INTEGRITY, "MESSAGE-INTEGRITY")
 }
 
-func (this *message) getAttrStringValue(typevalue uint16) (string, error) {
+func (this *message) getAttrStringValue(typevalue uint16, typename string) (string, error) {
 
 	attr := this.findAttr(typevalue)
 	if attr == nil {
-		return "", fmt.Errorf("not found")
+		return "", fmt.Errorf("%s not found", typename)
 	}
 
 	return string(attr.value[0:attr.length]), nil
@@ -527,6 +528,11 @@ func (this *message) findAttrAll(typevalue uint16) []*attribute {
 	return list
 }
 
+// -------------------------------------------------------------------------------------------------
+
+// STUN long-term credential
+// https://tools.ietf.org/html/rfc5389#page-24
+
 func (this *message) computeIntegrity(key string) string {
 
 	// hmac, use sha1
@@ -548,4 +554,62 @@ func (this *message) checkIntegrity(key string) error {
 		return fmt.Errorf("wrong message integrity")
 	}
 	return nil
+}
+
+func (this *message) addIntegrity(username string) error {
+
+	key, err := conf.Users.Find(username)
+	if err != nil {
+		return err
+	}
+	this.length += this.addAttrMsgIntegrity(key)
+
+	return nil
+}
+
+func (this *message) getCredential() (username, realm, nonce, integrity string, err error) {
+
+	if username, err = this.getAttrUsername(); err != nil {
+		return
+	}
+	if realm, err = this.getAttrRealm(); err != nil {
+		return
+	}
+	if nonce, err = this.getAttrNonce(); err != nil {
+		return
+	}
+	if integrity, err = this.getAttrMsgIntegrity(); err != nil {
+		return
+	}
+
+	return
+}
+
+func (this *message) checkCredential() (code int, err error) {
+
+	// get username realm nonce integrity
+	username, realm, _, _, err := this.getCredential()
+	if err != nil {
+		return STUN_ERR_BAD_REQUEST, fmt.Errorf("credential error")
+	}
+
+	// check realm
+	if realm != *conf.Args.Realm {
+		return STUN_ERR_WRONG_CRED, fmt.Errorf("realm mismatch")
+	}
+
+	if username == "" {
+		return STUN_ERR_WRONG_CRED, fmt.Errorf("username is empty")
+	}
+
+	// check username and password
+	key, err := conf.Users.Find(username)
+	if err != nil {
+		return STUN_ERR_WRONG_CRED, fmt.Errorf("username or password error")
+	}
+	if err = this.checkIntegrity(key); err != nil {
+		return STUN_ERR_WRONG_CRED, fmt.Errorf("username or password error")
+	}
+
+	return 0, nil
 }
