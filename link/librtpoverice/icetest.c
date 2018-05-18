@@ -19,7 +19,7 @@ char remoteSdpStr[2048]={0};
 #define OFFER 1
 #define ANSWER 2
 #define OFFERSDP "offer.sdp"
-#define ANSWERSDP "anser.sdp"
+#define ANSWERSDP "answer.sdp"
 int gRole = OFFER;
 char * gOpenFile = NULL;
 
