@@ -8,4 +8,5 @@ ExternalProject_Add(stun
 )
 
 add_subdirectory(libmuxer)
+add_subdirectory(libsip)
 add_subdirectory(libice)
