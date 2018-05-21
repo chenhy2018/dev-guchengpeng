@@ -75,6 +75,8 @@ struct SipData {
         pj_caching_pool Cp;
         pj_pool_t *pPool;
         pj_mutex_t *pMutex;
+        pj_str_t LocalIp;
+        int LocalPort;
 
         pjsip_endpoint*pSipEndPoint;
         pj_bool_t bThreadQuit;

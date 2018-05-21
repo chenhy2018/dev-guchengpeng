@@ -27,7 +27,8 @@ int main()
         SipCreateInstance(&cb);
         sleep(2);
         int nid1 = SipAddNewAccount("1001", "1001", "192.168.56.102");
-        int nid3 = SipAddNewAccount("1003", "1003", "192.168.56.102");
+        /*
+          int nid3 = SipAddNewAccount("1003", "1003", "192.168.56.102");
         int nid4 = SipAddNewAccount("1004", "1004", "192.168.56.102");
         int nid5 = SipAddNewAccount("1005", "1005", "192.168.56.102");
         int nid6 = SipAddNewAccount("1006", "1006", "192.168.56.102");
@@ -36,7 +37,6 @@ int main()
         int nid9 = SipAddNewAccount("1009", "1009", "192.168.56.102");
         int nid10 = SipAddNewAccount("1010", "1010", "192.168.56.102");
 
-        SipRegAccount(nid1, 1);
         SipRegAccount(nid3, 1);
         SipRegAccount(nid4, 1);
         SipRegAccount(nid5, 1);
@@ -45,9 +45,11 @@ int main()
         SipRegAccount(nid8, 1);
         SipRegAccount(nid9, 1);
         SipRegAccount(nid10, 1);
+        */
+        SipRegAccount(nid1, 1);
 
         sleep(20);
-        //int nCallId1 = SipMakeNewCall(nid3, "<sip:1004@192.168.56.102>");
+        int nCallId1 = SipMakeNewCall(nid1, "<sip:1003@192.168.56.102>");
         //sleep(20);
         //SipHangUp(nCallId1);
         //SipDestroyInstance();

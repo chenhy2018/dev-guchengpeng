@@ -1,6 +1,5 @@
 #include <pjsip.h>
 #include <pjmedia.h>
-#include <pjmedia-codec.h>
 #include <pjsip_ua.h>
 #include <pjsip_simple.h>
 #include <pjlib-util.h>
@@ -58,6 +57,7 @@ static void onSipCallOnForked(IN pjsip_inv_session *pInviteSession, IN pjsip_eve
 /* Get local AccountId from incoming message */
 static int SipGetAccountIdFromRxData(IN const pjsip_rx_data *_pRxData);
 
+static int CreateTmpSDP(pj_pool_t *pPool, SipCall *pCall, pjmedia_sdp_session **pSdp);
 /* This is a PJSIP module to be registered by application to handle
  * incoming requests outside any dialogs/transactions. The main purpose
  * here is to handle incoming INVITE request message, where we will
@@ -168,8 +168,9 @@ int SipCreateInstance(IN const SipCallBack *_pSipCallBack)
         /* start udp socket on sip port */
         pj_sockaddr Address;
         pjsip_transport *tp;
-        pj_sockaddr_init(pj_AF_INET(), &Address, NULL, (pj_uint16_t)SIP_PORT);
+        pj_sockaddr_init(pj_AF_INET(), &Address, NULL, 0);
         Status = pjsip_udp_transport_start(SipAppData.pSipEndPoint, &Address.ipv4, NULL, 1, &tp);
+        SipAppData.LocalPort = tp->local_name.port;
         PJ_ASSERT_RETURN(Status == PJ_SUCCESS, Status);
 
         PJ_LOG(3,(THIS_FILE, "SIP UDP listening on %.*s:%d",
@@ -494,7 +495,8 @@ static pj_status_t SipRegcInit(IN const int _nAccountId)
                 pj_sockaddr_in_init(&tmpAddr, pHostName, 0);
                 pj_inet_ntop(pj_AF_INET(), &tmpAddr.sin_addr, LocalIp,
                              sizeof(LocalIp));
-                pj_ansi_sprintf(tmpConcat, "<sip:%s@%s:%d>", pAccount->Config.UserName.ptr, LocalIp, SIP_PORT);
+                SipAppData.LocalIp = pj_str(LocalIp);
+                pj_ansi_sprintf(tmpConcat, "<sip:%s@%s:%d>", pAccount->Config.UserName.ptr, LocalIp, SipAppData.LocalPort);
         }
         pj_str_t Concat = pj_str(tmpConcat);
         pj_strdup(pAccount->pPool, &pAccount->Concat, &Concat);
@@ -785,7 +787,7 @@ int SipMakeNewCall(IN const int _nFromAccountId, IN const char *_pDestUri)
         pj_str_t Dest = pj_str((char *)_pDestUri);
         /* Create SIP dialog */
         char LocalUri[60];
-        pj_ansi_sprintf(LocalUri, "<sip:%s@%s:%d>", SipAppData.Accounts[_nFromAccountId].Config.UserName.ptr, SipAppData.Accounts[_nFromAccountId].Config.SipDomain.ptr, 5060);
+        pj_ansi_sprintf(LocalUri, "<sip:%s@%s:%d>", SipAppData.Accounts[_nFromAccountId].Config.UserName.ptr, SipAppData.Accounts[_nFromAccountId].Config.SipDomain.ptr, SipAppData.LocalPort);
         pj_str_t Local = pj_str(LocalUri);
         Status = pjsip_dlg_create_uac(pjsip_ua_instance(), &Local, &SipAppData.Accounts[_nFromAccountId].Concat, &Dest,  &Dest, &pDialog);
         if (Status != PJ_SUCCESS) {
@@ -794,9 +796,9 @@ int SipMakeNewCall(IN const int _nFromAccountId, IN const char *_pDestUri)
                 return -1;
         }
         /* TODO get Local SDP */
-
+        CreateTmpSDP(pDialog->pool, pCall, &pMediaSession);
         /* Create invite session */
-        Status = pjsip_inv_create_uac(pDialog, NULL, 0, &pCall->pInviteSession);
+        Status = pjsip_inv_create_uac(pDialog, pMediaSession, 0, &pCall->pInviteSession);
         if (Status != PJ_SUCCESS) {
                 PrintErrorMsg(Status, "Create uac invite session");
                 pjsip_dlg_terminate(pDialog);
@@ -897,8 +899,10 @@ static pj_bool_t onRxRequest(IN pjsip_rx_data *_pRxData )
 
 
         /* Verify that we can handle this request */
+        nOption = 0;
         Status = pjsip_inv_verify_request(_pRxData, &nOption, NULL, NULL, SipAppData.pSipEndPoint, &pTxData);
         if (Status != PJ_SUCCESS) {
+                PrintErrorMsg(Status, "Verify request failed");
                 pj_str_t Reason = pj_str("Sorry we can't handle this request");
                 pjsip_endpt_respond_stateless(SipAppData.pSipEndPoint, _pRxData, PJSIP_SC_INTERNAL_SERVER_ERROR,
                                               &Reason, NULL, NULL);
@@ -909,6 +913,7 @@ static pj_bool_t onRxRequest(IN pjsip_rx_data *_pRxData )
         /* Get account id with associated incoming call */
         nToAccountId = pCall->nAccountId = SipGetAccountIdFromRxData(_pRxData);
         if (nToAccountId == -1) {
+                PrintErrorMsg(Status, "Can't find correspond account Id");
                 pj_str_t Reason = pj_str("Sorry we can't find right To account Id");
                 pjsip_endpt_respond_stateless(SipAppData.pSipEndPoint, _pRxData, PJSIP_SC_INTERNAL_SERVER_ERROR,
                                               &Reason, NULL, NULL);
@@ -921,6 +926,7 @@ static pj_bool_t onRxRequest(IN pjsip_rx_data *_pRxData )
                                                    &SipAppData.Accounts[nToAccountId].Concat,
                                                    &pDialog);
         if (Status != PJ_SUCCESS) {
+                PrintErrorMsg(Status, "Create Uas dialog failed");
                 pj_str_t Reason = pj_str("Sorry we can't create dialog");
                 pjsip_endpt_respond_stateless(SipAppData.pSipEndPoint, _pRxData, PJSIP_SC_INTERNAL_SERVER_ERROR,
                                               &Reason, NULL, NULL);
@@ -929,8 +935,10 @@ static pj_bool_t onRxRequest(IN pjsip_rx_data *_pRxData )
         }
 
         /* Creat Invite Session */
-        Status = pjsip_inv_create_uas(pDialog, _pRxData, NULL, 0, &pCall->pInviteSession);
+        CreateTmpSDP(pDialog->pool, pCall, &pSdp);
+        Status = pjsip_inv_create_uas(pDialog, _pRxData, pSdp, 0, &pCall->pInviteSession);
         if (Status != PJ_SUCCESS) {
+                PrintErrorMsg(Status, "Create UAS invite session failed");
                 pj_str_t Reason = pj_str("Sorry we can't create Invite session");
                 pjsip_dlg_create_response(pDialog, _pRxData, PJSIP_SC_INTERNAL_SERVER_ERROR, &Reason, &pTxData);
                 pjsip_dlg_send_response(pDialog, pjsip_rdata_get_tsx(_pRxData), pTxData);
@@ -945,12 +953,14 @@ static pj_bool_t onRxRequest(IN pjsip_rx_data *_pRxData )
         pj_gettimeofday(&pCall->StartTime);
 
         /* TODO put remote SDP to mengke */
-        const pjmedia_sdp_session *pRemoteSdp;
-        pjmedia_sdp_neg_get_neg_remote(pCall->pInviteSession->neg, &pRemoteSdp);
-        int nContentLen = _pRxData->msg_info.msg->body->len;
-        char buf[nContentLen];
-        pjmedia_sdp_print(pRemoteSdp, buf, nContentLen);
-        PJ_LOG(4, (THIS_FILE, "remote SDP\n%s", buf));
+        int nContentLen = _pRxData->msg_info.clen->len;
+        if (nContentLen != 0) {
+                char buf[nContentLen];
+                const pjmedia_sdp_session *pRemoteSdp;
+                pjmedia_sdp_neg_get_neg_remote(pCall->pInviteSession->neg, &pRemoteSdp);
+                pjmedia_sdp_print(pRemoteSdp, buf, nContentLen);
+                PJ_LOG(4, (THIS_FILE, "remote SDP\n%s", buf));
+        }
         pCall->bValid = PJ_TRUE;
 
         /* Create a 180 response */
@@ -1046,7 +1056,7 @@ static void onSipCallOnMediaUpdate(IN pjsip_inv_session *_pInviteSession,
                                   pj_status_t _nStatus)
 {
         const pjmedia_sdp_session *pRemoteSdp;
-        pjmedia_sdp_neg_get_active_remote(_pInviteSession->neg, &pRemoteSdp);
+        //pjmedia_sdp_neg_get_active_remote(_pInviteSession->neg, &pRemoteSdp);
         /* TODO put remote SDP to mengke */
 }
 
@@ -1085,5 +1095,95 @@ static void onSipCallOnStateChanged(IN pjsip_inv_session *_pInviteSession,
 /* Callback to be called when dialog has forked: */
 static void onSipCallOnForked(pjsip_inv_session *pInviteSession, pjsip_event *pEvent)
 {
+
+}
+
+static int CreateTmpSDP(pj_pool_t *_pPool, SipCall *_pCall, pjmedia_sdp_session **_pSdp)
+{
+        pj_time_val TimeVal;
+        pjmedia_sdp_session *pSdp;
+        pjmedia_sdp_media *pMedia;
+        pjmedia_sdp_attr *pAttr;
+
+        PJ_ASSERT_RETURN(_pPool && _pSdp, PJ_EINVAL);
+
+
+        /* Create and initialize basic SDP session */
+        pSdp = pj_pool_zalloc(_pPool, sizeof(pjmedia_sdp_session));
+
+        pj_gettimeofday(&TimeVal);
+        pSdp->origin.user = pj_str("pjsip-siprtp");
+        pSdp->origin.version = pSdp->origin.id = TimeVal.sec + 2208988800UL;
+        pSdp->origin.net_type = pj_str("IN");
+        pSdp->origin.addr_type = pj_str("IP4");
+        pSdp->origin.addr = *pj_gethostname();
+        pSdp->name = pj_str("pjsip");
+
+        /* Since we only support one media stream at present, put the
+         * SDP connection line in the session level.
+         */
+        pSdp->conn = pj_pool_zalloc (_pPool, sizeof(pjmedia_sdp_conn));
+        pSdp->conn->net_type = pj_str("IN");
+        pSdp->conn->addr_type = pj_str("IP4");
+        pSdp->conn->addr = SipAppData.LocalIp;
+
+
+        /* SDP time and attributes. */
+        pSdp->time.start = pSdp->time.stop = 0;
+        pSdp->attr_count = 0;
+
+        /* Create media stream 0: */
+
+        pSdp->media_count = 1;
+        pMedia = pj_pool_zalloc (_pPool, sizeof(pjmedia_sdp_media));
+        pSdp->media[0] = pMedia;
+
+        /* Standard media info: */
+        pMedia->desc.media = pj_str("audio");
+        pMedia->desc.port = pj_ntohs(4000);
+        pMedia->desc.port_count = 1;
+        pMedia->desc.transport = pj_str("RTP/AVP");
+
+        /* Add format and rtpmap for each codec. */
+        pMedia->desc.fmt_count = 1;
+        pMedia->attr_count = 0;
+
+        {
+                pjmedia_sdp_rtpmap rtpmap;
+                char ptstr[10];
+
+                sprintf(ptstr, "%d", 0);
+                pj_strdup2(_pPool, &pMedia->desc.fmt[0], ptstr);
+                rtpmap.pt = pMedia->desc.fmt[0];
+                rtpmap.clock_rate = 8000;
+                rtpmap.enc_name = pj_str("PCMU");
+                rtpmap.param.slen = 0;
+
+                pjmedia_sdp_rtpmap_to_attr(_pPool, &rtpmap, &pAttr);
+                pMedia->attr[pMedia->attr_count++] = pAttr;
+
+        }
+
+        /* Add sendrecv attribute. */
+        pAttr = pj_pool_zalloc(_pPool, sizeof(pjmedia_sdp_attr));
+        pAttr->name = pj_str("sendrecv");
+        pMedia->attr[pMedia->attr_count++] = pAttr;
+
+        pMedia->desc.fmt[pMedia->desc.fmt_count++] = pj_str("121");
+        /* Add rtpmap. */
+        pAttr = pj_pool_zalloc(_pPool, sizeof(pjmedia_sdp_attr));
+        pAttr->name = pj_str("rtpmap");
+        pAttr->value = pj_str("121 telephone-event/8000");
+        pMedia->attr[pMedia->attr_count++] = pAttr;
+        /* Add fmtp */
+        pAttr = pj_pool_zalloc(_pPool, sizeof(pjmedia_sdp_attr));
+        pAttr->name = pj_str("fmtp");
+        pAttr->value = pj_str("121 0-15");
+        pMedia->attr[pMedia->attr_count++] = pAttr;
+
+        /* Done */
+        *_pSdp = pSdp;
+
+        return PJ_SUCCESS;
 
 }
