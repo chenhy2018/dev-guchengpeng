@@ -12,7 +12,7 @@
 #include "sip_internal.h"
 
 
-#define THIS_FILE "sip_core.c"
+#define THIS_FILE "sip.c"
 
 void PrintErrorMsg(IN const pj_status_t _Status, IN const char *_pMsg)
 {
