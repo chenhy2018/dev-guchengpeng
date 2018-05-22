@@ -8,8 +8,7 @@ ExternalProject_Add(pjsip
 )
 
 include(ExternalProject)
-tar -xzvf mosquitto-1.4.8.tar.gz
-ExternalProject_Add(mosquitto
+ExternalProject_Add(libmosquitto
         SOURCE_DIR mosquitto-1.4.8
         BUILD_COMMAND make
         INSTALL_COMMAND make install
