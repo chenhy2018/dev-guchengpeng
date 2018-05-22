@@ -1,0 +1,8 @@
+*.o
+*.depend
+*.cmake
+*.txt
+CMakeFiles
+*.log
+bin
+lib
