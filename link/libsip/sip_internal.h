@@ -42,13 +42,12 @@ typedef struct SipAccount {
         int nIndex;
         pj_bool_t bValid;
         pjsip_regc *pRegc;
-        pj_str_t Concat;
+        pj_str_t Contact;
         int nLastRegCode;
 
         unsigned nCredCnt;
         pjsip_cred_info  Cred[SIP_MAX_CRED];
-        pj_bool_t bConcatRewritten;
-        pj_str_t ViaAddr;
+        pjsip_host_port ViaAddr;
         /* Add Keepalive timer for this account */
         pj_timer_entry   KaTimer;
         pjsip_transport *KaTransport;
