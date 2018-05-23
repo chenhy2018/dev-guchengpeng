@@ -13,6 +13,7 @@
 #include "rtmp_publish.h"
 #include "curl_req.h"
 #include "devsdk.h"
+#include "rtmp.h"
 
 #define QN_SUCCESS 0
 #define QN_FAIL 1
@@ -29,8 +30,6 @@
 #define QU_LEN 128  //视频缓存队列大小
 #define PTHREAD_STACK (20<< 20)
 
-#define RTMP_START 1
-#define RTMP_STOP 0
 
 typedef int (*RTMPH264SEND_CALLBACK)(char *addrStream, int textLen, unsigned long timeStamp, int iskey);
 typedef int (*RTMPAUDIOSEND_CALLBACK)(char *addrAAC, int textLen, double timestamp, unsigned int audioType);
@@ -655,7 +654,7 @@ int rtmp_init(ACONTEXT *pAContext)
 void rtmp_uninit()
 {
 	RtmpPubDel((RtmpPubContext *)g_AContext.pRtmpc);
-	aj_unInit();
+    aj_unInit();
 	return;
 }
 //解析adts固定头部
@@ -932,16 +931,21 @@ void init_signals(void)
 
 void RTMPStat(int _status)
 {
+    int ret = 0;
 	g_AContext.status = _status;
 
 	if (_status == RTMP_START) {
 		g_AContext.is_ok = FALSE;
 		g_AContext.video_state = FALSE;
 		g_AContext.audio_state = FALSE;
+        ret = rtmp_init(&g_AContext);
+        if (0 != ret)
+        {
+            printf("Open Rtmp Client fail.\n");
+        }
+        aj_Init();
 	} else {
-		g_AContext.is_ok = FALSE;
-		g_AContext.video_state = FALSE;
-		g_AContext.audio_state = FALSE;
+        rtmp_uninit(&g_AContext);
     }
 }
 
@@ -960,13 +964,13 @@ void Rtmp_Init()
 	}
 #endif
 
-	ret = rtmp_init(&g_AContext);
-	if (0 != ret)
-	{
-		printf("Open Rtmp Client fail.\n");
-		return -1;
-	}
+    /*ret = rtmp_init(&g_AContext);*/
+    /*if (0 != ret)*/
+    /*{*/
+        /*printf("Open Rtmp Client fail.\n");*/
+        /*return -1;*/
+    /*}*/
 	
-	aj_Init();
+	/*aj_Init();*/
 }
 

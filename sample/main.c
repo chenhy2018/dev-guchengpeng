@@ -1,6 +1,8 @@
 #include "sip.h"
 #include <unistd.h>
 #include <stdio.h>
+#include "rtmp.h"
+#include "main.h"
 
 SipAnswerCode cbOnIncomingCall(int _nAccountId, int _nCallId, const char *_pFrom)
 {
@@ -15,8 +17,18 @@ void cbOnRegStatusChange(int _nAccountId, SipAnswerCode _StatusCode)
 
 void cbOnCallStateChange(int _nCallId, SipInviteState _State, SipAnswerCode _StatusCode)
 {
-        printf("------------------------------------------------------------------->state = %d, status code = %d\n", _State, _StatusCode);
+        printf("------------------------------------------------>state = %d, status code = %d\n", _State, _StatusCode);
+        if ( _State == INV_STATE_CONFIRMED ) {
+            DBG_LOG("INV_STATE_CONFIRMED\n");
+            RTMPStat( RTMP_START );
+        } else if ( _State == INV_STATE_DISCONNECTED ) {
+            DBG_LOG("INV_STATE_DISCONNECTED\n");
+            RTMPStat( RTMP_STOP );
+        } else {
+            DBG_LOG("other state\n");
+        }
 }
+
 int main()
 {
         SipCallBack cb;
@@ -24,34 +36,12 @@ int main()
         cb.OnCallStateChange = &cbOnCallStateChange;
         cb.OnRegStatusChange = &cbOnRegStatusChange;
 
+        Rtmp_Init();
+
         SipCreateInstance(&cb);
         sleep(2);
         int nid1 = SipAddNewAccount("1001", "1001", "123.59.204.198");
-        /*
-          int nid3 = SipAddNewAccount("1003", "1003", "192.168.56.102");
-        int nid4 = SipAddNewAccount("1004", "1004", "192.168.56.102");
-        int nid5 = SipAddNewAccount("1005", "1005", "192.168.56.102");
-        int nid6 = SipAddNewAccount("1006", "1006", "192.168.56.102");
-        int nid7 = SipAddNewAccount("1007", "1007", "192.168.56.102");
-        int nid8 = SipAddNewAccount("1008", "1008", "192.168.56.102");
-        int nid9 = SipAddNewAccount("1009", "1009", "192.168.56.102");
-        int nid10 = SipAddNewAccount("1010", "1010", "192.168.56.102");
-
-        SipRegAccount(nid3, 1);
-        SipRegAccount(nid4, 1);
-        SipRegAccount(nid5, 1);
-        SipRegAccount(nid6, 1);
-        SipRegAccount(nid7, 1);
-        SipRegAccount(nid8, 1);
-        SipRegAccount(nid9, 1);
-        SipRegAccount(nid10, 1);
-        */
         SipRegAccount(nid1, 1);
-
-        sleep(20);
-        int nCallId1 = SipMakeNewCall(nid1, "<sip:1004@123.59.204.198>");
-        sleep(60);
-        SipHangUp(nCallId1);
         //sleep(20);
         //SipHangUp(nCallId1);
         //SipDestroyInstance();
