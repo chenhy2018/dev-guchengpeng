@@ -57,6 +57,8 @@ static void onSipCallOnForked(IN pjsip_inv_session *pInviteSession, IN pjsip_eve
 /* Get local AccountId from incoming message */
 static int SipGetAccountIdFromRxData(IN const pjsip_rx_data *_pRxData);
 
+static pj_bool_t SipUpdateContactIfNat(IN SipAccount *_pAccount, IN struct pjsip_regc_cbparam *_pCbData);
+
 static int CreateTmpSDP(pj_pool_t *pPool, SipCall *pCall, pjmedia_sdp_session **pSdp);
 /* This is a PJSIP module to be registered by application to handle
  * incoming requests outside any dialogs/transactions. The main purpose
@@ -377,7 +379,7 @@ void SipDeleteAccount(IN const int _nAccountId)
                 pAccount->pPool = NULL;
         }
         pAccount->bValid = PJ_FALSE;
-        pAccount->Concat.slen = 0;
+        pAccount->Contact.slen = 0;
         //pj_mutex_unlock(SipAppData.pMutex);
 }
 
@@ -484,7 +486,7 @@ static pj_status_t SipRegcInit(IN const int _nAccountId)
                 return Status;
         }
         /* Create concat */
-        char tmpConcat[64];
+        char tmpContact[64];
         /* Get local IP address for the default IP address */
         {
                 static char LocalIp[PJ_INET_ADDRSTRLEN];
@@ -496,22 +498,22 @@ static pj_status_t SipRegcInit(IN const int _nAccountId)
                 pj_inet_ntop(pj_AF_INET(), &tmpAddr.sin_addr, LocalIp,
                              sizeof(LocalIp));
                 SipAppData.LocalIp = pj_str(LocalIp);
-                pj_ansi_sprintf(tmpConcat, "<sip:%s@%s:%d>", pAccount->Config.UserName.ptr, LocalIp, SipAppData.LocalPort);
+                pj_ansi_sprintf(tmpContact, "<sip:%s@%s:%d>", pAccount->Config.UserName.ptr, LocalIp, SipAppData.LocalPort);
         }
-        pj_str_t Concat = pj_str(tmpConcat);
-        pj_strdup(pAccount->pPool, &pAccount->Concat, &Concat);
+        pj_str_t Contact = pj_str(tmpContact);
+        pj_strdup(pAccount->pPool, &pAccount->Contact, &Contact);
         Status = pjsip_regc_init(pAccount->pRegc,
                                  &pAccount->Config.RegUri,
                                  &pAccount->Config.Id,
                                  &pAccount->Config.Id,
                                  1,
-                                 &pAccount->Concat,
+                                 &pAccount->Contact,
                                  pAccount->Config.nRegTimeout);
         if (Status != PJ_SUCCESS) {
                 PJ_LOG(3, (THIS_FILE, "Client registration initialization error", Status));
                 pjsip_regc_destroy(pAccount->pRegc);
                 pAccount->pRegc = NULL;
-                pAccount->Concat.slen = 0;
+                pAccount->Contact.slen = 0;
                 return Status;
         }
 
@@ -541,7 +543,7 @@ static void onSipRegc(IN struct pjsip_regc_cbparam *_pCbData)
                 PJ_LOG(3, (THIS_FILE, "SIP registration error, status = %d", _pCbData->status));
                 pjsip_regc_destroy(pAccount->pRegc);
                 pAccount->pRegc = NULL;
-                pAccount->Concat.slen = 0;
+                pAccount->Contact.slen = 0;
 
                 /* Stop keep alive timer */
                 UpdateKeepAlive(pAccount, PJ_FALSE, NULL);
@@ -550,7 +552,7 @@ static void onSipRegc(IN struct pjsip_regc_cbparam *_pCbData)
                            _pCbData->code, (int)_pCbData->reason.slen, _pCbData->reason.ptr));
                 pjsip_regc_destroy(pAccount->pRegc);
                 pAccount->pRegc = NULL;
-                pAccount->Concat.slen = 0;
+                pAccount->Contact.slen = 0;
 
                 /* Stop keep alive timer */
                 UpdateKeepAlive(pAccount, PJ_FALSE, NULL);
@@ -559,7 +561,7 @@ static void onSipRegc(IN struct pjsip_regc_cbparam *_pCbData)
                 if (_pCbData->expiration < 1) {
                         pjsip_regc_destroy(pAccount->pRegc);
                         pAccount->pRegc = NULL;
-                        pAccount->Concat.slen = 0;
+                        pAccount->Contact.slen = 0;
                         /* Stop keep alive timer */
                         UpdateKeepAlive(pAccount, PJ_FALSE, NULL);
                         PJ_LOG(3, (THIS_FILE, "%s: un-registration success", pAccount->Config.Id.ptr));
@@ -710,44 +712,68 @@ static void onSipRegcTsx(IN struct pjsip_regc_tsx_cb_param *_pCbData)
 {
         PJ_LOG(3, (THIS_FILE, "call onSipRegcTsx"));
         // TODO update concat
+        SipAccount *pAccount = (SipAccount *)_pCbData->cbparam.token;
+        if (SipUpdateContactIfNat(pAccount, &_pCbData->cbparam)) {
+                _pCbData->contact_cnt = 1;
+                _pCbData->contact[0] = pAccount->Contact;
+        }
 }
 
-static void SipUpdateConcatViaNatAddress(IN const SipAccount *_pAccount, IN const struct pjsip_regc_cbparam *_pCbData)
+static pj_bool_t isPrivateIp(const pj_str_t *pAddr)
 {
-        pjsip_transport *pTransport;
-        const pj_str_t *pViaAddr;
-        int nrport;
-        pjsip_sip_uri *pUir;
-        pjsip_via_hdr *pVia;
-        pj_sockaddr ConcatAddr;
-        pj_sockaddr RecvAddr = {{0}};
-        pj_status_t Status;
-        pj_bool_t bMatched;
-        pjsip_contact_hdr *pContactHdr;
-        const pj_str_t STR_CONTACT = { "Contact", 7 };
+            const pj_str_t PrivateNet[] =
+                    {
+                            { "10.", 3 },
+                            {"100.", 4}, // !!!! I'm not sure about this address
+                            { "127.", 4 },
+                            { "172.16.", 7 }, { "172.17.", 7 }, { "172.18.", 7 }, { "172.19.", 7 },
+                            { "172.20.", 7 }, { "172.21.", 7 }, { "172.22.", 7 }, { "172.23.", 7 },
+                            { "172.24.", 7 }, { "172.25.", 7 }, { "172.26.", 7 }, { "172.27.", 7 },
+                            { "172.28.", 7 }, { "172.29.", 7 }, { "172.30.", 7 }, { "172.31.", 7 },
+                            { "192.168.", 8 }
+                    };
+            unsigned i;
 
-        pTransport = _pCbData->rdata->tp_info.transport;
+            for (i=0; i<PJ_ARRAY_SIZE(PrivateNet); ++i) {
+                    if (pj_strncmp(pAddr, &PrivateNet[i], PrivateNet[i].slen)==0)
+                            return PJ_TRUE;
+            }
+            return PJ_FALSE;
+}
+
+static pj_bool_t SipUpdateContactIfNat(IN SipAccount *_pAccount, IN struct pjsip_regc_cbparam *_pCbData)
+{
+        const pj_str_t *pViaAddr;
+        int nRport;
+        pjsip_via_hdr *pVia;
+
+        if (!isPrivateIp(&SipAppData.LocalIp))
+                return PJ_FALSE;
 
         pVia = _pCbData->rdata->msg_info.via;
-        if (pVia->rport_param < 1) {
-                /*remote doest not support rport*/
-                nrport = pVia->sent_by.port;
-                if (nrport ==  0) {
-                        pjsip_transport_type_e TransportType;
-                        TransportType = (pjsip_transport_type_e) pTransport->key.type;
-                        nrport = pjsip_transport_get_default_port_for_type(TransportType);
-                }
-        } else
-                nrport = pVia->rport_param;
-
-        if (pVia->recvd_param.slen != 0)
+        if (pVia->rport_param < 1 || (pVia->recvd_param.slen ==0))
+                return PJ_FALSE;
+        else {
+                nRport = pVia->rport_param;
                 pViaAddr = &pVia->recvd_param;
-        else
-                pViaAddr = &pVia->sent_by.host;
+        }
+        if (pj_strcmp(&_pAccount->ViaAddr.host, pViaAddr) == 0)
+                return PJ_FALSE;
 
-        /* Allow rewrite via header */
+        pj_strdup(_pAccount->pPool, &_pAccount->ViaAddr.host, pViaAddr);
+        _pAccount->ViaAddr.port = nRport;
+        /* Update Via */
+        //pjsip_regc_set_via_sent_by(_pAccount->pRegc, &_pAccount->ViaAddr, _pCbData->rdata->tp_info.transport);
 
+        /*Update Contact */
+        char tmpContact[64];
+        pj_ansi_sprintf(tmpContact, "<sip:%s@%s:%d>", _pAccount->Config.UserName.ptr,  _pAccount->ViaAddr.host.ptr, _pAccount->ViaAddr.port);
+        PJ_LOG(4, (THIS_FILE, "Contact change from %s to %s", _pAccount->Contact.ptr, tmpContact));
+        pj_strdup2_with_null(_pAccount->pPool, &_pAccount->Contact, tmpContact);
+        //        pjsip_regc_update_contact(_pAccount->pRegc, 1, &_pAccount->Contact);
+        return PJ_TRUE;
 }
+
 static int SipGetFreeCallId(void)
 {
         int nCallId;
@@ -787,9 +813,9 @@ int SipMakeNewCall(IN const int _nFromAccountId, IN const char *_pDestUri)
         pj_str_t Dest = pj_str((char *)_pDestUri);
         /* Create SIP dialog */
         char LocalUri[60];
-        pj_ansi_sprintf(LocalUri, "<sip:%s@%s:%d>", SipAppData.Accounts[_nFromAccountId].Config.UserName.ptr, SipAppData.Accounts[_nFromAccountId].Config.SipDomain.ptr, SipAppData.LocalPort);
+        pj_ansi_sprintf(LocalUri, "<sip:%s@%s:%d>", SipAppData.Accounts[_nFromAccountId].Config.UserName.ptr, SipAppData.LocalIp.ptr, SipAppData.LocalPort);
         pj_str_t Local = pj_str(LocalUri);
-        Status = pjsip_dlg_create_uac(pjsip_ua_instance(), &Local, &SipAppData.Accounts[_nFromAccountId].Concat, &Dest,  &Dest, &pDialog);
+        Status = pjsip_dlg_create_uac(pjsip_ua_instance(), &Local, &SipAppData.Accounts[_nFromAccountId].Contact, &Dest,  &Dest, &pDialog);
         if (Status != PJ_SUCCESS) {
                 PrintErrorMsg(Status, "Create uac dialg failed");
                 pj_mutex_unlock(SipAppData.pMutex);
@@ -923,7 +949,7 @@ static pj_bool_t onRxRequest(IN pjsip_rx_data *_pRxData )
 
         /* Create UAS dialog */
         Status = pjsip_dlg_create_uas_and_inc_lock(pjsip_ua_instance(), _pRxData,
-                                                   &SipAppData.Accounts[nToAccountId].Concat,
+                                                   &SipAppData.Accounts[nToAccountId].Contact,
                                                    &pDialog);
         if (Status != PJ_SUCCESS) {
                 PrintErrorMsg(Status, "Create Uas dialog failed");
