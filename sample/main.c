@@ -49,7 +49,9 @@ int main()
         SipRegAccount(nid1, 1);
 
         sleep(20);
-        int nCallId1 = SipMakeNewCall(nid1, "<sip:1003@123.59.204.198>");
+        int nCallId1 = SipMakeNewCall(nid1, "<sip:1004@123.59.204.198>");
+        sleep(60);
+        SipHangUp(nCallId1);
         //sleep(20);
         //SipHangUp(nCallId1);
         //SipDestroyInstance();

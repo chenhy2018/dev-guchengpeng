@@ -747,8 +747,8 @@ static pj_bool_t SipUpdateContactIfNat(IN SipAccount *_pAccount, IN struct pjsip
         int nRport;
         pjsip_via_hdr *pVia;
 
-        if (!isPrivateIp(&SipAppData.LocalIp))
-                return PJ_FALSE;
+        /*if (!isPrivateIp(&SipAppData.LocalIp))*/
+                /*return PJ_FALSE;*/
 
         pVia = _pCbData->rdata->msg_info.via;
         if (pVia->rport_param < 1 || (pVia->recvd_param.slen ==0))
