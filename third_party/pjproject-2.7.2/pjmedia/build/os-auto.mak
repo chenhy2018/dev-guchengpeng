@@ -11,7 +11,7 @@ SDL_CFLAGS =
 SDL_LDFLAGS = 
 
 # FFMPEG dlags
-FFMPEG_CFLAGS =  -DPJMEDIA_USE_OLD_FFMPEG=1 
+FFMPEG_CFLAGS =  
 FFMPEG_LDFLAGS =  
 
 # Video4Linux2
@@ -55,7 +55,7 @@ export LDFLAGS += $(SDL_LDFLAGS) $(FFMPEG_LDFLAGS) $(V4L2_LDFLAGS) \
 AC_PJMEDIA_SND=alsa
 
 # For Unix, specify if ALSA should be supported
-AC_PA_USE_ALSA=1
+AC_PA_USE_ALSA=0
 
 # Additional PortAudio CFLAGS are in  -DHAVE_SYS_SOUNDCARD_H -DHAVE_LINUX_SOUNDCARD_H -DPA_LITTLE_ENDIAN
 
@@ -211,7 +211,7 @@ ifeq (,1)
 export CFLAGS += -DPJMEDIA_HAS_WEBRTC_AEC=0
 else
 export CFLAGS += -DPJMEDIA_HAS_WEBRTC_AEC=1
-ifneq ($(findstring arm,$(sse2)),)
+ifneq ($(findstring arm,$()),)
 export CFLAGS += -DPJMEDIA_WEBRTC_AEC_USE_MOBILE=1
 endif
 
@@ -233,11 +233,11 @@ endif
 #
 # Unix specific
 #
-ifneq ($(findstring alsa,$(AC_PJMEDIA_SND)),)
+#ifneq ($(findstring alsa,$(AC_PJMEDIA_SND)),)
 #export CFLAGS += -DPJMEDIA_AUDIO_DEV_HAS_ALSA=1 \
 #		 -DPJMEDIA_AUDIO_DEV_HAS_PORTAUDIO=0 \
 #		 -DPJMEDIA_AUDIO_DEV_HAS_WMME=0
-endif
+#endif
 
 #
 # Windows specific
