@@ -141,7 +141,7 @@ int main(int argc, char **argv)
         status = createAnswer(&app.peerConnection, pSdpPool, pOffer, &pAnswer);
         TESTCHECK(status, app);
         setLocalDescription(&app.peerConnection, pAnswer);
-        write_sdp(pOffer, ANSWERFILE);
+        write_sdp(pAnswer, ANSWERFILE);
     }
     
     input_confirm("confirm to negotiation:");
