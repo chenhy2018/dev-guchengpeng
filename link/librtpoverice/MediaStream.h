@@ -23,7 +23,7 @@
 #define STATUS_CHECK(info, s) if ( s != PJ_SUCCESS) { \
 char errmsg[PJ_ERR_MSG_SIZE];\
 pj_strerror(s, errmsg, sizeof(errmsg));\
-PJ_LOG(3,(__FILE__, "%s: %s [code=%d]", info, errmsg, s));\
+PJ_LOG(3,(__FILE__, "%s: %s [code=%d]", #info, errmsg, s));\
 return s;}
 
 #ifndef IN

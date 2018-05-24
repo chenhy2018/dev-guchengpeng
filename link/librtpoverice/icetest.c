@@ -9,6 +9,10 @@ typedef struct _App{
 }App;
 App app;
 
+#define TESTCHECK(status, a) if(status != 0){\
+ReleasePeerConnectoin(&a.peerConnection);\
+return status;}
+
 
 int main(int argc, char **argv)
 {
@@ -31,15 +35,21 @@ int main(int argc, char **argv)
     app.audioConfig.audioConfig.nSampleRate = 8000;
     app.audioConfig.audioConfig.nRtpDynamicType = 96;
     app.audioConfig.audioConfig.format = MEDIA_FORMAT_PCMU;
-    AddAudioTrack(&app.peerConnection, &app.audioConfig);
+    status = AddAudioTrack(&app.peerConnection, &app.audioConfig);
+    TESTCHECK(status, app);
     
     InitMediaConfig(&app.videoConfig);
     app.videoConfig.videoConfig.nClockRate = 90000;
     app.videoConfig.videoConfig.nRtpDynamicType = 98;
     app.videoConfig.videoConfig.format = MEDIA_FORMAT_H264;
-    AddVideoTrack(&app.peerConnection, &app.videoConfig);
+    status = AddVideoTrack(&app.peerConnection, &app.videoConfig);
+    TESTCHECK(status, app);
     
     pj_pool_t * pSdpPool = pj_pool_create(&app.cachingPool.factory, NULL, 1024, 512, NULL);
     pjmedia_sdp_session *pOffer = NULL;
-    createOffer(&app.peerConnection, pSdpPool, &pOffer);
+    status = createOffer(&app.peerConnection, pSdpPool, &pOffer);
+    TESTCHECK(status, app);
+    setLocalDescription(&app.peerConnection, pOffer);
+    
+    return 0;
 }

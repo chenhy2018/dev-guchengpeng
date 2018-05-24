@@ -61,6 +61,7 @@ typedef struct _TransportIce
     pj_pool_t         *pTimerHeapPool;
     pj_thread_t       *pPollThread;
     pj_pool_t         *pThreadPool;
+    pj_pool_t         *pNegotiationPool;
     IceState iceState;
     pj_ice_strans_cfg iceConfig;
     void *pPeerConnection;
@@ -91,10 +92,9 @@ int createAnswer(IN OUT PeerConnection * pPeerConnection, IN pj_pool_t * pPool,
                  IN pjmedia_sdp_session *pOffer, OUT pjmedia_sdp_session **pAnswer);
 void setLocalDescription(IN OUT PeerConnection * pPeerConnection, IN pjmedia_sdp_session * pLocalSdp);
 void setRemoteDescription(IN OUT PeerConnection * pPeerConnection, IN pjmedia_sdp_session * pRemoteSdp);
+int StartNegotiation(IN PeerConnection * pPeerConnection);
 
 void ReleasePeerConnectoin(IN OUT PeerConnection * _pPeerConnection);
-
-
 
 
 #endif

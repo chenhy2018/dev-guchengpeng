@@ -256,6 +256,11 @@ static void transportIceDestroy(IN OUT TransportIce * _pTransportIce)
         pj_pool_release(_pTransportIce->pTimerHeapPool);
         _pTransportIce->pTimerHeapPool = NULL;
     }
+    
+    if (_pTransportIce->pNegotiationPool) {
+        pj_pool_release(_pTransportIce->pNegotiationPool);
+        _pTransportIce->pNegotiationPool = NULL;
+    }
 }
 
 static pj_status_t createMediaEndpt(IN OUT PeerConnection * _pPeerConnection)
@@ -333,9 +338,8 @@ int AddAudioTrack(IN OUT PeerConnection * _pPeerConnection, IN MediaConfig * _pA
 
     pj_status_t status;
     status = initTransportIce(_pPeerConnection, &_pPeerConnection->transportIce[nAudioIndex]);
-    if(status != PJ_SUCCESS){
-        ReleasePeerConnectoin(_pPeerConnection);
-    }
+    STATUS_CHECK(audio initTransportIce, status);
+
     AddMediaTrack(&_pPeerConnection->mediaStream, _pAudioConfig, nAudioIndex, TYPE_AUDIO);
     _pPeerConnection->nAvIndex[nAudioIndex] = nAudioIndex;
     return PJ_SUCCESS;
@@ -359,9 +363,8 @@ int AddVideoTrack(IN OUT PeerConnection * _pPeerConnection, IN MediaConfig * _pV
     
     pj_status_t status;
     status = initTransportIce(_pPeerConnection, &_pPeerConnection->transportIce[nVideoIndex]);
-    if(status != PJ_SUCCESS){
-        ReleasePeerConnectoin(_pPeerConnection);
-    }
+    STATUS_CHECK(video initTransportIce, status);
+    
     AddMediaTrack(&_pPeerConnection->mediaStream, _pVideoConfig, nVideoIndex, TYPE_VIDEO);
     _pPeerConnection->nAvIndex[nVideoIndex] = nVideoIndex;
     return PJ_SUCCESS;
@@ -487,4 +490,22 @@ void setLocalDescription(IN OUT PeerConnection * _pPeerConnectoin, IN pjmedia_sd
 void setRemoteDescription(IN OUT PeerConnection * _pPeerConnectoin, IN pjmedia_sdp_session * _pRemoteSdp)
 {
     _pPeerConnectoin->pAnswerSdp = _pRemoteSdp;
+}
+
+int StartNegotiation(IN PeerConnection * _pPeerConnection)
+{
+    pj_status_t status;
+    int nMaxTracks = sizeof(_pPeerConnection->nAvIndex) / sizeof(int);
+    for ( int i = 0; i < nMaxTracks; i++) {
+        if (_pPeerConnection->nAvIndex[i] != -1) {
+            TransportIce *pTransportIce = &_pPeerConnection->transportIce[i];
+            pj_pool_t * pIceNegPool = pj_pool_create(_pPeerConnection->pPoolFactory, NULL, 512, 512, NULL);
+            ASSERT_RETURN_CHECK(pj_pool_create, pj_pool_create);
+            pTransportIce->pNegotiationPool = pIceNegPool;
+            status = pjmedia_transport_media_start(pTransportIce->pTransport, pIceNegPool,
+                                            _pPeerConnection->pOfferSdp, _pPeerConnection->pAnswerSdp, 0);
+            STATUS_CHECK(pjmedia_transport_media_start, status);
+        }
+    }
+    return PJ_SUCCESS;
 }
