@@ -448,12 +448,12 @@ int createAnswer(IN OUT PeerConnectoin * _pPeerConnection, IN pj_pool_t * _pPool
     return PJ_SUCCESS;
 }
 
-int setLocalDescription(IN OUT PeerConnectoin * _pPeerConnectoin, IN pjmedia_sdp_session * _pLocalSdp)
+void setLocalDescription(IN OUT PeerConnectoin * _pPeerConnectoin, IN pjmedia_sdp_session * _pLocalSdp)
 {
     _pPeerConnectoin->pOfferSdp = _pLocalSdp;
 }
 
-int setRemoteDescription(IN OUT PeerConnectoin * _pPeerConnectoin, IN pjmedia_sdp_session * _pRemoteSdp)
+void setRemoteDescription(IN OUT PeerConnectoin * _pPeerConnectoin, IN pjmedia_sdp_session * _pRemoteSdp)
 {
     _pPeerConnectoin->pAnswerSdp = _pRemoteSdp;
 }

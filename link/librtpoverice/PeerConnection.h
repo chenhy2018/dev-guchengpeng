@@ -88,8 +88,8 @@ int AddVideoTrack(IN OUT PeerConnectoin * pPeerConnection, IN MediaConfig *pVide
 int createOffer(IN OUT PeerConnectoin * pPeerConnection, IN pj_pool_t * pPool, OUT pjmedia_sdp_session **pOffer);
 int createAnswer(IN OUT PeerConnectoin * pPeerConnection, IN pj_pool_t * pPool,
                  IN pjmedia_sdp_session *pOffer, OUT pjmedia_sdp_session **pAnswer);
-int setLocalDescription(IN OUT PeerConnectoin * pPeerConnection, IN pjmedia_sdp_session * pLocalSdp);
-int setRemoteDescription(IN OUT PeerConnectoin * pPeerConnection, IN pjmedia_sdp_session * pRemoteSdp);
+void setLocalDescription(IN OUT PeerConnectoin * pPeerConnection, IN pjmedia_sdp_session * pLocalSdp);
+void setRemoteDescription(IN OUT PeerConnectoin * pPeerConnection, IN pjmedia_sdp_session * pRemoteSdp);
 
 void ReleasePeerConnectoin(IN OUT PeerConnectoin * _pPeerConnection);
 
