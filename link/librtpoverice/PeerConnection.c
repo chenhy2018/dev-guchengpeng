@@ -1,5 +1,19 @@
 #include "PeerConnection.h"
 
+static int waitState(IN TransportIce *_pTransportIce, IN IceState currentState)
+{
+    int nCnt = 0;
+    do{
+        if (nCnt > 5) {
+            return 1; //fail
+        }
+        nCnt++;
+        pj_thread_sleep(500);
+    }while(_pTransportIce->iceState == currentState);
+    
+    return 0;
+}
+
 
 static void onIceComplete2(pjmedia_transport *tp, pj_ice_strans_op op,
                       pj_status_t status, void *user_data) {
@@ -408,11 +422,11 @@ static int createSdp(IN OUT PeerConnection * _pPeerConnection, IN pj_pool_t * _p
     int nMaxTracks = sizeof(_pPeerConnection->nAvIndex) / sizeof(int);
     for ( int i = 0; i < nMaxTracks; i++) {
         if (_pPeerConnection->nAvIndex[i] != -1) {
-            //TEST
-            do{
-                pj_thread_sleep(500);
-            }while(_pPeerConnection->transportIce[i].iceState == ICE_STATE_INIT);
-            //END
+            if (waitState(&_pPeerConnection->transportIce[i], ICE_STATE_INIT)) {
+                PJ_LOG(3,(__FILE__, "wait ICE_STATE_GATHERING_OK timeout"));
+                return 0;
+            }
+            
             if (_pPeerConnection->mediaStream.streamTracks[i].type == TYPE_AUDIO) {
                 status = createMediaSdpMLine(_pPeerConnection->pMediaEndpt, _pPeerConnection->transportIce[i].pTransport, _pPool,
                                              &_pPeerConnection->mediaStream.streamTracks[i], &pAudioSdp);
@@ -499,12 +513,31 @@ int StartNegotiation(IN PeerConnection * _pPeerConnection)
     for ( int i = 0; i < nMaxTracks; i++) {
         if (_pPeerConnection->nAvIndex[i] != -1) {
             TransportIce *pTransportIce = &_pPeerConnection->transportIce[i];
+            
+            pjmedia_transport_info tpinfo;
+            pjmedia_transport_info_init(&tpinfo);
+            pjmedia_transport_get_info(pTransportIce->pTransport, &tpinfo);
+            
+            pjmedia_transport_attach(pTransportIce->pTransport, NULL,
+                                     &tpinfo.sock_info.rtp_addr_name,
+                                     &tpinfo.sock_info.rtcp_addr_name,
+                                     sizeof(tpinfo.sock_info.rtp_addr_name),
+                                     NULL, //void (*rtp_cb)(void *user_data, void *pkt,pj_ssize_t),
+                                     NULL //void (*rtcp_cb)(void *usr_data,void*pkt,pj_ssize_t)
+                                     );
+            
+            
             pj_pool_t * pIceNegPool = pj_pool_create(_pPeerConnection->pPoolFactory, NULL, 512, 512, NULL);
-            ASSERT_RETURN_CHECK(pj_pool_create, pj_pool_create);
+            ASSERT_RETURN_CHECK(pIceNegPool, pj_pool_create);
             pTransportIce->pNegotiationPool = pIceNegPool;
             status = pjmedia_transport_media_start(pTransportIce->pTransport, pIceNegPool,
                                             _pPeerConnection->pOfferSdp, _pPeerConnection->pAnswerSdp, 0);
             STATUS_CHECK(pjmedia_transport_media_start, status);
+            
+            if (waitState(&_pPeerConnection->transportIce[i], ICE_STATE_GATHERING_OK)){
+                PJ_LOG(3,(__FILE__, "wait ICE_STATE_NEGOTIATION_OK timeout"));
+                return 0;
+            }
         }
     }
     return PJ_SUCCESS;

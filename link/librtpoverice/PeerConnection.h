@@ -16,6 +16,9 @@
 
 #include "MediaStream.h"
 
+typedef void(*RtpReceiveCallback)(void *user_data, void *pkt, pj_ssize_t);
+typedef void(*RtcpReceiveCallback)(void *usr_data, void*pkt, pj_ssize_t);
+
 #define MAX_NAMESERVER_SIZE 128
 #define MAX_STUN_HOST_SIZE  128
 #define MAX_TURN_HOST_SIZE  128
