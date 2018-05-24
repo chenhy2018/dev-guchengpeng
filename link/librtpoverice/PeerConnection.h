@@ -45,6 +45,13 @@ typedef struct _IceConfig
     
 }IceConfig;
 
+typedef enum _IceState{
+    ICE_STATE_INIT,
+    ICE_STATE_GATHERING_OK,
+    ICE_STATE_NEGOTIATION_OK,
+    ICE_STATE_FAIL,
+}IceState;
+
 typedef struct _TransportIce
 {
     pjmedia_transport *pTransport;
@@ -54,19 +61,14 @@ typedef struct _TransportIce
     pj_pool_t         *pTimerHeapPool;
     pj_thread_t       *pPollThread;
     pj_pool_t         *pThreadPool;
+    IceState iceState;
+    pj_ice_strans_cfg iceConfig;
+    void *pPeerConnection;
 }TransportIce;
-
-typedef enum _IceState{
-    ICE_STATE_INIT,
-    ICE_STATE_GATHERING_OK,
-    ICE_STATE_NEGOTIATION_OK,
-    ICE_STATE_FAIL,
-}IceState;
 
 typedef struct _PeerConnectoin
 {
     IceConfig         userIceConfig;
-    pj_ice_strans_cfg iceConfig;
     TransportIce      transportIce[2]; //audio and video
     int               nAvIndex[2];
     pj_pool_factory   *pPoolFactory;
@@ -75,12 +77,11 @@ typedef struct _PeerConnectoin
     pjmedia_sdp_session *pOfferSdp;
     pjmedia_sdp_session *pAnswerSdp;
     int bQuit;
-    IceState iceState;
 }PeerConnectoin;
 
 void InitIceConfig(IN OUT IceConfig *pIceConfig);
 
-int InitPeerConnectoin(IN OUT PeerConnectoin * pPeerConnectoin, IN IceConfig *pIceConfig,
+void InitPeerConnectoin(IN OUT PeerConnectoin * pPeerConnectoin, IN IceConfig *pIceConfig,
                        IN pj_pool_factory * pPoolFactory);
 
 int AddAudioTrack(IN OUT PeerConnectoin * pPeerConnection, IN MediaConfig *pAudioConfig);

@@ -39,5 +39,7 @@ int main(int argc, char **argv)
     app.videoConfig.videoConfig.format = MEDIA_FORMAT_H264;
     AddVideoTrack(&app.peerConnection, &app.videoConfig);
     
-    //createOffer(&app.peerConnectoin, IN pj_pool_t * pPool, OUT pjmedia_sdp_session **pOffer);
+    pj_pool_t * pSdpPool = pj_pool_create(&app.cachingPool.factory, NULL, 1024, 512, NULL);
+    pjmedia_sdp_session *pOffer = NULL;
+    createOffer(&app.peerConnection, pSdpPool, &pOffer);
 }

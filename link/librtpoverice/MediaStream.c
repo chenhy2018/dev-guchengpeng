@@ -35,9 +35,12 @@ int CreateSdpAudioMLine(IN pjmedia_endpt *_pMediaEndpt, IN pjmedia_transport_inf
     status = pjmedia_endpt_create_audio_sdp(_pMediaEndpt, _pPool, &_pTransportInfo->sock_info, 0, _pAudioSdp);
     STATUS_CHECK(pjmedia_endpt_create_audio_sdp, status);
     
+    pj_str_t * fmt;
     switch (_pMediaTrack->mediaConfig.audioConfig.format) {
         case MEDIA_FORMAT_PCMU:
-            (*_pAudioSdp)->desc.fmt[(*_pAudioSdp)->desc.fmt_count++] = pj_str("0");
+            fmt = &((*_pAudioSdp)->desc.fmt[(*_pAudioSdp)->desc.fmt_count++]);
+            fmt->ptr = "0";
+            fmt->slen = 1;
             break;
         case MEDIA_FORMAT_H264:
             break;
@@ -52,12 +55,15 @@ int CreateSdpVideoMLine(IN pjmedia_endpt *_pMediaEndpt, IN pjmedia_transport_inf
     pj_assert(_pMediaTrack->type == TYPE_VIDEO);
     
     pj_status_t status;
-    status = pjmedia_endpt_create_audio_sdp(_pMediaEndpt, _pPool, &_pTransportInfo->sock_info, 0, _pVideoSdp);
+    status = pjmedia_endpt_create_video_sdp(_pMediaEndpt, _pPool, &_pTransportInfo->sock_info, 0, _pVideoSdp);
     STATUS_CHECK(pjmedia_endpt_create_audio_sdp, status);
     
+    pj_str_t * fmt;
     switch (_pMediaTrack->mediaConfig.videoConfig.format) {
         case MEDIA_FORMAT_H264:
-            (*_pVideoSdp)->desc.fmt[(*_pVideoSdp)->desc.fmt_count++] = pj_str("116");
+            fmt = &((*_pVideoSdp)->desc.fmt[(*_pVideoSdp)->desc.fmt_count++]);
+            fmt->ptr = "116";
+            fmt->slen = 3;
             pjmedia_sdp_attr *pAttr = NULL;
             pjmedia_sdp_rtpmap rtpmap;
             pj_bzero(&rtpmap, sizeof(rtpmap));

@@ -3,24 +3,24 @@
 
 static void onIceComplete2(pjmedia_transport *tp, pj_ice_strans_op op,
                       pj_status_t status, void *user_data) {
-    PeerConnectoin *pPeerConnectoin = (PeerConnectoin *)user_data;
+    TransportIce *pTransportIce = (TransportIce *)user_data;
     
     if(status != PJ_SUCCESS){
-        pPeerConnectoin->iceState = ICE_STATE_FAIL;
+        pTransportIce->iceState = ICE_STATE_FAIL;
         return;
     }
-    pPeerConnectoin->iceState =  op;
+    //pTransportIce->iceState =  op;
     switch (op) {
             /** Initialization (candidate gathering) */
         case PJ_ICE_STRANS_OP_INIT:
-            pPeerConnectoin->iceState = ICE_STATE_GATHERING_OK;
+            pTransportIce->iceState = ICE_STATE_GATHERING_OK;
             printf("--->gathering candidates finish\n");
             break;
             
             /** Negotiation */
         case PJ_ICE_STRANS_OP_NEGOTIATION:
             printf("--->PJ_ICE_STRANS_OP_NEGOTIATION\n");
-            pPeerConnectoin->iceState = ICE_STATE_NEGOTIATION_OK;
+            pTransportIce->iceState = ICE_STATE_NEGOTIATION_OK;
             break;
             
             /** This operation is used to report failure in keep-alive operation.
@@ -38,8 +38,9 @@ static void onIceComplete2(pjmedia_transport *tp, pj_ice_strans_op op,
 
 static int iceWorkerThread(void * _pArg)
 {
-    PeerConnectoin * pPeerConnection = (PeerConnectoin *)_pArg;
-    pj_ice_strans_cfg * pIceCfg = &pPeerConnection->iceConfig;
+    TransportIce * pTransportIce = (TransportIce *)_pArg;
+    pj_ice_strans_cfg * pIceCfg = &pTransportIce->iceConfig;
+    PeerConnectoin * pPeerConnection = (PeerConnectoin*)pTransportIce->pPeerConnection;
     
     while (!pPeerConnection->bQuit) {
         enum { MAX_NET_EVENTS = 1 };
@@ -101,73 +102,70 @@ static int iceWorkerThread(void * _pArg)
 
 static int peerConnectInitIceConfig(IN OUT PeerConnectoin * _pPeerConnectoin)
 {
-    pj_assert(_pPeerConnectoin->pMediaEndpt);
-    
-    pj_ice_strans_cfg * pIceCfg = &_pPeerConnectoin->iceConfig;
-    pj_ice_strans_cfg_default(pIceCfg);
-    
-    //stun turn deprecated
-    pj_bzero(&pIceCfg->stun, sizeof(pIceCfg->stun));
-    pj_bzero(&pIceCfg->turn, sizeof(pIceCfg->turn));
-    
-    pIceCfg->af = pj_AF_INET();
-    
-    IceConfig *pUserIceConfig = &_pPeerConnectoin->userIceConfig;
-    if (pUserIceConfig->bRegular) {
-        pIceCfg->opt.aggressive = PJ_FALSE;
-    } else {
-        pIceCfg->opt.aggressive = PJ_TRUE;
-    }
-    
-    
-    if (pUserIceConfig->nMaxHosts > 0 || pUserIceConfig->stunHost[0] != '\0') {
-        pIceCfg->stun_tp_cnt = 1;
-        pj_ice_strans_stun_cfg_default(&pIceCfg->stun_tp[0]);
+    for (int i = 0; i < sizeof(_pPeerConnectoin->transportIce) / sizeof(TransportIce); i++) {
+        pj_ice_strans_cfg * pIceCfg = &_pPeerConnectoin->transportIce[i].iceConfig;
+        pj_ice_strans_cfg_default(pIceCfg);
         
-        pIceCfg->stun_tp[0].max_host_cands = pUserIceConfig->nMaxHosts;
-        if (pUserIceConfig->stunHost[0] != '\0') {
-            pIceCfg->stun_tp[0].server = pj_str(pUserIceConfig->stunHost);
-        }
-        if (pUserIceConfig->nKeepAlive > 0) {
-            pIceCfg->stun_tp[0].cfg.ka_interval = pUserIceConfig->nKeepAlive;
-        }
-        if (pUserIceConfig->nKeepAlive > 0) {
-            pIceCfg->stun_tp[0].cfg.ka_interval = pUserIceConfig->nKeepAlive;
-        }
-    }
-    
-    
-    if (pUserIceConfig->turnHost[0] != '\0') {
-        pIceCfg->turn_tp_cnt = 1;
-        pj_ice_strans_turn_cfg_default(&pIceCfg->turn_tp[0]);
+        //stun turn deprecated
+        pj_bzero(&pIceCfg->stun, sizeof(pIceCfg->stun));
+        pj_bzero(&pIceCfg->turn, sizeof(pIceCfg->turn));
         
-        pIceCfg->turn_tp[0].server = pj_str(pUserIceConfig->turnHost);
-        pIceCfg->turn_tp[0].port = PJ_STUN_PORT;
+        pIceCfg->af = pj_AF_INET();
         
-        if (pUserIceConfig->turnUsername[0] != '\0') {
-            pIceCfg->turn_tp[0].auth_cred.type = PJ_STUN_AUTH_CRED_STATIC;
-            pIceCfg->turn_tp[0].auth_cred.data.static_cred.username = pj_str(pUserIceConfig->turnUsername);
-            pIceCfg->turn_tp[0].auth_cred.data.static_cred.data_type = PJ_STUN_PASSWD_PLAIN;
-            pIceCfg->turn_tp[0].auth_cred.data.static_cred.data = pj_str(pUserIceConfig->turnPassword);
-        }
-        
-        if (pUserIceConfig->bTurnTcp) {
-            pIceCfg->turn_tp[0].conn_type = PJ_TURN_TP_TCP;
+        IceConfig *pUserIceConfig = &_pPeerConnectoin->userIceConfig;
+        if (pUserIceConfig->bRegular) {
+            pIceCfg->opt.aggressive = PJ_FALSE;
         } else {
-            pIceCfg->turn_tp[0].conn_type = PJ_TURN_TP_UDP;
+            pIceCfg->opt.aggressive = PJ_TRUE;
         }
-    }
-    
-    pj_status_t status;
-    if (pUserIceConfig->nameserver[0] != '\0') {
-        pj_str_t nameserver = pj_str(pUserIceConfig->nameserver);
-        status = pj_dns_resolver_create(_pPeerConnectoin->pPoolFactory, "resolver", 0,
-                                        pIceCfg->stun_cfg.timer_heap,
-                                        pIceCfg->stun_cfg.ioqueue,
-                                        &pIceCfg->resolver);
-        STATUS_CHECK(pj_dns_resolver_create, status);
-        status = pj_dns_resolver_set_ns(pIceCfg->resolver, 1, &nameserver, NULL);
-        STATUS_CHECK(pj_dns_resolver_set_ns, status);
+        
+        
+        if (pUserIceConfig->nMaxHosts > 0 || pUserIceConfig->stunHost[0] != '\0') {
+            pIceCfg->stun_tp_cnt = 1;
+            pj_ice_strans_stun_cfg_default(&pIceCfg->stun_tp[0]);
+            
+            pIceCfg->stun_tp[0].max_host_cands = pUserIceConfig->nMaxHosts;
+            if (pUserIceConfig->stunHost[0] != '\0') {
+                pIceCfg->stun_tp[0].server = pj_str(pUserIceConfig->stunHost);
+            }
+            if (pUserIceConfig->nKeepAlive > 0) {
+                pIceCfg->stun_tp[0].cfg.ka_interval = pUserIceConfig->nKeepAlive;
+            }
+        }
+        
+        
+        if (pUserIceConfig->turnHost[0] != '\0') {
+            pIceCfg->turn_tp_cnt = 1;
+            pj_ice_strans_turn_cfg_default(&pIceCfg->turn_tp[0]);
+            
+            pIceCfg->turn_tp[0].server = pj_str(pUserIceConfig->turnHost);
+            pIceCfg->turn_tp[0].port = PJ_STUN_PORT;
+            
+            if (pUserIceConfig->turnUsername[0] != '\0') {
+                pIceCfg->turn_tp[0].auth_cred.type = PJ_STUN_AUTH_CRED_STATIC;
+                pIceCfg->turn_tp[0].auth_cred.data.static_cred.username = pj_str(pUserIceConfig->turnUsername);
+                pIceCfg->turn_tp[0].auth_cred.data.static_cred.data_type = PJ_STUN_PASSWD_PLAIN;
+                pIceCfg->turn_tp[0].auth_cred.data.static_cred.data = pj_str(pUserIceConfig->turnPassword);
+            }
+            
+            if (pUserIceConfig->bTurnTcp) {
+                pIceCfg->turn_tp[0].conn_type = PJ_TURN_TP_TCP;
+            } else {
+                pIceCfg->turn_tp[0].conn_type = PJ_TURN_TP_UDP;
+            }
+        }
+        
+        pj_status_t status;
+        if (pUserIceConfig->nameserver[0] != '\0') {
+            pj_str_t nameserver = pj_str(pUserIceConfig->nameserver);
+            status = pj_dns_resolver_create(_pPeerConnectoin->pPoolFactory, "resolver", 0,
+                                            pIceCfg->stun_cfg.timer_heap,
+                                            pIceCfg->stun_cfg.ioqueue,
+                                            &pIceCfg->resolver);
+            STATUS_CHECK(pj_dns_resolver_create, status);
+            status = pj_dns_resolver_set_ns(pIceCfg->resolver, 1, &nameserver, NULL);
+            STATUS_CHECK(pj_dns_resolver_set_ns, status);
+        }
     }
     return PJ_SUCCESS;
 }
@@ -194,14 +192,16 @@ static pj_status_t initTransportIce(IN PeerConnectoin * _pPeerConnectoin, OUT Tr
     _pTransportIce->pTimerHeap = pTimerHeap;
     
     
-    pj_stun_config_init(&_pPeerConnectoin->iceConfig.stun_cfg, _pPeerConnectoin->pPoolFactory, 0,
+    pj_stun_config_init(&_pTransportIce->iceConfig.stun_cfg, _pPeerConnectoin->pPoolFactory, 0,
                         pIoQueue, pTimerHeap);
     
+    _pTransportIce->pPeerConnection = _pPeerConnectoin;
+    
     pj_thread_t * pThread;
-    pj_pool_t * pThreadPool = pj_pool_create(_pPeerConnectoin->pPoolFactory, NULL, 2048, 1024, NULL);
+    pj_pool_t * pThreadPool = pj_pool_create(_pPeerConnectoin->pPoolFactory, NULL, 512, 512, NULL);
     ASSERT_RETURN_CHECK(pThreadPool, pj_pool_create);
     _pTransportIce->pThreadPool = pThreadPool;
-    status = pj_thread_create(pThreadPool, NULL, &iceWorkerThread, _pPeerConnectoin, 0, 0, &pThread);
+    status = pj_thread_create(pThreadPool, NULL, &iceWorkerThread, _pTransportIce, 0, 0, &pThread);
     STATUS_CHECK(pj_thread_create, status);
     _pTransportIce->pPollThread = pThread;
     
@@ -211,9 +211,9 @@ static pj_status_t initTransportIce(IN PeerConnectoin * _pPeerConnectoin, OUT Tr
     
     pjmedia_transport *transport = NULL;
     status = pjmedia_ice_create3(_pPeerConnectoin->pMediaEndpt, NULL, _pPeerConnectoin->userIceConfig.nComponents,
-                                 &_pPeerConnectoin->iceConfig, &cb, 0, _pPeerConnectoin, &transport);
+                                 &_pTransportIce->iceConfig, &cb, 0, _pPeerConnectoin, &transport);
     STATUS_CHECK(pjmedia_ice_create3, status);
-    pjmedia_ice_add_ice_cb(transport, &cb, _pPeerConnectoin);
+    pjmedia_ice_add_ice_cb(transport, &cb, _pTransportIce);
     _pTransportIce->pTransport = transport;
     
     return PJ_SUCCESS;
@@ -258,6 +258,22 @@ static void transportIceDestroy(IN OUT TransportIce * _pTransportIce)
     }
 }
 
+static pj_status_t createMediaEndpt(IN OUT PeerConnectoin * _pPeerConnection)
+{
+    if (_pPeerConnection->pMediaEndpt != NULL) {
+        return PJ_SUCCESS;
+    }
+    
+    pj_status_t status;
+    
+    status = pjmedia_endpt_create(_pPeerConnection->pPoolFactory, NULL, 1, &_pPeerConnection->pMediaEndpt);
+    STATUS_CHECK(pjmedia_endpt_create, status);
+    int nNoTelephoneEvent = 0;
+    status = pjmedia_endpt_set_flag(_pPeerConnection->pMediaEndpt, PJMEDIA_ENDPT_HAS_TELEPHONE_EVENT_FLAG, (void *)&nNoTelephoneEvent);
+    STATUS_CHECK(pjmedia_endpt_set_flag, status);
+    return status;
+}
+
 void InitIceConfig(IN OUT IceConfig *_pIceConfig)
 {
     pj_bzero(_pIceConfig, sizeof(IceConfig));
@@ -268,25 +284,20 @@ void InitIceConfig(IN OUT IceConfig *_pIceConfig)
     _pIceConfig->nKeepAlive = 300;
 }
 
-int InitPeerConnectoin(IN OUT PeerConnectoin * _pPeerConnection, IN IceConfig *_pIceConfig, IN pj_pool_factory * _pPoolFactory)
+void InitPeerConnectoin(IN OUT PeerConnectoin * _pPeerConnection, IN IceConfig *_pIceConfig, IN pj_pool_factory * _pPoolFactory)
 {
     pj_memset(_pPeerConnection, 0, sizeof(PeerConnectoin));
     
     _pPeerConnection->userIceConfig = *_pIceConfig;
     _pPeerConnection->pPoolFactory = _pPoolFactory;
     
-    pj_status_t status;
-    status = pjmedia_endpt_create(_pPeerConnection->pPoolFactory, NULL, 1, &_pPeerConnection->pMediaEndpt);
-    STATUS_CHECK(pjmedia_endpt_create, status);
-
-    pjmedia_endpt_set_flag(_pPeerConnection->pMediaEndpt, PJMEDIA_ENDPT_HAS_TELEPHONE_EVENT_FLAG, (void *)0);
-    
     peerConnectInitIceConfig(_pPeerConnection);
+    
     for ( int i = 0; i < sizeof(_pPeerConnection->nAvIndex) / sizeof(int); i++) {
         _pPeerConnection->nAvIndex[i] = -1;
     }
     
-    return status;
+    return ;
 }
 
 void ReleasePeerConnectoin(IN OUT PeerConnectoin * _pPeerConnection)
@@ -306,6 +317,8 @@ void ReleasePeerConnectoin(IN OUT PeerConnectoin * _pPeerConnection)
 
 int AddAudioTrack(IN OUT PeerConnectoin * _pPeerConnection, IN MediaConfig * _pAudioConfig)
 {
+    createMediaEndpt(_pPeerConnection);
+    
     //TODO dupicated check
     int nAudioIndex;
     int nMaxTracks = sizeof(_pPeerConnection->nAvIndex) / sizeof(int);
@@ -324,11 +337,14 @@ int AddAudioTrack(IN OUT PeerConnectoin * _pPeerConnection, IN MediaConfig * _pA
         ReleasePeerConnectoin(_pPeerConnection);
     }
     AddMediaTrack(&_pPeerConnection->mediaStream, _pAudioConfig, nAudioIndex, TYPE_AUDIO);
+    _pPeerConnection->nAvIndex[nAudioIndex] = nAudioIndex;
     return PJ_SUCCESS;
 }
 
 int AddVideoTrack(IN OUT PeerConnectoin * _pPeerConnection, IN MediaConfig * _pVideoConfig)
 {
+    createMediaEndpt(_pPeerConnection);
+    
     //TODO dupicated check
     int nVideoIndex;
     int nMaxTracks = sizeof(_pPeerConnection->nAvIndex) / sizeof(int);
@@ -347,6 +363,7 @@ int AddVideoTrack(IN OUT PeerConnectoin * _pPeerConnection, IN MediaConfig * _pV
         ReleasePeerConnectoin(_pPeerConnection);
     }
     AddMediaTrack(&_pPeerConnection->mediaStream, _pVideoConfig, nVideoIndex, TYPE_VIDEO);
+    _pPeerConnection->nAvIndex[nVideoIndex] = nVideoIndex;
     return PJ_SUCCESS;
 }
 
@@ -359,9 +376,9 @@ static int createMediaSdpMLine(IN pjmedia_endpt *_pMediaEndpt, IN pjmedia_transp
     
     pj_status_t status = PJ_SUCCESS;
     if (_pMediaTrack->type == TYPE_AUDIO) {
-        status = pjmedia_endpt_create_audio_sdp(_pMediaEndpt, _pPool, &tpinfo.sock_info, 0, _pSdp);
+        status = CreateSdpAudioMLine(_pMediaEndpt, &tpinfo, _pPool, _pMediaTrack, _pSdp);
     } else {
-        status = pjmedia_endpt_create_video_sdp(_pMediaEndpt, _pPool, &tpinfo.sock_info, 0, _pSdp);
+        status = CreateSdpVideoMLine(_pMediaEndpt, &tpinfo, _pPool, _pMediaTrack, _pSdp);
     }
     
     return status;
@@ -388,6 +405,11 @@ static int createSdp(IN OUT PeerConnectoin * _pPeerConnection, IN pj_pool_t * _p
     int nMaxTracks = sizeof(_pPeerConnection->nAvIndex) / sizeof(int);
     for ( int i = 0; i < nMaxTracks; i++) {
         if (_pPeerConnection->nAvIndex[i] != -1) {
+            //TEST
+            do{
+                pj_thread_sleep(500);
+            }while(_pPeerConnection->transportIce[i].iceState == ICE_STATE_INIT);
+            //END
             if (_pPeerConnection->mediaStream.streamTracks[i].type == TYPE_AUDIO) {
                 status = createMediaSdpMLine(_pPeerConnection->pMediaEndpt, _pPeerConnection->transportIce[i].pTransport, _pPool,
                                              &_pPeerConnection->mediaStream.streamTracks[i], &pAudioSdp);
@@ -412,6 +434,11 @@ int createOffer(IN OUT PeerConnectoin * _pPeerConnection, IN pj_pool_t * _pPool,
     status = createSdp(_pPeerConnection, _pPool, _pOffer);
     STATUS_CHECK(createSdp, status);
     
+    char sdpStr[2048];
+    memset(sdpStr, 0, 2048);
+    pjmedia_sdp_print(*_pOffer, sdpStr, sizeof(sdpStr));
+    printf("%s\n", sdpStr);
+    
     int nMaxTracks = sizeof(_pPeerConnection->nAvIndex) / sizeof(int);
     for ( int i = 0; i < nMaxTracks; i++) {
         if (_pPeerConnection->nAvIndex[i] != -1) {
@@ -422,6 +449,10 @@ int createOffer(IN OUT PeerConnectoin * _pPeerConnection, IN pj_pool_t * _pPool,
             STATUS_CHECK(pjmedia_transport_encode_sdp, status);
         }
     }
+    
+    memset(sdpStr, 0, 2048);
+    pjmedia_sdp_print(*_pOffer, sdpStr, sizeof(sdpStr));
+    printf("----------------\n%s\n", sdpStr);
     
     return PJ_SUCCESS;
 }
