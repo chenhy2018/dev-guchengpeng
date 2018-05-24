@@ -60,6 +60,7 @@ static int SipGetAccountIdFromRxData(IN const pjsip_rx_data *_pRxData);
 static pj_bool_t SipUpdateContactIfNat(IN SipAccount *_pAccount, IN struct pjsip_regc_cbparam *_pCbData);
 
 static int CreateTmpSDP(pj_pool_t *pPool, SipCall *pCall, pjmedia_sdp_session **pSdp);
+
 /* This is a PJSIP module to be registered by application to handle
  * incoming requests outside any dialogs/transactions. The main purpose
  * here is to handle incoming INVITE request message, where we will
@@ -228,6 +229,7 @@ int SipCreateInstance(IN const SipCallBack *_pSipCallBack)
         for(i = 0; i < SIP_MAX_CALLS; ++i) {
                 SipAppData.Calls[i].nIndex = i;
                 SipAppData.Calls[i].bValid = PJ_FALSE;
+                SipAppData.Calls[i].nAccountId = -1;
         }
 
         /* Create a thraed to pull pjsip endpoint transport event*/
@@ -544,7 +546,6 @@ static void onSipRegc(IN struct pjsip_regc_cbparam *_pCbData)
                 pjsip_regc_destroy(pAccount->pRegc);
                 pAccount->pRegc = NULL;
                 pAccount->Contact.slen = 0;
-
                 /* Stop keep alive timer */
                 UpdateKeepAlive(pAccount, PJ_FALSE, NULL);
         } else if (_pCbData->code < 0 || _pCbData->code >= 300) {
@@ -583,6 +584,16 @@ static void onSipRegc(IN struct pjsip_regc_cbparam *_pCbData)
         }
         pj_mutex_unlock(SipAppData.pMutex);
 
+        /* hangup call if re-registration attempt failed */
+        if (_pCbData->code == PJSIP_SC_REQUEST_TIMEOUT ||
+             _pCbData->code == PJSIP_SC_INTERNAL_SERVER_ERROR ||
+             _pCbData->code == PJSIP_SC_BAD_GATEWAY ||
+             _pCbData->code == PJSIP_SC_SERVICE_UNAVAILABLE ||
+             _pCbData->code == PJSIP_SC_SERVER_TIMEOUT ||
+             _pCbData->code == PJSIP_SC_TEMPORARILY_UNAVAILABLE ||
+            PJSIP_IS_STATUS_IN_CLASS(_pCbData->code, 600)) {
+                SipHangUpByAccountId(pAccount->nIndex);
+        }
 }
 static void UpdateKeepAlive(INOUT SipAccount *_pAccount, IN const pj_bool_t _Start, IN const struct pjsip_regc_cbparam *_pCbData)
 {
@@ -712,10 +723,12 @@ static void onSipRegcTsx(IN struct pjsip_regc_tsx_cb_param *_pCbData)
 {
         PJ_LOG(3, (THIS_FILE, "call onSipRegcTsx"));
         // TODO update concat
-        SipAccount *pAccount = (SipAccount *)_pCbData->cbparam.token;
-        if (SipUpdateContactIfNat(pAccount, &_pCbData->cbparam)) {
-                _pCbData->contact_cnt = 1;
-                _pCbData->contact[0] = pAccount->Contact;
+        if (_pCbData->cbparam.code >= 400 && _pCbData->cbparam.rdata) {
+                SipAccount *pAccount = (SipAccount *)_pCbData->cbparam.token;
+                if (SipUpdateContactIfNat(pAccount, &_pCbData->cbparam)) {
+                        _pCbData->contact_cnt = 1;
+                        _pCbData->contact[0] = pAccount->Contact;
+                }
         }
 }
 
@@ -880,6 +893,16 @@ void SipHangUpAll()
         int i;
         for (i = 0; i < SIP_MAX_CALLS; ++i) {
                 SipHangUp(SipAppData.Calls[i].nIndex);
+        }
+}
+
+void SipHangUpByAccountId(int _nAccountId)
+{
+        int i;
+        for (i = 0; i < SIP_MAX_CALLS; ++i) {
+                if (SipAppData.Calls[i].bValid == PJ_TRUE && SipAppData.Calls[i].nAccountId == _nAccountId)
+                        PJ_LOG(3, (THIS_FILE, "Disconnecting call of account #%d, after reregistration attempt failed", _nAccountId));
+                        SipHangUp(SipAppData.Calls[i].nIndex);
         }
 }
 /* Callback to be called to handle incoming requests outside dialogs: */
