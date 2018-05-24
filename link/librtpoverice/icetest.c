@@ -1,7 +1,7 @@
 #include "PeerConnection.h"
 
 typedef struct _App{
-    PeerConnectoin peerConnection;
+    PeerConnection peerConnection;
     pj_caching_pool cachingPool;
     MediaConfig audioConfig;
     MediaConfig videoConfig;

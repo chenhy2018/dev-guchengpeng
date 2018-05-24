@@ -66,7 +66,7 @@ typedef struct _TransportIce
     void *pPeerConnection;
 }TransportIce;
 
-typedef struct _PeerConnectoin
+typedef struct _PeerConnection
 {
     IceConfig         userIceConfig;
     TransportIce      transportIce[2]; //audio and video
@@ -77,22 +77,22 @@ typedef struct _PeerConnectoin
     pjmedia_sdp_session *pOfferSdp;
     pjmedia_sdp_session *pAnswerSdp;
     int bQuit;
-}PeerConnectoin;
+}PeerConnection;
 
 void InitIceConfig(IN OUT IceConfig *pIceConfig);
 
-void InitPeerConnectoin(IN OUT PeerConnectoin * pPeerConnectoin, IN IceConfig *pIceConfig,
+void InitPeerConnectoin(IN OUT PeerConnection * pPeerConnectoin, IN IceConfig *pIceConfig,
                        IN pj_pool_factory * pPoolFactory);
 
-int AddAudioTrack(IN OUT PeerConnectoin * pPeerConnection, IN MediaConfig *pAudioConfig);
-int AddVideoTrack(IN OUT PeerConnectoin * pPeerConnection, IN MediaConfig *pVideoConfig);
-int createOffer(IN OUT PeerConnectoin * pPeerConnection, IN pj_pool_t * pPool, OUT pjmedia_sdp_session **pOffer);
-int createAnswer(IN OUT PeerConnectoin * pPeerConnection, IN pj_pool_t * pPool,
+int AddAudioTrack(IN OUT PeerConnection * pPeerConnection, IN MediaConfig *pAudioConfig);
+int AddVideoTrack(IN OUT PeerConnection * pPeerConnection, IN MediaConfig *pVideoConfig);
+int createOffer(IN OUT PeerConnection * pPeerConnection, IN pj_pool_t * pPool, OUT pjmedia_sdp_session **pOffer);
+int createAnswer(IN OUT PeerConnection * pPeerConnection, IN pj_pool_t * pPool,
                  IN pjmedia_sdp_session *pOffer, OUT pjmedia_sdp_session **pAnswer);
-void setLocalDescription(IN OUT PeerConnectoin * pPeerConnection, IN pjmedia_sdp_session * pLocalSdp);
-void setRemoteDescription(IN OUT PeerConnectoin * pPeerConnection, IN pjmedia_sdp_session * pRemoteSdp);
+void setLocalDescription(IN OUT PeerConnection * pPeerConnection, IN pjmedia_sdp_session * pLocalSdp);
+void setRemoteDescription(IN OUT PeerConnection * pPeerConnection, IN pjmedia_sdp_session * pRemoteSdp);
 
-void ReleasePeerConnectoin(IN OUT PeerConnectoin * _pPeerConnection);
+void ReleasePeerConnectoin(IN OUT PeerConnection * _pPeerConnection);
 
 
 

@@ -40,7 +40,7 @@ static int iceWorkerThread(void * _pArg)
 {
     TransportIce * pTransportIce = (TransportIce *)_pArg;
     pj_ice_strans_cfg * pIceCfg = &pTransportIce->iceConfig;
-    PeerConnectoin * pPeerConnection = (PeerConnectoin*)pTransportIce->pPeerConnection;
+    PeerConnection * pPeerConnection = (PeerConnection*)pTransportIce->pPeerConnection;
     
     while (!pPeerConnection->bQuit) {
         enum { MAX_NET_EVENTS = 1 };
@@ -100,7 +100,7 @@ static int iceWorkerThread(void * _pArg)
     return 0;
 }
 
-static int peerConnectInitIceConfig(IN OUT PeerConnectoin * _pPeerConnectoin)
+static int peerConnectInitIceConfig(IN OUT PeerConnection * _pPeerConnectoin)
 {
     for (int i = 0; i < sizeof(_pPeerConnectoin->transportIce) / sizeof(TransportIce); i++) {
         pj_ice_strans_cfg * pIceCfg = &_pPeerConnectoin->transportIce[i].iceConfig;
@@ -170,7 +170,7 @@ static int peerConnectInitIceConfig(IN OUT PeerConnectoin * _pPeerConnectoin)
     return PJ_SUCCESS;
 }
 
-static pj_status_t initTransportIce(IN PeerConnectoin * _pPeerConnectoin, OUT TransportIce * _pTransportIce)
+static pj_status_t initTransportIce(IN PeerConnection * _pPeerConnectoin, OUT TransportIce * _pTransportIce)
 {
     pj_assert(_pPeerConnectoin->pMediaEndpt);
     pj_status_t status;
@@ -258,7 +258,7 @@ static void transportIceDestroy(IN OUT TransportIce * _pTransportIce)
     }
 }
 
-static pj_status_t createMediaEndpt(IN OUT PeerConnectoin * _pPeerConnection)
+static pj_status_t createMediaEndpt(IN OUT PeerConnection * _pPeerConnection)
 {
     if (_pPeerConnection->pMediaEndpt != NULL) {
         return PJ_SUCCESS;
@@ -284,9 +284,9 @@ void InitIceConfig(IN OUT IceConfig *_pIceConfig)
     _pIceConfig->nKeepAlive = 300;
 }
 
-void InitPeerConnectoin(IN OUT PeerConnectoin * _pPeerConnection, IN IceConfig *_pIceConfig, IN pj_pool_factory * _pPoolFactory)
+void InitPeerConnectoin(IN OUT PeerConnection * _pPeerConnection, IN IceConfig *_pIceConfig, IN pj_pool_factory * _pPoolFactory)
 {
-    pj_memset(_pPeerConnection, 0, sizeof(PeerConnectoin));
+    pj_memset(_pPeerConnection, 0, sizeof(PeerConnection));
     
     _pPeerConnection->userIceConfig = *_pIceConfig;
     _pPeerConnection->pPoolFactory = _pPoolFactory;
@@ -300,7 +300,7 @@ void InitPeerConnectoin(IN OUT PeerConnectoin * _pPeerConnection, IN IceConfig *
     return ;
 }
 
-void ReleasePeerConnectoin(IN OUT PeerConnectoin * _pPeerConnection)
+void ReleasePeerConnectoin(IN OUT PeerConnection * _pPeerConnection)
 {
     
     for ( int i = 0; i < sizeof(_pPeerConnection->nAvIndex) / sizeof(int); i++) {
@@ -315,7 +315,7 @@ void ReleasePeerConnectoin(IN OUT PeerConnectoin * _pPeerConnection)
     }
 }
 
-int AddAudioTrack(IN OUT PeerConnectoin * _pPeerConnection, IN MediaConfig * _pAudioConfig)
+int AddAudioTrack(IN OUT PeerConnection * _pPeerConnection, IN MediaConfig * _pAudioConfig)
 {
     createMediaEndpt(_pPeerConnection);
     
@@ -341,7 +341,7 @@ int AddAudioTrack(IN OUT PeerConnectoin * _pPeerConnection, IN MediaConfig * _pA
     return PJ_SUCCESS;
 }
 
-int AddVideoTrack(IN OUT PeerConnectoin * _pPeerConnection, IN MediaConfig * _pVideoConfig)
+int AddVideoTrack(IN OUT PeerConnection * _pPeerConnection, IN MediaConfig * _pVideoConfig)
 {
     createMediaEndpt(_pPeerConnection);
     
@@ -384,7 +384,7 @@ static int createMediaSdpMLine(IN pjmedia_endpt *_pMediaEndpt, IN pjmedia_transp
     return status;
 }
 
-static int createSdp(IN OUT PeerConnectoin * _pPeerConnection, IN pj_pool_t * _pPool, OUT pjmedia_sdp_session **_pOffer)
+static int createSdp(IN OUT PeerConnection * _pPeerConnection, IN pj_pool_t * _pPool, OUT pjmedia_sdp_session **_pOffer)
 {
     pj_assert(_pPeerConnection && _pOffer);
     pj_assert(_pPeerConnection->pMediaEndpt);
@@ -427,7 +427,7 @@ static int createSdp(IN OUT PeerConnectoin * _pPeerConnection, IN pj_pool_t * _p
     return PJ_SUCCESS;
 }
 
-int createOffer(IN OUT PeerConnectoin * _pPeerConnection, IN pj_pool_t * _pPool, OUT pjmedia_sdp_session **_pOffer)
+int createOffer(IN OUT PeerConnection * _pPeerConnection, IN pj_pool_t * _pPool, OUT pjmedia_sdp_session **_pOffer)
 {
     pj_status_t  status;
     
@@ -457,7 +457,7 @@ int createOffer(IN OUT PeerConnectoin * _pPeerConnection, IN pj_pool_t * _pPool,
     return PJ_SUCCESS;
 }
 
-int createAnswer(IN OUT PeerConnectoin * _pPeerConnection, IN pj_pool_t * _pPool,
+int createAnswer(IN OUT PeerConnection * _pPeerConnection, IN pj_pool_t * _pPool,
                  IN pjmedia_sdp_session *_pOffer, OUT pjmedia_sdp_session **_pAnswer)
 {
     pj_status_t  status;
@@ -479,12 +479,12 @@ int createAnswer(IN OUT PeerConnectoin * _pPeerConnection, IN pj_pool_t * _pPool
     return PJ_SUCCESS;
 }
 
-void setLocalDescription(IN OUT PeerConnectoin * _pPeerConnectoin, IN pjmedia_sdp_session * _pLocalSdp)
+void setLocalDescription(IN OUT PeerConnection * _pPeerConnectoin, IN pjmedia_sdp_session * _pLocalSdp)
 {
     _pPeerConnectoin->pOfferSdp = _pLocalSdp;
 }
 
-void setRemoteDescription(IN OUT PeerConnectoin * _pPeerConnectoin, IN pjmedia_sdp_session * _pRemoteSdp)
+void setRemoteDescription(IN OUT PeerConnection * _pPeerConnectoin, IN pjmedia_sdp_session * _pRemoteSdp)
 {
     _pPeerConnectoin->pAnswerSdp = _pRemoteSdp;
 }
