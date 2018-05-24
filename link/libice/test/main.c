@@ -40,6 +40,10 @@ int main(int argc, char** argv)
 	opt.bRegular = 1;
 	char* turnhost = "123.59.204.198:3478";
 	memcpy(&opt.turnHost, turnhost, strlen(turnhost));
+	char* turnuser = "root";
+	memcpy(&opt.turnUsername, turnuser, strlen(turnuser));
+	char* turnpsw = "root";
+	memcpy(&opt.turnPassword, turnpsw, strlen(turnpsw));
 	opt.nKeepAlive = 300;
 
 	IceOptions opta, optb;
@@ -56,7 +60,7 @@ int main(int argc, char** argv)
 	IceInstance* pb = IceCreateInstance(&optb);
 
 	// wait for turn to return relayed ip
-	sleep(10000);
+	sleep(10);
 
 	// set offerer and anwerer
 	IceSetOfferer(pa);
