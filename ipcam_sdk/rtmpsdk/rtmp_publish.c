@@ -583,7 +583,7 @@ static int RtmpPubSendMetadata(RtmpPubContext * _pRtmp)
 	// get width and height from sps and pps
 	int nWidth;
 	int nHeight;
-	if (DecodeSps(_pRtmp->m_pPps.m_pData, _pRtmp->m_pPps.m_nSize, &nWidth, &nHeight) < 0) {
+	if (DecodeSps(_pRtmp->m_pSps.m_pData, _pRtmp->m_pSps.m_nSize, &nWidth, &nHeight) < 0) {
 		Debug("sps format is not valid");
 		return -1;
 	}
