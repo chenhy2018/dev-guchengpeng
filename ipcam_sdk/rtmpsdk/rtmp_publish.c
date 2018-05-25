@@ -217,7 +217,7 @@ unsigned int Ue(const char *_pBuf, unsigned int _nLen, unsigned int * _nStartBit
                 nZeroNum++;
                 (*_nStartBit)++;
         }
-        *_nStartBit ++;
+        (*_nStartBit)++;
 
         uint32_t dwRet = 0;
 	unsigned int i = 0;
