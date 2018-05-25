@@ -97,9 +97,10 @@ int main(int argc, char **argv)
     
     
     InitIceConfig(&app.userConfig);
-    strcpy(app.userConfig.turnHost, "123.59.204.198");
-    strcpy(app.userConfig.turnUsername, "root");
-    strcpy(app.userConfig.turnPassword, "root");
+    strcpy(app.userConfig.turnHost, "127.0.0.1");
+    //strcpy(app.userConfig.turnHost, "123.59.204.198");
+    //strcpy(app.userConfig.turnUsername, "root");
+    //strcpy(app.userConfig.turnPassword, "root");
     InitPeerConnectoin(&app.peerConnection, &app.userConfig, &app.cachingPool.factory);
     
     InitMediaConfig(&app.audioConfig);

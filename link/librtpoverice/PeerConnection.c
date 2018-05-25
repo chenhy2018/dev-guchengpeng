@@ -293,6 +293,17 @@ static pj_status_t createMediaEndpt(IN OUT PeerConnection * _pPeerConnection)
     return status;
 }
 
+static inline int GetTransportIndex(IN PeerConnection * _pPeerConnection, IN TransportIce *pTransportIce)
+{
+    for (int i = 0; i < sizeof(_pPeerConnection->transportIce) / sizeof(TransportIce); i++) {
+        if (&_pPeerConnection->transportIce[i] == pTransportIce) {
+            return i;
+        }
+    }
+
+    return -1;
+}
+
 void InitIceConfig(IN OUT IceConfig *_pIceConfig)
 {
     pj_bzero(_pIceConfig, sizeof(IceConfig));
@@ -339,14 +350,15 @@ int AddAudioTrack(IN OUT PeerConnection * _pPeerConnection, IN MediaConfig * _pA
     createMediaEndpt(_pPeerConnection);
     
     //TODO dupicated check
-    int nAudioIndex;
+    int nAudioIndex = -1;
     int nMaxTracks = sizeof(_pPeerConnection->nAvIndex) / sizeof(int);
     for ( int i = 0; i < nMaxTracks; i++) {
         if (_pPeerConnection->nAvIndex[i] == -1) {
             nAudioIndex = i;
+            break;
         }
     }
-    if(nAudioIndex == nMaxTracks) {
+    if(nAudioIndex == -1) {
         return -1;
     }
 
@@ -364,14 +376,15 @@ int AddVideoTrack(IN OUT PeerConnection * _pPeerConnection, IN MediaConfig * _pV
     createMediaEndpt(_pPeerConnection);
     
     //TODO dupicated check
-    int nVideoIndex;
+    int nVideoIndex = -1;
     int nMaxTracks = sizeof(_pPeerConnection->nAvIndex) / sizeof(int);
     for ( int i = 0; i < nMaxTracks; i++) {
         if (_pPeerConnection->nAvIndex[i] == -1) {
             nVideoIndex = i;
+            break;
         }
     }
-    if(nVideoIndex == nMaxTracks) {
+    if(nVideoIndex == -1) {
         return -1;
     }
     
@@ -424,7 +437,7 @@ static int createSdp(IN OUT PeerConnection * _pPeerConnection, IN pj_pool_t * _p
         if (_pPeerConnection->nAvIndex[i] != -1) {
             if (waitState(&_pPeerConnection->transportIce[i], ICE_STATE_INIT)) {
                 PJ_LOG(3,(__FILE__, "wait ICE_STATE_GATHERING_OK timeout"));
-                return 0;
+                return -1;
             }
             
             if (_pPeerConnection->mediaStream.streamTracks[i].type == TYPE_AUDIO) {
@@ -506,6 +519,9 @@ void setRemoteDescription(IN OUT PeerConnection * _pPeerConnectoin, IN pjmedia_s
     _pPeerConnectoin->pAnswerSdp = _pRemoteSdp;
 }
 
+/*
+ * will init rtp rtcp session is negotiation ok
+ */
 int StartNegotiation(IN PeerConnection * _pPeerConnection)
 {
     pj_status_t status;
@@ -517,7 +533,7 @@ int StartNegotiation(IN PeerConnection * _pPeerConnection)
             ASSERT_RETURN_CHECK(pIceNegPool, pj_pool_create);
             pTransportIce->pNegotiationPool = pIceNegPool;
             status = pjmedia_transport_media_start(pTransportIce->pTransport, pIceNegPool,
-                                            _pPeerConnection->pOfferSdp, _pPeerConnection->pAnswerSdp, 0);
+                                            _pPeerConnection->pOfferSdp, _pPeerConnection->pAnswerSdp, i);
             STATUS_CHECK(pjmedia_transport_media_start, status);
             
             if (waitState(&_pPeerConnection->transportIce[i], ICE_STATE_GATHERING_OK)){
