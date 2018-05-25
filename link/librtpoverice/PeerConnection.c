@@ -540,10 +540,10 @@ int StartNegotiation(IN PeerConnection * _pPeerConnection)
 
             //init rtp sesstoin
             MediaStreamTrack * pMediaTrack = &_pPeerConnection->mediaStream.streamTracks[i];
-            pjmedia_rtp_session_init(&pMediaTrack->rtpSession, pMediaTrack->mediaConfig.audioConfig.nRtpDynamicType,
+            pjmedia_rtp_session_init(&pMediaTrack->rtpSession, pMediaTrack->mediaConfig.nRtpDynamicType,
                                      pj_rand());
 
-            pjmedia_rtcp_init(&pMediaTrack->rtcpSession, NULL, pMediaTrack->mediaConfig.audioConfig.nSampleRate,
+            pjmedia_rtcp_init(&pMediaTrack->rtcpSession, NULL, pMediaTrack->mediaConfig.nSampleOrClockRate,
                               160, 0); //TODO 160 instead by cacl
         }
     }
@@ -568,8 +568,8 @@ int SendAudio(IN PeerConnection *_pPeerConnection, uint8_t *_pData, int _nLen)
     }
     TransportIce * pTransportIce = &_pPeerConnection->transportIce[nTransportIndex];
 
-    AudioConfig *pAudioConfig = &pMediaTrack->mediaConfig.audioConfig;
-    unsigned nMsecInterval = _nLen * 1000 / pAudioConfig->nChannel / (pAudioConfig->nBitDepth / 8) / pAudioConfig->nSampleRate;
+    MediaConfig *pAudioConfig = &pMediaTrack->mediaConfig;
+    unsigned nMsecInterval = _nLen * 1000 / pAudioConfig->nChannel / (pAudioConfig->nBitDepth / 8) / pAudioConfig->nSampleOrClockRate;
 
     if(pMediaTrack->hzPerSecond.u64 == 0){
         pj_get_timestamp_freq(&pMediaTrack->hzPerSecond);

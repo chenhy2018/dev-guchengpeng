@@ -16,3 +16,4 @@ how to test:
 TODO
 1. MediaConfig不在使用union，合并到一起
 2. transport是否要放到stream里面去
+3. 回调函数，目前是sleep等待超时ice的状态

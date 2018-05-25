@@ -103,16 +103,16 @@ int main(int argc, char **argv)
     InitPeerConnectoin(&app.peerConnection, &app.userConfig, &app.cachingPool.factory);
     
     InitMediaConfig(&app.audioConfig);
-    app.audioConfig.audioConfig.nSampleRate = 8000;
-    app.audioConfig.audioConfig.nRtpDynamicType = 96;
-    app.audioConfig.audioConfig.format = MEDIA_FORMAT_PCMU;
+    app.audioConfig.nSampleOrClockRate = 8000;
+    app.audioConfig.nRtpDynamicType = 96;
+    app.audioConfig.format = MEDIA_FORMAT_PCMU;
     status = AddAudioTrack(&app.peerConnection, &app.audioConfig);
     TESTCHECK(status, app);
     
     InitMediaConfig(&app.videoConfig);
-    app.videoConfig.videoConfig.nClockRate = 90000;
-    app.videoConfig.videoConfig.nRtpDynamicType = 98;
-    app.videoConfig.videoConfig.format = MEDIA_FORMAT_H264;
+    app.videoConfig.nSampleOrClockRate = 90000;
+    app.videoConfig.nRtpDynamicType = 98;
+    app.videoConfig.format = MEDIA_FORMAT_H264;
     status = AddVideoTrack(&app.peerConnection, &app.videoConfig);
     TESTCHECK(status, app);
     

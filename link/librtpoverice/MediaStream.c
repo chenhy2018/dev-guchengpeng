@@ -25,10 +25,10 @@ void AddMediaTrack(IN OUT MediaStream *_pMediaStraem, IN MediaConfig *_pMediaCon
     _pMediaStraem->streamTracks[_nIndex].type = _type;
     _pMediaStraem->streamTracks[_nIndex].mediaConfig = *_pMediaConfig;
 
-    switch (_pMediaConfig->audioConfig.format) {
+    switch (_pMediaConfig->format) {
         case MEDIA_FORMAT_PCMU:
-            _pMediaConfig->audioConfig.nChannel = 1;
-            _pMediaConfig->audioConfig.nBitDepth = 8;
+            _pMediaConfig->nChannel = 1;
+            _pMediaConfig->nBitDepth = 8;
             break;
         case MEDIA_FORMAT_H264:
             break;
@@ -45,7 +45,7 @@ int CreateSdpAudioMLine(IN pjmedia_endpt *_pMediaEndpt, IN pjmedia_transport_inf
     STATUS_CHECK(pjmedia_endpt_create_audio_sdp, status);
     
     pj_str_t * fmt;
-    switch (_pMediaTrack->mediaConfig.audioConfig.format) {
+    switch (_pMediaTrack->mediaConfig.format) {
         case MEDIA_FORMAT_PCMU:
             fmt = &((*_pAudioSdp)->desc.fmt[(*_pAudioSdp)->desc.fmt_count++]);
             fmt->ptr = "0";
@@ -68,7 +68,7 @@ int CreateSdpVideoMLine(IN pjmedia_endpt *_pMediaEndpt, IN pjmedia_transport_inf
     STATUS_CHECK(pjmedia_endpt_create_audio_sdp, status);
     
     pj_str_t * fmt;
-    switch (_pMediaTrack->mediaConfig.videoConfig.format) {
+    switch (_pMediaTrack->mediaConfig.format) {
         case MEDIA_FORMAT_H264:
             fmt = &((*_pVideoSdp)->desc.fmt[(*_pVideoSdp)->desc.fmt_count++]);
             fmt->ptr = "116";

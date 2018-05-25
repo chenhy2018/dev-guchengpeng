@@ -45,25 +45,12 @@ typedef enum _MediaType
     TYPE_VIDEO,
 }MediaType;
 
-typedef struct _AudioConfig
-{
+typedef union _MediaConfig{
     int nRtpDynamicType;
     MediaFromat format;
-    int nSampleRate;
+    int nSampleOrClockRate;
     int nChannel;
     int nBitDepth;
-}AudioConfig;
-
-typedef struct _VideoConfig
-{
-    int nRtpDynamicType;
-    MediaFromat format;
-    int nClockRate;
-}VideoConfig;
-
-typedef union _MediaConfig{
-    AudioConfig audioConfig;
-    VideoConfig videoConfig;
 }MediaConfig;
 
 typedef struct _MediaStreamTrack
