@@ -314,10 +314,19 @@ void InitIceConfig(IN OUT IceConfig *_pIceConfig)
     _pIceConfig->nKeepAlive = 300;
 }
 
-void InitPeerConnectoin(IN OUT PeerConnection * _pPeerConnection, IN IceConfig *_pIceConfig, IN pj_pool_factory * _pPoolFactory)
+void InitPeerConnectoin(IN OUT PeerConnection * _pPeerConnection, IN pj_pool_factory * _pPoolFactory, IN IceConfig *_pIceConfig)
 {
     pj_memset(_pPeerConnection, 0, sizeof(PeerConnection));
     
+    IceConfig userConfig;
+    if ( _pIceConfig == NULL) {
+        InitIceConfig(&userConfig);
+        strcpy(userConfig.turnHost, "123.59.204.198");
+        strcpy(userConfig.turnUsername, "root");
+        strcpy(userConfig.turnPassword, "root");
+        _pIceConfig = &userConfig;
+    }
+
     _pPeerConnection->userIceConfig = *_pIceConfig;
     _pPeerConnection->pPoolFactory = _pPoolFactory;
     

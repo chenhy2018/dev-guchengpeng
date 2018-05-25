@@ -96,12 +96,13 @@ int main(int argc, char **argv)
     pj_caching_pool_init(&app.cachingPool, &pj_pool_factory_default_policy, 0);
     
     
-    InitIceConfig(&app.userConfig);
-    strcpy(app.userConfig.turnHost, "127.0.0.1");
+    //InitIceConfig(&app.userConfig);
+    //strcpy(app.userConfig.turnHost, "127.0.0.1");
     //strcpy(app.userConfig.turnHost, "123.59.204.198");
     //strcpy(app.userConfig.turnUsername, "root");
     //strcpy(app.userConfig.turnPassword, "root");
-    InitPeerConnectoin(&app.peerConnection, &app.userConfig, &app.cachingPool.factory);
+    //there is default ice config
+    InitPeerConnectoin(&app.peerConnection, &app.cachingPool.factory, NULL); //&app.userConfig
     
     InitMediaConfig(&app.audioConfig);
     app.audioConfig.nSampleOrClockRate = 8000;

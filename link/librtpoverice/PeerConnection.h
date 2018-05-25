@@ -86,8 +86,8 @@ typedef struct _PeerConnection
 
 void InitIceConfig(IN OUT IceConfig *pIceConfig);
 
-void InitPeerConnectoin(IN OUT PeerConnection * pPeerConnectoin, IN IceConfig *pIceConfig,
-                       IN pj_pool_factory * pPoolFactory);
+void InitPeerConnectoin(IN OUT PeerConnection * pPeerConnectoin, IN pj_pool_factory * pPoolFactory,
+                        IN IceConfig *pIceConfig);
 
 int AddAudioTrack(IN OUT PeerConnection * pPeerConnection, IN MediaConfig *pAudioConfig);
 int AddVideoTrack(IN OUT PeerConnection * pPeerConnection, IN MediaConfig *pVideoConfig);
