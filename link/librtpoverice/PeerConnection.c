@@ -681,6 +681,12 @@ int SendAudio(IN PeerConnection *_pPeerConnection, uint8_t *_pData, int _nLen)
         }
     }
 
+    pj_get_timestamp(&now);
+    pj_uint64_t nLate = ((pMediaTrack->nextRtpTimestamp.u64 - now.u64) * 1000) / pMediaTrack->hzPerSecond.u64;
+    if ( nLate > 1) {
+        //if late than 1 millisecond
+        PJ_LOG(4,(__FILE__, "audio data late:%lld", nLate));
+    }
 
     //start to send rtp
     pj_status_t status;
