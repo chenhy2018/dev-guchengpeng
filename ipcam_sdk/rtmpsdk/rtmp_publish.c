@@ -215,7 +215,7 @@ unsigned int Ue(const char *_pBuf, unsigned int _nLen, unsigned int * _nStartBit
                         break;
                 }
                 nZeroNum++;
-                *_nStartBit++;
+                (*_nStartBit)++;
         }
         *_nStartBit ++;
 
@@ -226,7 +226,7 @@ unsigned int Ue(const char *_pBuf, unsigned int _nLen, unsigned int * _nStartBit
                 if (_pBuf[*_nStartBit / 8] & (0x80 >> (*_nStartBit % 8))) {
                         dwRet += 1;
                 }
-                *_nStartBit++;
+                (*_nStartBit)++;
         }
         return (1 << nZeroNum) - 1 + dwRet;
 }
@@ -254,7 +254,7 @@ uint32_t U(unsigned int _nBitCount, const char * _pBuf, unsigned int *_nStartBit
                 if (_pBuf[*_nStartBit / 8] & (0x80 >> (*_nStartBit % 8))) {
                         dwRet += 1;
                 }
-                *_nStartBit++;
+                (*_nStartBit)++;
         }
         return dwRet;
 }
