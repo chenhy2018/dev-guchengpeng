@@ -24,6 +24,15 @@ void AddMediaTrack(IN OUT MediaStream *_pMediaStraem, IN MediaConfig *_pMediaCon
 
     _pMediaStraem->streamTracks[_nIndex].type = _type;
     _pMediaStraem->streamTracks[_nIndex].mediaConfig = *_pMediaConfig;
+
+    switch (_pMediaConfig->audioConfig.format) {
+        case MEDIA_FORMAT_PCMU:
+            _pMediaConfig->audioConfig.nChannel = 1;
+            _pMediaConfig->audioConfig.nBitDepth = 8;
+            break;
+        case MEDIA_FORMAT_H264:
+            break;
+    }
 }
 
 int CreateSdpAudioMLine(IN pjmedia_endpt *_pMediaEndpt, IN pjmedia_transport_info *_pTransportInfo,
@@ -79,3 +88,35 @@ int CreateSdpVideoMLine(IN pjmedia_endpt *_pMediaEndpt, IN pjmedia_transport_inf
     
     return PJ_SUCCESS;
 }
+
+static inline MediaStreamTrack * GetTrackByType(IN MediaStream * _pMediaStream, MediaType _type)
+{
+    for (int i = 0; i < sizeof(_pMediaStream->streamTracks) / sizeof(MediaStreamTrack); i++) {
+        if (_pMediaStream->streamTracks[i].type == _type) {
+            return &_pMediaStream->streamTracks[i];
+        }
+    }
+    return NULL;
+}
+
+MediaStreamTrack * GetAudioTrack(IN MediaStream * _pMediaStream)
+{
+    return GetTrackByType(_pMediaStream, TYPE_AUDIO);
+}
+
+MediaStreamTrack * GetVideoTrack(IN MediaStream * _pMediaStream)
+{
+    return GetTrackByType(_pMediaStream, TYPE_VIDEO);
+}
+
+int GetMediaTrackIndex(IN MediaStream * _pMediaStream, IN MediaStreamTrack *_pMediaStreamTrack)
+{
+    for (int i = 0; i < sizeof(_pMediaStream->streamTracks) / sizeof(MediaStreamTrack); i++) {
+        if (&_pMediaStream->streamTracks[i] == _pMediaStreamTrack) {
+            return i;
+        }
+    }
+
+    return -1;
+}
+

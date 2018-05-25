@@ -41,6 +41,7 @@ typedef struct _IceConfig
     char         turnUsername[MAX_TURN_USR_SIZE];
     char         turnPassword[MAX_TURN_PWD_SIZE];
 
+    //TODO not use now
     void (*onIceComplete)(IN pjmedia_transport *pTransport, IN pj_ice_strans_op op,
                           IN pj_status_t status);
     void (*onIceComplete2)(IN pjmedia_transport *pTransport, IN pj_ice_strans_op op,
@@ -96,6 +97,9 @@ int createAnswer(IN OUT PeerConnection * pPeerConnection, IN pj_pool_t * pPool,
 void setLocalDescription(IN OUT PeerConnection * pPeerConnection, IN pjmedia_sdp_session * pLocalSdp);
 void setRemoteDescription(IN OUT PeerConnection * pPeerConnection, IN pjmedia_sdp_session * pRemoteSdp);
 int StartNegotiation(IN PeerConnection * pPeerConnection);
+
+int SendAudio(IN PeerConnection *pPeerConnection, uint8_t *pData, int nLen);
+int SendVideo(IN PeerConnection *pPeerConnection, uint8_t *pData, int nLen);
 
 void ReleasePeerConnectoin(IN OUT PeerConnection * _pPeerConnection);
 

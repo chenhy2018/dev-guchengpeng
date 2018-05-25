@@ -13,4 +13,6 @@ how to test:
 5. 将answer.sdp copy到offer的当前目录
 7. 输入ok开始协商
 
-
+TODO
+1. MediaConfig不在使用union，合并到一起
+2. transport是否要放到stream里面去

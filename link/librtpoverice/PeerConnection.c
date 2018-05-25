@@ -513,20 +513,6 @@ int StartNegotiation(IN PeerConnection * _pPeerConnection)
     for ( int i = 0; i < nMaxTracks; i++) {
         if (_pPeerConnection->nAvIndex[i] != -1) {
             TransportIce *pTransportIce = &_pPeerConnection->transportIce[i];
-            
-            pjmedia_transport_info tpinfo;
-            pjmedia_transport_info_init(&tpinfo);
-            pjmedia_transport_get_info(pTransportIce->pTransport, &tpinfo);
-            
-            pjmedia_transport_attach(pTransportIce->pTransport, NULL,
-                                     &tpinfo.sock_info.rtp_addr_name,
-                                     &tpinfo.sock_info.rtcp_addr_name,
-                                     sizeof(tpinfo.sock_info.rtp_addr_name),
-                                     NULL, //void (*rtp_cb)(void *user_data, void *pkt,pj_ssize_t),
-                                     NULL //void (*rtcp_cb)(void *usr_data,void*pkt,pj_ssize_t)
-                                     );
-            
-            
             pj_pool_t * pIceNegPool = pj_pool_create(_pPeerConnection->pPoolFactory, NULL, 512, 512, NULL);
             ASSERT_RETURN_CHECK(pIceNegPool, pj_pool_create);
             pTransportIce->pNegotiationPool = pIceNegPool;
@@ -536,9 +522,148 @@ int StartNegotiation(IN PeerConnection * _pPeerConnection)
             
             if (waitState(&_pPeerConnection->transportIce[i], ICE_STATE_GATHERING_OK)){
                 PJ_LOG(3,(__FILE__, "wait ICE_STATE_NEGOTIATION_OK timeout"));
-                return 0;
+                return -1;
             }
+
+            pjmedia_transport_info tpinfo;
+            pjmedia_transport_info_init(&tpinfo);
+            pjmedia_transport_get_info(pTransportIce->pTransport, &tpinfo);
+            
+            status = pjmedia_transport_attach(pTransportIce->pTransport, NULL,
+                                     &tpinfo.sock_info.rtp_addr_name,
+                                     &tpinfo.sock_info.rtcp_addr_name,
+                                     sizeof(tpinfo.sock_info.rtp_addr_name),
+                                     NULL, //void (*rtp_cb)(void *user_data, void *pkt,pj_ssize_t),
+                                     NULL //void (*rtcp_cb)(void *usr_data,void*pkt,pj_ssize_t)
+                                     );
+            STATUS_CHECK(pjmedia_transport_attach, status);
+
+            //init rtp sesstoin
+            MediaStreamTrack * pMediaTrack = &_pPeerConnection->mediaStream.streamTracks[i];
+            pjmedia_rtp_session_init(&pMediaTrack->rtpSession, pMediaTrack->mediaConfig.audioConfig.nRtpDynamicType,
+                                     pj_rand());
+
+            pjmedia_rtcp_init(&pMediaTrack->rtcpSession, NULL, pMediaTrack->mediaConfig.audioConfig.nSampleRate,
+                              160, 0); //TODO 160 instead by cacl
         }
     }
+
     return PJ_SUCCESS;
+}
+
+int SendAudio(IN PeerConnection *_pPeerConnection, uint8_t *_pData, int _nLen)
+{
+    enum { RTCP_INTERVAL = 5000, RTCP_RAND = 2000 };
+    char packet[1500];
+
+    MediaStreamTrack * pMediaTrack = GetAudioTrack(&_pPeerConnection->mediaStream);
+    if (pMediaTrack == NULL) {
+        PJ_LOG(3, (__FILE__, "no audio track in stream"));
+        return -1;
+    }
+    int nTransportIndex = GetMediaTrackIndex(&_pPeerConnection->mediaStream, pMediaTrack);
+    if (nTransportIndex < 0){
+        PJ_LOG(3, (__FILE__, "no found match track in stream"));
+        return -2;
+    }
+    TransportIce * pTransportIce = &_pPeerConnection->transportIce[nTransportIndex];
+
+    AudioConfig *pAudioConfig = &pMediaTrack->mediaConfig.audioConfig;
+    unsigned nMsecInterval = _nLen * 1000 / pAudioConfig->nChannel / (pAudioConfig->nBitDepth / 8) / pAudioConfig->nSampleRate;
+
+    if(pMediaTrack->hzPerSecond.u64 == 0){
+        pj_get_timestamp_freq(&pMediaTrack->hzPerSecond);
+
+        pj_get_timestamp(&pMediaTrack->nextRtpTimestamp);
+        pMediaTrack->nextRtpTimestamp.u64 += (pMediaTrack->hzPerSecond.u64 * nMsecInterval / 1000);
+
+        pMediaTrack->nextRtcpTimestamp = pMediaTrack->nextRtpTimestamp;
+        pMediaTrack->nextRtcpTimestamp.u64 += (pMediaTrack->hzPerSecond.u64 * (RTCP_INTERVAL+(pj_rand()%RTCP_RAND)) / 1000);
+    }
+
+    pj_timestamp now;
+    if (pMediaTrack->nextRtpTimestamp.u64 >= pMediaTrack->nextRtcpTimestamp.u64) {
+        pj_get_timestamp(&now);
+        if (pMediaTrack->nextRtcpTimestamp.u64 <= now.u64) {
+            void *pRtcpPkt;
+            int nRtcpLen;
+            pj_ssize_t size;
+            pj_status_t status;
+
+            /* Build RTCP packet */
+            pjmedia_rtcp_build_rtcp(&pMediaTrack->rtcpSession, &pRtcpPkt, &nRtcpLen);
+
+            /* Send packet */
+            size = nRtcpLen;
+            status = pjmedia_transport_send_rtcp(pTransportIce->pTransport,
+                                                 pRtcpPkt, size);
+            STATUS_CHECK(pjmedia_transport_send_rtcp, status);
+
+            /* Schedule next send */
+            pMediaTrack->nextRtcpTimestamp.u64 += (pMediaTrack->hzPerSecond.u64 * (RTCP_INTERVAL+(pj_rand()%RTCP_RAND)) / 1000);
+        }
+    }
+
+    pj_timestamp lesser;
+    pj_time_val timeout;
+
+    lesser = pMediaTrack->nextRtpTimestamp;
+    pj_get_timestamp(&now);
+
+    /* Determine how long to sleep */
+    if (lesser.u64 <= now.u64) {
+        timeout.sec = timeout.msec = 0;
+        //printf("immediate "); fflush(stdout);
+    } else {
+        pj_uint64_t tick_delay;
+        tick_delay = lesser.u64 - now.u64;
+        timeout.sec = 0;
+        timeout.msec = (pj_uint32_t)(tick_delay * 1000 / pMediaTrack->hzPerSecond.u64);
+        pj_time_val_normalize(&timeout);
+
+        //printf("%d:%03d ", timeout.sec, timeout.msec); fflush(stdout);
+    }
+    printf("timeout:%ld %ld\n", timeout.sec, timeout.msec);
+    pj_thread_sleep(PJ_TIME_VAL_MSEC(timeout)); //TODO deal sleep
+
+    //start to send rtp
+    pj_status_t status;
+    const void *p_hdr;
+    const pjmedia_rtp_hdr *hdr;
+    pj_ssize_t size;
+    int hdrlen;
+
+    /* Format RTP header */
+    status = pjmedia_rtp_encode_rtp( &pMediaTrack->rtpSession, 0, //pt is 0 for pcmu
+                                    0, /* marker bit */
+                                    160,
+                                    160,
+                                    &p_hdr, &hdrlen);
+    STATUS_CHECK(pjmedia_rtp_encode_rtp, status);
+
+
+    //PJ_LOG(4,(THIS_FILE, "\t\tTx seq=%d", pj_ntohs(hdr->seq)));
+    hdr = (const pjmedia_rtp_hdr*) p_hdr;
+
+    /* Copy RTP header to packet */
+    pj_memcpy(packet, hdr, hdrlen);
+
+    /* Zero the payload */
+    pj_memcpy(packet+hdrlen, _pData, 160);
+
+    /* Send RTP packet */
+    size = hdrlen + 160;
+    status = pjmedia_transport_send_rtp(pTransportIce->pTransport,
+                                        packet, size);
+    STATUS_CHECK(pjmedia_transport_send_rtp, status);
+
+
+
+    /* Update RTCP SR */
+    pjmedia_rtcp_tx_rtp( &pMediaTrack->rtcpSession, 160);
+
+    /* Schedule next send */
+    pMediaTrack->nextRtpTimestamp.u64 += (nMsecInterval * pMediaTrack->hzPerSecond.u64 / 1000);
+
+    return 0;
 }

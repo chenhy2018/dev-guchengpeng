@@ -49,8 +49,8 @@ typedef struct _AudioConfig
 {
     int nRtpDynamicType;
     MediaFromat format;
-    int nChannel;
     int nSampleRate;
+    int nChannel;
     int nBitDepth;
 }AudioConfig;
 
@@ -69,7 +69,12 @@ typedef union _MediaConfig{
 typedef struct _MediaStreamTrack
 {
     MediaType   type;
+    pj_timestamp hzPerSecond;
+    pj_timestamp nextRtpTimestamp;
+    pj_timestamp nextRtcpTimestamp;
     MediaConfig mediaConfig;
+    pjmedia_rtp_session  rtpSession;
+    pjmedia_rtcp_session rtcpSession;
 }MediaStreamTrack;
 
 typedef struct _MediaStream
@@ -86,4 +91,7 @@ int CreateSdpAudioMLine(IN pjmedia_endpt *pMediaEndpt, IN pjmedia_transport_info
 int CreateSdpVideoMLine(IN pjmedia_endpt *pMediaEndpt, IN pjmedia_transport_info *pTransportInfo,
                         IN pj_pool_t * pPool, IN MediaStreamTrack *pMediaTrack, OUT pjmedia_sdp_media ** pVideoSdp);
 
+MediaStreamTrack * GetAudioTrack(IN MediaStream * pMediaStream);
+MediaStreamTrack * GetVideoTrack(IN MediaStream * pMediaStream);
+int GetMediaTrackIndex(IN MediaStream * pMediaStream, IN MediaStreamTrack *pMediaStreamTrack);
 #endif
