@@ -13,6 +13,9 @@
 #include <pjmedia-codec.h>
 #include <pjlib-util.h>
 #include <pjlib.h>
+#ifndef __APPLE__
+#include <inttypes.h>
+#endif
 
 #include "MediaStream.h"
 
