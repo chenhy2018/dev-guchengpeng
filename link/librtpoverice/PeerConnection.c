@@ -618,7 +618,9 @@ int StartNegotiation(IN PeerConnection * _pPeerConnection)
                                      pj_rand());
 
             pjmedia_rtcp_init(&pMediaTrack->rtcpSession, NULL, pMediaTrack->mediaConfig.nSampleOrClockRate,
-                              160, 0); //TODO 160 instead by cacl
+                              160, //TODO Average number of samples per frame. I don't know???
+                                   //How do I set it if payload is video
+                              0);
         }
     }
 
@@ -645,6 +647,7 @@ int SendAudio(IN PeerConnection *_pPeerConnection, uint8_t *_pData, int _nLen)
     MediaConfig *pAudioConfig = &pMediaTrack->mediaConfig;
     unsigned nMsecInterval = _nLen * 1000 / pAudioConfig->nChannel / (pAudioConfig->nBitDepth / 8) / pAudioConfig->nSampleOrClockRate;
 
+    // init timestamp
     if(pMediaTrack->hzPerSecond.u64 == 0){
         pj_get_timestamp_freq(&pMediaTrack->hzPerSecond);
 
@@ -678,55 +681,34 @@ int SendAudio(IN PeerConnection *_pPeerConnection, uint8_t *_pData, int _nLen)
         }
     }
 
-    pj_timestamp lesser;
-    pj_time_val timeout;
-
-    lesser = pMediaTrack->nextRtpTimestamp;
-    pj_get_timestamp(&now);
-
-    /* Determine how long to sleep */
-    if (lesser.u64 <= now.u64) {
-        timeout.sec = timeout.msec = 0;
-        //printf("immediate "); fflush(stdout);
-    } else {
-        pj_uint64_t tick_delay;
-        tick_delay = lesser.u64 - now.u64;
-        timeout.sec = 0;
-        timeout.msec = (pj_uint32_t)(tick_delay * 1000 / pMediaTrack->hzPerSecond.u64);
-        pj_time_val_normalize(&timeout);
-
-        //printf("%d:%03d ", timeout.sec, timeout.msec); fflush(stdout);
-    }
-    printf("timeout:%ld %ld\n", timeout.sec, timeout.msec);
-    pj_thread_sleep(PJ_TIME_VAL_MSEC(timeout)); //TODO deal sleep
 
     //start to send rtp
     pj_status_t status;
-    const void *p_hdr;
-    const pjmedia_rtp_hdr *hdr;
+    const void *pVoidHeader;
+    const pjmedia_rtp_hdr *pRtpHeader;
     pj_ssize_t size;
-    int hdrlen;
+    int nHeaderLen;
 
     /* Format RTP header */
     status = pjmedia_rtp_encode_rtp( &pMediaTrack->rtpSession, 0, //pt is 0 for pcmu
                                     0, /* marker bit */
-                                    160,
-                                    160,
-                                    &p_hdr, &hdrlen);
+                                    _nLen,
+                                    nMsecInterval,
+                                    &pVoidHeader, &nHeaderLen);
     STATUS_CHECK(pjmedia_rtp_encode_rtp, status);
 
 
     //PJ_LOG(4,(THIS_FILE, "\t\tTx seq=%d", pj_ntohs(hdr->seq)));
-    hdr = (const pjmedia_rtp_hdr*) p_hdr;
+    pRtpHeader = (const pjmedia_rtp_hdr*) pVoidHeader;
 
     /* Copy RTP header to packet */
-    pj_memcpy(packet, hdr, hdrlen);
+    pj_memcpy(packet, pRtpHeader, nHeaderLen);
 
     /* Zero the payload */
-    pj_memcpy(packet+hdrlen, _pData, 160);
+    pj_memcpy(packet+nHeaderLen, _pData, _nLen);
 
     /* Send RTP packet */
-    size = hdrlen + 160;
+    size = nHeaderLen + _nLen;
     status = pjmedia_transport_send_rtp(pTransportIce->pTransport,
                                         packet, size);
     STATUS_CHECK(pjmedia_transport_send_rtp, status);
@@ -734,7 +716,7 @@ int SendAudio(IN PeerConnection *_pPeerConnection, uint8_t *_pData, int _nLen)
 
 
     /* Update RTCP SR */
-    pjmedia_rtcp_tx_rtp( &pMediaTrack->rtcpSession, 160);
+    pjmedia_rtcp_tx_rtp( &pMediaTrack->rtcpSession, _nLen);
 
     /* Schedule next send */
     pMediaTrack->nextRtpTimestamp.u64 += (nMsecInterval * pMediaTrack->hzPerSecond.u64 / 1000);
