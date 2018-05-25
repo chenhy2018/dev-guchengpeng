@@ -614,10 +614,12 @@ int StartNegotiation(IN PeerConnection * _pPeerConnection)
 
             //init rtp sesstoin
             MediaStreamTrack * pMediaTrack = &_pPeerConnection->mediaStream.streamTracks[i];
-            pjmedia_rtp_session_init(&pMediaTrack->rtpSession, pMediaTrack->mediaConfig.nRtpDynamicType,
-                                     pj_rand());
+            int nIdx = pMediaTrack->mediaConfig.nUseIndex;
+            int nRtpDynamicType = pMediaTrack->mediaConfig.configs[nIdx].nRtpDynamicType;
+            pjmedia_rtp_session_init(&pMediaTrack->rtpSession, nRtpDynamicType, pj_rand());
 
-            pjmedia_rtcp_init(&pMediaTrack->rtcpSession, NULL, pMediaTrack->mediaConfig.nSampleOrClockRate,
+            int nSampleOrClockRate = pMediaTrack->mediaConfig.configs[nIdx].nSampleOrClockRate;
+            pjmedia_rtcp_init(&pMediaTrack->rtcpSession, NULL, nSampleOrClockRate,
                               160, //TODO Average number of samples per frame. I don't know???
                                    //How do I set it if payload is video
                               0);
@@ -645,7 +647,11 @@ int SendAudio(IN PeerConnection *_pPeerConnection, uint8_t *_pData, int _nLen)
     TransportIce * pTransportIce = &_pPeerConnection->transportIce[nTransportIndex];
 
     MediaConfig *pAudioConfig = &pMediaTrack->mediaConfig;
-    unsigned nMsecInterval = _nLen * 1000 / pAudioConfig->nChannel / (pAudioConfig->nBitDepth / 8) / pAudioConfig->nSampleOrClockRate;
+    int nIdx = pMediaTrack->mediaConfig.nUseIndex;
+    int nChannel = pAudioConfig->configs[nIdx].nChannel;
+    int nBitDepth = pAudioConfig->configs[nIdx].nBitDepth;
+    int nSampleRate = pAudioConfig->configs[nIdx].nSampleOrClockRate;
+    unsigned nMsecInterval = _nLen * 1000 /nChannel / (nBitDepth / 8) / nSampleRate;
 
     // init timestamp
     if(pMediaTrack->hzPerSecond.u64 == 0){

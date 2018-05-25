@@ -36,7 +36,10 @@ return s;}
 typedef enum _MediaFormat
 {
     MEDIA_FORMAT_PCMU,
+    MEDIA_FORMAT_PCMA,
+    MEDIA_FORMAT_G729,
     MEDIA_FORMAT_H264,
+    MEDIA_FORMAT_H265,
 }MediaFromat;
 
 typedef enum _MediaType
@@ -45,12 +48,17 @@ typedef enum _MediaType
     TYPE_VIDEO,
 }MediaType;
 
-typedef union _MediaConfig{
-    int nRtpDynamicType;
-    MediaFromat format;
-    int nSampleOrClockRate;
-    int nChannel;
-    int nBitDepth;
+#define MAX_CODEC_LEN 3
+typedef struct _MediaConfig{
+    struct{
+        int nRtpDynamicType;
+        MediaFromat format;
+        int nSampleOrClockRate;
+        int nChannel;
+        int nBitDepth;
+    }configs[MAX_CODEC_LEN];
+    int nCount;
+    int nUseIndex;
 }MediaConfig;
 
 typedef struct _MediaStreamTrack

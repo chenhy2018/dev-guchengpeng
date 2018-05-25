@@ -10,12 +10,30 @@ void InitMediaStream(IN MediaStream *_pMediaStraem)
     pj_bzero(_pMediaStraem, sizeof(MediaStream));
 }
 
+static void setMediaConfig(IN OUT MediaConfig *_pMediaConfig)
+{
+    for ( int i = 0; i < _pMediaConfig->nCount; i++) {
+        switch (_pMediaConfig->configs[i].format) {
+            case MEDIA_FORMAT_PCMU:
+            case MEDIA_FORMAT_PCMA:
+            case MEDIA_FORMAT_G729:
+                _pMediaConfig->configs[i].nChannel = 1;
+                _pMediaConfig->configs[i].nBitDepth = 8;
+                break;
+            case MEDIA_FORMAT_H264:
+            case MEDIA_FORMAT_H265:
+                break;
+        }
+    }
+}
+
 void AddMediaTrack(IN OUT MediaStream *_pMediaStraem, IN MediaConfig *_pMediaConfig, IN int _nIndex, IN MediaType _type)
 {
     pj_assert(_pMediaStraem && _pMediaConfig);
     
     for (int i = 0; i < _pMediaStraem->nCount; i++) {
         if ( _pMediaStraem->streamTracks[i].type == _type ){
+            PJ_LOG(3, (__FILE__, "media type exists"));
             return;
         }
     }
@@ -25,14 +43,7 @@ void AddMediaTrack(IN OUT MediaStream *_pMediaStraem, IN MediaConfig *_pMediaCon
     _pMediaStraem->streamTracks[_nIndex].type = _type;
     _pMediaStraem->streamTracks[_nIndex].mediaConfig = *_pMediaConfig;
 
-    switch (_pMediaConfig->format) {
-        case MEDIA_FORMAT_PCMU:
-            _pMediaConfig->nChannel = 1;
-            _pMediaConfig->nBitDepth = 8;
-            break;
-        case MEDIA_FORMAT_H264:
-            break;
-    }
+    setMediaConfig(_pMediaConfig);
 }
 
 int CreateSdpAudioMLine(IN pjmedia_endpt *_pMediaEndpt, IN pjmedia_transport_info *_pTransportInfo,
@@ -45,14 +56,19 @@ int CreateSdpAudioMLine(IN pjmedia_endpt *_pMediaEndpt, IN pjmedia_transport_inf
     STATUS_CHECK(pjmedia_endpt_create_audio_sdp, status);
     
     pj_str_t * fmt;
-    switch (_pMediaTrack->mediaConfig.format) {
-        case MEDIA_FORMAT_PCMU:
-            fmt = &((*_pAudioSdp)->desc.fmt[(*_pAudioSdp)->desc.fmt_count++]);
-            fmt->ptr = "0";
-            fmt->slen = 1;
-            break;
-        case MEDIA_FORMAT_H264:
-            break;
+    for ( int i = 0; i < _pMediaTrack->mediaConfig.nCount; i++) {
+        switch (_pMediaTrack->mediaConfig.configs[i].format) {
+            case MEDIA_FORMAT_PCMU:
+            case MEDIA_FORMAT_PCMA:
+            case MEDIA_FORMAT_G729:
+                fmt = &((*_pAudioSdp)->desc.fmt[(*_pAudioSdp)->desc.fmt_count++]);
+                fmt->ptr = pj_pool_alloc(_pPool, 4);
+                fmt->slen = snprintf(fmt->ptr, 4, "%d", _pMediaTrack->mediaConfig.configs[i].nRtpDynamicType);
+                break;
+            case MEDIA_FORMAT_H264:
+            case MEDIA_FORMAT_H265:
+                break;
+        }
     }
     
     return PJ_SUCCESS;
@@ -68,22 +84,31 @@ int CreateSdpVideoMLine(IN pjmedia_endpt *_pMediaEndpt, IN pjmedia_transport_inf
     STATUS_CHECK(pjmedia_endpt_create_audio_sdp, status);
     
     pj_str_t * fmt;
-    switch (_pMediaTrack->mediaConfig.format) {
-        case MEDIA_FORMAT_H264:
-            fmt = &((*_pVideoSdp)->desc.fmt[(*_pVideoSdp)->desc.fmt_count++]);
-            fmt->ptr = "116";
-            fmt->slen = 3;
-            pjmedia_sdp_attr *pAttr = NULL;
-            pjmedia_sdp_rtpmap rtpmap;
-            pj_bzero(&rtpmap, sizeof(rtpmap));
-            rtpmap.pt = pj_str("116");
-            rtpmap.clock_rate = 90000;
-            rtpmap.enc_name = pj_str("H264");
-            pjmedia_sdp_rtpmap_to_attr(_pPool, &rtpmap, &pAttr);
-            (*_pVideoSdp)->attr[(*_pVideoSdp)->attr_count++] = pAttr;
-            break;
-        case MEDIA_FORMAT_PCMU:
-            break;
+    for ( int i = 0; i < _pMediaTrack->mediaConfig.nCount; i++) {
+        switch (_pMediaTrack->mediaConfig.configs[i].format) {
+            case MEDIA_FORMAT_PCMU:
+            case MEDIA_FORMAT_PCMA:
+            case MEDIA_FORMAT_G729:
+                break;
+            case MEDIA_FORMAT_H264:
+            case MEDIA_FORMAT_H265:
+                fmt = &((*_pVideoSdp)->desc.fmt[(*_pVideoSdp)->desc.fmt_count++]);
+                fmt->ptr = pj_pool_alloc(_pPool, 4);
+                fmt->slen = snprintf(fmt->ptr, 4, "%d", _pMediaTrack->mediaConfig.configs[i].nRtpDynamicType);
+                pjmedia_sdp_attr *pAttr = NULL;
+                pjmedia_sdp_rtpmap rtpmap;
+                pj_bzero(&rtpmap, sizeof(rtpmap));
+                rtpmap.pt = *fmt;
+                rtpmap.clock_rate = _pMediaTrack->mediaConfig.configs[i].nSampleOrClockRate;
+                if (_pMediaTrack->mediaConfig.configs[i].format == MEDIA_FORMAT_H265) {
+                    rtpmap.enc_name = pj_str("H265");
+                } else {
+                    rtpmap.enc_name = pj_str("H264");
+                }
+                pjmedia_sdp_rtpmap_to_attr(_pPool, &rtpmap, &pAttr);
+                (*_pVideoSdp)->attr[(*_pVideoSdp)->attr_count++] = pAttr;
+                break;
+        }
     }
     
     return PJ_SUCCESS;

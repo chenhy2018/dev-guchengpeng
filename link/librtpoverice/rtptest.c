@@ -105,16 +105,24 @@ int main(int argc, char **argv)
     InitPeerConnectoin(&app.peerConnection, &app.cachingPool.factory, NULL); //&app.userConfig
     
     InitMediaConfig(&app.audioConfig);
-    app.audioConfig.nSampleOrClockRate = 8000;
-    app.audioConfig.nRtpDynamicType = 96;
-    app.audioConfig.format = MEDIA_FORMAT_PCMU;
+    app.audioConfig.configs[0].nSampleOrClockRate = 8000;
+    app.audioConfig.configs[0].nRtpDynamicType = 0;
+    app.audioConfig.configs[0].format = MEDIA_FORMAT_PCMU;
+    app.audioConfig.configs[1].nSampleOrClockRate = 8000;
+    app.audioConfig.configs[1].nRtpDynamicType = 8;
+    app.audioConfig.configs[1].format = MEDIA_FORMAT_PCMA;
+    app.audioConfig.nCount = 2;
     status = AddAudioTrack(&app.peerConnection, &app.audioConfig);
     TESTCHECK(status, app);
     
     InitMediaConfig(&app.videoConfig);
-    app.videoConfig.nSampleOrClockRate = 90000;
-    app.videoConfig.nRtpDynamicType = 98;
-    app.videoConfig.format = MEDIA_FORMAT_H264;
+    app.videoConfig.configs[0].nSampleOrClockRate = 90000;
+    app.videoConfig.configs[0].nRtpDynamicType = 98;
+    app.videoConfig.configs[0].format = MEDIA_FORMAT_H264;
+    app.videoConfig.configs[1].nSampleOrClockRate = 90000;
+    app.videoConfig.configs[1].nRtpDynamicType = 99;
+    app.videoConfig.configs[1].format = MEDIA_FORMAT_H265;
+    app.videoConfig.nCount = 2;
     status = AddVideoTrack(&app.peerConnection, &app.videoConfig);
     TESTCHECK(status, app);
     
