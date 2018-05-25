@@ -13,9 +13,14 @@ how to test:
 5. 将answer.sdp copy到offer的当前目录
 7. 输入ok开始协商
 
-TODO
+TODO 已解决
 1. MediaConfig不在使用union，合并到一起, 已完成
 2. transport是否要放到stream里面去。 不这样做，但是现在需要确认streamTracks和transportIce的下标一致
    确定一致，在addtrack的时候会初始化对应下标的transport
-3. ice协商时候把每个mline拆分单独协商
-4. 回调函数，目前是sleep等待超时ice的状态
+3. ice协商时候把每个mline拆分单独协商. 这个是代码问题，现在成功了
+   pjmedia_transport_media_start media_index 一直传的0
+   addtrack的时候下标搞错了，导致先添加的下标位1，后添加的下标为0
+
+TODO 未解决
+4. 发送数据的接受到数据和rtcp的回调函数，参考siprtp. 正在做
+5. 回调函数，目前是sleep等待超时ice的状态. 对于用户没有回调，即同步的. 确定是否这样做？
