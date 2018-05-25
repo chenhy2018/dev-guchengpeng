@@ -1,6 +1,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <math.h>
 #include "aac_encoder.h"
 #include "rtmp_publish.h"
 #include "rtmp_sys.h"
@@ -183,6 +184,147 @@ typedef struct _AdtsHeader
 
         unsigned int nNoRawDataBlocksInFrame;
 } AdtsHeader;
+
+// ---------------------------------------------------------------
+
+typedef struct _H264Sps
+{
+        int nProfileIdc;
+        int nLevelIdc;
+        int nHeight;
+        int nWidth;
+        int constraintSet4Flag[4];
+        int nSeqParamSetId;
+        int nNumRefFrames;
+        int nGapsInFrameNumValueAllowedFlag;
+        int nDeltaPicOrderAlwaysZeroFlag;
+        int nResidualColorTransformFlag;
+        int nBitDepthLumaMinus8;
+        int nItDepthChromaMinus8;
+        int nQpprimeYZeroTransformBypassFlag;
+
+        int nSeqScalingMatrixPresentFlag;
+        int seqScalingListPresentFlag[8];
+} H264Sps;
+
+unsigned int Ue(const char *_pBuf, unsigned int _nLen, unsigned int * _nStartBit)
+{
+        unsigned int nZeroNum = 0;
+        while (*_nStartBit < _nLen * 8) {
+                if (_pBuf[*_nStartBit / 8] & (0x80 >> (*_nStartBit % 8))) {
+                        break;
+                }
+                nZeroNum++;
+                *_nStartBit++;
+        }
+        *_nStartBit ++;
+
+        uint32_t dwRet = 0;
+        for (unsigned int i = 0; i < nZeroNum; i++) {
+                dwRet <<= 1;
+                if (_pBuf[*_nStartBit / 8] & (0x80 >> (*_nStartBit % 8))) {
+                        dwRet += 1;
+                }
+                *_nStartBit++;
+        }
+        return (1 << nZeroNum) - 1 + dwRet;
+}
+
+int Se(const char *_pBuf, unsigned int _nLen, unsigned int *_nStartBit)
+{
+        int UeVal = Ue(_pBuf, _nLen, _nStartBit);
+        double k = UeVal;
+        int nValue = ceil(k / 2);
+
+        if (UeVal % 2 == 0) {
+                nValue =- nValue;
+        }
+        return nValue;
+}
+
+
+uint32_t U(unsigned int _nBitCount, const char * _pBuf, unsigned int *_nStartBit)
+{
+        uint32_t dwRet = 0;
+
+        for (unsigned int i = 0; i < _nBitCount; i++) {
+                dwRet <<= 1;
+                if (_pBuf[*_nStartBit / 8] & (0x80 >> (*_nStartBit % 8))) {
+                        dwRet += 1;
+                }
+                *_nStartBit++;
+        }
+        return dwRet;
+}
+
+int DecodeSps(const char * _pBuf, unsigned int _nLen, int* _nWidth, int* _nHeight)
+{
+	H264Sps sps;
+
+        unsigned int startBit = 0;
+        int forbiddenZeroBit = U(1, _pBuf, &startBit);
+        int nalRefIdc = U(2, _pBuf, &startBit);
+        int nalUnitType = U(5, _pBuf, &startBit);
+
+        if (nalUnitType == 0x7) {
+                sps.nProfileIdc = U(8, _pBuf, &startBit);
+                sps.constraintSet4Flag[0] = U(1, _pBuf, &startBit);
+                sps.constraintSet4Flag[1] = U(1, _pBuf, &startBit);
+                sps.constraintSet4Flag[2] = U(1, _pBuf, &startBit);
+                sps.constraintSet4Flag[3] = U(1, _pBuf, &startBit);
+                int reservedZero4bits = U(4, _pBuf, &startBit);
+                sps.nLevelIdc = U(8, _pBuf, &startBit);
+
+                sps.nSeqParamSetId = Ue(_pBuf, _nLen, &startBit);
+
+                if (sps.nProfileIdc == 100 || sps.nProfileIdc == 110 ||
+		    sps.nProfileIdc == 122 || sps.nProfileIdc == 144) {
+                        int chromaFormatIdc = Ue(_pBuf, _nLen, &startBit);
+                        if (chromaFormatIdc == 0x3) {
+                                sps.nResidualColorTransformFlag = U(1, _pBuf, &startBit);
+                        }
+                        sps.nBitDepthLumaMinus8 = Ue(_pBuf, _nLen, &startBit);
+                        sps.nItDepthChromaMinus8 = Ue(_pBuf, _nLen, &startBit);
+                        sps.nQpprimeYZeroTransformBypassFlag = U(1, _pBuf, &startBit);
+                        sps.nSeqScalingMatrixPresentFlag = U(1, _pBuf, &startBit);
+
+                        if (sps.nSeqScalingMatrixPresentFlag) {
+                                for (int i = 0; i < 8; i++) {
+                                        sps.seqScalingListPresentFlag[i] = U(1, _pBuf, &startBit);
+                                }
+                        }
+                }
+                int log2MaxFrameNumMinus4 = Ue(_pBuf, _nLen, &startBit);
+                int picOrderCntType = Ue(_pBuf, _nLen, &startBit);
+                if (picOrderCntType == 0) {
+                        int log2MaxPicOrderCntLsbMinus4 = Ue(_pBuf, _nLen, &startBit);
+                } else if (picOrderCntType == 1) {
+                        sps.nDeltaPicOrderAlwaysZeroFlag = U(1, _pBuf, &startBit);
+                        int offsetForNonRefPic = Se(_pBuf, _nLen, &startBit);
+                        int offsetForTopToBottomField = Se(_pBuf, _nLen, &startBit);
+                        int numRefFramesInPicOrderCntCycle = Ue(_pBuf, _nLen, &startBit);
+
+                        int *offsetForRefFrame = malloc(sizeof(int) * numRefFramesInPicOrderCntCycle);
+                        for (int i = 0; i < numRefFramesInPicOrderCntCycle; i++) {
+                                offsetForRefFrame[i] = Se(_pBuf, _nLen, &startBit);
+                        }
+                        free(offsetForRefFrame);
+                }
+                sps.nNumRefFrames = Ue(_pBuf, _nLen, &startBit);
+                sps.nGapsInFrameNumValueAllowedFlag = U(1, _pBuf, &startBit);
+                int picWidthInMbsMinus1 = Ue(_pBuf, _nLen, &startBit);
+                int picHeightInMapUnitsMinus1 = Ue(_pBuf, _nLen, &startBit);
+
+                *_nWidth = (picWidthInMbsMinus1 + 1) * 16;
+                *_nHeight = (picHeightInMapUnitsMinus1 + 1) * 16;
+                return 0;
+        } else {
+                return -1;
+        }
+        return 0;
+}
+
+// ---------------------------------------------------------------
 
 static void RtmpPubFillNalunit(RtmpPubNalUnit * _pUnit, const char * _pData, unsigned int _nSize)
 {
@@ -380,6 +522,91 @@ static int SendVideos(RtmpPubContext * _pRtmp, const char * _pData, unsigned int
         }
         Debug("Video Frame send- timestamp:%u, headertype:%d channel:%d", nPacketStamp, nHeaderType, nChannel);
         return SendPacket(_pRtmp, RTMP_PACKET_TYPE_VIDEO, _pData, _nSize, nPacketStamp, nHeaderType, nChannel);
+}
+
+static inline char * PutByte(char *output, uint8_t nVal)
+{
+        output[0] = nVal;
+        return output + 1;
+}
+
+static inline char * PutBe16(char *output, uint16_t nVal)
+{
+        output[1] = nVal & 0xff;
+        output[0] = nVal >> 8;
+        return output + 2;
+}
+
+static inline char * PutAmfString( char *c, const char *str )
+{
+        uint16_t len = strlen(str);
+        c = PutBe16(c, len);
+        memcpy(c, str, len);
+        return c + len;
+}
+
+static inline char * PutAmfDouble(char *c, double d)
+{
+        *c++ = AMF_NUMBER;  /* type: Number */
+        {
+                char *ci, *co;
+                ci = (char *)&d;
+                co = (char *)c;
+                co[0] = ci[7];
+                co[1] = ci[6];
+                co[2] = ci[5];
+                co[3] = ci[4];
+                co[4] = ci[3];
+                co[5] = ci[2];
+                co[6] = ci[1];
+                co[7] = ci[0];
+        }
+        return c + 8;
+}
+
+static int RtmpPubSendMetadata(RtmpPubContext * _pRtmp)
+{
+	if (_pRtmp == NULL) {
+		return -1;
+	}
+
+        // sanity check
+        if (_pRtmp->m_pPps.m_nSize == 0 || _pRtmp->m_pSps.m_nSize <  4) {
+                Debug("No pps or sps");
+                return -1;
+        }
+
+	// get width and height from sps and pps
+	int nWidth;
+	int nHeight;
+	if (DecodeSps(_pRtmp->m_pPps.m_pData, _pRtmp->m_pPps.m_nSize, &nWidth, &nHeight) < 0) {
+		Debug("sps format is not valid");
+		return -1;
+	}
+
+	char body[1024] = {0};
+	char *p = (char *)body;
+
+	p = PutByte(p, AMF_STRING);
+        p = PutAmfString(p, "@setDataFrame");
+
+        p = PutByte(p, AMF_STRING);
+        p = PutAmfString(p, "onMetaData");
+
+        p = PutByte(p, AMF_OBJECT);
+        p = PutAmfString(p, "copyright");
+        p = PutByte(p, AMF_STRING);
+        p = PutAmfString(p, "pub_toolkit");
+
+	p = PutAmfString(p, "width");
+	p = PutAmfDouble(p, nWidth);
+	p = PutAmfString(p, "height");
+	p = PutAmfDouble(p, nHeight);
+
+        p = PutAmfString(p, "");
+        p = PutByte(p, AMF_OBJECT_END);
+
+	return SendPacket(_pRtmp, RTMP_PACKET_TYPE_INFO, &body[0], p - body, 0, 0, 4);
 }
 
 static int RtmpPubSendH264Config(RtmpPubContext * _pRtmp, unsigned int _nTimeStamp)
@@ -968,6 +1195,10 @@ int RtmpPubSendVideoKeyframe(RtmpPubContext * _pRtmp, const char * _pData, unsig
 {
         int ret = 0;
         if (_pRtmp->m_nIsVideoConfigSent == 0) {
+		ret = RtmpPubSendMetadata(_pRtmp);
+		if (ret < 0) {
+			return ret;
+		}
                 ret = RtmpPubSendH264Config(_pRtmp, _presentationTime);
                 if (ret < 0) {
                         return ret;
