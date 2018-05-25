@@ -220,7 +220,8 @@ unsigned int Ue(const char *_pBuf, unsigned int _nLen, unsigned int * _nStartBit
         *_nStartBit ++;
 
         uint32_t dwRet = 0;
-        for (unsigned int i = 0; i < nZeroNum; i++) {
+	unsigned int i = 0;
+        for (; i < nZeroNum; i++) {
                 dwRet <<= 1;
                 if (_pBuf[*_nStartBit / 8] & (0x80 >> (*_nStartBit % 8))) {
                         dwRet += 1;
@@ -247,7 +248,8 @@ uint32_t U(unsigned int _nBitCount, const char * _pBuf, unsigned int *_nStartBit
 {
         uint32_t dwRet = 0;
 
-        for (unsigned int i = 0; i < _nBitCount; i++) {
+	unsigned int i = 0;
+        for (; i < _nBitCount; i++) {
                 dwRet <<= 1;
                 if (_pBuf[*_nStartBit / 8] & (0x80 >> (*_nStartBit % 8))) {
                         dwRet += 1;
@@ -289,7 +291,8 @@ int DecodeSps(const char * _pBuf, unsigned int _nLen, int* _nWidth, int* _nHeigh
                         sps.nSeqScalingMatrixPresentFlag = U(1, _pBuf, &startBit);
 
                         if (sps.nSeqScalingMatrixPresentFlag) {
-                                for (int i = 0; i < 8; i++) {
+				int i = 0;
+                                for (; i < 8; i++) {
                                         sps.seqScalingListPresentFlag[i] = U(1, _pBuf, &startBit);
                                 }
                         }
@@ -305,7 +308,8 @@ int DecodeSps(const char * _pBuf, unsigned int _nLen, int* _nWidth, int* _nHeigh
                         int numRefFramesInPicOrderCntCycle = Ue(_pBuf, _nLen, &startBit);
 
                         int *offsetForRefFrame = malloc(sizeof(int) * numRefFramesInPicOrderCntCycle);
-                        for (int i = 0; i < numRefFramesInPicOrderCntCycle; i++) {
+			int i = 0;
+                        for (; i < numRefFramesInPicOrderCntCycle; i++) {
                                 offsetForRefFrame[i] = Se(_pBuf, _nLen, &startBit);
                         }
                         free(offsetForRefFrame);
