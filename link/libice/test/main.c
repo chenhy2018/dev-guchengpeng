@@ -124,8 +124,12 @@ int main(int argc, char** argv)
 
 	// send some data to others
 	while (1) {
-		const char* stra = "I'm aaaaaaaaa";
-		const char* strb = "I'm bbbbbbbbb";
+		char stra[1500];
+		char strb[1500];
+		memset(stra, 'A', 1400);
+		memset(strb, 'B', 1400);
+		stra[1400] = '\0';
+		strb[1400] = '\0';
 		int i = IceSendToPeer(pa, 1, stra, strlen(stra));
 		int j = IceSendToPeer(pb, 1, strb, strlen(strb));
 		if (i != 0 || j != 0) {
