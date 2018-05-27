@@ -10,6 +10,12 @@
 #ifndef QUEUE_H
 #define QUEUE_H
 
+#include <pthread.h>
+#include <stdlib.h>
+#include <sys/time.h>
+#include <errno.h>
+#include <stdio.h>
+
 typedef struct
 {
 	int       nMessageID;
