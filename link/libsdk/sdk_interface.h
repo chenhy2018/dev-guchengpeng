@@ -1,4 +1,4 @@
-// Last Update:2018-05-27 16:47:14
+// Last Update:2018-05-27 17:27:53
 /**
  * @file sdk_interface.h
  * @brief 
@@ -33,8 +33,23 @@ typedef enum {
     STREAM_TYPE_VIDEO,
 } StreamType_e;
 
+typedef enum {
+    AUDIO_CODEC_NONE,
+    AUDIO_CODEC_G711,
+    AUDIO_CODEC_AAC,
+    AUDIO_CODEC_G729,
+} AudioCodec_e;
+
+typedef enum {
+    VIDEO_CODEC_NONE,
+    VIDEO_CODEC_H264,
+    VIDEO_CODEC_H265,
+} VideoCodec_e;
+
 #define URL_LEN_MAX (128)
 #define STREAM_PACKET_LEN (256)
+#define AUDIO_CODEC_MAX 16
+#define VIDEO_CODEC_MAX 16
 
 typedef struct {
     StreamType_e type;
@@ -42,6 +57,8 @@ typedef struct {
     int channels;
     int width;
     int height;
+    AudioCodec_e audioCodec[AUDIO_CODEC_MAX];
+    VideoCodec_e videoCodec[VIDEO_CODEC_MAX];
 } stream_s;
 
 typedef struct {
@@ -60,7 +77,7 @@ typedef struct {
 } event_s;
 
 int CreateUA();
-int UA_Destroy();
+int DestroyUA();
 int Register( const char* id, const char* host, const char* password, const int _bDeReg);
 int MakeCall( int fd, int _nNid, const char* _pDestUri, const stream_s * _pStream );
 int AnswerCall( int fd, int callId );

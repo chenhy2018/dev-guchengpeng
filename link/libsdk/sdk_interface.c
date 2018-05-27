@@ -1,4 +1,4 @@
-// Last Update:2018-05-27 17:18:34
+// Last Update:2018-05-27 17:18:36
 /**
  * @file sdk_interface.c
  * @brief 
@@ -102,7 +102,7 @@ int CreateUA()
     return pUA->fd;
 }
 
-int UA_Destroy()
+int DestroyUA()
 {
     if ( pUA->pQueue ) {
         DestroyMessageQueue( &pUA->pQueue );
