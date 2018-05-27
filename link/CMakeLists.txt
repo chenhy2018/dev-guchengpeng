@@ -7,5 +7,4 @@ ExternalProject_Add(stun
         BUILD_IN_SOURCE 1
 )
 
-add_subdirectory(libmuxer)
 add_subdirectory(libice)
