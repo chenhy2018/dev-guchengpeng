@@ -15,6 +15,7 @@ const (
 
 const (
 	TCP_MAX_TIMEOUT    = 300
+	TCP_MAX_BUF_SIZE   = 1024 * 1024 * 3 // 3MB 
 	DEFAULT_MTU        = 1500
 )
 
@@ -86,6 +87,7 @@ func ListenTCP(ip, port string) error {
 
 		go func(conn *net.TCPConn) {
 
+			rest := make([]byte, 0)
 			rm, _ := net.ResolveTCPAddr(conn.RemoteAddr().Network(), conn.RemoteAddr().String())
 			addr := &address{
 				IP:    rm.IP,
@@ -101,25 +103,27 @@ func ListenTCP(ip, port string) error {
 				conn.SetDeadline(time.Now().Add(time.Second * time.Duration(TCP_MAX_TIMEOUT)))
 
 				buf := make([]byte, DEFAULT_MTU)
-				len, err := conn.Read(buf)
-
+				nr, err := conn.Read(buf)
 				if err != nil {
 					return
 				}
 
-				go func(req []byte, r *net.TCPAddr) {
-
-
-					resp := process(req, addr)
-					if resp == nil {
-						return
-					}
-
-					_, err := conn.Write(resp)
+				rest = append(rest, buf[:nr]...)
+				for {
+					one := []byte{}
+					one, rest, err = decodeTCP(rest)
 					if err != nil {
-						return
+						if len(rest) > TCP_MAX_BUF_SIZE {
+							rest = []byte{}
+						}
+						break
 					}
-				}(buf[:len], rm)
+
+					resp := process(one, addr)
+					if resp != nil {
+						conn.Write(resp)
+					}
+				}
 			}
 		}(tcpConn)
 	}
@@ -163,6 +167,43 @@ func ListenUDP(ip, port string) error {
 			}
 		}(buf[:nr], rm)
 	}
+}
+
+func decodeTCP(req []byte) ([]byte, []byte, error) {
+
+	if len(req) == 0 {
+		return nil, req, fmt.Errorf("empty request")
+	}
+
+	// split first stun message or channel data from TCP stream
+
+	switch req[0] & MSG_TYPE_MASK {
+	case MSG_TYPE_STUN_MSG:
+		// get first stun message
+		buf, err := checkMessage(req)
+		if err != nil {
+			return nil, req, err
+		}
+
+		return buf, req[len(buf):], nil
+
+	case MSG_TYPE_CHANNELDATA:
+		// get first channel data
+		buf, err := checkChannelData(req)
+		if err != nil {
+			return nil, req, err
+		}
+
+		// there may be paddings in channeldata according to https://tools.ietf.org/html/rfc5766#section-11.5
+		roundup := 0
+		if len(buf) % 4 != 0 {
+			roundup = 4 - len(buf) % 4
+		}
+
+		return buf, req[len(buf)+roundup:], nil
+	}
+
+	return nil, []byte{}, fmt.Errorf("bad message type")
 }
 
 func process(req []byte, addr *address) []byte {
@@ -267,6 +308,14 @@ func sendTo(addr *address, data []byte) error {
 	case NET_UDP:
 		return sendUDP(addr, data)
 	case NET_TCP:
+		// channel data over tcp must roundup to 32 bits
+		roundup := 0
+		if len(data) % 4 != 0 {
+			roundup = 4 - len(data) % 4
+		}
+		pad := make([]byte, roundup)
+		data = append(data, pad...)
+
 		return sendTCP(addr, data)
 	}
 	return nil
