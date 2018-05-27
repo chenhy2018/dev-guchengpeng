@@ -1,4 +1,4 @@
-// Last Update:2018-05-27 17:06:24
+// Last Update:2018-05-27 17:18:34
 /**
  * @file sdk_interface.c
  * @brief 
@@ -41,7 +41,8 @@ SipAnswerCode cbOnIncomingCall(int _nAccountId, int _nCallId, const char *_pFrom
         
         pMessage->pMessage = pEvent;
     }
-    SendMessage( pUA->pQueue, pMessage );
+    if ( pMessage )
+        SendMessage( pUA->pQueue, pMessage );
 	return OK;
 }
 
@@ -73,6 +74,9 @@ void cbOnCallStateChange(int _nCallId, SipInviteState _State, SipAnswerCode _Sta
     }
     if ( pEvent )
         pMessage->pMessage  = (void *)pEvent;
+
+    if ( pMessage )
+        SendMessage( pUA->pQueue, pMessage );
 }
 
 int CreateUA()
