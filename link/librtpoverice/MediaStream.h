@@ -35,11 +35,11 @@ return s;}
 
 typedef enum _MediaFormat
 {
-    MEDIA_FORMAT_PCMU,
-    MEDIA_FORMAT_PCMA,
-    MEDIA_FORMAT_G729,
-    MEDIA_FORMAT_H264,
-    MEDIA_FORMAT_H265,
+    MEDIA_FORMAT_PCMU = 0,
+    MEDIA_FORMAT_PCMA = 8,
+    MEDIA_FORMAT_G729 = 18,
+    MEDIA_FORMAT_H264 = 96,
+    MEDIA_FORMAT_H265 = 98,
 }MediaFromat;
 
 typedef enum _MediaType

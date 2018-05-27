@@ -17,6 +17,7 @@ static void setMediaConfig(IN OUT MediaConfig *_pMediaConfig)
             case MEDIA_FORMAT_PCMU:
             case MEDIA_FORMAT_PCMA:
             case MEDIA_FORMAT_G729:
+                _pMediaConfig->configs[i].nRtpDynamicType = _pMediaConfig->configs[i].format;
                 _pMediaConfig->configs[i].nChannel = 1;
                 _pMediaConfig->configs[i].nBitDepth = 8;
                 break;
