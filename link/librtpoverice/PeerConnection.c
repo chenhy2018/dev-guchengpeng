@@ -493,6 +493,8 @@ int createOffer(IN OUT PeerConnection * _pPeerConnection, IN pj_pool_t * _pPool,
     pjmedia_sdp_print(*_pOffer, sdpStr, sizeof(sdpStr));
     printf("----------------\n%s\n", sdpStr);
     
+    _pPeerConnection->role = ICE_ROLE_OFFERER;
+
     return PJ_SUCCESS;
 }
 
@@ -515,6 +517,8 @@ int createAnswer(IN OUT PeerConnection * _pPeerConnection, IN pj_pool_t * _pPool
         }
     }
     
+    _pPeerConnection->role = ICE_ROLE_ANSWERER;
+
     return PJ_SUCCESS;
 }
 

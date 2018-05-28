@@ -59,6 +59,12 @@ typedef enum _IceState{
     ICE_STATE_FAIL,
 }IceState;
 
+typedef enum _IceRole{
+    ICE_ROLE_NONE,
+    ICE_ROLE_OFFERER,
+    ICE_ROLE_ANSWERER
+}IceRole;
+
 typedef struct _TransportIce
 {
     pjmedia_transport *pTransport;
@@ -84,7 +90,9 @@ typedef struct _PeerConnection
     MediaStream       mediaStream;
     pjmedia_sdp_session *pOfferSdp;
     pjmedia_sdp_session *pAnswerSdp;
+    pjmedia_sdp_neg *pIceNeg;
     int bQuit;
+    IceRole role;
 }PeerConnection;
 
 void InitIceConfig(IN OUT IceConfig *pIceConfig);
