@@ -352,6 +352,11 @@ void ReleasePeerConnectoin(IN OUT PeerConnection * _pPeerConnection)
         pjmedia_endpt_destroy(_pPeerConnection->pMediaEndpt);
         _pPeerConnection->pMediaEndpt = NULL;
     }
+
+    if (_pPeerConnection->pNegPool) {
+        pj_pool_release(_pPeerConnection->pNegPool);
+        _pPeerConnection->pNegPool = NULL;
+    }
 }
 
 int AddAudioTrack(IN OUT PeerConnection * _pPeerConnection, IN MediaConfig * _pAudioConfig)
@@ -522,14 +527,56 @@ int createAnswer(IN OUT PeerConnection * _pPeerConnection, IN pj_pool_t * _pPool
     return PJ_SUCCESS;
 }
 
-void setLocalDescription(IN OUT PeerConnection * _pPeerConnectoin, IN pjmedia_sdp_session * _pLocalSdp)
+static int checkAndInitSdpNeg(IN OUT PeerConnection * _pPeerConnection)
 {
-    _pPeerConnectoin->pOfferSdp = _pLocalSdp;
+    pj_assert(_pPeerConnection->role != ICE_ROLE_NONE);
+
+    if (_pPeerConnection->pNegPool == NULL) {
+        _pPeerConnection->pNegPool =  pj_pool_create(_pPeerConnection->pPoolFactory, NULL, 512, 512, NULL);
+        ASSERT_RETURN_CHECK(_pPeerConnection->pNegPool, pj_pool_create);
+    }
+
+    pj_status_t status;
+
+    if (_pPeerConnection->role == ICE_ROLE_OFFERER) {
+        if (_pPeerConnection->pIceNeg == NULL) {
+
+            status = pjmedia_sdp_neg_create_w_local_offer (_pPeerConnection->pNegPool,
+                                                           _pPeerConnection->pOfferSdp, &_pPeerConnection->pIceNeg);
+            STATUS_CHECK(pjmedia_sdp_neg_create_w_local_offer, status);
+            status = pjmedia_sdp_neg_set_remote_answer (_pPeerConnection->pNegPool,
+                                                        _pPeerConnection->pIceNeg, _pPeerConnection->pAnswerSdp);
+            STATUS_CHECK(pjmedia_sdp_neg_set_remote_answer, status);
+        }
+    } else if (_pPeerConnection->role == ICE_ROLE_ANSWERER) {
+        status = pjmedia_sdp_neg_create_w_remote_offer(_pPeerConnection->pNegPool,
+                                                       _pPeerConnection->pAnswerSdp, _pPeerConnection->pOfferSdp,
+                                                       &_pPeerConnection->pIceNeg);
+        STATUS_CHECK(pjmedia_sdp_neg_create_w_remote_offer, status);
+    }
+
+    status = pjmedia_sdp_neg_negotiate (_pPeerConnection->pNegPool, _pPeerConnection->pIceNeg, 0);
+    STATUS_CHECK(pjmedia_sdp_neg_set_remote_answer, status);
+
+    return PJ_SUCCESS;
 }
 
-void setRemoteDescription(IN OUT PeerConnection * _pPeerConnectoin, IN pjmedia_sdp_session * _pRemoteSdp)
+int setLocalDescription(IN OUT PeerConnection * _pPeerConnection, IN pjmedia_sdp_session * _pSdp)
 {
-    _pPeerConnectoin->pAnswerSdp = _pRemoteSdp;
+    _pPeerConnection->pOfferSdp = _pSdp;
+    if (_pPeerConnection->pAnswerSdp) {
+        return checkAndInitSdpNeg(_pPeerConnection);
+    }
+    return PJ_SUCCESS;
+}
+
+int setRemoteDescription(IN OUT PeerConnection * _pPeerConnection, IN pjmedia_sdp_session * _pSdp)
+{
+    _pPeerConnection->pAnswerSdp = _pSdp;
+    if(_pPeerConnection->pOfferSdp){
+        return checkAndInitSdpNeg(_pPeerConnection);
+    }
+    return PJ_SUCCESS;
 }
 
 static void on_rx_rtcp(void *pUserData, void *pPkt, pj_ssize_t size)

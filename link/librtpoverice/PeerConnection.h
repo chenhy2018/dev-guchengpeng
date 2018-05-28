@@ -91,6 +91,7 @@ typedef struct _PeerConnection
     pjmedia_sdp_session *pOfferSdp;
     pjmedia_sdp_session *pAnswerSdp;
     pjmedia_sdp_neg *pIceNeg;
+    pj_pool_t *pNegPool;
     int bQuit;
     IceRole role;
 }PeerConnection;
@@ -105,8 +106,8 @@ int AddVideoTrack(IN OUT PeerConnection * pPeerConnection, IN MediaConfig *pVide
 int createOffer(IN OUT PeerConnection * pPeerConnection, IN pj_pool_t * pPool, OUT pjmedia_sdp_session **pOffer);
 int createAnswer(IN OUT PeerConnection * pPeerConnection, IN pj_pool_t * pPool,
                  IN pjmedia_sdp_session *pOffer, OUT pjmedia_sdp_session **pAnswer);
-void setLocalDescription(IN OUT PeerConnection * pPeerConnection, IN pjmedia_sdp_session * pLocalSdp);
-void setRemoteDescription(IN OUT PeerConnection * pPeerConnection, IN pjmedia_sdp_session * pRemoteSdp);
+int setLocalDescription(IN OUT PeerConnection * pPeerConnection, IN pjmedia_sdp_session * pSdp);
+int setRemoteDescription(IN OUT PeerConnection * pPeerConnection, IN pjmedia_sdp_session * pSdp);
 int StartNegotiation(IN PeerConnection * pPeerConnection);
 
 int SendAudio(IN PeerConnection *pPeerConnection, uint8_t *pData, int nLen);
