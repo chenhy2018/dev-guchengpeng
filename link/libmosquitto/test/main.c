@@ -38,6 +38,7 @@ int main()
         void* instance = NULL;
         printf("try first \n");
         instance = MosquittoCreateInstance(&options);
+        sleep(3);
         MosquittoSubscribe(instance, NULL, "sensor/room1/#");
         for (int i = 0 ; i < 10; ++i) {
             MosquittoPublish(instance, NULL, "sensor/room1/temperature", 10, "test1234456");
@@ -58,9 +59,9 @@ int main()
         } 
         MosquittoDestroy(instance);
         printf("try third \n");
-        memset(options.primaryUserInfo.hostname, 0, MAX_MOSQUITTO_USR_SIZE);
-        strcpy(options.primaryUserInfo.hostname, "172.17.0.8");
-        strcpy(options.primaryUserInfo.cafile, "/opt2/emqttd-16/etc/server/ca.crt");
+        //memset(options.primaryUserInfo.hostname, 0, MAX_MOSQUITTO_USR_SIZE);
+        //strcpy(options.primaryUserInfo.hostname, "172.17.0.8");
+        strcpy(options.primaryUserInfo.cafile, "./test/ca.crt");
         options.primaryUserInfo.nPort = 8883;
         options.primaryUserInfo.nAuthenicatinMode = MOSQUITTO_AUTHENTICATION_USER | MOSQUITTO_AUTHENTICATION_ONEWAY_SSL;
         instance = MosquittoCreateInstance(&options);

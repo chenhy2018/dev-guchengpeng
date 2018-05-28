@@ -7,14 +7,6 @@ ExternalProject_Add(pjsip
         BUILD_IN_SOURCE 1
 )
 
-include(ExternalProject)
-ExternalProject_Add(libmosquitto
-        SOURCE_DIR mosquitto-1.4.8
-        BUILD_COMMAND make
-        INSTALL_COMMAND make install
-        BUILD_IN_SOURCE 1
-)
-
 SET(X264_PREFIX_PATH "${CMAKE_CURRENT_SOURCE_DIR}/x264/prefix")
 include(ExternalProject)
 ExternalProject_Add(x264
