@@ -10,9 +10,6 @@
 #define STATUS_CONNECTING 1
 #define STATUS_CONNACK_RECVD 2
 #define STATUS_WAITING 3
-#define STATUS_DISCONNECTING 4
-#define STATUS_PUBLISHING 5
-#define STATUS_PUBLISHED 6
 
 #define MinQueueSize 50
 
@@ -25,8 +22,7 @@ typedef struct Node
 bool insertNode(Node* pHead, char* val) {
         int i = 0;
         Node* p = pHead;
-        while(NULL != p->pNext)
-        {
+        while(p->pNext) {
                 i++;
                 p = p->pNext;
         }
@@ -42,7 +38,7 @@ bool deleteNode(Node* PHead, char * pval)
 {
         int i = 0;
         Node* p = PHead;
-        while(p->pNext != NULL){
+        while (p->pNext != NULL) {
                if (strcmp(p->pNext->topic, pval) == 0) {
                        Node* temp = p->pNext;
                        p->pNext = temp->pNext;
@@ -50,7 +46,7 @@ bool deleteNode(Node* PHead, char * pval)
                        return true;
                }
         }
-        printf("Can't find \n");
+        printf("Can't find node \n");
         return false;
 }
 
@@ -60,8 +56,16 @@ struct MosquittoInstance
         struct MosquittoOptions options;
         int status;
         bool connected;
+        bool isDestroying;
         Node pSubsribeList;
 };
+
+void onEventCallback(struct MosquittoInstance* _pInstance, int rc, const char* _pStr)
+{
+        if (_pInstance->options.callbacks.onEvent != NULL) {
+                _pInstance->options.callbacks.onEvent(_pInstance, rc, _pStr);
+        }
+}
 
 void onLogCallback(struct mosquitto* _pMosq, void* _pObj, int level, const char* _pStr)
 {
@@ -81,19 +85,20 @@ void onConnectCallback(struct mosquitto* _pMosq, void* _pObj, int result)
 {
         int rc = MOSQ_ERR_SUCCESS;
         struct MosquittoInstance* pInstance = (struct MosquittoInstance*)(_pObj);
-        pInstance->status = STATUS_WAITING;
         pInstance->connected = true;
         fprintf(stderr, " on_connect_callback \n ");
         if (result) {
                 fprintf(stderr, "%s\n", mosquitto_connack_string(result));
         }
         else {
+                pInstance->status = STATUS_CONNACK_RECVD;
                 Node* p = pInstance->pSubsribeList.pNext;
                 while (p) {
                         mosquitto_subscribe(pInstance->mosq, NULL, p->topic, pInstance->options.nQos);
                         p = p->pNext;
                 }
         }
+        onEventCallback(pInstance, result, (result == 0) ? "on connect success" : mosquitto_connack_string(result));
 }
 
 
@@ -104,6 +109,7 @@ void onDisconnectCallback(struct mosquitto* _pMosq, void* _pObj, int rc)
         struct MosquittoInstance* pInstance = (struct MosquittoInstance*)(_pObj);
         pInstance->connected = false;
         pInstance->status = STATUS_IDLE;
+        onEventCallback(pInstance, rc, (rc == 0) ? "on disconnect success" : mosquitto_connack_string(rc));
 }
 
 void onSubscribeCallback(struct mosquitto* _pMosq, void* pObj, int mid, int qos_count, const int* pGranted_qos)
@@ -121,7 +127,6 @@ void onPublishCallback(struct mosquitto* _pMosq, void* _pObj, int mid)
         fprintf(stderr, " my_publish_callback \n ");
         struct MosquittoInstance* pInstance = (struct MosquittoInstance*)(_pObj);
         int last_mid_sent = mid;
-        pInstance->status = STATUS_PUBLISHED;
 }
 
 
@@ -140,13 +145,33 @@ static void MosquittoInstanceInit(struct MosquittoInstance* _pInstance, const st
         _pInstance->mosq = NULL;
         _pInstance->connected = false;
         _pInstance->status = STATUS_IDLE;
+        _pInstance->isDestroying = false;
         _pInstance->pSubsribeList.pNext = NULL;
+}
+
+bool ClientOptSet(struct MosquittoInstance* _pInstance, struct mosquitto* _pMosq, struct MosquittoUserInfo info)
+{
+        int rc = 0;
+        if (info.nAuthenicatinMode & MOSQUITTO_AUTHENTICATION_USER) {
+                printf("mosquitto_username_pw_set \n");
+                rc = mosquitto_username_pw_set(_pMosq, info.username, info.password);
+                if (rc)
+                        return rc;
+        }
+        if (info.nAuthenicatinMode & MOSQUITTO_AUTHENTICATION_ONEWAY_SSL) {
+                printf("mosquitto_tls_set \n");
+                rc = mosquitto_tls_set(_pMosq, info.cafile, NULL, NULL, NULL, NULL);
+        }
+        else if (info.nAuthenicatinMode & MOSQUITTO_AUTHENTICATION_TWOWAY_SSL) {
+                printf("mosquitto_tls_set 111 \n");
+                rc = mosquitto_tls_set(_pMosq, info.cafile, NULL, info.certfile, info.keyfile, NULL);
+        }
+        return rc;
 }
 
 void * Mosquittothread(void* _pData)
 {
         int rc;
-        mosquitto_lib_init();
         
         struct MosquittoInstance* pInstance = (struct MosquittoInstance*)(_pData);
 
@@ -176,32 +201,38 @@ void * Mosquittothread(void* _pData)
                  if (!pInstance->connected && pInstance->status == STATUS_IDLE) {
                          fprintf(stderr, "connecting \n");
                          pInstance->status = STATUS_CONNECTING;
-                         mosquitto_username_pw_set(pInstance->mosq, pInstance->options.primaryUserInfo.username, pInstance->options.primaryUserInfo.password);
-                         rc = mosquitto_connect(pInstance->mosq, pInstance->options.primaryUserInfo.hostname, pInstance->options.primaryUserInfo.nPort, pInstance->options.nKeepalive);
+                         rc = ClientOptSet(pInstance, pInstance->mosq, pInstance->options.primaryUserInfo);
+                         if (rc == 0) {
+                                 rc = mosquitto_connect(pInstance->mosq, pInstance->options.primaryUserInfo.hostname, pInstance->options.primaryUserInfo.nPort, pInstance->options.nKeepalive);
+                         }
                          if (rc) {
-                                 sleep(1);
-                                 
+                                 onEventCallback(pInstance, rc, mosquitto_strerror(rc));
                                  fprintf(stderr, "Unable to connect (%s). try to reconnect to secondary server. \n", mosquitto_strerror(rc));
-                                 mosquitto_username_pw_set(pInstance->mosq, pInstance->options.secondaryUserInfo.username, pInstance->options.secondaryUserInfo.password);
-                                 rc = mosquitto_connect(pInstance->mosq, pInstance->options.secondaryUserInfo.hostname, pInstance->options.secondaryUserInfo.nPort, pInstance->options.nKeepalive);
+                                 rc = ClientOptSet(pInstance, pInstance->mosq, pInstance->options.secondaryUserInfo);
+                                 if (rc == 0) {
+                                         rc = mosquitto_connect(pInstance->mosq, pInstance->options.secondaryUserInfo.hostname, pInstance->options.secondaryUserInfo.nPort, pInstance->options.nKeepalive);
+                                 }
                                  if (rc) {
                                          fprintf(stderr, "Unable to connect Secondary server  %s \n", mosquitto_strerror(rc) );
                                          pInstance->status = STATUS_IDLE;
                                          // TODO add error callback.
-                                         sleep(1);
+                                         onEventCallback(pInstance, rc, mosquitto_strerror(rc));
+                                         sleep(30);
                                  }
                                  else {
                                          pInstance->status = STATUS_CONNECTING;
                                  }
                          }
+                         sleep(1);
                  }
                  rc = mosquitto_loop(pInstance->mosq, -1, 1);
-        } while (pInstance->status != STATUS_DISCONNECTING);
+        } while (!pInstance->isDestroying);
+        printf("quite !!! \n");
         if (pInstance->connected) {
                 mosquitto_disconnect(pInstance->mosq);
         }
         mosquitto_destroy(pInstance->mosq);
-        mosquitto_lib_cleanup();
+        free(pInstance);
         if (rc) {
                 fprintf(stderr, "Error: %s\n", mosquitto_strerror(rc));
         }
@@ -225,22 +256,48 @@ void* MosquittoCreateInstance(IN const struct MosquittoOptions* pOption)
 void MosquittoDestroy(IN const void* _pInstance)
 {	
         struct MosquittoInstance* pInstance = (struct MosquittoInstance*)(_pInstance);
-        pInstance->status = STATUS_DISCONNECTING;
+        pInstance->isDestroying = true;;
+        pInstance->options.callbacks.onMessage = NULL;
+        pInstance->options.callbacks.onEvent = NULL;
 }
 
 static int MosquittoErrorStatusChange(int nStatus)
 {
         switch (nStatus) {
-                case MOSQ_ERR_INVAL:
-                        return MOSQUITTO_ERR_INVAL;
+                case MOSQ_ERR_CONN_PENDING:
+                        return MOSQUITTO_ERR_CONN_PENDING;
                 case MOSQ_ERR_NOMEM:
                         return MOSQUITTO_ERR_NOMEM;
+                case MOSQ_ERR_INVAL:
+                        return MOSQUITTO_ERR_INVAL;
                 case MOSQ_ERR_NO_CONN:
                         return MOSQUITTO_ERR_NO_CONN;
-                case MOSQ_ERR_PROTOCOL:
-                        return MOSQUITTO_ERR_PROTOCOL;
+                case MOSQ_ERR_CONN_REFUSED:
+                        return MOSQUITTO_ERR_CONN_REFUSED;
+                case MOSQ_ERR_NOT_FOUND:
+                        return MOSQUITTO_ERR_NOT_FOUND;
+                case MOSQ_ERR_CONN_LOST:
+                        return MOSQUITTO_ERR_CONN_LOST;
+                case MOSQ_ERR_TLS:
+                        return MOSQUITTO_ERR_TLS;
                 case MOSQ_ERR_PAYLOAD_SIZE:
                         return MOSQUITTO_ERR_PAYLOAD_SIZE;
+                case MOSQ_ERR_NOT_SUPPORTED:
+                        return MOSQUITTO_ERR_NOT_SUPPORTED;
+                case MOSQ_ERR_AUTH:
+                        return MOSQUITTO_ERR_AUTH;
+                case MOSQ_ERR_ACL_DENIED:
+                        return MOSQUITTO_ERR_ACL_DENIED;
+                case MOSQ_ERR_UNKNOWN:
+                        return MOSQUITTO_ERR_UNKNOWN;
+                case MOSQ_ERR_ERRNO:
+                        return MOSQUITTO_ERR_ERRNO;
+                case MOSQ_ERR_EAI:
+                        return MOSQUITTO_ERR_EAI;
+                case MOSQ_ERR_PROXY:
+                        return MOSQUITTO_ERR_PROXY;
+                case MOSQ_ERR_PROTOCOL:
+                        return MOSQUITTO_ERR_PROTOCOL;
                 case MOSQ_ERR_SUCCESS:
                         return MOSQUITTO_ERR_SUCCESS;
                 default:
@@ -330,4 +387,16 @@ int MosquittoUnsubscribe(IN const void* _pInstance, OUT int* _pMid, IN char* _pS
                }
         }
         return rc;
+}
+
+int MosquittoLibInit()
+{
+        int rc = mosquitto_lib_init();
+        return MosquittoErrorStatusChange(rc);
+}
+
+int MosquittoLibCleanup()
+{
+        int rc = mosquitto_lib_cleanup();
+        return MosquittoErrorStatusChange(rc);
 }
