@@ -104,7 +104,8 @@ static void print_neg_state(pjmedia_sdp_neg * pNeg) {
             break;
     }
 }
-void pjmedia_sdp_neg_test(pj_pool_factory *_pFactory){
+void pjmedia_sdp_neg_test(pj_pool_factory *_pFactory)
+{
     char localTextSdpBuf[2048] = {0};
     pj_pool_t *pOfferPool = pj_pool_create(_pFactory, NULL, 512, 512, NULL);
     pj_assert(pOfferPool);
@@ -152,7 +153,63 @@ void pjmedia_sdp_neg_test(pj_pool_factory *_pFactory){
     pj_assert(status == PJ_SUCCESS);
     printf("remote active sdp:\n");
     print_sdp(pRemoteActiveSdp);
+    
+    pj_pool_release(pOfferPool);
+    pj_pool_release(pAnswerPool);
+    pj_pool_release(pSdpNegPool);
+    pj_pool_release(pNegPool);
+}
 
+void pjmedia_sdp_neg_test2(pj_pool_factory *_pFactory)
+{
+    char localTextSdpBuf[2048] = {0};
+    pj_pool_t *pOfferPool = pj_pool_create(_pFactory, NULL, 512, 512, NULL);
+    pj_assert(pOfferPool);
+    pjmedia_sdp_session *pOffer = NULL;
+    sdp_from_file(&pOffer, OFFERFILE, pOfferPool, localTextSdpBuf, sizeof(localTextSdpBuf));
+    pj_assert(pOffer != NULL);
+    
+    char remoteTextSdpBuf[2048] = {0};
+    pj_pool_t *pAnswerPool = pj_pool_create(_pFactory, NULL, 512, 512, NULL);
+    pj_assert(pAnswerPool);
+    pjmedia_sdp_session *pAnswer = NULL;
+    sdp_from_file(&pAnswer, ANSWERFILE, pAnswerPool, remoteTextSdpBuf, sizeof(remoteTextSdpBuf));
+    pj_assert(pAnswer != NULL);
+    
+    pj_status_t status;
+    pj_pool_t *pSdpNegPool = pj_pool_create(_pFactory, NULL, 512, 512, NULL);
+    pj_assert(pSdpNegPool);
+    
+    pjmedia_sdp_neg *pIceNeg = NULL;
+    status = pjmedia_sdp_neg_create_w_remote_offer (pSdpNegPool, pAnswer, pOffer, &pIceNeg);
+    pj_assert(status == PJ_SUCCESS);
+    pj_assert(pIceNeg);
+    pjmedia_sdp_neg_set_prefer_remote_codec_order(pIceNeg, 0);
+    print_neg_state(pIceNeg);
+    
+    pj_pool_t *pNegPool = pj_pool_create(_pFactory, NULL, 512, 512, NULL);
+    pj_assert(pNegPool);
+    status = pjmedia_sdp_neg_negotiate (pNegPool, pIceNeg, 0);
+    pj_assert(status == PJ_SUCCESS);
+    print_neg_state(pIceNeg);
+    
+    const pjmedia_sdp_session * pLocalActiveSdp = NULL;
+    status = pjmedia_sdp_neg_get_active_local(pIceNeg, &pLocalActiveSdp);
+    pj_assert(status == PJ_SUCCESS);
+    printf("local active sdp2:\n");
+    print_sdp(pLocalActiveSdp);
+    
+    
+    const pjmedia_sdp_session * pRemoteActiveSdp = NULL;
+    status = pjmedia_sdp_neg_get_active_remote(pIceNeg, &pRemoteActiveSdp);
+    pj_assert(status == PJ_SUCCESS);
+    printf("remote active sdp2:\n");
+    print_sdp(pRemoteActiveSdp);
+    
+    pj_pool_release(pOfferPool);
+    pj_pool_release(pAnswerPool);
+    pj_pool_release(pSdpNegPool);
+    pj_pool_release(pNegPool);
 }
 #endif //SDP_NEG_TEST
 
@@ -191,6 +248,8 @@ int main(int argc, char **argv)
 #ifdef SDP_NEG_TESG
     printf("go into pjmedia_sdp_neg_test\n");
     pjmedia_sdp_neg_test(&app.cachingPool.factory);
+    printf("--------pjmedia_sdp_neg_test2----------\n");
+    pjmedia_sdp_neg_test2(&app.cachingPool.factory);
     return 0;
 #endif //SDP_NEG_TEST
     
