@@ -6,6 +6,7 @@
 #include <pjmedia-codec.h>
 #include <pjlib-util.h>
 #include <pjlib.h>
+#include <pjmedia-codec/h264_packetizer.h>
 
 #define _s_l_(x) #x
 #define _str_line_(x) _s_l_(x)
@@ -70,6 +71,8 @@ typedef struct _MediaStreamTrack
     MediaConfig mediaConfig;
     pjmedia_rtp_session  rtpSession;
     pjmedia_rtcp_session rtcpSession;
+    pj_pool_t *pH264PacketizerPool;
+    pjmedia_h264_packetizer *pH264Packetizer;
 }MediaStreamTrack;
 
 typedef struct _MediaStream
