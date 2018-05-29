@@ -46,7 +46,7 @@ typedef struct MosquittoOptions MosquittoOptions;
 
 struct MosquittoCallback
 {
-        void (*onMessage)(IN const void* instance, IN const char* _pTopic, IN const char* message, IN size_t length);
+        void (*onMessage)(IN const void* instance, IN const char* topic, IN const char* message, IN size_t length);
         void (*onEvent)(IN const void* instance, IN int code, const char* reason);
 };
 
@@ -87,10 +87,10 @@ extern void MosquittoDestroy(IN const void* pInstance);
 
 /* step 3 : mosquitto pub/sub */
 
-extern int MosquittoPublish(IN const void* _pInstance, OUT int* _pMid, IN char* _pTopic, IN int _nPayloadlen, IN const void* _pPayload);
+extern int MosquittoPublish(IN const void* _pInstance, IN char* _pTopic, IN int _nPayloadlen, IN const void* _pPayload);
 
-extern int MosquittoSubscribe(IN const void* _pInstance, OUT int* _pMid, IN char* _pTopic);
+extern int MosquittoSubscribe(IN const void* _pInstance, IN char* _pTopic);
 
-extern int MosquittoUnsubscribe(IN const void* _pInstance, OUT int* _pMid, IN char* pSub);
+extern int MosquittoUnsubscribe(IN const void* _pInstance, IN char* pSub);
 
 #endif

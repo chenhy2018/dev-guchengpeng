@@ -310,7 +310,7 @@ static int MosquittoErrorStatusChange(int nStatus)
         return MOSQUITTO_ERR_OTHERS;
 }
 
-int MosquittoPublish(IN const void* _pInstance, IN int* _pMid, IN char* _pTopic, IN int _nPayloadlen, IN const void* _pPayload)
+int MosquittoPublish(IN const void* _pInstance, IN char* _pTopic, IN int _nPayloadlen, IN const void* _pPayload)
 {
        struct MosquittoInstance* pInstance = (struct MosquittoInstance*)(_pInstance);
        int rc = mosquitto_publish(pInstance->mosq, NULL, _pTopic, _nPayloadlen, _pPayload, pInstance->options.nQos, pInstance->options.bRetain);
@@ -336,10 +336,10 @@ int MosquittoPublish(IN const void* _pInstance, IN int* _pMid, IN char* _pTopic,
        return rc;
 }
 
-int MosquittoSubscribe(IN const void* _pInstance, OUT int* _pMid, IN char* _pTopic)
+int MosquittoSubscribe(IN const void* _pInstance, IN char* _pTopic)
 {
         struct MosquittoInstance* pInstance = (struct MosquittoInstance*)(_pInstance);
-        int rc = mosquitto_subscribe(pInstance->mosq, _pMid, _pTopic, pInstance->options.nQos);
+        int rc = mosquitto_subscribe(pInstance->mosq, _pTopic, pInstance->options.nQos);
         fprintf(stderr, "mos sub %d", rc);
         if (!rc) {
                 insertNode(&pInstance->pSubsribeList, _pTopic);
@@ -366,10 +366,10 @@ int MosquittoSubscribe(IN const void* _pInstance, OUT int* _pMid, IN char* _pTop
         return rc;
 }
 
-int MosquittoUnsubscribe(IN const void* _pInstance, OUT int* _pMid, IN char* _pSub)
+int MosquittoUnsubscribe(IN const void* _pInstance, IN char* _pSub)
 {
         struct MosquittoInstance* pInstance = (struct MosquittoInstance*)(_pInstance);
-        int rc = mosquitto_unsubscribe(pInstance->mosq, _pMid, _pSub);
+        int rc = mosquitto_unsubscribe(pInstance->mosq, _pSub);
         fprintf(stderr, "mos sub %d", rc);
         if (!rc) {
                deleteNode(&pInstance->pSubsribeList, _pSub);
