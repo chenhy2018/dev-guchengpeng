@@ -527,7 +527,109 @@ int createAnswer(IN OUT PeerConnection * _pPeerConnection, IN pj_pool_t * _pPool
     return PJ_SUCCESS;
 }
 
-static int checkAndInitSdpNeg(IN OUT PeerConnection * _pPeerConnection)
+
+static void on_rx_rtcp(void *pUserData, void *pPkt, pj_ssize_t size)
+{
+    MediaStreamTrack *pMediaTrack = (MediaStreamTrack *)pUserData;
+    
+    if (size < 0) {
+        PJ_LOG(3, (__FILE__, "Error receiving RTCP packet:%d", size));
+        return;
+    }
+    
+    /* Update RTCP session */
+    pjmedia_rtcp_rx_rtcp(&pMediaTrack->rtcpSession, pPkt, size);
+    return;
+}
+
+static void on_rx_rtp(void *pUserData, void *pPkt, pj_ssize_t size)
+{
+    pj_status_t status;
+    const pjmedia_rtp_hdr *pRtpHeader;
+    const void *pPayload;
+    unsigned nPayloadLen;
+    
+    MediaStreamTrack *pMediaTrack = (MediaStreamTrack *)pUserData;
+    
+    /* Check for errors */
+    if (size < 0) {
+        PJ_LOG(3, (__FILE__, "RTP recv() error:%d", size));
+        return;
+    }
+    
+    /* Decode RTP packet. */
+    status = pjmedia_rtp_decode_rtp(&pMediaTrack->rtpSession,
+                                    pPkt, (int)size,
+                                    &pRtpHeader, &pPayload, &nPayloadLen);
+    if (status != PJ_SUCCESS) {
+        PJ_LOG(3, (__FILE__, "RTP decode error:%d", status));
+        return;
+    }
+    
+    //PJ_LOG(4,(THIS_FILE, "Rx seq=%d", pj_ntohs(hdr->seq)));
+    /* Update the RTCP session. */
+    pjmedia_rtcp_rx_rtp(&pMediaTrack->rtcpSession, pj_ntohs(pRtpHeader->seq),
+                        pj_ntohl(pRtpHeader->ts), nPayloadLen);
+    
+    /* Update RTP session */
+    pjmedia_rtp_session_update(&pMediaTrack->rtpSession, pRtpHeader, NULL);
+    return;
+}
+
+/*
+ * will init rtp rtcp session is negotiation ok
+ */
+int StartNegotiation(IN PeerConnection * _pPeerConnection)
+{
+    pj_status_t status;
+    int nMaxTracks = sizeof(_pPeerConnection->nAvIndex) / sizeof(int);
+    for ( int i = 0; i < nMaxTracks; i++) {
+        if (_pPeerConnection->nAvIndex[i] != -1) {
+            TransportIce *pTransportIce = &_pPeerConnection->transportIce[i];
+            pj_pool_t * pIceNegPool = pj_pool_create(_pPeerConnection->pPoolFactory, NULL, 512, 512, NULL);
+            ASSERT_RETURN_CHECK(pIceNegPool, pj_pool_create);
+            pTransportIce->pNegotiationPool = pIceNegPool;
+            status = pjmedia_transport_media_start(pTransportIce->pTransport, pIceNegPool,
+                                                   _pPeerConnection->pOfferSdp, _pPeerConnection->pAnswerSdp, i);
+            STATUS_CHECK(pjmedia_transport_media_start, status);
+            
+            if (waitState(&_pPeerConnection->transportIce[i], ICE_STATE_GATHERING_OK)){
+                PJ_LOG(3,(__FILE__, "wait ICE_STATE_NEGOTIATION_OK timeout"));
+                return -1;
+            }
+            
+            pjmedia_transport_info tpinfo;
+            pjmedia_transport_info_init(&tpinfo);
+            pjmedia_transport_get_info(pTransportIce->pTransport, &tpinfo);
+            
+            status = pjmedia_transport_attach(pTransportIce->pTransport,
+                                              &_pPeerConnection->mediaStream.streamTracks[i],
+                                              &tpinfo.sock_info.rtp_addr_name,
+                                              &tpinfo.sock_info.rtcp_addr_name,
+                                              sizeof(tpinfo.sock_info.rtp_addr_name),
+                                              on_rx_rtp, //void (*rtp_cb)(void *user_data, void *pkt,pj_ssize_t),
+                                              on_rx_rtcp //void (*rtcp_cb)(void *usr_data,void*pkt,pj_ssize_t)
+                                              );
+            STATUS_CHECK(pjmedia_transport_attach, status);
+            
+            //init rtp sesstoin
+            MediaStreamTrack * pMediaTrack = &_pPeerConnection->mediaStream.streamTracks[i];
+            int nIdx = pMediaTrack->mediaConfig.nUseIndex;
+            int nRtpDynamicType = pMediaTrack->mediaConfig.configs[nIdx].nRtpDynamicType;
+            pjmedia_rtp_session_init(&pMediaTrack->rtpSession, nRtpDynamicType, pj_rand());
+            
+            int nSampleOrClockRate = pMediaTrack->mediaConfig.configs[nIdx].nSampleOrClockRate;
+            pjmedia_rtcp_init(&pMediaTrack->rtcpSession, NULL, nSampleOrClockRate,
+                              160, //TODO Average number of samples per frame. I don't know???
+                              //How do I set it if payload is video
+                              0);
+        }
+    }
+    
+    return PJ_SUCCESS;
+}
+
+static int checkAndNeg(IN OUT PeerConnection * _pPeerConnection)
 {
     pj_assert(_pPeerConnection->role != ICE_ROLE_NONE);
 
@@ -565,7 +667,7 @@ int setLocalDescription(IN OUT PeerConnection * _pPeerConnection, IN pjmedia_sdp
 {
     _pPeerConnection->pOfferSdp = _pSdp;
     if (_pPeerConnection->pAnswerSdp) {
-        return checkAndInitSdpNeg(_pPeerConnection);
+        return checkAndNeg(_pPeerConnection);
     }
     return PJ_SUCCESS;
 }
@@ -574,109 +676,8 @@ int setRemoteDescription(IN OUT PeerConnection * _pPeerConnection, IN pjmedia_sd
 {
     _pPeerConnection->pAnswerSdp = _pSdp;
     if(_pPeerConnection->pOfferSdp){
-        return checkAndInitSdpNeg(_pPeerConnection);
+        return checkAndNeg(_pPeerConnection);
     }
-    return PJ_SUCCESS;
-}
-
-static void on_rx_rtcp(void *pUserData, void *pPkt, pj_ssize_t size)
-{
-    MediaStreamTrack *pMediaTrack = (MediaStreamTrack *)pUserData;
-
-    if (size < 0) {
-        PJ_LOG(3, (__FILE__, "Error receiving RTCP packet:%d", size));
-        return;
-    }
-
-    /* Update RTCP session */
-    pjmedia_rtcp_rx_rtcp(&pMediaTrack->rtcpSession, pPkt, size);
-    return;
-}
-
-static void on_rx_rtp(void *pUserData, void *pPkt, pj_ssize_t size)
-{
-    pj_status_t status;
-    const pjmedia_rtp_hdr *pRtpHeader;
-    const void *pPayload;
-    unsigned nPayloadLen;
-
-    MediaStreamTrack *pMediaTrack = (MediaStreamTrack *)pUserData;
-
-    /* Check for errors */
-    if (size < 0) {
-        PJ_LOG(3, (__FILE__, "RTP recv() error:%d", size));
-        return;
-    }
-
-    /* Decode RTP packet. */
-    status = pjmedia_rtp_decode_rtp(&pMediaTrack->rtpSession,
-                                    pPkt, (int)size,
-                                    &pRtpHeader, &pPayload, &nPayloadLen);
-    if (status != PJ_SUCCESS) {
-        PJ_LOG(3, (__FILE__, "RTP decode error:%d", status));
-        return;
-    }
-
-    //PJ_LOG(4,(THIS_FILE, "Rx seq=%d", pj_ntohs(hdr->seq)));
-    /* Update the RTCP session. */
-    pjmedia_rtcp_rx_rtp(&pMediaTrack->rtcpSession, pj_ntohs(pRtpHeader->seq),
-                        pj_ntohl(pRtpHeader->ts), nPayloadLen);
-
-    /* Update RTP session */
-    pjmedia_rtp_session_update(&pMediaTrack->rtpSession, pRtpHeader, NULL);
-    return;
-}
-
-/*
- * will init rtp rtcp session is negotiation ok
- */
-int StartNegotiation(IN PeerConnection * _pPeerConnection)
-{
-    pj_status_t status;
-    int nMaxTracks = sizeof(_pPeerConnection->nAvIndex) / sizeof(int);
-    for ( int i = 0; i < nMaxTracks; i++) {
-        if (_pPeerConnection->nAvIndex[i] != -1) {
-            TransportIce *pTransportIce = &_pPeerConnection->transportIce[i];
-            pj_pool_t * pIceNegPool = pj_pool_create(_pPeerConnection->pPoolFactory, NULL, 512, 512, NULL);
-            ASSERT_RETURN_CHECK(pIceNegPool, pj_pool_create);
-            pTransportIce->pNegotiationPool = pIceNegPool;
-            status = pjmedia_transport_media_start(pTransportIce->pTransport, pIceNegPool,
-                                            _pPeerConnection->pOfferSdp, _pPeerConnection->pAnswerSdp, i);
-            STATUS_CHECK(pjmedia_transport_media_start, status);
-            
-            if (waitState(&_pPeerConnection->transportIce[i], ICE_STATE_GATHERING_OK)){
-                PJ_LOG(3,(__FILE__, "wait ICE_STATE_NEGOTIATION_OK timeout"));
-                return -1;
-            }
-
-            pjmedia_transport_info tpinfo;
-            pjmedia_transport_info_init(&tpinfo);
-            pjmedia_transport_get_info(pTransportIce->pTransport, &tpinfo);
-            
-            status = pjmedia_transport_attach(pTransportIce->pTransport,
-                                              &_pPeerConnection->mediaStream.streamTracks[i],
-                                              &tpinfo.sock_info.rtp_addr_name,
-                                              &tpinfo.sock_info.rtcp_addr_name,
-                                              sizeof(tpinfo.sock_info.rtp_addr_name),
-                                              on_rx_rtp, //void (*rtp_cb)(void *user_data, void *pkt,pj_ssize_t),
-                                              on_rx_rtcp //void (*rtcp_cb)(void *usr_data,void*pkt,pj_ssize_t)
-                                              );
-            STATUS_CHECK(pjmedia_transport_attach, status);
-
-            //init rtp sesstoin
-            MediaStreamTrack * pMediaTrack = &_pPeerConnection->mediaStream.streamTracks[i];
-            int nIdx = pMediaTrack->mediaConfig.nUseIndex;
-            int nRtpDynamicType = pMediaTrack->mediaConfig.configs[nIdx].nRtpDynamicType;
-            pjmedia_rtp_session_init(&pMediaTrack->rtpSession, nRtpDynamicType, pj_rand());
-
-            int nSampleOrClockRate = pMediaTrack->mediaConfig.configs[nIdx].nSampleOrClockRate;
-            pjmedia_rtcp_init(&pMediaTrack->rtcpSession, NULL, nSampleOrClockRate,
-                              160, //TODO Average number of samples per frame. I don't know???
-                                   //How do I set it if payload is video
-                              0);
-        }
-    }
-
     return PJ_SUCCESS;
 }
 
