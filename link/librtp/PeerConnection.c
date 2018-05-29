@@ -660,6 +660,18 @@ static int checkAndNeg(IN OUT PeerConnection * _pPeerConnection)
     status = pjmedia_sdp_neg_negotiate (_pPeerConnection->pNegPool, _pPeerConnection->pIceNeg, 0);
     STATUS_CHECK(pjmedia_sdp_neg_set_remote_answer, status);
 
+    // which codec is agree
+    const pjmedia_sdp_session * pActiveSdp = NULL;
+    if (_pPeerConnection->role == ICE_ROLE_OFFERER) {
+        status = pjmedia_sdp_neg_get_active_local(_pPeerConnection->pIceNeg, &pActiveSdp);
+        STATUS_CHECK(pjmedia_sdp_neg_get_active_local, status);
+    } else if (_pPeerConnection->role == ICE_ROLE_ANSWERER) {
+        status = pjmedia_sdp_neg_get_active_remote(_pPeerConnection->pIceNeg, &pActiveSdp);
+        STATUS_CHECK(pjmedia_sdp_neg_get_active_remote, status);
+    }
+    status = SetActiveCodec(&_pPeerConnection->mediaStream, pActiveSdp);
+    STATUS_CHECK(pjmedia_sdp_neg_get_active_remote, status);
+
     return PJ_SUCCESS;
 }
 

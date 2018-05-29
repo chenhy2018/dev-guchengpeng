@@ -146,3 +146,30 @@ int GetMediaTrackIndex(IN MediaStream * _pMediaStream, IN MediaStreamTrack *_pMe
     return -1;
 }
 
+static int setActiveCodecConfig(IN OUT MediaStreamTrack *_pMediaStreamTrack, int _nActivePt)
+{
+    if (_nActivePt < 0) {
+        return -1;
+    }
+    int nCount = _pMediaStreamTrack->mediaConfig.nCount;
+    for (int i = 0; i < nCount; i++) {
+        if(_nActivePt == _pMediaStreamTrack->mediaConfig.configs[i].nRtpDynamicType){
+            _pMediaStreamTrack->mediaConfig.nUseIndex = i;
+            return PJ_SUCCESS;
+        }
+    }
+    return -2;
+}
+
+int SetActiveCodec(IN OUT MediaStream *_pMediaStream, IN const pjmedia_sdp_session *_pActiveSdp)
+{
+    int nPt = -1;
+    pj_status_t status;
+    for ( int i = 0; i < _pActiveSdp->media_count; i++) {
+        nPt = atoi(_pActiveSdp->media[i]->desc.fmt[0].ptr);
+        status = setActiveCodecConfig(&_pMediaStream->streamTracks[i], nPt);
+        STATUS_CHECK(setActiveCodecConfig, status);
+    }
+
+    return PJ_SUCCESS;
+}

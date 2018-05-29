@@ -85,7 +85,7 @@ int CreateSdpAudioMLine(IN pjmedia_endpt *pMediaEndpt, IN pjmedia_transport_info
                         IN pj_pool_t * pPool, IN MediaStreamTrack *pMediaTrack, OUT pjmedia_sdp_media ** pAudioSdp);
 int CreateSdpVideoMLine(IN pjmedia_endpt *pMediaEndpt, IN pjmedia_transport_info *pTransportInfo,
                         IN pj_pool_t * pPool, IN MediaStreamTrack *pMediaTrack, OUT pjmedia_sdp_media ** pVideoSdp);
-
+int SetActiveCodec( IN OUT MediaStream *pMediaStream, IN const pjmedia_sdp_session *pActiveSdp);
 MediaStreamTrack * GetAudioTrack(IN MediaStream * pMediaStream);
 MediaStreamTrack * GetVideoTrack(IN MediaStream * pMediaStream);
 int GetMediaTrackIndex(IN MediaStream * pMediaStream, IN MediaStreamTrack *pMediaStreamTrack);

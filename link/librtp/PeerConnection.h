@@ -118,6 +118,7 @@ int setRemoteDescription(IN OUT PeerConnection * pPeerConnection, IN pjmedia_sdp
 int StartNegotiation(IN PeerConnection * pPeerConnection);
 
 int SendPacket(IN PeerConnection *pPeerConnection, IN RtpPacket * pPacket);
+int ReceivePacket(IN RtpPacket * pPacket);
 
 void ReleasePeerConnectoin(IN OUT PeerConnection * _pPeerConnection);
 
