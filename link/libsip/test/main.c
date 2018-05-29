@@ -13,7 +13,7 @@ void cbOnRegStatusChange(int _nAccountId, SipAnswerCode _StatusCode)
         printf("------------------------------------------------------------------->reg status = %d\n", _StatusCode);
 }
 
-void cbOnCallStateChange(int _nCallId, SipInviteState _State, SipAnswerCode _StatusCode)
+void cbOnCallStateChange(int _nCallId, int _nAccountId, SipInviteState _State, SipAnswerCode _StatusCode)
 {
         printf("------------------------------------------------------------------->state = %d, status code = %d\n", _State, _StatusCode);
 }

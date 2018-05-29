@@ -124,10 +124,11 @@ typedef struct SipCallBack
         /**
          * Notify application when call state has changed
          * @param CallId
+         * @param nAccountId, Call associated accountId
          * @param state state of this call see inv_state
          *
          */
-        void (*OnCallStateChange)(IN const int nCallId, IN const SipInviteState State, IN const SipAnswerCode StatusCode);
+        void (*OnCallStateChange)(IN const int nCallId, IN const int nAccountId, IN const SipInviteState State, IN const SipAnswerCode StatusCode);
 
 } SipCallBack;
 
@@ -192,6 +193,8 @@ void  SipHangUp(IN const int nCallId);
  *
  **/
 void SipHangUpAll();
+
+void SipHangUpByAccountId(int nAccountId);
 
 /**
  * Destroy sip instance

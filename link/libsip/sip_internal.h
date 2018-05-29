@@ -91,7 +91,7 @@ struct SipData {
 
 
         void (*OnRegStateChange)(int nAccountId, SipAnswerCode Code);
-        void (*OnCallStateChange)(IN const int nCallId, IN const SipInviteState State, IN const SipAnswerCode StatusCode);
+        void (*OnCallStateChange)(IN const int nCallId,IN const int nAccountId, IN const SipInviteState State, IN const SipAnswerCode StatusCode);
         SipAnswerCode (*OnIncomingCall)(IN const int nAccountId, IN const int nCallId, IN const char *From);
 
 };

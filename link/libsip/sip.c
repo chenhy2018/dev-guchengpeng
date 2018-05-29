@@ -881,7 +881,7 @@ void SipHangUp(IN const int _nCallId)
                 return;
 
         /* TODO release media resource */
-
+        SipAppData.Calls[_nCallId].bValid = PJ_FALSE;
         Status = pjsip_inv_end_session(SipAppData.Calls[_nCallId].pInviteSession, 603, NULL, &pTxData);
         if (Status == PJ_SUCCESS && pTxData != NULL)
                 pjsip_inv_send_msg(SipAppData.Calls[_nCallId].pInviteSession, pTxData);
@@ -1138,7 +1138,7 @@ static void onSipCallOnStateChanged(IN pjsip_inv_session *_pInviteSession,
                 _pInviteSession->mod_data[SipMod.id] = NULL;
                 /* TODO destory media */
         }
-        SipAppData.OnCallStateChange(pCall->nIndex, (SipInviteState)_pInviteSession->state, (SipAnswerCode)_pInviteSession->cause);
+        SipAppData.OnCallStateChange(pCall->nIndex, pCall->nAccountId, (SipInviteState)_pInviteSession->state, (SipAnswerCode)_pInviteSession->cause);
 }
 
 /* Callback to be called when dialog has forked: */
