@@ -22,7 +22,6 @@ typedef struct Node
 void mallocAndStrcpy(char** des, const char* src)
 {
       if (src) {
-              fprintf(stderr, "src %d", sizeof(src));
               *des = malloc(sizeof(src));
               if (*des) strcpy(*des, src);
       }
@@ -112,7 +111,6 @@ void onConnectCallback(struct mosquitto* _pMosq, void* _pObj, int result)
         int rc = MOSQ_ERR_SUCCESS;
         struct MosquittoInstance* pInstance = (struct MosquittoInstance*)(_pObj);
         pInstance->connected = true;
-        fprintf(stderr, " on_connect_callback \n ");
         if (result) {
                 fprintf(stderr, "%s\n", mosquitto_connack_string(result));
         }
@@ -131,7 +129,6 @@ void onConnectCallback(struct mosquitto* _pMosq, void* _pObj, int result)
 void onDisconnectCallback(struct mosquitto* _pMosq, void* _pObj, int rc)
 {
 
-        fprintf(stderr, " on_disconnect_callback \n ");
         struct MosquittoInstance* pInstance = (struct MosquittoInstance*)(_pObj);
         pInstance->connected = false;
         pInstance->status = STATUS_IDLE;
