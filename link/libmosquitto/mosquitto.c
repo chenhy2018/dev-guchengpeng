@@ -19,11 +19,26 @@ typedef struct Node
         struct Node *pNext;
 }Node;
 
+void mallocAndStrcpy(char** des, const char* src)
+{
+      if (src) {
+              fprintf(stderr, "src %d", sizeof(src));
+              *des = malloc(sizeof(src));
+              if (*des) strcpy(*des, src);
+      }
+      else {
+              *des = NULL;
+      }
+}
+
+void safeFree(char* des)
+{
+      if (des) free(des);
+}
+
 bool insertNode(Node* pHead, char* val) {
-        int i = 0;
         Node* p = pHead;
         while(p->pNext) {
-                i++;
                 p = p->pNext;
         }
         Node* pNew = malloc(sizeof(Node));
@@ -48,6 +63,17 @@ bool deleteNode(Node* PHead, char * pval)
         }
         printf("Can't find node \n");
         return false;
+}
+
+void clearNode(Node* PHead)
+{
+        int i = 0;
+        Node* p = PHead;
+        while (p->pNext != NULL) {
+                Node* temp = p->pNext;
+                p->pNext = temp->pNext;
+                free(temp);
+        }
 }
 
 struct MosquittoInstance
@@ -134,14 +160,19 @@ static void MosquittoInstanceInit(struct MosquittoInstance* _pInstance, const st
 {
         /* copy options */
         memcpy(&_pInstance->options, _pOption, sizeof(struct MosquittoOptions));
-        _pInstance->options.id[MAX_MOSQUITTO_ID_SIZE - 1] = 0;
-        _pInstance->options.primaryUserInfo.username[MAX_MOSQUITTO_USR_SIZE - 1] = 0;
-        _pInstance->options.primaryUserInfo.password[MAX_MOSQUITTO_PWD_SIZE - 1] = 0;
-        _pInstance->options.primaryUserInfo.hostname[MAX_MOSQUITTO_HOST_SIZE - 1] = 0;
-        _pInstance->options.secondaryUserInfo.username[MAX_MOSQUITTO_USR_SIZE - 1] = 0;
-        _pInstance->options.secondaryUserInfo.password[MAX_MOSQUITTO_PWD_SIZE - 1] = 0;
-        _pInstance->options.secondaryUserInfo.hostname[MAX_MOSQUITTO_HOST_SIZE - 1] = 0;
-
+        mallocAndStrcpy(&_pInstance->options.pId, _pOption->pId);
+        mallocAndStrcpy(&_pInstance->options.primaryUserInfo.pUsername, _pOption->primaryUserInfo.pUsername);
+        mallocAndStrcpy(&_pInstance->options.primaryUserInfo.pPassword, _pOption->primaryUserInfo.pPassword);
+        mallocAndStrcpy(&_pInstance->options.primaryUserInfo.pHostname, _pOption->primaryUserInfo.pHostname);
+        mallocAndStrcpy(&_pInstance->options.primaryUserInfo.pCafile, _pOption->primaryUserInfo.pCafile);
+        mallocAndStrcpy(&_pInstance->options.primaryUserInfo.pCertfile, _pOption->primaryUserInfo.pCertfile);
+        mallocAndStrcpy(&_pInstance->options.primaryUserInfo.pKeyfile, _pOption->primaryUserInfo.pKeyfile);
+        mallocAndStrcpy(&_pInstance->options.secondaryUserInfo.pUsername, _pOption->secondaryUserInfo.pUsername);
+        mallocAndStrcpy(&_pInstance->options.secondaryUserInfo.pPassword, _pOption->secondaryUserInfo.pPassword);
+        mallocAndStrcpy(&_pInstance->options.secondaryUserInfo.pHostname, _pOption->secondaryUserInfo.pHostname);
+        mallocAndStrcpy(&_pInstance->options.secondaryUserInfo.pCafile, _pOption->secondaryUserInfo.pCafile);
+        mallocAndStrcpy(&_pInstance->options.secondaryUserInfo.pCertfile, _pOption->secondaryUserInfo.pCertfile);
+        mallocAndStrcpy(&_pInstance->options.secondaryUserInfo.pKeyfile, _pOption->secondaryUserInfo.pKeyfile);
         _pInstance->mosq = NULL;
         _pInstance->connected = false;
         _pInstance->status = STATUS_IDLE;
@@ -154,17 +185,17 @@ bool ClientOptSet(struct MosquittoInstance* _pInstance, struct mosquitto* _pMosq
         int rc = 0;
         if (info.nAuthenicatinMode & MOSQUITTO_AUTHENTICATION_USER) {
                 printf("mosquitto_username_pw_set \n");
-                rc = mosquitto_username_pw_set(_pMosq, info.username, info.password);
+                rc = mosquitto_username_pw_set(_pMosq, info.pUsername, info.pPassword);
                 if (rc)
                         return rc;
         }
         if (info.nAuthenicatinMode & MOSQUITTO_AUTHENTICATION_ONEWAY_SSL) {
-                printf("mosquitto_tls_set %s \n", info.cafile);
-                rc = mosquitto_tls_set(_pMosq, info.cafile, NULL, NULL, NULL, NULL);
+                printf("mosquitto_tls_set %s \n", info.pCafile);
+                rc = mosquitto_tls_set(_pMosq, info.pCafile, NULL, NULL, NULL, NULL);
                 printf("mosquitto_tls_set rc %d \n", rc);
         }
         else if (info.nAuthenicatinMode & MOSQUITTO_AUTHENTICATION_TWOWAY_SSL) {
-                rc = mosquitto_tls_set(_pMosq, info.cafile, NULL, info.certfile, info.keyfile, NULL);
+                rc = mosquitto_tls_set(_pMosq, info.pCafile, NULL, info.pCertfile, info.pKeyfile, NULL);
                 printf("mosquitto_tls_set 111 rc %d \n", rc);
         }
         if (rc) {
@@ -179,7 +210,7 @@ void * Mosquittothread(void* _pData)
         
         struct MosquittoInstance* pInstance = (struct MosquittoInstance*)(_pData);
 
-        pInstance->mosq = mosquitto_new(pInstance->options.id, true, pInstance);
+        pInstance->mosq = mosquitto_new(pInstance->options.pId, true, pInstance);
         if (!pInstance->mosq) {
                 switch(errno) {
                         case ENOMEM:
@@ -207,14 +238,14 @@ void * Mosquittothread(void* _pData)
                          pInstance->status = STATUS_CONNECTING;
                          rc = ClientOptSet(pInstance, pInstance->mosq, pInstance->options.primaryUserInfo);
                          if (rc == 0) {
-                                 rc = mosquitto_connect(pInstance->mosq, pInstance->options.primaryUserInfo.hostname, pInstance->options.primaryUserInfo.nPort, pInstance->options.nKeepalive);
+                                 rc = mosquitto_connect(pInstance->mosq, pInstance->options.primaryUserInfo.pHostname, pInstance->options.primaryUserInfo.nPort, pInstance->options.nKeepalive);
                          }
                          if (rc) {
                                  onEventCallback(pInstance, rc, mosquitto_strerror(rc));
                                  fprintf(stderr, "Unable to connect (%s). try to reconnect to secondary server. \n", mosquitto_strerror(rc));
                                  rc = ClientOptSet(pInstance, pInstance->mosq, pInstance->options.secondaryUserInfo);
                                  if (rc == 0) {
-                                         rc = mosquitto_connect(pInstance->mosq, pInstance->options.secondaryUserInfo.hostname, pInstance->options.secondaryUserInfo.nPort, pInstance->options.nKeepalive);
+                                         rc = mosquitto_connect(pInstance->mosq, pInstance->options.secondaryUserInfo.pHostname, pInstance->options.secondaryUserInfo.nPort, pInstance->options.nKeepalive);
                                  }
                                  if (rc) {
                                          fprintf(stderr, "Unable to connect Secondary server  %s \n", mosquitto_strerror(rc) );
@@ -236,7 +267,21 @@ void * Mosquittothread(void* _pData)
                 mosquitto_disconnect(pInstance->mosq);
         }
         mosquitto_destroy(pInstance->mosq);
-        free(pInstance);
+        clearNode(&pInstance->pSubsribeList);
+        safeFree(pInstance->options.pId);
+        safeFree(pInstance->options.primaryUserInfo.pUsername);
+        safeFree(pInstance->options.primaryUserInfo.pPassword);
+        safeFree(pInstance->options.primaryUserInfo.pHostname);
+        safeFree(pInstance->options.primaryUserInfo.pCafile);
+        safeFree(pInstance->options.primaryUserInfo.pCertfile);
+        safeFree(pInstance->options.primaryUserInfo.pKeyfile);
+        safeFree(pInstance->options.secondaryUserInfo.pUsername);
+        safeFree(pInstance->options.secondaryUserInfo.pPassword);
+        safeFree(pInstance->options.secondaryUserInfo.pHostname);
+        safeFree(pInstance->options.secondaryUserInfo.pCafile);
+        safeFree(pInstance->options.secondaryUserInfo.pCertfile);
+        safeFree(pInstance->options.secondaryUserInfo.pKeyfile);
+        if (pInstance) free(pInstance);
         if (rc) {
                 fprintf(stderr, "Error: %s\n", mosquitto_strerror(rc));
         }
@@ -253,7 +298,10 @@ void* MosquittoCreateInstance(IN const struct MosquittoOptions* pOption)
         
         MosquittoInstanceInit(pInstance, pOption);
         pthread_t t;
-        pthread_create(&t, NULL, Mosquittothread, pInstance);
+        pthread_attr_t attr;
+        pthread_attr_init(&attr);
+        pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
+        pthread_create(&t, &attr, Mosquittothread, pInstance);
         return pInstance;
 }
 

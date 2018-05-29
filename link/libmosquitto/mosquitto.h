@@ -53,19 +53,19 @@ struct MosquittoCallback
 struct MosquittoUserInfo
 {
         int nAuthenicatinMode;
-        char username[MAX_MOSQUITTO_USR_SIZE];
-        char password[MAX_MOSQUITTO_PWD_SIZE];
-        char hostname[MAX_MOSQUITTO_HOST_SIZE];
+        char* pUsername;
+        char* pPassword;
+        char* pHostname;
         int nPort;
-        char cafile[MAX_MOSQUITTO_FILE_SIZE];
-        char certfile[MAX_MOSQUITTO_FILE_SIZE];
-        char keyfile[MAX_MOSQUITTO_FILE_SIZE];
+        char* pCafile;
+        char* pCertfile;
+        char* pKeyfile;
         //char bindaddress[MAX_MOSQUITTO_HOST_SIZE]; //not used in current time.
 };
 
 struct MosquittoOptions
 {
-        char id[MAX_MOSQUITTO_ID_SIZE];
+        char* pId;
         bool bCleanSession;
         struct MosquittoUserInfo primaryUserInfo;
         struct MosquittoUserInfo secondaryUserInfo;
