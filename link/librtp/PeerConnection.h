@@ -110,6 +110,7 @@ typedef struct _RtpPacket{
     int nDataLen;
     int64_t nTimestamp;
     MediaType type;
+    MediaFromat format;
 }RtpPacket;
 
 void InitIceConfig(IN OUT IceConfig *pIceConfig);

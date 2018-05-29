@@ -28,7 +28,8 @@ static void setMediaConfig(IN OUT MediaConfig *_pMediaConfig)
     }
 }
 
-void AddMediaTrack(IN OUT MediaStream *_pMediaStraem, IN MediaConfig *_pMediaConfig, IN int _nIndex, IN MediaType _type)
+void AddMediaTrack(IN OUT MediaStream *_pMediaStraem, IN MediaConfig *_pMediaConfig, IN int _nIndex, IN MediaType _type,
+                   IN void * _pPeerConnection)
 {
     pj_assert(_pMediaStraem && _pMediaConfig);
     
@@ -43,6 +44,7 @@ void AddMediaTrack(IN OUT MediaStream *_pMediaStraem, IN MediaConfig *_pMediaCon
 
     _pMediaStraem->streamTracks[_nIndex].type = _type;
     _pMediaStraem->streamTracks[_nIndex].mediaConfig = *_pMediaConfig;
+    _pMediaStraem->streamTracks[_nIndex].pPeerConnection = _pPeerConnection;
 
     setMediaConfig(_pMediaConfig);
 }

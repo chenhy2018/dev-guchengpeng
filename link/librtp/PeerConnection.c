@@ -398,7 +398,7 @@ int AddAudioTrack(IN OUT PeerConnection * _pPeerConnection, IN MediaConfig * _pA
     status = initTransportIce(_pPeerConnection, &_pPeerConnection->transportIce[nAudioIndex]);
     STATUS_CHECK(audio initTransportIce, status);
 
-    AddMediaTrack(&_pPeerConnection->mediaStream, _pAudioConfig, nAudioIndex, TYPE_AUDIO);
+    AddMediaTrack(&_pPeerConnection->mediaStream, _pAudioConfig, nAudioIndex, TYPE_AUDIO, _pPeerConnection);
     _pPeerConnection->nAvIndex[nAudioIndex] = nAudioIndex;
     return PJ_SUCCESS;
 }
@@ -424,7 +424,7 @@ int AddVideoTrack(IN OUT PeerConnection * _pPeerConnection, IN MediaConfig * _pV
     status = initTransportIce(_pPeerConnection, &_pPeerConnection->transportIce[nVideoIndex]);
     STATUS_CHECK(video initTransportIce, status);
     
-    AddMediaTrack(&_pPeerConnection->mediaStream, _pVideoConfig, nVideoIndex, TYPE_VIDEO);
+    AddMediaTrack(&_pPeerConnection->mediaStream, _pVideoConfig, nVideoIndex, TYPE_VIDEO, _pPeerConnection);
     _pPeerConnection->nAvIndex[nVideoIndex] = nVideoIndex;
     return PJ_SUCCESS;
 }
@@ -588,9 +588,36 @@ static void on_rx_rtp(void *pUserData, void *pPkt, pj_ssize_t size)
     /* Update the RTCP session. */
     pjmedia_rtcp_rx_rtp(&pMediaTrack->rtcpSession, pj_ntohs(pRtpHeader->seq),
                         pj_ntohl(pRtpHeader->ts), nPayloadLen);
-    
+
     /* Update RTP session */
     pjmedia_rtp_session_update(&pMediaTrack->rtpSession, pRtpHeader, NULL);
+
+    //deal with payload
+    RtpPacket rtpPacket;
+    pj_bzero(&rtpPacket, sizeof(rtpPacket));
+    rtpPacket.type = pMediaTrack->type;
+    rtpPacket.pData = (uint8_t *)pPayload;
+    rtpPacket.nDataLen = nPayloadLen;
+    rtpPacket.nTimestamp = pRtpHeader->ts;
+    int nIdx = pMediaTrack->mediaConfig.nUseIndex;
+    AvParam * pAvParam = &pMediaTrack->mediaConfig.configs[nIdx];
+    rtpPacket.format = pAvParam->format;
+
+    PeerConnection * pPeerConnection = (PeerConnection *)pMediaTrack->pPeerConnection;
+    switch (pAvParam->format) {
+        case MEDIA_FORMAT_PCMU:
+        case MEDIA_FORMAT_PCMA:
+            pPeerConnection->userIceConfig.userCallback(pPeerConnection->userIceConfig.pCbUserData,
+                                                        CALLBACK_RTP,
+                                                        &rtpPacket);
+            break;
+        case MEDIA_FORMAT_G729:
+            break;
+        case MEDIA_FORMAT_H264:
+        case MEDIA_FORMAT_H265:
+            break;
+    }
+
     return;
 }
 

@@ -74,6 +74,7 @@ typedef struct _MediaStreamTrack
     pjmedia_rtcp_session rtcpSession;
     pj_pool_t *pH264PacketizerPool;
     pjmedia_h264_packetizer *pH264Packetizer;
+    void *pPeerConnection;
 }MediaStreamTrack;
 
 typedef struct _MediaStream
@@ -84,7 +85,8 @@ typedef struct _MediaStream
 
 void InitMediaConfig(IN MediaConfig * pMediaConfig);
 void InitMediaStream(IN MediaStream *pMediaStraem);
-void AddMediaTrack(IN OUT MediaStream *pMediaStraem, IN MediaConfig *pMediaConfig, IN int nIndex, IN MediaType type);
+void AddMediaTrack(IN OUT MediaStream *pMediaStraem, IN MediaConfig *pMediaConfig, IN int nIndex, IN MediaType type,
+                   IN void * pPeerConnection);
 int CreateSdpAudioMLine(IN pjmedia_endpt *pMediaEndpt, IN pjmedia_transport_info *pTransportInfo,
                         IN pj_pool_t * pPool, IN MediaStreamTrack *pMediaTrack, OUT pjmedia_sdp_media ** pAudioSdp);
 int CreateSdpVideoMLine(IN pjmedia_endpt *pMediaEndpt, IN pjmedia_transport_info *pTransportInfo,
