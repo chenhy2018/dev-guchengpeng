@@ -77,7 +77,7 @@ void onMessageCallback(struct mosquitto* _pMosq, void* _pObj, const struct mosqu
         int rc = MOSQ_ERR_SUCCESS;
         struct MosquittoInstance* pInstance = (struct MosquittoInstance*)(_pObj);
         if (pInstance->options.callbacks.onMessage) {
-                pInstance->options.callbacks.onMessage(_pObj, _pMessage->payload, _pMessage->payloadlen);
+                pInstance->options.callbacks.onMessage(_pObj, _pMessage->topic, _pMessage->payload, _pMessage->payloadlen);
         }
 }
 
@@ -114,12 +114,12 @@ void onDisconnectCallback(struct mosquitto* _pMosq, void* _pObj, int rc)
 
 void onSubscribeCallback(struct mosquitto* _pMosq, void* pObj, int mid, int qos_count, const int* pGranted_qos)
 {       
-        fprintf(stderr, "Subscribed (mid: %d): %d", mid, pGranted_qos[0]);
+        fprintf(stderr, "Subscribed (mid: %d): %d \n", mid, pGranted_qos[0]);
 }
 
 void onUnsubscribeCallback(struct mosquitto* _pMosq, void* _pObj, int mid)
 {
-        fprintf(stderr, "Unsubscribed (mid: %d)", mid);
+        fprintf(stderr, "Unsubscribed (mid: %d) \n", mid);
 }
 
 void onPublishCallback(struct mosquitto* _pMosq, void* _pObj, int mid)
@@ -159,12 +159,16 @@ bool ClientOptSet(struct MosquittoInstance* _pInstance, struct mosquitto* _pMosq
                         return rc;
         }
         if (info.nAuthenicatinMode & MOSQUITTO_AUTHENTICATION_ONEWAY_SSL) {
-                printf("mosquitto_tls_set \n");
+                printf("mosquitto_tls_set %s \n", info.cafile);
                 rc = mosquitto_tls_set(_pMosq, info.cafile, NULL, NULL, NULL, NULL);
+                printf("mosquitto_tls_set rc %d \n", rc);
         }
         else if (info.nAuthenicatinMode & MOSQUITTO_AUTHENTICATION_TWOWAY_SSL) {
-                printf("mosquitto_tls_set 111 \n");
                 rc = mosquitto_tls_set(_pMosq, info.cafile, NULL, info.certfile, info.keyfile, NULL);
+                printf("mosquitto_tls_set 111 rc %d \n", rc);
+        }
+        if (rc) {
+                printf("ClientOptSet error %d\n", rc);
         }
         return rc;
 }

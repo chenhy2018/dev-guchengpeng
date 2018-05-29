@@ -46,7 +46,7 @@ typedef struct MosquittoOptions MosquittoOptions;
 
 struct MosquittoCallback
 {
-        void (*onMessage)(IN const void* instance, IN const char* message, IN size_t length);
+        void (*onMessage)(IN const void* instance, IN const char* _pTopic, IN const char* message, IN size_t length);
         void (*onEvent)(IN const void* instance, IN int code, const char* reason);
 };
 

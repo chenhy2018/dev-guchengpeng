@@ -3,9 +3,9 @@
 #include <string.h>
 #include <stdio.h>
 
-void onMessage(IN const void* instance, IN const char* message, IN size_t length)
+void onMessage(IN const void* instance, IN const char* topic, IN const char* message, IN size_t length)
 {
-        fprintf(stderr, "message %s \n", message);
+        fprintf(stderr, "topic %s message %s \n", topic,  message);
 }
 
 void onEvent(IN const void* instance, IN int id,  IN const char* reason)
