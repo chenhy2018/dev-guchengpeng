@@ -14,12 +14,12 @@
 
 #define THIS_FILE "PeerConnection.c"
 #define ASSERT_RETURN_CHECK(expr, errmsg) if ( (expr) == NULL ) { \
-        PJ_LOG(3,(__FILE__, "%s", errmsg));;\
-        return -1;}
+PJ_LOG(3,(__FILE__, "%s", errmsg));;\
+return -1;}
 #if 0
 #define STATUS_CHECK(info, s) if ( s != PJ_SUCCESS) { \
-        status_perror(__STR_LINE__, #info, s);\
-        return s;}
+status_perror(__STR_LINE__, #info, s);\
+return s;}
 #endif
 #define STATUS_CHECK(info, s) if ( s != PJ_SUCCESS) { \
 char errmsg[PJ_ERR_MSG_SIZE];\
@@ -36,51 +36,51 @@ return s;}
 
 typedef enum _MediaFormat
 {
-    MEDIA_FORMAT_PCMU = 0,
-    MEDIA_FORMAT_PCMA = 8,
-    MEDIA_FORMAT_G729 = 18,
-    MEDIA_FORMAT_H264 = 96,
-    MEDIA_FORMAT_H265 = 98,
+        MEDIA_FORMAT_PCMU = 0,
+        MEDIA_FORMAT_PCMA = 8,
+        MEDIA_FORMAT_G729 = 18,
+        MEDIA_FORMAT_H264 = 96,
+        MEDIA_FORMAT_H265 = 98,
 }MediaFromat;
 
 typedef enum _MediaType
 {
-    TYPE_AUDIO,
-    TYPE_VIDEO,
+        TYPE_AUDIO,
+        TYPE_VIDEO,
 }MediaType;
 
 #define MAX_CODEC_LEN 3
 typedef struct _AvParam{
-    int nRtpDynamicType;
-    MediaFromat format;
-    int nSampleOrClockRate;
-    int nChannel;
-    int nBitDepth;
+        int nRtpDynamicType;
+        MediaFromat format;
+        int nSampleOrClockRate;
+        int nChannel;
+        int nBitDepth;
 }AvParam;
 typedef struct _MediaConfig{
-    AvParam configs[MAX_CODEC_LEN];
-    int nCount;
-    int nUseIndex;
+        AvParam configs[MAX_CODEC_LEN];
+        int nCount;
+        int nUseIndex;
 }MediaConfig;
 
 typedef struct _MediaStreamTrack
 {
-    MediaType   type;
-    pj_timestamp hzPerSecond;
-    pj_timestamp nextRtpTimestamp;
-    pj_timestamp nextRtcpTimestamp;
-    MediaConfig mediaConfig;
-    pjmedia_rtp_session  rtpSession;
-    pjmedia_rtcp_session rtcpSession;
-    pj_pool_t *pH264PacketizerPool;
-    pjmedia_h264_packetizer *pH264Packetizer;
-    void *pPeerConnection;
+        MediaType   type;
+        pj_timestamp hzPerSecond;
+        pj_timestamp nextRtpTimestamp;
+        pj_timestamp nextRtcpTimestamp;
+        MediaConfig mediaConfig;
+        pjmedia_rtp_session  rtpSession;
+        pjmedia_rtcp_session rtcpSession;
+        pj_pool_t *pH264PacketizerPool;
+        pjmedia_h264_packetizer *pH264Packetizer;
+        void *pPeerConnection;
 }MediaStreamTrack;
 
 typedef struct _MediaStream
 {
-    int nCount;
-    MediaStreamTrack streamTracks[2]; //for audio and video
+        int nCount;
+        MediaStreamTrack streamTracks[2]; //for audio and video
 }MediaStream;
 
 void InitMediaConfig(IN MediaConfig * pMediaConfig);
