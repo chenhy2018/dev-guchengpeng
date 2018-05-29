@@ -339,7 +339,7 @@ int MosquittoPublish(IN const void* _pInstance, IN char* _pTopic, IN int _nPaylo
 int MosquittoSubscribe(IN const void* _pInstance, IN char* _pTopic)
 {
         struct MosquittoInstance* pInstance = (struct MosquittoInstance*)(_pInstance);
-        int rc = mosquitto_subscribe(pInstance->mosq, _pTopic, pInstance->options.nQos);
+        int rc = mosquitto_subscribe(pInstance->mosq, NULL, _pTopic, pInstance->options.nQos);
         fprintf(stderr, "mos sub %d", rc);
         if (!rc) {
                 insertNode(&pInstance->pSubsribeList, _pTopic);
@@ -369,7 +369,7 @@ int MosquittoSubscribe(IN const void* _pInstance, IN char* _pTopic)
 int MosquittoUnsubscribe(IN const void* _pInstance, IN char* _pSub)
 {
         struct MosquittoInstance* pInstance = (struct MosquittoInstance*)(_pInstance);
-        int rc = mosquitto_unsubscribe(pInstance->mosq, _pSub);
+        int rc = mosquitto_unsubscribe(pInstance->mosq, NULL, _pSub);
         fprintf(stderr, "mos sub %d", rc);
         if (!rc) {
                deleteNode(&pInstance->pSubsribeList, _pSub);

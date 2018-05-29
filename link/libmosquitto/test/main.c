@@ -39,10 +39,9 @@ int main()
         printf("try first \n");
         instance = MosquittoCreateInstance(&options);
         sleep(3);
-        MosquittoSubscribe(instance, NULL, "sensor/room1/#");
+        MosquittoSubscribe(instance, "sensor/room1/#");
         for (int i = 0 ; i < 10; ++i) {
-            MosquittoPublish(instance, NULL, "sensor/room1/temperature", 10, "test1234456");
-            usleep(1000000);
+            MosquittoPublish(instance, "sensor/room1/temperature", 10, "test1234456");
         }
         MosquittoDestroy(instance);
         printf("try second \n");
@@ -52,11 +51,11 @@ int main()
         strcpy(options.primaryUserInfo.password, "root");
         instance = MosquittoCreateInstance(&options);
                 sleep(3);
-        MosquittoSubscribe(instance, NULL, "sensor/room1/#");
+        MosquittoSubscribe(instance, "sensor/room1/#");
         for (int i = 0 ; i < 10; ++i) {
-            MosquittoPublish(instance, NULL, "sensor/room1/temperature", 10, "test1234456");
-            usleep(1000000);
-        } 
+            MosquittoPublish(instance, "sensor/room1/temperature", 10, "test1234456");
+        }
+        sleep(5); 
         MosquittoDestroy(instance);
         printf("try third \n");
         //memset(options.primaryUserInfo.hostname, 0, MAX_MOSQUITTO_USR_SIZE);
@@ -66,11 +65,11 @@ int main()
         options.primaryUserInfo.nAuthenicatinMode = MOSQUITTO_AUTHENTICATION_USER | MOSQUITTO_AUTHENTICATION_ONEWAY_SSL;
         instance = MosquittoCreateInstance(&options);
         sleep(3);
-        MosquittoSubscribe(instance, NULL, "sensor/room1/#");
+        MosquittoSubscribe(instance, "sensor/room1/#");
         for (int i = 0 ; i < 10; ++i) {
-            MosquittoPublish(instance, NULL, "sensor/room1/temperature", 10, "test1234456");
-            usleep(1000000);
+            MosquittoPublish(instance, "sensor/room1/temperature", 10, "test1234456");
         }
+        sleep(5);
         MosquittoDestroy(instance);
         MosquittoLibCleanup();
         return 1;
