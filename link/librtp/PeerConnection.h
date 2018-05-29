@@ -19,8 +19,13 @@
 
 #include "MediaStream.h"
 
-typedef void(*RtpReceiveCallback)(void *user_data, void *pkt, pj_ssize_t);
-typedef void(*RtcpReceiveCallback)(void *usr_data, void*pkt, pj_ssize_t);
+typedef enum _CallbackType{
+    CALLBACK_ICE,
+    CALLBACK_RTP,
+    CALLBACK_RTCP
+}CallbackType;
+
+typedef void(*UserCallback)(void *pUserData, CallbackType type, void *pCbData);
 
 #define MAX_NAMESERVER_SIZE 128
 #define MAX_STUN_HOST_SIZE  128
@@ -44,11 +49,8 @@ typedef struct _IceConfig
     char         turnUsername[MAX_TURN_USR_SIZE];
     char         turnPassword[MAX_TURN_PWD_SIZE];
 
-    //TODO not use now
-    void (*onIceComplete)(IN pjmedia_transport *pTransport, IN pj_ice_strans_op op,
-                          IN pj_status_t status);
-    void (*onIceComplete2)(IN pjmedia_transport *pTransport, IN pj_ice_strans_op op,
-                          IN pj_status_t status, void * pUserData);
+    UserCallback userCallback;
+    void *       pCbUserData;
     
 }IceConfig;
 
@@ -118,7 +120,6 @@ int setRemoteDescription(IN OUT PeerConnection * pPeerConnection, IN pjmedia_sdp
 int StartNegotiation(IN PeerConnection * pPeerConnection);
 
 int SendPacket(IN PeerConnection *pPeerConnection, IN RtpPacket * pPacket);
-int ReceivePacket(IN RtpPacket * pPacket);
 
 void ReleasePeerConnectoin(IN OUT PeerConnection * _pPeerConnection);
 

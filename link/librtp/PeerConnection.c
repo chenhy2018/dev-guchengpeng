@@ -18,9 +18,13 @@ static int waitState(IN TransportIce *_pTransportIce, IN IceState currentState)
 static void onIceComplete2(pjmedia_transport *tp, pj_ice_strans_op op,
                       pj_status_t status, void *user_data) {
     TransportIce *pTransportIce = (TransportIce *)user_data;
-    
+    PeerConnection * pPeerConnection = (PeerConnection *)pTransportIce->pPeerConnection;
     if(status != PJ_SUCCESS){
         pTransportIce->iceState = ICE_STATE_FAIL;
+        if (pPeerConnection->userIceConfig.userCallback) {
+            pPeerConnection->userIceConfig.userCallback(pPeerConnection->userIceConfig.pCbUserData,
+                                                        CALLBACK_ICE, (void *)ICE_STATE_FAIL);
+        }
         return;
     }
     //pTransportIce->iceState =  op;
@@ -35,6 +39,10 @@ static void onIceComplete2(pjmedia_transport *tp, pj_ice_strans_op op,
         case PJ_ICE_STRANS_OP_NEGOTIATION:
             printf("--->PJ_ICE_STRANS_OP_NEGOTIATION\n");
             pTransportIce->iceState = ICE_STATE_NEGOTIATION_OK;
+            if (pPeerConnection->userIceConfig.userCallback) {
+                pPeerConnection->userIceConfig.userCallback(pPeerConnection->userIceConfig.pCbUserData,
+                                                            CALLBACK_ICE, (void *)ICE_STATE_NEGOTIATION_OK);
+            }
             break;
             
             /** This operation is used to report failure in keep-alive operation.
