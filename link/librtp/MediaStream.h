@@ -50,14 +50,15 @@ typedef enum _MediaType
 }MediaType;
 
 #define MAX_CODEC_LEN 3
+typedef struct _AvParam{
+    int nRtpDynamicType;
+    MediaFromat format;
+    int nSampleOrClockRate;
+    int nChannel;
+    int nBitDepth;
+}AvParam;
 typedef struct _MediaConfig{
-    struct{
-        int nRtpDynamicType;
-        MediaFromat format;
-        int nSampleOrClockRate;
-        int nChannel;
-        int nBitDepth;
-    }configs[MAX_CODEC_LEN];
+    AvParam configs[MAX_CODEC_LEN];
     int nCount;
     int nUseIndex;
 }MediaConfig;

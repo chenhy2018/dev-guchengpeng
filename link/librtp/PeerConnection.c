@@ -21,9 +21,10 @@ static void onIceComplete2(pjmedia_transport *tp, pj_ice_strans_op op,
     PeerConnection * pPeerConnection = (PeerConnection *)pTransportIce->pPeerConnection;
     if(status != PJ_SUCCESS){
         pTransportIce->iceState = ICE_STATE_FAIL;
+        pPeerConnection->iceNegInfo.state = ICE_STATE_FAIL;
         if (pPeerConnection->userIceConfig.userCallback) {
             pPeerConnection->userIceConfig.userCallback(pPeerConnection->userIceConfig.pCbUserData,
-                                                        CALLBACK_ICE, (void *)ICE_STATE_FAIL);
+                                                        CALLBACK_ICE, &pPeerConnection->iceNegInfo);
         }
         return;
     }
@@ -39,9 +40,10 @@ static void onIceComplete2(pjmedia_transport *tp, pj_ice_strans_op op,
         case PJ_ICE_STRANS_OP_NEGOTIATION:
             printf("--->PJ_ICE_STRANS_OP_NEGOTIATION\n");
             pTransportIce->iceState = ICE_STATE_NEGOTIATION_OK;
+            pPeerConnection->iceNegInfo.state = ICE_STATE_NEGOTIATION_OK;
             if (pPeerConnection->userIceConfig.userCallback) {
                 pPeerConnection->userIceConfig.userCallback(pPeerConnection->userIceConfig.pCbUserData,
-                                                            CALLBACK_ICE, (void *)ICE_STATE_NEGOTIATION_OK);
+                                                            CALLBACK_ICE, &pPeerConnection->iceNegInfo);
             }
             break;
             
@@ -687,6 +689,11 @@ static int checkAndNeg(IN OUT PeerConnection * _pPeerConnection)
     }
     status = SetActiveCodec(&_pPeerConnection->mediaStream, pActiveSdp);
     STATUS_CHECK(pjmedia_sdp_neg_get_active_remote, status);
+    _pPeerConnection->iceNegInfo.nCount = pActiveSdp->media_count;
+    for (int i = 0; i < _pPeerConnection->iceNegInfo.nCount; i++) {
+        int nTmp =_pPeerConnection->mediaStream.streamTracks[i].mediaConfig.nUseIndex;
+        _pPeerConnection->iceNegInfo.configs[i] = &_pPeerConnection->mediaStream.streamTracks[i].mediaConfig.configs[nTmp];
+    }
 
     MediaStreamTrack *pVideoTrack = GetVideoTrack(&_pPeerConnection->mediaStream);
     if (pVideoTrack) {

@@ -67,6 +67,12 @@ typedef enum _IceRole{
     ICE_ROLE_ANSWERER
 }IceRole;
 
+typedef struct _IceNegInfo {
+    IceState state;
+    const AvParam* configs[2];
+    int nCount;
+}IceNegInfo;
+
 typedef struct _TransportIce
 {
     pjmedia_transport *pTransport;
@@ -94,6 +100,7 @@ typedef struct _PeerConnection
     pjmedia_sdp_session *pAnswerSdp;
     pjmedia_sdp_neg *pIceNeg;
     pj_pool_t *pNegPool;
+    IceNegInfo iceNegInfo;
     int bQuit;
     IceRole role;
 }PeerConnection;
