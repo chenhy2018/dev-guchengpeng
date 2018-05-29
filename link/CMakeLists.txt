@@ -10,4 +10,4 @@ ExternalProject_Add(stun
 add_subdirectory(libsip)
 add_subdirectory(libice)
 add_subdirectory(libmqtt)
-add_subdirectory(librtpoverice)
+add_subdirectory(librtp)
