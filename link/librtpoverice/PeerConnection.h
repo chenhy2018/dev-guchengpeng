@@ -96,6 +96,13 @@ typedef struct _PeerConnection
     IceRole role;
 }PeerConnection;
 
+typedef struct _RtpPacket{
+    uint8_t * pData;
+    int nDataLen;
+    int64_t nTimestamp;
+    MediaType type;
+}RtpPacket;
+
 void InitIceConfig(IN OUT IceConfig *pIceConfig);
 
 void InitPeerConnectoin(IN OUT PeerConnection * pPeerConnectoin, IN pj_pool_factory * pPoolFactory,
@@ -110,8 +117,7 @@ int setLocalDescription(IN OUT PeerConnection * pPeerConnection, IN pjmedia_sdp_
 int setRemoteDescription(IN OUT PeerConnection * pPeerConnection, IN pjmedia_sdp_session * pSdp);
 int StartNegotiation(IN PeerConnection * pPeerConnection);
 
-int SendAudio(IN PeerConnection *pPeerConnection, uint8_t *pData, int nLen);
-int SendVideo(IN PeerConnection *pPeerConnection, uint8_t *pData, int nLen);
+int SendPacket(IN PeerConnection *pPeerConnection, IN RtpPacket * pPacket);
 
 void ReleasePeerConnectoin(IN OUT PeerConnection * _pPeerConnection);
 

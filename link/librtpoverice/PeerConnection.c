@@ -680,7 +680,7 @@ int StartNegotiation(IN PeerConnection * _pPeerConnection)
     return PJ_SUCCESS;
 }
 
-int SendAudio(IN PeerConnection *_pPeerConnection, uint8_t *_pData, int _nLen)
+static int SendAudioPacket(IN PeerConnection *_pPeerConnection, IN RtpPacket * _pPacket)
 {
     enum { RTCP_INTERVAL = 5000, RTCP_RAND = 2000 };
     char packet[1500];
@@ -702,7 +702,7 @@ int SendAudio(IN PeerConnection *_pPeerConnection, uint8_t *_pData, int _nLen)
     int nChannel = pAudioConfig->configs[nIdx].nChannel;
     int nBitDepth = pAudioConfig->configs[nIdx].nBitDepth;
     int nSampleRate = pAudioConfig->configs[nIdx].nSampleOrClockRate;
-    unsigned nMsecInterval = _nLen * 1000 /nChannel / (nBitDepth / 8) / nSampleRate;
+    unsigned nMsecInterval = _pPacket->nDataLen * 1000 /nChannel / (nBitDepth / 8) / nSampleRate;
 
     // init timestamp
     if(pMediaTrack->hzPerSecond.u64 == 0){
@@ -755,7 +755,7 @@ int SendAudio(IN PeerConnection *_pPeerConnection, uint8_t *_pData, int _nLen)
     /* Format RTP header */
     status = pjmedia_rtp_encode_rtp( &pMediaTrack->rtpSession, 0, //pt is 0 for pcmu
                                     0, /* marker bit */
-                                    _nLen,
+                                    _pPacket->nDataLen,
                                     nMsecInterval,
                                     &pVoidHeader, &nHeaderLen);
     STATUS_CHECK(pjmedia_rtp_encode_rtp, status);
@@ -768,10 +768,10 @@ int SendAudio(IN PeerConnection *_pPeerConnection, uint8_t *_pData, int _nLen)
     pj_memcpy(packet, pRtpHeader, nHeaderLen);
 
     /* Zero the payload */
-    pj_memcpy(packet+nHeaderLen, _pData, _nLen);
+    pj_memcpy(packet+nHeaderLen, _pPacket->pData, _pPacket->nDataLen);
 
     /* Send RTP packet */
-    size = nHeaderLen + _nLen;
+    size = nHeaderLen + _pPacket->nDataLen;
     status = pjmedia_transport_send_rtp(pTransportIce->pTransport,
                                         packet, size);
     STATUS_CHECK(pjmedia_transport_send_rtp, status);
@@ -779,10 +779,25 @@ int SendAudio(IN PeerConnection *_pPeerConnection, uint8_t *_pData, int _nLen)
 
 
     /* Update RTCP SR */
-    pjmedia_rtcp_tx_rtp( &pMediaTrack->rtcpSession, _nLen);
+    pjmedia_rtcp_tx_rtp( &pMediaTrack->rtcpSession, _pPacket->nDataLen);
 
     /* Schedule next send */
     pMediaTrack->nextRtpTimestamp.u64 += (nMsecInterval * pMediaTrack->hzPerSecond.u64 / 1000);
 
     return 0;
+}
+
+static int SendVideoPacket(IN PeerConnection *_pPeerConnection, IN RtpPacket * _pPacket)
+{
+    return PJ_SUCCESS;
+}
+
+int SendPacket(IN PeerConnection *_pPeerConnection, IN RtpPacket * _pPacket)
+{
+    pj_assert(_pPacket);
+    if (_pPacket->type == TYPE_AUDIO) {
+        return SendAudioPacket(_pPeerConnection, _pPacket);
+    } else {
+        return SendVideoPacket(_pPeerConnection, _pPacket);
+    }
 }
