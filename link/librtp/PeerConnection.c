@@ -365,6 +365,14 @@ void ReleasePeerConnectoin(IN OUT PeerConnection * _pPeerConnection)
         pj_pool_release(_pPeerConnection->pNegPool);
         _pPeerConnection->pNegPool = NULL;
     }
+
+    for ( int i = 0 ; i < _pPeerConnection->mediaStream.nCount; i++) {
+        pj_pool_t *pTmp = _pPeerConnection->mediaStream.streamTracks[i].pH264PacketizerPool;
+        if (pTmp) {
+            pj_pool_release(pTmp);
+            _pPeerConnection->mediaStream.streamTracks[i].pH264PacketizerPool = NULL;
+        }
+    }
 }
 
 int AddAudioTrack(IN OUT PeerConnection * _pPeerConnection, IN MediaConfig * _pAudioConfig)
