@@ -9,4 +9,4 @@ ExternalProject_Add(stun
 
 add_subdirectory(libmuxer)
 add_subdirectory(libice)
-add_subdirectory(libmosquitto)
+add_subdirectory(libmqtt)

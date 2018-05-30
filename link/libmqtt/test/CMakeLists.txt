@@ -24,4 +24,4 @@ set (LIBRARIES ${OPENSSL_CRYPTO_LIBRARY} ${OPENSSL_CRYPTO_LIBRARY})
 aux_source_directory(. LIB_MOSQUITTO_TEST)
 add_executable(mos_test ${LIB_MOSQUITTO_TEST})
 
-target_link_libraries(mos_test emqtt pthread ${OPENSSL_CRYPTO_LIBRARY} ${OPENSSL_SSL_LIBRARY})
+target_link_libraries(mos_test mqtt pthread ${OPENSSL_CRYPTO_LIBRARY} ${OPENSSL_SSL_LIBRARY})
