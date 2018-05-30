@@ -785,20 +785,20 @@ int setRemoteDescription(IN OUT PeerConnection * _pPeerConnection, IN pjmedia_sd
         return PJ_SUCCESS;
 }
 
-static inline void initMediaTrackTimeStamp(MediaStreamTrack * _pMediaTrack, pj_timestamp _now)
+static inline void firstScheduleNextSendRtcpTime(MediaStreamTrack * _pMediaTrack, pj_timestamp _now)
 {
         // init timestamp
         if(_pMediaTrack->hzPerSecond.u64 == 0){
                 pj_get_timestamp_freq(&_pMediaTrack->hzPerSecond);
-                _pMediaTrack->nextRtpTimestamp = _now;
-                _pMediaTrack->nextRtcpTimestamp = _pMediaTrack->nextRtpTimestamp;
+                _pMediaTrack->nextRtcpTimestamp = _now;
                 _pMediaTrack->nextRtcpTimestamp.u64 += (_pMediaTrack->hzPerSecond.u64 * (RTCP_INTERVAL+(pj_rand()%RTCP_RAND)) / 1000);
         }
 }
 
 static pj_status_t checkAndSendRtcp(MediaStreamTrack *_pMediaTrack, TransportIce *_pTransportIce, pj_timestamp _now)
 {
-        if (_pMediaTrack->nextRtpTimestamp.u64 >= _pMediaTrack->nextRtcpTimestamp.u64) {
+        firstScheduleNextSendRtcpTime(_pMediaTrack, _now);
+        if (_now.u64 >= _pMediaTrack->nextRtcpTimestamp.u64) {
                 if (_pMediaTrack->nextRtcpTimestamp.u64 <= _now.u64) {
                         void *pRtcpPkt;
                         int nRtcpLen;
@@ -832,6 +832,11 @@ static inline uint64_t getTimestampGapFromLastPacket(IN MediaStreamTrack *_pMedi
         return diff;
 }
 
+static inline uint64_t getTimestampFromBase(IN MediaStreamTrack *_pMediaTrack, uint64_t _timestamp)
+{
+        return _timestamp - _pMediaTrack->nFirstPktTimestamp;
+}
+
 // _nPktTimestampGap millisecond?
 static inline uint32_t calcRtpTimestampLen(uint64_t _nPktTimestampGap, int nRate)
 {
@@ -857,15 +862,19 @@ static int SendAudioPacket(IN PeerConnection *_pPeerConnection, IN RtpPacket * _
         
         MediaConfig *pAudioConfig = &pMediaTrack->mediaConfig;
         int nIdx = pMediaTrack->mediaConfig.nUseIndex;
-        int nChannel = pAudioConfig->configs[nIdx].nChannel;
-        int nBitDepth = pAudioConfig->configs[nIdx].nBitDepth;
         int nSampleRate = pAudioConfig->configs[nIdx].nSampleOrClockRate;
-        unsigned nMsecInterval = _pPacket->nDataLen * 1000 /nChannel / (nBitDepth / 8) / nSampleRate;
+        int nRtpType = pAudioConfig->configs[nIdx].nRtpDynamicType;
+        //int nChannel = pAudioConfig->configs[nIdx].nChannel;
+        //int nBitDepth = pAudioConfig->configs[nIdx].nBitDepth;
+        //unsigned nMsecInterval = _pPacket->nDataLen * 1000 /nChannel / (nBitDepth / 8) / nSampleRate;
         
         pj_timestamp now;
         pj_get_timestamp(&now);
 
-        initMediaTrackTimeStamp(pMediaTrack, now);
+        if (pMediaTrack->nSysTimeBase.u64 == 0) {
+                pMediaTrack->nSysTimeBase = now;
+                pMediaTrack->nFirstPktTimestamp = _pPacket->nTimestamp;
+        }
 
         checkAndSendRtcp(pMediaTrack, pTransportIce, now);
 
@@ -873,18 +882,24 @@ static int SendAudioPacket(IN PeerConnection *_pPeerConnection, IN RtpPacket * _
 
         uint32_t nRtpTsLen = calcRtpTimestampLen(nPktTimestampGap, nSampleRate);
 
+        uint32_t nElapse = getTimestampFromBase(pMediaTrack, _pPacket->nTimestamp);
+        pj_timestamp exptectNow;
+        now.u64 = now.u64 + nElapse * pMediaTrack->hzPerSecond.u64 / 1000;
+        exptectNow = now;
+
         pj_uint64_t nLate = 0;
-        if (pMediaTrack->nextRtpTimestamp.u64 > now.u64) {
-                nLate = ((pMediaTrack->nextRtpTimestamp.u64 - now.u64) * 1000) / pMediaTrack->hzPerSecond.u64;
+        if (exptectNow.u64 > now.u64) {
+                nLate = ((exptectNow.u64 - now.u64) * 1000) / pMediaTrack->hzPerSecond.u64;
                 if ( nLate > 1) {
-                        PJ_LOG(4,(__FILE__, "audio data late:%lld-%lld=%lld",pMediaTrack->nextRtpTimestamp.u64, now.u64, nLate));
+                        PJ_LOG(4,(__FILE__, "audio data late:%lld-%lld=%lld",exptectNow.u64, now.u64, nLate));
                 }
         } else {
-                nLate = ((now.u64 - pMediaTrack->nextRtpTimestamp.u64) * 1000) / pMediaTrack->hzPerSecond.u64;
+                nLate = ((now.u64 - exptectNow.u64) * 1000) / pMediaTrack->hzPerSecond.u64;
                 if ( nLate > 1) {
-                        PJ_LOG(4,(__FILE__, "audio data early:%lld-%lld=%lld",now.u64, pMediaTrack->nextRtpTimestamp.u64, nLate));
+                        PJ_LOG(4,(__FILE__, "audio data early:%lld-%lld=%lld",now.u64, exptectNow.u64, nLate));
                 }
         }
+
         
 
         //start to send rtp
@@ -895,7 +910,7 @@ static int SendAudioPacket(IN PeerConnection *_pPeerConnection, IN RtpPacket * _
         int nHeaderLen;
         
         /* Format RTP header */
-        status = pjmedia_rtp_encode_rtp( &pMediaTrack->rtpSession, 0, //pt is 0 for pcmu
+        status = pjmedia_rtp_encode_rtp( &pMediaTrack->rtpSession, nRtpType,
                                         0, /* marker bit */
                                         _pPacket->nDataLen,
                                         nRtpTsLen,
@@ -923,9 +938,6 @@ static int SendAudioPacket(IN PeerConnection *_pPeerConnection, IN RtpPacket * _
         /* Update RTCP SR */
         pjmedia_rtcp_tx_rtp( &pMediaTrack->rtcpSession, _pPacket->nDataLen);
         
-        /* Schedule next send */
-        pMediaTrack->nextRtpTimestamp.u64 += (nMsecInterval * pMediaTrack->hzPerSecond.u64 / 1000);
-        
         return 0;
 }
 
@@ -947,7 +959,6 @@ static int SendVideoPacket(IN PeerConnection *_pPeerConnection, IN RtpPacket * _
         pj_timestamp now;
         pj_get_timestamp(&now);
 
-        initMediaTrackTimeStamp(pMediaTrack, now);
         checkAndSendRtcp(pMediaTrack, pTransportIce, now);
 
         int nLeft = _pPacket->nDataLen;
