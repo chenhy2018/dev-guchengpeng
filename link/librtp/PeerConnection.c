@@ -1,5 +1,7 @@
 #include "PeerConnection.h"
 
+enum { RTCP_INTERVAL = 5000, RTCP_RAND = 2000 };
+
 static int waitState(IN TransportIce *_pTransportIce, IN IceState currentState)
 {
         int nCnt = 0;
@@ -783,9 +785,44 @@ int setRemoteDescription(IN OUT PeerConnection * _pPeerConnection, IN pjmedia_sd
         return PJ_SUCCESS;
 }
 
+static inline void initMediaTrackTimeStamp(MediaStreamTrack * _pMediaTrack, pj_timestamp _now)
+{
+        // init timestamp
+        if(_pMediaTrack->hzPerSecond.u64 == 0){
+                pj_get_timestamp_freq(&_pMediaTrack->hzPerSecond);
+                _pMediaTrack->nextRtpTimestamp = _now;
+                _pMediaTrack->nextRtcpTimestamp = _pMediaTrack->nextRtpTimestamp;
+                _pMediaTrack->nextRtcpTimestamp.u64 += (_pMediaTrack->hzPerSecond.u64 * (RTCP_INTERVAL+(pj_rand()%RTCP_RAND)) / 1000);
+        }
+}
+
+static pj_status_t checkAndSendRtcp(MediaStreamTrack *_pMediaTrack, TransportIce *_pTransportIce, pj_timestamp _now)
+{
+        if (_pMediaTrack->nextRtpTimestamp.u64 >= _pMediaTrack->nextRtcpTimestamp.u64) {
+                if (_pMediaTrack->nextRtcpTimestamp.u64 <= _now.u64) {
+                        void *pRtcpPkt;
+                        int nRtcpLen;
+                        pj_ssize_t size;
+                        pj_status_t status;
+
+                        /* Build RTCP packet */
+                        pjmedia_rtcp_build_rtcp(&_pMediaTrack->rtcpSession, &pRtcpPkt, &nRtcpLen);
+
+                        /* Send packet */
+                        size = nRtcpLen;
+                        status = pjmedia_transport_send_rtcp(_pTransportIce->pTransport,
+                                                             pRtcpPkt, size);
+                        STATUS_CHECK(pjmedia_transport_send_rtcp, status);
+
+                        /* Schedule next send */
+                        _pMediaTrack->nextRtcpTimestamp.u64 += (_pMediaTrack->hzPerSecond.u64 * (RTCP_INTERVAL+(pj_rand()%RTCP_RAND)) / 1000);
+                }
+        }
+        return PJ_SUCCESS;
+}
+
 static int SendAudioPacket(IN PeerConnection *_pPeerConnection, IN RtpPacket * _pPacket)
 {
-        enum { RTCP_INTERVAL = 5000, RTCP_RAND = 2000 };
         char packet[1500];
         
         MediaStreamTrack * pMediaTrack = GetAudioTrack(&_pPeerConnection->mediaStream);
@@ -807,41 +844,13 @@ static int SendAudioPacket(IN PeerConnection *_pPeerConnection, IN RtpPacket * _
         int nSampleRate = pAudioConfig->configs[nIdx].nSampleOrClockRate;
         unsigned nMsecInterval = _pPacket->nDataLen * 1000 /nChannel / (nBitDepth / 8) / nSampleRate;
         
-        // init timestamp
-        if(pMediaTrack->hzPerSecond.u64 == 0){
-                pj_get_timestamp_freq(&pMediaTrack->hzPerSecond);
-                
-                pj_get_timestamp(&pMediaTrack->nextRtpTimestamp);
-                pMediaTrack->nextRtpTimestamp.u64 += (pMediaTrack->hzPerSecond.u64 * nMsecInterval / 1000);
-                
-                pMediaTrack->nextRtcpTimestamp = pMediaTrack->nextRtpTimestamp;
-                pMediaTrack->nextRtcpTimestamp.u64 += (pMediaTrack->hzPerSecond.u64 * (RTCP_INTERVAL+(pj_rand()%RTCP_RAND)) / 1000);
-        }
-        
         pj_timestamp now;
-        if (pMediaTrack->nextRtpTimestamp.u64 >= pMediaTrack->nextRtcpTimestamp.u64) {
-                pj_get_timestamp(&now);
-                if (pMediaTrack->nextRtcpTimestamp.u64 <= now.u64) {
-                        void *pRtcpPkt;
-                        int nRtcpLen;
-                        pj_ssize_t size;
-                        pj_status_t status;
-                        
-                        /* Build RTCP packet */
-                        pjmedia_rtcp_build_rtcp(&pMediaTrack->rtcpSession, &pRtcpPkt, &nRtcpLen);
-                        
-                        /* Send packet */
-                        size = nRtcpLen;
-                        status = pjmedia_transport_send_rtcp(pTransportIce->pTransport,
-                                                             pRtcpPkt, size);
-                        STATUS_CHECK(pjmedia_transport_send_rtcp, status);
-                        
-                        /* Schedule next send */
-                        pMediaTrack->nextRtcpTimestamp.u64 += (pMediaTrack->hzPerSecond.u64 * (RTCP_INTERVAL+(pj_rand()%RTCP_RAND)) / 1000);
-                }
-        }
-        
         pj_get_timestamp(&now);
+
+        initMediaTrackTimeStamp(pMediaTrack, now);
+
+        checkAndSendRtcp(pMediaTrack, pTransportIce, now);
+
         pj_uint64_t nLate = 0;
         if (pMediaTrack->nextRtpTimestamp.u64 > now.u64) {
                 nLate = ((pMediaTrack->nextRtpTimestamp.u64 - now.u64) * 1000) / pMediaTrack->hzPerSecond.u64;
@@ -912,7 +921,13 @@ static int SendVideoPacket(IN PeerConnection *_pPeerConnection, IN RtpPacket * _
                 return -2;
         }
         TransportIce * pTransportIce = &_pPeerConnection->transportIce[nTransportIndex];
-        
+
+        pj_timestamp now;
+        pj_get_timestamp(&now);
+
+        initMediaTrackTimeStamp(pMediaTrack, now);
+        checkAndSendRtcp(pMediaTrack, pTransportIce, now);
+
         int nLeft = _pPacket->nDataLen;
         unsigned nOffset = 0;
         
@@ -930,9 +945,7 @@ static int SendVideoPacket(IN PeerConnection *_pPeerConnection, IN RtpPacket * _
                                                 &pPayload,
                                                 &nPayloadLen
                                                 );
-                if (status != PJ_SUCCESS) {
-                        return status;
-                }
+                STATUS_CHECK(pjmedia_h264_packetize, status);
                 nLeft -= nBitsPos;
                 nOffset += nBitsPos;
                 
