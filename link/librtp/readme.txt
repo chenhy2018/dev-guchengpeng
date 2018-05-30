@@ -21,13 +21,21 @@ TODO 已解决
    pjmedia_transport_media_start media_index 一直传的0
    addtrack的时候下标搞错了，导致先添加的下标位1，后添加的下标为0
 
+4. 多路track会有多次回调，这个要屏蔽为一次. 已完成。
+	PeerConnection加了mutex和nNegFail nNegSuccess记录次数来控制回调次数
+5. sdp mline支持多种格式，需要知道那种格式协商成功了: 已完成，待了解的更清楚
+    pjmedia_sdp_neg 可以获取这个消息。目前能获取了
+    但是没有通知调用者, 如何通知: 回调函数，PeerConnection加了一个IceNegInfo的成员，这个成员的附值在checkAndNeg里面
+    可能的问题：作为answerer，active_remote 得到的sdp似乎不正确, active_local 和预期一致
+
 TODO 未解决
-4. sdp mline支持多种格式，需要知道那种格式协商成功了 
-    pjmedia_sdp_neg 可以获取这个消息。目前能获取了，
-    但是没有通知调用者, 如何通知？？回调函数，PeerConnection加了一个IceNegInfo的成员，这个成员的附值在checkAndNeg里面
-5. 发送数据的接受到数据和rtcp的回调函数，参考siprtp. 正在做
+6. 发送数据的接受到数据和rtcp的回调函数，参考siprtp. pcmu完成，h264待做
    添加上了，还没有测试，并且还需要缓冲并拼接成一个完整的帧
-6. 回调函数，目前是sleep等待超时ice的状态. 对于用户没有回调，即同步的. 确定是否这样做？
+   目前pcmu传输和接收没有问题
 7. 时间戳维护, rtp时间戳溢出问题？
-8. StartNegotiation移动到checkAndNeg最后面去，即offer和answer都获取到就自动协商了. 可能最后做，这样做了不好通过文件sdp手动测试了
-9. 多路track会有多次回调，这个要屏蔽为一次. 已完成。PeerConnection加了mutex和nNegFail nNegSuccess记录次数来控制回调次数
+
+
+
+已明确，待选择做法:
+1. 回调函数，目前是sleep等待超时ice的状态. 对于用户没有回调，即同步的. 确定是否这样做？
+2. StartNegotiation移动到checkAndNeg最后面去，即offer和answer都获取到就自动协商了. 可能最后做，这样做了不好通过文件sdp手动测试了
