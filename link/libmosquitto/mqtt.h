@@ -40,8 +40,8 @@ typedef struct MqttOptions MqttOptions;
 
 struct MqttCallback
 {
-        void (*OnMessage)(IN const void* instance, IN const char* topic, IN const char* message, IN size_t length);
-        void (*OnEvent)(IN const void* instance, IN int code, const char* reason);
+        void (*OnMessage)(IN const void* _pInstance, IN const char* _pTopic, IN const char* _pMessage, IN size_t nLength);
+        void (*OnEvent)(IN const void* _pInstance, IN int nCode, const char* _pReason);
 };
 
 struct MqttUserInfo
