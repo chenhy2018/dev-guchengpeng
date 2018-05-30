@@ -4,7 +4,7 @@
 #include <stdio.h>
 
 struct connect_status {
-        bool connect;
+        int status;
         void* pInstance;
 } connect_status;
 
@@ -24,12 +24,7 @@ void OnEvent(IN const void* _pInstance, IN int _nId,  IN const char* _pReason)
                         pStatus = &Status[i];
                 }
         }
-        if (_nId == MQTT_CONNECT_SUCCESS) {
-                pStatus->connect = true;
-        }
-        else {
-                pStatus->connect = false;
-        }
+        pStatus->status = _nId;
 }
 
 int main()
@@ -44,7 +39,7 @@ int main()
         options.secondaryUserInfo.pHostname = "172.17.0.4";
         //strcpy(options.secondBindaddress, "172.17.0.2`");
         options.primaryUserInfo.pUsername = "test_sub";
-        options.primaryUserInfo.pPassword = "testsub";
+        options.primaryUserInfo.pPassword = "testsub1";
         options.secondaryUserInfo.pUsername = "test";
         options.secondaryUserInfo.pPassword = "111";
         options.secondaryUserInfo.nPort = 1883;
@@ -64,7 +59,7 @@ int main()
         printf("try first sub \n");
         instance = MqttCreateInstance(&options);
         Status[0].pInstance = instance;
-        while (!Status[0].connect) {
+        while (!(Status[0].status & 3000)) {
                 sleep(1);
         }
         MqttSubscribe(instance, "test/#");
@@ -74,7 +69,7 @@ int main()
         options.primaryUserInfo.pPassword = "testpub";
         void* pubInstance = MqttCreateInstance(&options);
         Status[1].pInstance = pubInstance;
-        while (!Status[1].connect) {
+        while (!(Status[1].status & 3000)) {
                 sleep(1);
         }
         for (int i = 0 ; i < 10; ++i) {
@@ -85,8 +80,8 @@ int main()
         sleep(10);
         Status[1].pInstance = NULL;
         Status[0].pInstance = NULL;
-        Status[1].connect = false;
-        Status[0].connect = false;
+        Status[1].status = 0;
+        Status[0].status = 0;
         MqttDestroy(instance);
         MqttDestroy(pubInstance);
         printf("try second \n");
@@ -96,7 +91,7 @@ int main()
         options.primaryUserInfo.pPassword = "root";
         instance = MqttCreateInstance(&options);
         Status[1].pInstance = instance;
-        while (!Status[1].connect) {
+        while (!(Status[1].status & 3000)) {
                 sleep(1);
         }
         MqttSubscribe(instance, "sensor/room1/#");
@@ -119,7 +114,7 @@ int main()
                 //MqttLibInit();
                 instance = MqttCreateInstance(&options);
                 Status[0].pInstance = instance;
-                while (!Status[0].connect) {
+                while (!(Status[0].status & 3000)) {
                         sleep(1);
                 }
                 MqttSubscribe(instance, "sensor/room1/#");
