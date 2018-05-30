@@ -1,6 +1,6 @@
 #include "PeerConnection.h"
 
-#define SDP_NEG_TESG
+//#define SDP_NEG_TESG
 
 typedef struct _App{
         PeerConnection peerConnection;
@@ -213,6 +213,34 @@ void pjmedia_sdp_neg_test2(pj_pool_factory *_pFactory)
 }
 #endif //SDP_NEG_TEST
 
+pj_oshandle_t gPcmuFd;
+static void onRxRtp(void *_pUserData, CallbackType _type, void *_pCbData)
+{
+        switch (_type){
+                case CALLBACK_ICE:{
+                        IceNegInfo *pInfo = (IceNegInfo *)_pCbData;
+                        fprintf(stderr, "==========>callback_ice: state:%d\n", pInfo->state);
+                        for ( int i = 0; i < pInfo->nCount; i++) {
+                                fprintf(stderr, "           codec type:%d\n", pInfo->configs[i]->nRtpDynamicType);
+                        }
+                }
+                        break;
+                case CALLBACK_RTP:{
+                        RtpPacket *pPkt = (RtpPacket *)_pCbData;
+                        pj_ssize_t nLen = pPkt->nDataLen;
+                        if (nLen == 160) {
+                                pj_file_write(gPcmuFd, pPkt->pData, &nLen);
+                        } else {
+                                printf("-------========>%lld\n", nLen);
+                        }
+                }
+                        break;
+                case CALLBACK_RTCP:
+                        fprintf(stderr, "==========>callback_rtcp\n");
+                        break;
+        }
+}
+
 int main(int argc, char **argv)
 {
         if(argc != 2){
@@ -236,14 +264,23 @@ int main(int argc, char **argv)
         
         pj_caching_pool_init(&app.cachingPool, &pj_pool_factory_default_policy, 0);
         
+        //test receive pcmu
+        pj_pool_t * apool = pj_pool_create(&app.cachingPool.factory, "rxrtp", 2000, 2000, NULL);
+        status = pj_file_open(apool, "/Users/liuye/Documents/p2p/build/src/work/Debug/rxrtp.mulaw", PJ_O_WRONLY, &gPcmuFd);
+        if(status != PJ_SUCCESS){
+                printf("pj_file_open fail:%d\n", status);
+                return status;
+        }
+        //end test recive pcmu
         
-        //InitIceConfig(&app.userConfig);
-        //strcpy(app.userConfig.turnHost, "127.0.0.1");
-        //strcpy(app.userConfig.turnHost, "123.59.204.198");
-        //strcpy(app.userConfig.turnUsername, "root");
-        //strcpy(app.userConfig.turnPassword, "root");
+        InitIceConfig(&app.userConfig);
+        strcpy(app.userConfig.turnHost, "127.0.0.1");
+        strcpy(app.userConfig.turnHost, "123.59.204.198");
+        strcpy(app.userConfig.turnUsername, "root");
+        strcpy(app.userConfig.turnPassword, "root");
+        app.userConfig.userCallback = onRxRtp;
         //there is default ice config
-        InitPeerConnectoin(&app.peerConnection, &app.cachingPool.factory, NULL); //&app.userConfig
+        InitPeerConnectoin(&app.peerConnection, &app.cachingPool.factory, &app.userConfig); //&app.userConfig
         
 #ifdef SDP_NEG_TESG
         printf("go into pjmedia_sdp_neg_test\n");
@@ -317,20 +354,59 @@ int main(int argc, char **argv)
         StartNegotiation(&app.peerConnection);
         
         char packet[120];
-        while(1){
-                memset(packet, 0, sizeof(packet));
-                memset(packet, 0x30, 12);
-                printf("input:");
-                scanf("%s", packet+12);
-                if(packet[12] == 'q'){
-                        break;
+        
+        if (role == ANSWER) {
+                while(1){
+                        memset(packet, 0, sizeof(packet));
+                        memset(packet, 0x30, 12);
+                        printf("input:");
+                        scanf("%s", packet+12);
+                        if(packet[12] == 'q'){
+                                break;
+                        }
+                        pjmedia_transport_send_rtp(app.peerConnection.transportIce[0].pTransport, packet, strlen(packet));
+                        memset(packet, 0x31, 12);
+                        pjmedia_transport_send_rtp(app.peerConnection.transportIce[1].pTransport, packet, strlen(packet));
                 }
-                pjmedia_transport_send_rtp(app.peerConnection.transportIce[0].pTransport, packet, strlen(packet));
-                memset(packet, 0x31, 12);
-                pjmedia_transport_send_rtp(app.peerConnection.transportIce[1].pTransport, packet, strlen(packet));
+        } else {
+                input_confirm("confirm to sendfile:");
+                pj_oshandle_t audioFd;
+                pj_pool_t * apool = pj_pool_create(&app.cachingPool.factory, "afiletest", 2000, 2000, NULL);
+                status = pj_file_open(apool, "/Users/liuye/Documents/p2p/build/src/mysiprtp/Debug/8000_1.mulaw", PJ_O_RDONLY, &audioFd);
+                if(status != PJ_SUCCESS){
+                        printf("pj_file_open fail:%d\n", status);
+                        return status;
+                }
+                int aok = 1;
+                while(aok){
+                        pj_ssize_t readLen = 160;
+                        char abuf[1500] = {0};
+                        status = pj_file_read(audioFd, abuf, &readLen);
+                        if(status != PJ_SUCCESS){
+                                printf("pj_file_read fail:%d\n", status);
+                                aok = 0;
+                                continue;
+                        }
+                        if(readLen != 160){
+                                printf("pj_file_read less than one frame length:\n");
+                                aok = 0;
+                                continue;
+                        }
+                        printf("send %ld to rtp\n", readLen);
+                        RtpPacket rtpPacket;
+                        pj_bzero(&rtpPacket, sizeof(rtpPacket));
+                        rtpPacket.type = TYPE_AUDIO;
+                        rtpPacket.pData = (uint8_t *)abuf;
+                        rtpPacket.nDataLen = readLen;
+                        rtpPacket.nTimestamp = 0;// TODO SendPacket deal timestamp
+                        status = SendPacket(&app.peerConnection, &rtpPacket);
+                        if(status != 0)
+                                break;
+                        pj_thread_sleep(19);
+                }
         }
         
         input_confirm("quit");
-        
+        ReleasePeerConnectoin(&app.peerConnection);
         return 0;
 }
