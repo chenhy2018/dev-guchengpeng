@@ -736,13 +736,10 @@ static int checkAndNeg(IN OUT PeerConnection * _pPeerConnection)
         
         // which codec is agree
         const pjmedia_sdp_session * pActiveSdp = NULL;
-        if (_pPeerConnection->role == ICE_ROLE_OFFERER) {
-                status = pjmedia_sdp_neg_get_active_local(_pPeerConnection->pIceNeg, &pActiveSdp);
-                STATUS_CHECK(pjmedia_sdp_neg_get_active_local, status);
-        } else if (_pPeerConnection->role == ICE_ROLE_ANSWERER) {
-                status = pjmedia_sdp_neg_get_active_remote(_pPeerConnection->pIceNeg, &pActiveSdp);
-                STATUS_CHECK(pjmedia_sdp_neg_get_active_remote, status);
-        }
+
+        status = pjmedia_sdp_neg_get_active_local(_pPeerConnection->pIceNeg, &pActiveSdp);
+        STATUS_CHECK(pjmedia_sdp_neg_get_active_local, status);
+
         status = SetActiveCodec(&_pPeerConnection->mediaStream, pActiveSdp);
         STATUS_CHECK(pjmedia_sdp_neg_get_active_remote, status);
         _pPeerConnection->iceNegInfo.nCount = pActiveSdp->media_count;
