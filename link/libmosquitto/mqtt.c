@@ -1,4 +1,5 @@
-#include "mosquitto.h"
+#include "mqtt.h"
+#include <mosquitto.h>
 #include <stdio.h>
 #include <pthread.h>
 #include <stdlib.h>
@@ -10,16 +11,61 @@
 #define STATUS_CONNECTING 1
 #define STATUS_CONNACK_RECVD 2
 #define STATUS_WAITING 3
-
-#define MinQueueSize 50
+#define STATUS_CONNECT_ERROR 4
+#define MAX_MQTT_TOPIC_SIZE 128
 
 typedef struct Node
 {
-        char topic[MAX_MOSQUITTO_TOPIC_SIZE];
+        char topic[MAX_MQTT_TOPIC_SIZE];
         struct Node *pNext;
 }Node;
 
-void mallocAndStrcpy(char** des, const char* src)
+static int MqttErrorStatusChange(int nStatus)
+{
+        switch (nStatus) {
+                case MOSQ_ERR_CONN_PENDING:
+                        return MQTT_ERR_CONN_PENDING;
+                case MOSQ_ERR_NOMEM:
+                        return MQTT_ERR_NOMEM;
+                case MOSQ_ERR_INVAL:
+                        return MQTT_ERR_INVAL;
+                case MOSQ_ERR_NO_CONN:
+                        return MQTT_ERR_NO_CONN;
+                case MOSQ_ERR_CONN_REFUSED:
+                        return MQTT_ERR_CONN_REFUSED;
+                case MOSQ_ERR_NOT_FOUND:
+                        return MQTT_ERR_NOT_FOUND;
+                case MOSQ_ERR_CONN_LOST:
+                        return MQTT_ERR_CONN_LOST;
+                case MOSQ_ERR_TLS:
+                        return MQTT_ERR_TLS;
+                case MOSQ_ERR_PAYLOAD_SIZE:
+                        return MQTT_ERR_PAYLOAD_SIZE;
+                case MOSQ_ERR_NOT_SUPPORTED:
+                        return MQTT_ERR_NOT_SUPPORTED;
+                case MOSQ_ERR_AUTH:
+                        return MQTT_ERR_AUTH;
+                case MOSQ_ERR_ACL_DENIED:
+                        return MQTT_ERR_ACL_DENIED;
+                case MOSQ_ERR_UNKNOWN:
+                        return MQTT_ERR_UNKNOWN;
+                case MOSQ_ERR_ERRNO:
+                        return MQTT_ERR_ERRNO;
+                case MOSQ_ERR_EAI:
+                        return MQTT_ERR_EAI;
+                case MOSQ_ERR_PROXY:
+                        return MQTT_ERR_PROXY;
+                case MOSQ_ERR_PROTOCOL:
+                        return MQTT_ERR_PROTOCOL;
+                case MOSQ_ERR_SUCCESS:
+                        return MQTT_SUCCESS;
+                default:
+                        return MQTT_ERR_OTHERS;
+        }
+        return MQTT_ERR_OTHERS;
+}
+
+static void MallocAndStrcpy(char** des, const char* src)
 {
       if (src) {
               *des = malloc(sizeof(src));
@@ -30,12 +76,12 @@ void mallocAndStrcpy(char** des, const char* src)
       }
 }
 
-void safeFree(char* des)
+static void SafeFree(char* des)
 {
       if (des) free(des);
 }
 
-bool insertNode(Node* pHead, char* val) {
+static bool InsertNode(Node* pHead, char* val) {
         Node* p = pHead;
         while(p->pNext) {
                 p = p->pNext;
@@ -47,8 +93,7 @@ bool insertNode(Node* pHead, char* val) {
         return true;
 }
 
-
-bool deleteNode(Node* PHead, char * pval)
+static bool DeleteNode(Node* PHead, char * pval)
 {
         int i = 0;
         Node* p = PHead;
@@ -64,7 +109,7 @@ bool deleteNode(Node* PHead, char * pval)
         return false;
 }
 
-void clearNode(Node* PHead)
+static void ClearNode(Node* PHead)
 {
         int i = 0;
         Node* p = PHead;
@@ -75,44 +120,45 @@ void clearNode(Node* PHead)
         }
 }
 
-struct MosquittoInstance
+struct MqttInstance
 {
         struct mosquitto *mosq;
-        struct MosquittoOptions options;
+        struct MqttOptions options;
         int status;
         bool connected;
         bool isDestroying;
         Node pSubsribeList;
 };
 
-void onEventCallback(struct MosquittoInstance* _pInstance, int rc, const char* _pStr)
+void OnEventCallback(struct MqttInstance* _pInstance, int rc, const char* _pStr)
 {
-        if (_pInstance->options.callbacks.onEvent != NULL) {
-                _pInstance->options.callbacks.onEvent(_pInstance, rc, _pStr);
+        if (_pInstance->options.callbacks.OnEvent != NULL) {
+                _pInstance->options.callbacks.OnEvent(_pInstance, rc, _pStr);
         }
 }
 
-void onLogCallback(struct mosquitto* _pMosq, void* _pObj, int level, const char* _pStr)
+void OnLogCallback(struct mosquitto* _pMosq, void* _pObj, int level, const char* _pStr)
 {
         printf("%s\n", _pStr);
 }
 
-void onMessageCallback(struct mosquitto* _pMosq, void* _pObj, const struct mosquitto_message* _pMessage)
+void OnMessageCallback(struct mosquitto* _pMosq, void* _pObj, const struct mosquitto_message* _pMessage)
 {
         int rc = MOSQ_ERR_SUCCESS;
-        struct MosquittoInstance* pInstance = (struct MosquittoInstance*)(_pObj);
-        if (pInstance->options.callbacks.onMessage) {
-                pInstance->options.callbacks.onMessage(_pObj, _pMessage->topic, _pMessage->payload, _pMessage->payloadlen);
+        struct MqttInstance* pInstance = (struct MqttInstance*)(_pObj);
+        if (pInstance->options.callbacks.OnMessage) {
+                pInstance->options.callbacks.OnMessage(_pObj, _pMessage->topic, _pMessage->payload, _pMessage->payloadlen);
         }
 }
 
-void onConnectCallback(struct mosquitto* _pMosq, void* _pObj, int result)
+void OnConnectCallback(struct mosquitto* _pMosq, void* _pObj, int result)
 {
         int rc = MOSQ_ERR_SUCCESS;
-        struct MosquittoInstance* pInstance = (struct MosquittoInstance*)(_pObj);
+        struct MqttInstance* pInstance = (struct MqttInstance*)(_pObj);
         pInstance->connected = true;
         if (result) {
                 fprintf(stderr, "%s\n", mosquitto_connack_string(result));
+                pInstance->status = STATUS_CONNECT_ERROR;
         }
         else {
                 pInstance->status = STATUS_CONNACK_RECVD;
@@ -122,54 +168,60 @@ void onConnectCallback(struct mosquitto* _pMosq, void* _pObj, int result)
                         p = p->pNext;
                 }
         }
-        onEventCallback(pInstance, result, (result == 0) ? "on connect success" : mosquitto_connack_string(result));
+        OnEventCallback(pInstance,
+                        (result == 0) ? MQTT_CONNECT_SUCCESS : MqttErrorStatusChange(result),
+                        (result == 0) ? "on connect success" : mosquitto_connack_string(result));
 }
 
 
-void onDisconnectCallback(struct mosquitto* _pMosq, void* _pObj, int rc)
+void OnDisconnectCallback(struct mosquitto* _pMosq, void* _pObj, int rc)
 {
 
-        struct MosquittoInstance* pInstance = (struct MosquittoInstance*)(_pObj);
+        struct MqttInstance* pInstance = (struct MqttInstance*)(_pObj);
         pInstance->connected = false;
-        pInstance->status = STATUS_IDLE;
-        onEventCallback(pInstance, rc, (rc == 0) ? "on disconnect success" : mosquitto_connack_string(rc));
+        if (!rc) {
+                pInstance->status = STATUS_IDLE;
+        }
+        OnEventCallback(pInstance,
+                       (rc == 0) ? MQTT_DISCONNECT_SUCCESS : MqttErrorStatusChange(rc),
+                       (rc == 0) ? "on disconnect success" : mosquitto_connack_string(rc));
 }
 
-void onSubscribeCallback(struct mosquitto* _pMosq, void* pObj, int mid, int qos_count, const int* pGranted_qos)
+void OnSubscribeCallback(struct mosquitto* _pMosq, void* pObj, int mid, int qos_count, const int* pGranted_qos)
 {       
         fprintf(stderr, "Subscribed (mid: %d): %d \n", mid, pGranted_qos[0]);
 }
 
-void onUnsubscribeCallback(struct mosquitto* _pMosq, void* _pObj, int mid)
+void OnUnsubscribeCallback(struct mosquitto* _pMosq, void* _pObj, int mid)
 {
         fprintf(stderr, "Unsubscribed (mid: %d) \n", mid);
 }
 
-void onPublishCallback(struct mosquitto* _pMosq, void* _pObj, int mid)
+void OnPublishCallback(struct mosquitto* _pMosq, void* _pObj, int mid)
 {
         fprintf(stderr, " my_publish_callback \n ");
-        struct MosquittoInstance* pInstance = (struct MosquittoInstance*)(_pObj);
+        struct MqttInstance* pInstance = (struct MqttInstance*)(_pObj);
         int last_mid_sent = mid;
 }
 
 
-static void MosquittoInstanceInit(struct MosquittoInstance* _pInstance, const struct MosquittoOptions* _pOption)
+static void MqttInstanceInit(struct MqttInstance* _pInstance, const struct MqttOptions* _pOption)
 {
         /* copy options */
-        memcpy(&_pInstance->options, _pOption, sizeof(struct MosquittoOptions));
-        mallocAndStrcpy(&_pInstance->options.pId, _pOption->pId);
-        mallocAndStrcpy(&_pInstance->options.primaryUserInfo.pUsername, _pOption->primaryUserInfo.pUsername);
-        mallocAndStrcpy(&_pInstance->options.primaryUserInfo.pPassword, _pOption->primaryUserInfo.pPassword);
-        mallocAndStrcpy(&_pInstance->options.primaryUserInfo.pHostname, _pOption->primaryUserInfo.pHostname);
-        mallocAndStrcpy(&_pInstance->options.primaryUserInfo.pCafile, _pOption->primaryUserInfo.pCafile);
-        mallocAndStrcpy(&_pInstance->options.primaryUserInfo.pCertfile, _pOption->primaryUserInfo.pCertfile);
-        mallocAndStrcpy(&_pInstance->options.primaryUserInfo.pKeyfile, _pOption->primaryUserInfo.pKeyfile);
-        mallocAndStrcpy(&_pInstance->options.secondaryUserInfo.pUsername, _pOption->secondaryUserInfo.pUsername);
-        mallocAndStrcpy(&_pInstance->options.secondaryUserInfo.pPassword, _pOption->secondaryUserInfo.pPassword);
-        mallocAndStrcpy(&_pInstance->options.secondaryUserInfo.pHostname, _pOption->secondaryUserInfo.pHostname);
-        mallocAndStrcpy(&_pInstance->options.secondaryUserInfo.pCafile, _pOption->secondaryUserInfo.pCafile);
-        mallocAndStrcpy(&_pInstance->options.secondaryUserInfo.pCertfile, _pOption->secondaryUserInfo.pCertfile);
-        mallocAndStrcpy(&_pInstance->options.secondaryUserInfo.pKeyfile, _pOption->secondaryUserInfo.pKeyfile);
+        memcpy(&_pInstance->options, _pOption, sizeof(struct MqttOptions));
+        MallocAndStrcpy(&_pInstance->options.pId, _pOption->pId);
+        MallocAndStrcpy(&_pInstance->options.primaryUserInfo.pUsername, _pOption->primaryUserInfo.pUsername);
+        MallocAndStrcpy(&_pInstance->options.primaryUserInfo.pPassword, _pOption->primaryUserInfo.pPassword);
+        MallocAndStrcpy(&_pInstance->options.primaryUserInfo.pHostname, _pOption->primaryUserInfo.pHostname);
+        MallocAndStrcpy(&_pInstance->options.primaryUserInfo.pCafile, _pOption->primaryUserInfo.pCafile);
+        MallocAndStrcpy(&_pInstance->options.primaryUserInfo.pCertfile, _pOption->primaryUserInfo.pCertfile);
+        MallocAndStrcpy(&_pInstance->options.primaryUserInfo.pKeyfile, _pOption->primaryUserInfo.pKeyfile);
+        MallocAndStrcpy(&_pInstance->options.secondaryUserInfo.pUsername, _pOption->secondaryUserInfo.pUsername);
+        MallocAndStrcpy(&_pInstance->options.secondaryUserInfo.pPassword, _pOption->secondaryUserInfo.pPassword);
+        MallocAndStrcpy(&_pInstance->options.secondaryUserInfo.pHostname, _pOption->secondaryUserInfo.pHostname);
+        MallocAndStrcpy(&_pInstance->options.secondaryUserInfo.pCafile, _pOption->secondaryUserInfo.pCafile);
+        MallocAndStrcpy(&_pInstance->options.secondaryUserInfo.pCertfile, _pOption->secondaryUserInfo.pCertfile);
+        MallocAndStrcpy(&_pInstance->options.secondaryUserInfo.pKeyfile, _pOption->secondaryUserInfo.pKeyfile);
         _pInstance->mosq = NULL;
         _pInstance->connected = false;
         _pInstance->status = STATUS_IDLE;
@@ -177,21 +229,21 @@ static void MosquittoInstanceInit(struct MosquittoInstance* _pInstance, const st
         _pInstance->pSubsribeList.pNext = NULL;
 }
 
-bool ClientOptSet(struct MosquittoInstance* _pInstance, struct mosquitto* _pMosq, struct MosquittoUserInfo info)
+bool ClientOptSet(struct MqttInstance* _pInstance, struct mosquitto* _pMosq, struct MqttUserInfo info)
 {
         int rc = 0;
-        if (info.nAuthenicatinMode & MOSQUITTO_AUTHENTICATION_USER) {
+        if (info.nAuthenicatinMode & MQTT_AUTHENTICATION_USER) {
                 printf("mosquitto_username_pw_set \n");
                 rc = mosquitto_username_pw_set(_pMosq, info.pUsername, info.pPassword);
                 if (rc)
                         return rc;
         }
-        if (info.nAuthenicatinMode & MOSQUITTO_AUTHENTICATION_ONEWAY_SSL) {
+        if (info.nAuthenicatinMode & MQTT_AUTHENTICATION_ONEWAY_SSL) {
                 printf("mosquitto_tls_set %s \n", info.pCafile);
                 rc = mosquitto_tls_set(_pMosq, info.pCafile, NULL, NULL, NULL, NULL);
                 printf("mosquitto_tls_set rc %d \n", rc);
         }
-        else if (info.nAuthenicatinMode & MOSQUITTO_AUTHENTICATION_TWOWAY_SSL) {
+        else if (info.nAuthenicatinMode & MQTT_AUTHENTICATION_TWOWAY_SSL) {
                 rc = mosquitto_tls_set(_pMosq, info.pCafile, NULL, info.pCertfile, info.pKeyfile, NULL);
                 printf("mosquitto_tls_set 111 rc %d \n", rc);
         }
@@ -201,11 +253,11 @@ bool ClientOptSet(struct MosquittoInstance* _pInstance, struct mosquitto* _pMosq
         return rc;
 }
 
-void * Mosquittothread(void* _pData)
+void * Mqttthread(void* _pData)
 {
         int rc;
         
-        struct MosquittoInstance* pInstance = (struct MosquittoInstance*)(_pData);
+        struct MqttInstance* pInstance = (struct MqttInstance*)(_pData);
 
         pInstance->mosq = mosquitto_new(pInstance->options.pId, true, pInstance);
         if (!pInstance->mosq) {
@@ -221,13 +273,13 @@ void * Mosquittothread(void* _pData)
                 return NULL;
         }
         mosquitto_threaded_set(pInstance->mosq, true);
-        //mosquitto_log_callback_set(pInstance->mosq, onLogCallback);
-        mosquitto_connect_callback_set(pInstance->mosq, onConnectCallback);
-        mosquitto_disconnect_callback_set(pInstance->mosq, onDisconnectCallback);
-        mosquitto_publish_callback_set(pInstance->mosq, onPublishCallback);
-        mosquitto_message_callback_set(pInstance->mosq, onMessageCallback);
-        mosquitto_subscribe_callback_set(pInstance->mosq, onSubscribeCallback);
-        mosquitto_unsubscribe_callback_set(pInstance->mosq, onUnsubscribeCallback);
+        //mosquitto_log_callback_set(pInstance->mosq, OnLogCallback);
+        mosquitto_connect_callback_set(pInstance->mosq, OnConnectCallback);
+        mosquitto_disconnect_callback_set(pInstance->mosq, OnDisconnectCallback);
+        mosquitto_publish_callback_set(pInstance->mosq, OnPublishCallback);
+        mosquitto_message_callback_set(pInstance->mosq, OnMessageCallback);
+        mosquitto_subscribe_callback_set(pInstance->mosq, OnSubscribeCallback);
+        mosquitto_unsubscribe_callback_set(pInstance->mosq, OnUnsubscribeCallback);
         
         do {
                  if (!pInstance->connected && pInstance->status == STATUS_IDLE) {
@@ -238,7 +290,7 @@ void * Mosquittothread(void* _pData)
                                  rc = mosquitto_connect(pInstance->mosq, pInstance->options.primaryUserInfo.pHostname, pInstance->options.primaryUserInfo.nPort, pInstance->options.nKeepalive);
                          }
                          if (rc) {
-                                 onEventCallback(pInstance, rc, mosquitto_strerror(rc));
+                                 OnEventCallback(pInstance, rc, mosquitto_strerror(rc));
                                  fprintf(stderr, "Unable to connect (%s). try to reconnect to secondary server. \n", mosquitto_strerror(rc));
                                  rc = ClientOptSet(pInstance, pInstance->mosq, pInstance->options.secondaryUserInfo);
                                  if (rc == 0) {
@@ -247,8 +299,7 @@ void * Mosquittothread(void* _pData)
                                  if (rc) {
                                          fprintf(stderr, "Unable to connect Secondary server  %s \n", mosquitto_strerror(rc) );
                                          pInstance->status = STATUS_IDLE;
-                                         // TODO add error callback.
-                                         onEventCallback(pInstance, rc, mosquitto_strerror(rc));
+                                         OnEventCallback(pInstance, rc, mosquitto_strerror(rc));
                                          sleep(30);
                                  }
                                  else {
@@ -264,20 +315,20 @@ void * Mosquittothread(void* _pData)
                 mosquitto_disconnect(pInstance->mosq);
         }
         mosquitto_destroy(pInstance->mosq);
-        clearNode(&pInstance->pSubsribeList);
-        safeFree(pInstance->options.pId);
-        safeFree(pInstance->options.primaryUserInfo.pUsername);
-        safeFree(pInstance->options.primaryUserInfo.pPassword);
-        safeFree(pInstance->options.primaryUserInfo.pHostname);
-        safeFree(pInstance->options.primaryUserInfo.pCafile);
-        safeFree(pInstance->options.primaryUserInfo.pCertfile);
-        safeFree(pInstance->options.primaryUserInfo.pKeyfile);
-        safeFree(pInstance->options.secondaryUserInfo.pUsername);
-        safeFree(pInstance->options.secondaryUserInfo.pPassword);
-        safeFree(pInstance->options.secondaryUserInfo.pHostname);
-        safeFree(pInstance->options.secondaryUserInfo.pCafile);
-        safeFree(pInstance->options.secondaryUserInfo.pCertfile);
-        safeFree(pInstance->options.secondaryUserInfo.pKeyfile);
+        ClearNode(&pInstance->pSubsribeList);
+        SafeFree(pInstance->options.pId);
+        SafeFree(pInstance->options.primaryUserInfo.pUsername);
+        SafeFree(pInstance->options.primaryUserInfo.pPassword);
+        SafeFree(pInstance->options.primaryUserInfo.pHostname);
+        SafeFree(pInstance->options.primaryUserInfo.pCafile);
+        SafeFree(pInstance->options.primaryUserInfo.pCertfile);
+        SafeFree(pInstance->options.primaryUserInfo.pKeyfile);
+        SafeFree(pInstance->options.secondaryUserInfo.pUsername);
+        SafeFree(pInstance->options.secondaryUserInfo.pPassword);
+        SafeFree(pInstance->options.secondaryUserInfo.pHostname);
+        SafeFree(pInstance->options.secondaryUserInfo.pCafile);
+        SafeFree(pInstance->options.secondaryUserInfo.pCertfile);
+        SafeFree(pInstance->options.secondaryUserInfo.pKeyfile);
         if (pInstance) free(pInstance);
         if (rc) {
                 fprintf(stderr, "Error: %s\n", mosquitto_strerror(rc));
@@ -285,79 +336,34 @@ void * Mosquittothread(void* _pData)
         return NULL;
 }
 
-void* MosquittoCreateInstance(IN const struct MosquittoOptions* pOption)
+void* MqttCreateInstance(IN const struct MqttOptions* pOption)
 {
         /* allocate one mosquitto instance struct */
-        struct MosquittoInstance* pInstance = (struct MosquittoInstance*)malloc(sizeof(struct MosquittoInstance));
+        struct MqttInstance* pInstance = (struct MqttInstance*)malloc(sizeof(struct MqttInstance));
         if (pInstance == NULL) {
                 return NULL;
         }
         
-        MosquittoInstanceInit(pInstance, pOption);
+        MqttInstanceInit(pInstance, pOption);
         pthread_t t;
         pthread_attr_t attr;
         pthread_attr_init(&attr);
         pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
-        pthread_create(&t, &attr, Mosquittothread, pInstance);
+        pthread_create(&t, &attr, Mqttthread, pInstance);
         return pInstance;
 }
 
-void MosquittoDestroy(IN const void* _pInstance)
+void MqttDestroy(IN const void* _pInstance)
 {	
-        struct MosquittoInstance* pInstance = (struct MosquittoInstance*)(_pInstance);
+        struct MqttInstance* pInstance = (struct MqttInstance*)(_pInstance);
         pInstance->isDestroying = true;;
-        pInstance->options.callbacks.onMessage = NULL;
-        pInstance->options.callbacks.onEvent = NULL;
+        pInstance->options.callbacks.OnMessage = NULL;
+        pInstance->options.callbacks.OnEvent = NULL;
 }
 
-static int MosquittoErrorStatusChange(int nStatus)
+int MqttPublish(IN const void* _pInstance, IN char* _pTopic, IN int _nPayloadlen, IN const void* _pPayload)
 {
-        switch (nStatus) {
-                case MOSQ_ERR_CONN_PENDING:
-                        return MOSQUITTO_ERR_CONN_PENDING;
-                case MOSQ_ERR_NOMEM:
-                        return MOSQUITTO_ERR_NOMEM;
-                case MOSQ_ERR_INVAL:
-                        return MOSQUITTO_ERR_INVAL;
-                case MOSQ_ERR_NO_CONN:
-                        return MOSQUITTO_ERR_NO_CONN;
-                case MOSQ_ERR_CONN_REFUSED:
-                        return MOSQUITTO_ERR_CONN_REFUSED;
-                case MOSQ_ERR_NOT_FOUND:
-                        return MOSQUITTO_ERR_NOT_FOUND;
-                case MOSQ_ERR_CONN_LOST:
-                        return MOSQUITTO_ERR_CONN_LOST;
-                case MOSQ_ERR_TLS:
-                        return MOSQUITTO_ERR_TLS;
-                case MOSQ_ERR_PAYLOAD_SIZE:
-                        return MOSQUITTO_ERR_PAYLOAD_SIZE;
-                case MOSQ_ERR_NOT_SUPPORTED:
-                        return MOSQUITTO_ERR_NOT_SUPPORTED;
-                case MOSQ_ERR_AUTH:
-                        return MOSQUITTO_ERR_AUTH;
-                case MOSQ_ERR_ACL_DENIED:
-                        return MOSQUITTO_ERR_ACL_DENIED;
-                case MOSQ_ERR_UNKNOWN:
-                        return MOSQUITTO_ERR_UNKNOWN;
-                case MOSQ_ERR_ERRNO:
-                        return MOSQUITTO_ERR_ERRNO;
-                case MOSQ_ERR_EAI:
-                        return MOSQUITTO_ERR_EAI;
-                case MOSQ_ERR_PROXY:
-                        return MOSQUITTO_ERR_PROXY;
-                case MOSQ_ERR_PROTOCOL:
-                        return MOSQUITTO_ERR_PROTOCOL;
-                case MOSQ_ERR_SUCCESS:
-                        return MOSQUITTO_ERR_SUCCESS;
-                default:
-                        return MOSQUITTO_ERR_OTHERS;
-        }
-        return MOSQUITTO_ERR_OTHERS;
-}
-
-int MosquittoPublish(IN const void* _pInstance, IN char* _pTopic, IN int _nPayloadlen, IN const void* _pPayload)
-{
-       struct MosquittoInstance* pInstance = (struct MosquittoInstance*)(_pInstance);
+       struct MqttInstance* pInstance = (struct MqttInstance*)(_pInstance);
        int rc = mosquitto_publish(pInstance->mosq, NULL, _pTopic, _nPayloadlen, _pPayload, pInstance->options.nQos, pInstance->options.bRetain);
        if (rc) {
                switch (rc) {
@@ -378,16 +384,16 @@ int MosquittoPublish(IN const void* _pInstance, IN char* _pTopic, IN int _nPaylo
                                break;
                }
        }
-       return rc;
+       return MqttErrorStatusChange(rc);
 }
 
-int MosquittoSubscribe(IN const void* _pInstance, IN char* _pTopic)
+int MqttSubscribe(IN const void* _pInstance, IN char* _pTopic)
 {
-        struct MosquittoInstance* pInstance = (struct MosquittoInstance*)(_pInstance);
+        struct MqttInstance* pInstance = (struct MqttInstance*)(_pInstance);
         int rc = mosquitto_subscribe(pInstance->mosq, NULL, _pTopic, pInstance->options.nQos);
         fprintf(stderr, "mos sub %d", rc);
         if (!rc) {
-                insertNode(&pInstance->pSubsribeList, _pTopic);
+                InsertNode(&pInstance->pSubsribeList, _pTopic);
         }
         else {
                switch (rc) {
@@ -408,16 +414,16 @@ int MosquittoSubscribe(IN const void* _pInstance, IN char* _pTopic)
                                break;
                }
         }
-        return rc;
+        return MqttErrorStatusChange(rc);
 }
 
-int MosquittoUnsubscribe(IN const void* _pInstance, IN char* _pSub)
+int MqttUnsubscribe(IN const void* _pInstance, IN char* _pSub)
 {
-        struct MosquittoInstance* pInstance = (struct MosquittoInstance*)(_pInstance);
+        struct MqttInstance* pInstance = (struct MqttInstance*)(_pInstance);
         int rc = mosquitto_unsubscribe(pInstance->mosq, NULL, _pSub);
         fprintf(stderr, "mos sub %d", rc);
         if (!rc) {
-               deleteNode(&pInstance->pSubsribeList, _pSub);
+               DeleteNode(&pInstance->pSubsribeList, _pSub);
         }
         else {
                switch (rc) {
@@ -435,17 +441,17 @@ int MosquittoUnsubscribe(IN const void* _pInstance, IN char* _pSub)
                                break;
                }
         }
-        return rc;
+        return MqttErrorStatusChange(rc);
 }
 
-int MosquittoLibInit()
+int MqttLibInit()
 {
         int rc = mosquitto_lib_init();
-        return MosquittoErrorStatusChange(rc);
+        return MqttErrorStatusChange(rc);
 }
 
-int MosquittoLibCleanup()
+int MqttLibCleanup()
 {
         int rc = mosquitto_lib_cleanup();
-        return MosquittoErrorStatusChange(rc);
+        return MqttErrorStatusChange(rc);
 }

@@ -1,31 +1,50 @@
-#include "mosquitto.h"
+#include "mqtt.h"
 #include <unistd.h>
 #include <string.h>
 #include <stdio.h>
 
-void onMessage(IN const void* instance, IN const char* topic, IN const char* message, IN size_t length)
+struct connect_status {
+        bool connect;
+        void* pInstance;
+} connect_status;
+
+struct connect_status Status[10];
+
+void OnMessage(IN const void* _pInstance, IN const char* _pTopic, IN const char* _pMessage, IN size_t nLength)
 {
-        fprintf(stderr, "topic %s message %s \n", topic,  message);
+        fprintf(stderr, "%p topic %s message %s \n", _pInstance, _pTopic, _pMessage);
 }
 
-void onEvent(IN const void* instance, IN int id,  IN const char* reason)
+void OnEvent(IN const void* _pInstance, IN int _nId,  IN const char* _pReason)
 {
-        fprintf(stderr, "id %d, reason  %s \n", id, reason);
+        fprintf(stderr, "%p id %d, reason  %s \n",_pInstance, _nId, _pReason);
+        struct connect_status* pStatus;
+        for (int i = 0; i < 10; i++) {
+                if (Status[i].pInstance == _pInstance) {
+                        pStatus = &Status[i];
+                }
+        }
+        if (_nId == MQTT_CONNECT_SUCCESS) {
+                pStatus->connect = true;
+        }
+        else {
+                pStatus->connect = false;
+        }
 }
 
 int main()
 {
-        struct MosquittoOptions options;
-        MosquittoLibInit();
+        struct MqttOptions options;
+        MqttLibInit();
         options.pId = "test";
         options.bCleanSession = false;
-        options.primaryUserInfo.nAuthenicatinMode = MOSQUITTO_AUTHENTICATION_NULL;
+        options.primaryUserInfo.nAuthenicatinMode = MQTT_AUTHENTICATION_USER;
         options.primaryUserInfo.pHostname = "123.59.204.198";
         //strcpy(options.bindaddress, "172.17.0.2");
         options.secondaryUserInfo.pHostname = "172.17.0.4";
         //strcpy(options.secondBindaddress, "172.17.0.2`");
-        options.primaryUserInfo.pUsername = "root";
-        options.primaryUserInfo.pPassword = "root";
+        options.primaryUserInfo.pUsername = "test_sub";
+        options.primaryUserInfo.pPassword = "testsub";
         options.secondaryUserInfo.pUsername = "test";
         options.secondaryUserInfo.pPassword = "111";
         options.secondaryUserInfo.nPort = 1883;
@@ -39,51 +58,80 @@ int main()
         options.nKeepalive = 10;
         options.nQos = 0;
         options.bRetain = false;
-        options.callbacks.onMessage = &onMessage;
-        options.callbacks.onEvent = &onEvent;
+        options.callbacks.OnMessage = &OnMessage;
+        options.callbacks.OnEvent = &OnEvent;
         void* instance = NULL;
-        printf("try first \n");
-        instance = MosquittoCreateInstance(&options);
-        sleep(3);
-        MosquittoSubscribe(instance, "sensor/room1/#");
-        for (int i = 0 ; i < 10; ++i) {
-            MosquittoPublish(instance, "sensor/room1/temperature", 10, "test1234456");
+        printf("try first sub \n");
+        instance = MqttCreateInstance(&options);
+        Status[0].pInstance = instance;
+        while (!Status[0].connect) {
+                sleep(1);
         }
-        MosquittoDestroy(instance);
+        MqttSubscribe(instance, "test/#");
+        printf("try pub %p \n", instance);
+        options.pId = "pubtest";
+        options.primaryUserInfo.pUsername = "test_pub";
+        options.primaryUserInfo.pPassword = "testpub";
+        void* pubInstance = MqttCreateInstance(&options);
+        Status[1].pInstance = pubInstance;
+        while (!Status[1].connect) {
+                sleep(1);
+        }
+        for (int i = 0 ; i < 10; ++i) {
+            MqttPublish(pubInstance, "test/pub", 10, "test_pub");
+            MqttPublish(pubInstance, "test/pub3", 10, "test_pub3");
+            
+        }
+        sleep(10);
+        Status[1].pInstance = NULL;
+        Status[0].pInstance = NULL;
+        Status[1].connect = false;
+        Status[0].connect = false;
+        MqttDestroy(instance);
+        MqttDestroy(pubInstance);
         printf("try second \n");
-        options.primaryUserInfo.nAuthenicatinMode = MOSQUITTO_AUTHENTICATION_USER;
+        options.primaryUserInfo.nAuthenicatinMode = MQTT_AUTHENTICATION_USER;
         options.primaryUserInfo.pHostname = "123.59.204.198";
         options.primaryUserInfo.pUsername = "root";
         options.primaryUserInfo.pPassword = "root";
-        instance = MosquittoCreateInstance(&options);
-                sleep(3);
-        MosquittoSubscribe(instance, "sensor/room1/#");
-        for (int i = 0 ; i < 10; ++i) {
-              MosquittoPublish(instance, "sensor/room1/temperature", 10, "test1234456");
+        instance = MqttCreateInstance(&options);
+        Status[1].pInstance = instance;
+        while (!Status[1].connect) {
+                sleep(1);
         }
-        sleep(5); 
-        MosquittoDestroy(instance);
-        MosquittoLibCleanup();
+        MqttSubscribe(instance, "sensor/room1/#");
+        //usleep(100000);
+        for (int i = 0 ; i < 100; ++i) {
+              MqttPublish(instance, "sensor/room1/temperature", 10, "test1234456");
+        }
+        sleep(5);
+        Status[1].pInstance = NULL;
+        MqttDestroy(instance);
+        MqttLibCleanup();
         printf("try third \n");
-        //memset(options.primaryUserInfo.hostname, 0, MAX_MOSQUITTO_USR_SIZE);
+        //memset(options.primaryUserInfo.hostname, 0, MAX_MQTT_USR_SIZE);
         //strcpy(options.primaryUserInfo.hostname, "172.17.0.8");
         options.primaryUserInfo.pCafile = "./test/ca.crt";
         options.primaryUserInfo.nPort = 8883;
-        options.primaryUserInfo.nAuthenicatinMode = MOSQUITTO_AUTHENTICATION_USER | MOSQUITTO_AUTHENTICATION_ONEWAY_SSL;
-        MosquittoLibInit();
+        options.primaryUserInfo.nAuthenicatinMode = MQTT_AUTHENTICATION_USER | MQTT_AUTHENTICATION_ONEWAY_SSL;
+        MqttLibInit();
         while(1) {
-                //MosquittoLibInit();
-                instance = MosquittoCreateInstance(&options);
-                sleep(1);
-                MosquittoSubscribe(instance, "sensor/room1/#");
-                for (int i = 0; i < 10; ++ i) {
-                        MosquittoPublish(instance, "sensor/room1/temperature", 10, "test1234456");
+                //MqttLibInit();
+                instance = MqttCreateInstance(&options);
+                Status[0].pInstance = instance;
+                while (!Status[0].connect) {
+                        sleep(1);
+                }
+                MqttSubscribe(instance, "sensor/room1/#");
+                for (int i = 0; i < 1000000; ++ i) {
+                        MqttPublish(instance, "sensor/room1/temperature", 10, "test1234456");
                         usleep(100000);
                 }
                 sleep(3);
-                MosquittoDestroy(instance);
-                //MosquittoLibCleanup();
+                Status[0].pInstance = NULL;
+                MqttDestroy(instance);
+                //MqttLibCleanup();
         }
-        MosquittoLibCleanup();
+        MqttLibCleanup();
         return 1;
 }
