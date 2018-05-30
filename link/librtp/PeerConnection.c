@@ -821,6 +821,24 @@ static pj_status_t checkAndSendRtcp(MediaStreamTrack *_pMediaTrack, TransportIce
         return PJ_SUCCESS;
 }
 
+static inline uint64_t getTimestampGapFromLastPacket(IN MediaStreamTrack *_pMediaTrack, uint64_t _timestamp)
+{
+        if (_pMediaTrack->nLastTimestamp == 0) {
+                _pMediaTrack->nLastTimestamp = _timestamp;
+                return 0;
+        }
+        uint64_t diff = _timestamp - _pMediaTrack->nLastTimestamp;
+        _pMediaTrack->nLastTimestamp = _timestamp;
+        return diff;
+}
+
+// _nPktTimestampGap millisecond?
+static inline uint32_t calcRtpTimestampLen(uint64_t _nPktTimestampGap, int nRate)
+{
+        uint32_t rate = (uint32_t)nRate;
+        return _nPktTimestampGap * nRate / rate;
+}
+
 static int SendAudioPacket(IN PeerConnection *_pPeerConnection, IN RtpPacket * _pPacket)
 {
         char packet[1500];
@@ -851,6 +869,10 @@ static int SendAudioPacket(IN PeerConnection *_pPeerConnection, IN RtpPacket * _
 
         checkAndSendRtcp(pMediaTrack, pTransportIce, now);
 
+        uint64_t nPktTimestampGap = getTimestampGapFromLastPacket(pMediaTrack, _pPacket->nTimestamp);
+
+        uint32_t nRtpTsLen = calcRtpTimestampLen(nPktTimestampGap, nSampleRate);
+
         pj_uint64_t nLate = 0;
         if (pMediaTrack->nextRtpTimestamp.u64 > now.u64) {
                 nLate = ((pMediaTrack->nextRtpTimestamp.u64 - now.u64) * 1000) / pMediaTrack->hzPerSecond.u64;
@@ -876,7 +898,7 @@ static int SendAudioPacket(IN PeerConnection *_pPeerConnection, IN RtpPacket * _
         status = pjmedia_rtp_encode_rtp( &pMediaTrack->rtpSession, 0, //pt is 0 for pcmu
                                         0, /* marker bit */
                                         _pPacket->nDataLen,
-                                        nMsecInterval,
+                                        nRtpTsLen,
                                         &pVoidHeader, &nHeaderLen);
         STATUS_CHECK(pjmedia_rtp_encode_rtp, status);
         

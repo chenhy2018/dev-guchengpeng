@@ -112,7 +112,7 @@ typedef struct _PeerConnection
 typedef struct _RtpPacket{
         uint8_t * pData;
         int nDataLen;
-        int64_t nTimestamp;
+        uint64_t nTimestamp;
         MediaType type;
         MediaFromat format;
 }RtpPacket;
