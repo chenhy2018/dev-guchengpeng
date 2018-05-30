@@ -101,6 +101,10 @@ typedef struct _PeerConnection
         pjmedia_sdp_neg *pIceNeg;
         pj_pool_t *pNegPool;
         IceNegInfo iceNegInfo;
+        int nNegFail;
+        int nNegSuccess;
+        pj_mutex_t *pMutex;
+        pj_pool_t *pMutexPool;
         int bQuit;
         IceRole role;
 }PeerConnection;

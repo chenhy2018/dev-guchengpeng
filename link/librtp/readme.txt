@@ -30,3 +30,4 @@ TODO 未解决
 6. 回调函数，目前是sleep等待超时ice的状态. 对于用户没有回调，即同步的. 确定是否这样做？
 7. 时间戳维护, rtp时间戳溢出问题？
 8. StartNegotiation移动到checkAndNeg最后面去，即offer和answer都获取到就自动协商了. 可能最后做，这样做了不好通过文件sdp手动测试了
+9. 多路track会有多次回调，这个要屏蔽为一次. 已完成。PeerConnection加了mutex和nNegFail nNegSuccess记录次数来控制回调次数

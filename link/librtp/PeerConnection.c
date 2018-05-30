@@ -22,9 +22,14 @@ static void onIceComplete2(pjmedia_transport *pTransport, pj_ice_strans_op op,
         if(status != PJ_SUCCESS){
                 pTransportIce->iceState = ICE_STATE_FAIL;
                 pPeerConnection->iceNegInfo.state = ICE_STATE_FAIL;
-                if (pPeerConnection->userIceConfig.userCallback) {
+                pj_mutex_lock(pPeerConnection->pMutex);
+                if (pPeerConnection->userIceConfig.userCallback && pPeerConnection->nNegFail == 0) {
+                        pPeerConnection->nNegFail++;
+                        pj_mutex_unlock(pPeerConnection->pMutex);
                         pPeerConnection->userIceConfig.userCallback(pPeerConnection->userIceConfig.pCbUserData,
                                                                     CALLBACK_ICE, &pPeerConnection->iceNegInfo);
+                } else {
+                        pj_mutex_unlock(pPeerConnection->pMutex);
                 }
                 return;
         }
@@ -38,12 +43,18 @@ static void onIceComplete2(pjmedia_transport *pTransport, pj_ice_strans_op op,
                         
                         /** Negotiation */
                 case PJ_ICE_STRANS_OP_NEGOTIATION:
-                        printf("--->PJ_ICE_STRANS_OP_NEGOTIATION\n");
                         pTransportIce->iceState = ICE_STATE_NEGOTIATION_OK;
                         pPeerConnection->iceNegInfo.state = ICE_STATE_NEGOTIATION_OK;
-                        if (pPeerConnection->userIceConfig.userCallback) {
+                        pj_mutex_lock(pPeerConnection->pMutex);
+                        pPeerConnection->nNegSuccess++;
+                        fprintf(stderr, "--->PJ_ICE_STRANS_OP_NEGOTIATION:%d\n", pPeerConnection->nNegSuccess);
+                        if (pPeerConnection->userIceConfig.userCallback && pPeerConnection->nNegFail == 0 &&
+                            pPeerConnection->nNegSuccess == pPeerConnection->mediaStream.nCount) {
+                                pj_mutex_unlock(pPeerConnection->pMutex);
                                 pPeerConnection->userIceConfig.userCallback(pPeerConnection->userIceConfig.pCbUserData,
                                                                             CALLBACK_ICE, &pPeerConnection->iceNegInfo);
+                        } else {
+                                pj_mutex_unlock(pPeerConnection->pMutex);
                         }
                         break;
                         
@@ -295,6 +306,12 @@ static pj_status_t createMediaEndpt(IN OUT PeerConnection * _pPeerConnection)
         
         pj_status_t status;
         
+        pj_pool_t *pPool = pj_pool_create(_pPeerConnection->pPoolFactory, NULL, 128, 128, NULL);
+        ASSERT_RETURN_CHECK(pPool, pj_pool_create);
+        _pPeerConnection->pMutexPool = pPool;
+        status = pj_mutex_create(pPool, NULL, PJ_MUTEX_DEFAULT, &_pPeerConnection->pMutex);
+        STATUS_CHECK(pj_mutex_create, status);
+
         status = pjmedia_endpt_create(_pPeerConnection->pPoolFactory, NULL, 1, &_pPeerConnection->pMediaEndpt);
         STATUS_CHECK(pjmedia_endpt_create, status);
         int nNoTelephoneEvent = 0;
@@ -366,6 +383,16 @@ void ReleasePeerConnectoin(IN OUT PeerConnection * _pPeerConnection)
         if (_pPeerConnection->pNegPool) {
                 pj_pool_release(_pPeerConnection->pNegPool);
                 _pPeerConnection->pNegPool = NULL;
+        }
+
+        if (_pPeerConnection->pMutexPool) {
+                pj_pool_release(_pPeerConnection->pMutexPool);
+                _pPeerConnection->pMutexPool = NULL;
+        }
+
+        if (_pPeerConnection->pMutex) {
+                pj_mutex_destroy(_pPeerConnection->pMutex);
+                _pPeerConnection->pMutex = NULL;
         }
         
         for ( int i = 0 ; i < _pPeerConnection->mediaStream.nCount; i++) {
@@ -568,7 +595,7 @@ static void on_rx_rtp(void *pUserData, void *pPkt, pj_ssize_t size)
         unsigned nPayloadLen;
         
         MediaStreamTrack *pMediaTrack = (MediaStreamTrack *)pUserData;
-        
+
         /* Check for errors */
         if (size < 0) {
                 PJ_LOG(3, (__FILE__, "RTP recv() error:%d", size));
@@ -602,7 +629,9 @@ static void on_rx_rtp(void *pUserData, void *pPkt, pj_ssize_t size)
         int nIdx = pMediaTrack->mediaConfig.nUseIndex;
         AvParam * pAvParam = &pMediaTrack->mediaConfig.configs[nIdx];
         rtpPacket.format = pAvParam->format;
-        
+
+        fprintf(stderr, "rtp data receive:%ld, payLen:%d\n", size, nPayloadLen);
+
         PeerConnection * pPeerConnection = (PeerConnection *)pMediaTrack->pPeerConnection;
         switch (pAvParam->format) {
                 case MEDIA_FORMAT_PCMU:
@@ -816,12 +845,20 @@ static int SendAudioPacket(IN PeerConnection *_pPeerConnection, IN RtpPacket * _
         }
         
         pj_get_timestamp(&now);
-        pj_uint64_t nLate = ((pMediaTrack->nextRtpTimestamp.u64 - now.u64) * 1000) / pMediaTrack->hzPerSecond.u64;
-        if ( nLate > 1) {
-                //if late than 1 millisecond
-                PJ_LOG(4,(__FILE__, "audio data late:%lld", nLate));
+        pj_uint64_t nLate = 0;
+        if (pMediaTrack->nextRtpTimestamp.u64 > now.u64) {
+                nLate = ((pMediaTrack->nextRtpTimestamp.u64 - now.u64) * 1000) / pMediaTrack->hzPerSecond.u64;
+                if ( nLate > 1) {
+                        PJ_LOG(4,(__FILE__, "audio data late:%lld-%lld=%lld",pMediaTrack->nextRtpTimestamp.u64, now.u64, nLate));
+                }
+        } else {
+                nLate = ((now.u64 - pMediaTrack->nextRtpTimestamp.u64) * 1000) / pMediaTrack->hzPerSecond.u64;
+                if ( nLate > 1) {
+                        PJ_LOG(4,(__FILE__, "audio data early:%lld-%lld=%lld",now.u64, pMediaTrack->nextRtpTimestamp.u64, nLate));
+                }
         }
         
+
         //start to send rtp
         pj_status_t status;
         const void *pVoidHeader;
