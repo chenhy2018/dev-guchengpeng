@@ -826,7 +826,8 @@ int SipMakeNewCall(IN const int _nFromAccountId, IN const char *_pDestUri)
         pj_str_t Dest = pj_str((char *)_pDestUri);
         /* Create SIP dialog */
         char LocalUri[60];
-        pj_ansi_sprintf(LocalUri, "<sip:%s@%s:%d>", SipAppData.Accounts[_nFromAccountId].Config.UserName.ptr, SipAppData.LocalIp.ptr, SipAppData.LocalPort);
+
+        pj_ansi_sprintf(LocalUri, "<sip:%s@%s>", SipAppData.Accounts[_nFromAccountId].Config.UserName.ptr, SipAppData.Accounts[_nFromAccountId].Config.SipDomain.ptr);
         pj_str_t Local = pj_str(LocalUri);
         Status = pjsip_dlg_create_uac(pjsip_ua_instance(), &Local, &SipAppData.Accounts[_nFromAccountId].Contact, &Dest,  &Dest, &pDialog);
         if (Status != PJ_SUCCESS) {
