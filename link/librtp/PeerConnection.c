@@ -351,7 +351,7 @@ void InitPeerConnectoin(IN OUT PeerConnection * _pPeerConnection, IN pj_pool_fac
 
 void ReleasePeerConnectoin(IN OUT PeerConnection * _pPeerConnection)
 {
-        
+        _pPeerConnection->bQuit = 1;
         for ( int i = 0; i < sizeof(_pPeerConnection->nAvIndex) / sizeof(int); i++) {
                 if (_pPeerConnection->nAvIndex[i] != -1) {
                         transportIceDestroy(&_pPeerConnection->transportIce[i]);
