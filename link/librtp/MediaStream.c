@@ -46,7 +46,7 @@ void AddMediaTrack(IN OUT MediaStream *_pMediaStraem, IN MediaConfig *_pMediaCon
         _pMediaStraem->streamTracks[_nIndex].mediaConfig = *_pMediaConfig;
         _pMediaStraem->streamTracks[_nIndex].pPeerConnection = _pPeerConnection;
         
-        setMediaConfig(_pMediaConfig);
+        setMediaConfig(&_pMediaStraem->streamTracks[_nIndex].mediaConfig);
 }
 
 int CreateSdpAudioMLine(IN pjmedia_endpt *_pMediaEndpt, IN pjmedia_transport_info *_pTransportInfo,
