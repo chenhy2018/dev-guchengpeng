@@ -871,7 +871,7 @@ static void dealWithTimestamp(IN OUT MediaStreamTrack *_pMediaTrack, IN pj_times
 }
 
 static pj_status_t sendPacket(IN OUT MediaStreamTrack *_pMediaTrack, IN TransportIce * _pTransportIce,
-                              IN int _nRtpType, IN int _nRtpTsLen, IN void *_pData, IN int _nDataLen)
+                              IN int _nRtpType, IN int _nRtpTsLen, IN const void *_pData, IN int _nDataLen)
 {
         //start to send rtp
         pj_status_t status;
@@ -953,13 +953,8 @@ static int SendAudioPacket(IN PeerConnection *_pPeerConnection, IN RtpPacket * _
         return 0;
 }
 
-static int SendVideoPacket(IN PeerConnection *_pPeerConnection, IN RtpPacket * _pPacket)
+static int SendVideoPacket(IN PeerConnection *_pPeerConnection, IN OUT RtpPacket * _pPacket)
 {
-        const pj_uint8_t * pPayload;
-        pj_size_t nPayloadLen;
-        unsigned nBitsPos;
-        char packet[1500];
-        
         MediaStreamTrack *pMediaTrack = GetVideoTrack(&_pPeerConnection->mediaStream);
         int nTransportIndex = GetMediaTrackIndex(&_pPeerConnection->mediaStream, pMediaTrack);
         if (nTransportIndex < 0){
@@ -968,20 +963,36 @@ static int SendVideoPacket(IN PeerConnection *_pPeerConnection, IN RtpPacket * _
         }
         TransportIce * pTransportIce = &_pPeerConnection->transportIce[nTransportIndex];
 
+        MediaConfig *pVideoConfig = &pMediaTrack->mediaConfig;
+        int nIdx = pMediaTrack->mediaConfig.nUseIndex;
+        int nClockRate = pVideoConfig->configs[nIdx].nSampleOrClockRate;
+        int nRtpType = pVideoConfig->configs[nIdx].nRtpDynamicType;
+
         pj_timestamp now;
         pj_get_timestamp(&now);
 
+        if (pMediaTrack->nSysTimeBase.u64 == 0) {
+                pMediaTrack->nSysTimeBase = now;
+                pMediaTrack->nFirstPktTimestamp = _pPacket->nTimestamp;
+        }
+
         checkAndSendRtcp(pMediaTrack, pTransportIce, now);
+
+        uint32_t nRtpTsLen = 0;
+        dealWithTimestamp(pMediaTrack, now, nClockRate, _pPacket, &nRtpTsLen);
 
         int nLeft = _pPacket->nDataLen;
         unsigned nOffset = 0;
-        
+        const pj_uint8_t * pPayload;
+        pj_size_t nPayloadLen;
+        unsigned nBitsPos;
+
         while (nLeft != 0) {
-                
+
                 pPayload = NULL;
                 nPayloadLen = 0;
                 nBitsPos = 0;
-                
+
                 pj_status_t status;
                 status = pjmedia_h264_packetize(pMediaTrack->pH264Packetizer,
                                                 (pj_uint8_t *)_pPacket->pData + nOffset,
@@ -996,41 +1007,24 @@ static int SendVideoPacket(IN PeerConnection *_pPeerConnection, IN RtpPacket * _
                 
                 
                 int marker = 0;
-                int nTsLlen = 3600;
+                int nTsLlen = nRtpTsLen;
                 if (nOffset == _pPacket->nDataLen && nOffset != nBitsPos){
                         marker = 1;
                 }
                 int type = _pPacket->pData[0] & 0x1F;
-                if(type != 1 || type != 5 )
+                if(type != 1 && type != 5 )
                         nTsLlen = 0;
                 if(nOffset != nBitsPos)
                         nTsLlen = 0;
-                
-                
-                /* Format RTP header */
-                const void *p_hdr;
-                int hdrlen;
-                int nIdx = pMediaTrack->mediaConfig.nUseIndex;
-                status = pjmedia_rtp_encode_rtp(&pMediaTrack->rtpSession,
-                                                pMediaTrack->mediaConfig.configs[nIdx].nRtpDynamicType,
-                                                0, /* marker bit *///TODO marker bit set?
-                                                nPayloadLen,
-                                                nTsLlen,
-                                                &p_hdr, &hdrlen);
-                
-                pj_memcpy(packet, p_hdr, hdrlen);
-                pj_memcpy(&packet[hdrlen], pPayload, nPayloadLen);
-                status = pjmedia_transport_send_rtp(pTransportIce->pTransport,
-                                                    packet, nPayloadLen + hdrlen);
-                
-                
-                pjmedia_rtcp_tx_rtp(&pMediaTrack->rtcpSession, nPayloadLen);
+
+                status =  sendPacket(pMediaTrack, pTransportIce, nRtpType, nTsLlen, pPayload, nPayloadLen);
+                STATUS_CHECK(pjmedia_rtp_encode_rtp, status);
         }
         
         return PJ_SUCCESS;
 }
 
-int SendPacket(IN PeerConnection *_pPeerConnection, IN RtpPacket * _pPacket)
+int SendPacket(IN PeerConnection *_pPeerConnection, IN OUT RtpPacket * _pPacket)
 {
         pj_assert(_pPacket);
         if (_pPacket->type == TYPE_AUDIO) {

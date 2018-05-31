@@ -131,7 +131,7 @@ int setLocalDescription(IN OUT PeerConnection * pPeerConnection, IN pjmedia_sdp_
 int setRemoteDescription(IN OUT PeerConnection * pPeerConnection, IN pjmedia_sdp_session * pSdp);
 int StartNegotiation(IN PeerConnection * pPeerConnection);
 
-int SendPacket(IN PeerConnection *pPeerConnection, IN RtpPacket * pPacket);
+int SendPacket(IN PeerConnection *pPeerConnection, IN OUT RtpPacket * pPacket);
 
 void ReleasePeerConnectoin(IN OUT PeerConnection * _pPeerConnection);
 
