@@ -815,7 +815,7 @@ static pj_status_t checkAndSendRtcp(MediaStreamTrack *_pMediaTrack, TransportIce
                         STATUS_CHECK(pjmedia_transport_send_rtcp, status);
 
                         /* Schedule next send */
-                        _pMediaTrack->nextRtcpTimestamp.u64 += (_pMediaTrack->hzPerSecond.u64 * (RTCP_INTERVAL+(pj_rand()%RTCP_RAND)) / 1000);
+                        _pMediaTrack->nextRtcpTimestamp.u64 = _now.u64 + (_pMediaTrack->hzPerSecond.u64 * (RTCP_INTERVAL+(pj_rand()%RTCP_RAND)) / 1000);
                 }
         }
         return PJ_SUCCESS;
@@ -823,16 +823,16 @@ static pj_status_t checkAndSendRtcp(MediaStreamTrack *_pMediaTrack, TransportIce
 
 static inline uint64_t getTimestampGapFromLastPacket(IN MediaStreamTrack *_pMediaTrack, uint64_t _timestamp)
 {
-        if (_pMediaTrack->nLastTimestamp == 0) {
-                _pMediaTrack->nLastTimestamp = _timestamp;
+        if (_pMediaTrack->nLastPktTimestamp == 0) {
+                _pMediaTrack->nLastPktTimestamp = _timestamp;
                 return 0;
         }
-        uint64_t diff = _timestamp - _pMediaTrack->nLastTimestamp;
-        _pMediaTrack->nLastTimestamp = _timestamp;
+        uint64_t diff = _timestamp - _pMediaTrack->nLastPktTimestamp;
+        _pMediaTrack->nLastPktTimestamp = _timestamp;
         return diff;
 }
 
-static inline uint64_t getTimestampFromBase(IN MediaStreamTrack *_pMediaTrack, uint64_t _timestamp)
+static inline uint64_t getMediaTrackElapseTime(IN MediaStreamTrack *_pMediaTrack, uint64_t _timestamp)
 {
         return _timestamp - _pMediaTrack->nFirstPktTimestamp;
 }
@@ -882,7 +882,7 @@ static int SendAudioPacket(IN PeerConnection *_pPeerConnection, IN RtpPacket * _
 
         uint32_t nRtpTsLen = calcRtpTimestampLen(nPktTimestampGap, nSampleRate);
 
-        uint32_t nElapse = getTimestampFromBase(pMediaTrack, _pPacket->nTimestamp);
+        uint32_t nElapse = getMediaTrackElapseTime(pMediaTrack, _pPacket->nTimestamp);
         pj_timestamp exptectNow;
         now.u64 = now.u64 + nElapse * pMediaTrack->hzPerSecond.u64 / 1000;
         exptectNow = now;

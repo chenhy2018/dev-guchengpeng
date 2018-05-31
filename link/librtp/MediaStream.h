@@ -69,7 +69,7 @@ typedef struct _MediaStreamTrack
         pj_timestamp hzPerSecond;
         pj_timestamp nextRtcpTimestamp;
         pj_timestamp nSysTimeBase;
-        uint64_t nLastTimestamp;
+        uint64_t nLastPktTimestamp;
         uint64_t nFirstPktTimestamp;
         MediaConfig mediaConfig;
         pjmedia_rtp_session  rtpSession;
