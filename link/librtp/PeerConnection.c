@@ -759,7 +759,7 @@ static int checkAndNeg(IN OUT PeerConnection * _pPeerConnection)
                         cfg.mode = PJMEDIA_H264_PACKETIZER_MODE_NON_INTERLEAVED;
                         cfg.mtu = PJMEDIA_MAX_MTU;
                         pVideoTrack->pPacketizerPool = pj_pool_create(_pPeerConnection->pPoolFactory, NULL, 200*1024, 200*1024, NULL);
-                        status = createPacketizer("h264", 4, pVideoTrack->pPacketizerPool, &pVideoTrack->pMediaPacketier);
+                        status = CreatePacketizer("h264", 4, pVideoTrack->pPacketizerPool, &pVideoTrack->pMediaPacketier);
                         STATUS_CHECK(createPacketizer, status);
                 }
         }

@@ -135,7 +135,7 @@ MediaStreamTrack * GetAudioTrack(IN MediaStream * pMediaStream);
 MediaStreamTrack * GetVideoTrack(IN MediaStream * pMediaStream);
 int GetMediaTrackIndex(IN MediaStream * pMediaStream, IN MediaStreamTrack *pMediaStreamTrack);
 
-pj_status_t createPacketizer(IN char *pName, IN int nNameLen, IN pj_pool_t *pPktzPool, OUT MediaPacketier **pPktz);
+pj_status_t CreatePacketizer(IN char *pName, IN int nNameLen, IN pj_pool_t *pPktzPool, OUT MediaPacketier **pPktz);
 pj_status_t MediaPacketize(IN MediaPacketier *pPktz,IN pj_uint8_t *pBitstream, IN pj_size_t nBitstreamLen,
                            IN unsigned *pBitstreamPos, OUT const pj_uint8_t **pPayload, OUT pj_size_t *nPlyloadLen);
 pj_status_t MediaUnPacketize(IN OUT MediaPacketier *pKtz, IN const pj_uint8_t *pPayload, IN pj_size_t nPlyloadLen,

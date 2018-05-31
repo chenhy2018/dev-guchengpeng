@@ -321,7 +321,7 @@ static pj_status_t createPcmuPacketizer(IN pj_pool_t *_pPktzPool, OUT MediaPacke
         return PJ_SUCCESS;
 }
 
-pj_status_t createPacketizer(IN char *_pName, IN int _nNameLen, IN pj_pool_t *_pPktzPool, OUT MediaPacketier **_pPktz)
+pj_status_t CreatePacketizer(IN char *_pName, IN int _nNameLen, IN pj_pool_t *_pPktzPool, OUT MediaPacketier **_pPktz)
 {
         pj_assert(_nNameLen < 5);
 
