@@ -300,8 +300,8 @@ static pj_status_t createH264Packetizer(IN pj_pool_t *_pPktzPool, OUT MediaPacke
         STATUS_CHECK(pjmedia_h264_packetizer_create, status);
 
         *_pPktz = (MediaPacketier *)pPktz;
-        (*_pPktz)->pOperation->packetize = h264_packetize;
-        (*_pPktz)->pOperation->unpacketize = h264_unpacketize;
+        (*_pPktz)->pOperation.packetize = h264_packetize;
+        (*_pPktz)->pOperation.unpacketize = h264_unpacketize;
 
         return PJ_SUCCESS;
 }
@@ -315,8 +315,8 @@ static pj_status_t createPcmuPacketizer(IN pj_pool_t *_pPktzPool, OUT MediaPacke
 
         *_pPktz = (MediaPacketier *)pPktz;
 
-        (*_pPktz)->pOperation->packetize = pcmu_packetize;
-        (*_pPktz)->pOperation->unpacketize = pcmu_unpacketize;
+        (*_pPktz)->pOperation.packetize = pcmu_packetize;
+        (*_pPktz)->pOperation.unpacketize = pcmu_unpacketize;
 
         return PJ_SUCCESS;
 }
@@ -337,15 +337,15 @@ pj_status_t CreatePacketizer(IN char *_pName, IN int _nNameLen, IN pj_pool_t *_p
 
         pj_str_t pktzName = {lowerCase, _nNameLen};
 
-        if (pj_memcmp(&pktzName, &pcmuPktzName, pcmuPktzName.slen) == 0) {
+        if (pj_strcmp(&pktzName, &pcmuPktzName) == 0) {
                 return createPcmuPacketizer(_pPktzPool, _pPktz);
-        } else if (pj_memcmp(&pktzName, &pcmaPktzName, pcmaPktzName.slen) == 0) {
+        } else if (pj_strcmp(&pktzName, &pcmaPktzName) == 0) {
                 
-        } else if (pj_memcmp(&pktzName, &aacPktzName, aacPktzName.slen) == 0) {
+        } else if (pj_strcmp(&pktzName, &aacPktzName) == 0) {
                 
-        } else if (pj_memcmp(&pktzName, &h264PktzName, h264PktzName.slen) == 0) {
+        } else if (pj_strcmp(&pktzName, &h264PktzName) == 0) {
                 return createH264Packetizer(_pPktzPool, _pPktz);
-        } else if (pj_memcmp(&pktzName, &h265PktzName, h265PktzName.slen) == 0) {
+        } else if (pj_strcmp(&pktzName, &h265PktzName) == 0) {
                 
         }
 
@@ -355,11 +355,11 @@ pj_status_t CreatePacketizer(IN char *_pName, IN int _nNameLen, IN pj_pool_t *_p
 pj_status_t MediaPacketize(IN MediaPacketier *_pPktz,IN pj_uint8_t *_pBitstream, IN pj_size_t _nBitstreamLen,
                            IN unsigned *_pBitstreamPos, OUT const pj_uint8_t **_pPayload, OUT pj_size_t *_nPlyloadLen)
 {
-        return _pPktz->pOperation->packetize(_pPktz, _pBitstream, _nBitstreamLen, _pBitstreamPos, _pPayload, _nPlyloadLen);
+        return _pPktz->pOperation.packetize(_pPktz, _pBitstream, _nBitstreamLen, _pBitstreamPos, _pPayload, _nPlyloadLen);
 }
 
 pj_status_t MediaUnPacketize(IN OUT MediaPacketier *_pPKtz, IN const pj_uint8_t *_pPayload, IN pj_size_t _nPlyloadLen,
                              OUT pj_uint8_t **_pBitstream, OUT unsigned *_pBitstreamPos, IN int _nRtpMarker)
 {
-        return _pPKtz->pOperation->unpacketize(_pPKtz, _pPayload, _nPlyloadLen, _pBitstream, _pBitstreamPos, _nRtpMarker);
+        return _pPKtz->pOperation.unpacketize(_pPKtz, _pPayload, _nPlyloadLen, _pBitstream, _pBitstreamPos, _nRtpMarker);
 }

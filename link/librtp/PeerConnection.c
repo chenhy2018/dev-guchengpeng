@@ -620,13 +620,21 @@ static void on_rx_rtp(void *pUserData, void *pPkt, pj_ssize_t size)
         
         /* Update RTP session */
         pjmedia_rtp_session_update(&pMediaTrack->rtpSession, pRtpHeader, NULL);
-        
+
         //deal with payload
+        pj_uint8_t *pBitstream = NULL;
+        unsigned nBitstreamPos = 0;
+        status = MediaUnPacketize(pMediaTrack->pMediaPacketier, pPayload, nPayloadLen, &pBitstream, &nBitstreamPos, pRtpHeader->m);
+        if (nBitstreamPos == 0) {
+                PJ_LOG(3, (__FILE__, "MediaUnPacketize:%d", status));
+                return;
+        }
+
         RtpPacket rtpPacket;
         pj_bzero(&rtpPacket, sizeof(rtpPacket));
         rtpPacket.type = pMediaTrack->type;
-        rtpPacket.pData = (uint8_t *)pPayload;
-        rtpPacket.nDataLen = nPayloadLen;
+        rtpPacket.pData = pBitstream;
+        rtpPacket.nDataLen = nBitstreamPos;
         rtpPacket.nTimestamp = pRtpHeader->ts;
         int nIdx = pMediaTrack->mediaConfig.nUseIndex;
         AvParam * pAvParam = &pMediaTrack->mediaConfig.configs[nIdx];
@@ -755,11 +763,20 @@ static int checkAndNeg(IN OUT PeerConnection * _pPeerConnection)
                 int nIdx = pVideoTrack->mediaConfig.nUseIndex;
                 if (pVideoTrack->mediaConfig.configs[nIdx].format == MEDIA_FORMAT_H264){
 
-                        pjmedia_h264_packetizer_cfg cfg;
-                        cfg.mode = PJMEDIA_H264_PACKETIZER_MODE_NON_INTERLEAVED;
-                        cfg.mtu = PJMEDIA_MAX_MTU;
                         pVideoTrack->pPacketizerPool = pj_pool_create(_pPeerConnection->pPoolFactory, NULL, 200*1024, 200*1024, NULL);
                         status = CreatePacketizer("h264", 4, pVideoTrack->pPacketizerPool, &pVideoTrack->pMediaPacketier);
+                        STATUS_CHECK(createPacketizer, status);
+                }
+        }
+        
+        MediaStreamTrack *pAudioTrack = GetAudioTrack(&_pPeerConnection->mediaStream);
+        if (pAudioTrack) {
+                int nIdx = pAudioTrack->mediaConfig.nUseIndex;
+                if (pAudioTrack->mediaConfig.configs[nIdx].format == MEDIA_FORMAT_PCMU ||
+                    pAudioTrack->mediaConfig.configs[nIdx].format == MEDIA_FORMAT_PCMA){
+
+                        pAudioTrack->pPacketizerPool = pj_pool_create(_pPeerConnection->pPoolFactory, NULL, 512, 512, NULL);
+                        status = CreatePacketizer("pcmu", 4, pAudioTrack->pPacketizerPool, &pAudioTrack->pMediaPacketier);
                         STATUS_CHECK(createPacketizer, status);
                 }
         }

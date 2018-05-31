@@ -82,7 +82,7 @@ typedef struct _PacketierOperation {
 }PacketierOperation;
 
 typedef struct _MediaPacketier {
-        PacketierOperation *pOperation;
+        PacketierOperation pOperation;
 }MediaPacketier;
 
 typedef struct _PcmuPacketizer {
