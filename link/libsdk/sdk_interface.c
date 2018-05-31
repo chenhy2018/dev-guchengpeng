@@ -1,4 +1,4 @@
-// Last Update:2018-05-27 17:18:36
+// Last Update:2018-05-31 18:15:34
 /**
  * @file sdk_interface.c
  * @brief 
@@ -12,134 +12,107 @@
 #include "dbg.h"
 #include "queue.h"
 #include "sdk_interface.h"
+#include "mqtt.h"
+#include "sdk_local.h"
 
-#define MESSAGE_QUEUE_MAX 256
+UA UaList;
 
-typedef struct {
-    MessageQueue *pQueue;
-    int fd;
-} UA;
-
-UA UaInstance;
-UA *pUA = &UaInstance;
-
-SipAnswerCode cbOnIncomingCall(int _nAccountId, int _nCallId, const char *_pFrom)
-{
-    Message message, *pMessage = &message;
-    event_s *pEvent = (event_s *) malloc( sizeof(event_s) );
-
-    DBG_LOG("incoming call From %s to %d\n", _pFrom, _nAccountId);
-
-    memset( &message, 0, sizeof(Message) );
-    memset( pEvent, 0, sizeof(event_s) );
-    pMessage->nMessageID = EVENT_TYPE_INCOMING_CALL;
-    if ( pEvent ) {
-        pEvent->nAccountId = _nAccountId;
-        pEvent->nCallId = _nCallId;
-        if ( _pFrom )
-            memcpy( pEvent->body.From, _pFrom, strlen(_pFrom) );
-        
-        pMessage->pMessage = pEvent;
-    }
-    if ( pMessage )
-        SendMessage( pUA->pQueue, pMessage );
-	return OK;
-}
-
-void cbOnRegStatusChange(int _nAccountId, SipAnswerCode _StatusCode)
-{
-    DBG_LOG("reg status = %d\n", _StatusCode);
-}
-
-void cbOnCallStateChange(int _nCallId, SipInviteState _State, SipAnswerCode _StatusCode)
-{
-    Message message, *pMessage = &message;
-    event_s *pEvent = (event_s *) malloc( sizeof(event_s) );
-
-    DBG_LOG("state = %d, status code = %d\n", _State, _StatusCode);
-
-    memset( &message, 0, sizeof(Message) );
-    memset( pEvent, 0, sizeof(event_s) );
-    if ( _State == INV_STATE_CONFIRMED ) {
-        pMessage->nMessageID = EVENT_TYPE_SESSION_ESTABLISHED;
-        if ( pEvent ) {
-            pEvent->nCallId = _nCallId;
-        }
-    } else if ( _State == INV_STATE_DISCONNECTED ) {
-        pMessage->nMessageID = EVENT_TYPE_SESSION_ESTABLISHED;
-        if ( pEvent ) {
-            pEvent->nCallId = _nCallId;
-        }
-    } else {
-    }
-    if ( pEvent )
-        pMessage->pMessage  = (void *)pEvent;
-
-    if ( pMessage )
-        SendMessage( pUA->pQueue, pMessage );
-}
-
-int CreateUA()
+ErrorID LibraryInit()
 {
     SipCallBack cb;
 
-    memset( pUA, 0, sizeof(UA) );
-
-    if ( !pUA->pQueue ) {
-        pUA->pQueue = CreateMessageQueue( MESSAGE_QUEUE_MAX );
-        if ( !pUA->pQueue ) {
-            DBG_ERROR("queue malloc fail\n");
-            return -1;
-        }
-    }
-    pUA->fd++;
+    memset( &UaHead, 0, sizeof(UA) );
 
     cb.OnIncomingCall  = &cbOnIncomingCall;
     cb.OnCallStateChange = &cbOnCallStateChange;
     cb.OnRegStatusChange = &cbOnRegStatusChange;
     SipCreateInstance(&cb);
 
-    return pUA->fd;
+    return RET_OK;
 }
 
-int DestroyUA()
+ErrorID Register( IN char* id, IN char* host, IN char* password, int _bDeReg, OUT int *_nAccountId )
 {
-    if ( pUA->pQueue ) {
-        DestroyMessageQueue( &pUA->pQueue );
+    int nAccountId = 0;
+    UA *pUA = ( UA *) malloc ( sizeof(UA) );
+
+    if ( !pUA ) {
+        DBG_ERROR("malloc error\n");
+        return RET_MEM_ERROR;
+    }
+    memset( pUA, 0, sizeof(UA) );
+    pUA->pQueue = CreateMessageQueue( MESSAGE_QUEUE_MAX );
+    if ( !pUA->pQueue ) {
+        DBG_ERROR("queue malloc fail\n");
+        return RET_MEM_ERROR;
+    }
+    list_add( &(pUA->list), &(UaList.list) );
+    nAccountId = SipAddNewAccount( id, password, host );
+    SipRegAccount( nAccountId, _bDeReg );
+    *_nAccountId = nAccountId;
+
+    return RET_OK;
+}
+
+ErrorID UnRegister( AccountId _nAccountId )
+{
+    struct list_head *pos, q;
+    UA *tmp;
+
+    list_for_each_safe(pos, q, &UaList.list){
+        tmp = list_entry(pos, UA, list);
+        if ( tmp->id == _nAccountId ) {
+            list_del(pos);
+            free(tmp);
+            return RET_OK;
+        }
     }
 
-    return 0;
+    return RET_ACCOUNT_NOT_EXIST;
 }
 
-int Register( const char* id, const char* host, const char* password, const int _bDeReg)
+ErrorID MakeCall( int _nAccountId, IN char* _pDestUri, OUT int *_pCallId )
 {
-    int nid = 0;
+    int nCallId = 0;
 
-    nid = SipAddNewAccount( id, password, host );
-    SipRegAccount( nid, _bDeReg );
-
-    return nid;
-}
-
-int MakeCall( int fd, int _nNid, const char* _pDestUri, const stream_s * _pStream )
-{
-    int CallId = 0;
-
-    if ( !_pDestUri || !_pStream )
-        return;
+    if ( !_pDestUri || !_pCallId )
+        return RET_PARAM_ERROR;
 
     // libsip need to tell CallId when cb function been called
-    CallId = SipMakeNewCall( _nNid, _pDestUri );
+    *_pCallId = SipMakeNewCall( _nAccountId, _pDestUri );
 
-    return CallId;
+    return RET_OK;
 }
 
-int PollEvents(  int* eventID, void* event, int nTimeOut)
+ErrorID PollEvents( AccountID id, OUT int* eventID, OUT EventData** data int nTimeOut )
 {
     Message *pMessage = NULL;
+    static Message *pLastMessage = NULL;
+    struct list_head *pos, q;
+    UA *tmp = NULL;
 
     if (!eventID || !event ) {
-        return RET_FAIL;
+        return RET_PARAM_ERROR;
+    }
+
+    list_for_each_safe(pos, q, &UaList.list){
+        tmp = list_entry(pos, UA, list);
+        if ( tmp->id == _nAccountId ) {
+            break;
+        }
+    }
+
+    if ( !tmp ) {
+        DBG_ERROR("account id not exist, id = %d\n", id );
+        return RET_ACCOUNT_NOT_EXIST;
+    }
+
+    // pLastMessage use to free last message
+    if ( tmp->pLastMessage ) {
+        if ( tmp->pLastMessage->stream.packet ) {
+            free( tmp->pLastMessage->stream.packet );
+        }
+        free( tmp->pLastMessage );
     }
 
     if ( nTimeOut ) {
@@ -149,40 +122,70 @@ int PollEvents(  int* eventID, void* event, int nTimeOut)
     }
 
     if ( !pMessage ) {
-        return RET_FAIL;
+        return RET_RETRY;
     }
 
     *eventID = pMessage->nMessageID;
     if ( pMessage->pMessage ) {
-        memcpy( event, pMessage->pMessage, sizeof(event_s) );
-        free( pMessage->pMessage );
+        *data = (EventData *)pMessage->pMessage;
+        // save the pointer of current message
+        // so next time we received message
+        // we can free the last one
+        tmp->pLastMessage = pMessage;
     }
 
-    return RET_SUCCESS;
+    return RET_OK;
 }
 
-int AnswerCall( int fd, int _nCallIndex )
+ErrorID AnswerCall( AccountId id, int _nCallId )
+{
+    (void)id;
+
+    SipAnswerCall( _nCallId, OK );
+
+    return RET_OK;
+}
+
+ErrorID RejectCall( AccountId id, int _nCallId )
+{
+    (void)id;
+
+    SipAnswerCall( _nCallIndex, BUSY_HERE );
+
+    return RET_OK;
+}
+
+ErrorID HangupCall( AccountId id, int _nCallId )
+{
+    (void)id;
+
+    SipHangUp( _nCallId );
+
+    return RET_OK;
+}
+
+ErrorID SendPacket( AccountId id , int nCallId, int streamIndex, IN char* buffer, int size)
 {
 }
 
-int Reject( int fd, int _nCallIndex)
+ErrorID AddCodec( AccountID _id, Codec _codecs[], int _size, int _nSamplerate, int _channels);
 {
-}
+    UA *pUA = NULL;
 
-int HangupCall( int fd, int _nCallId )
-{
-    SipHangUp(_nCallId );
-
-    return RET_SUCCESS;
+    list_for_each_entry( pUA, &UaList.list, list ){
+        if ( pUA->id == _id ) {
+            memcpy( pUA->streamInfo.codecs, _codecs, _size );
+            pUA->streamInfo.samplerate = _nSamplerate;
+            pUA->channels = _channels;
+            return RET_OK;
+        }
+    }
+    
+    DBG_ERROR("account not found, id = %d\n", _id );
+    return RET_ACCOUNT_NOT_EXIST;
 }
 
 int Report( int fd, const char* message, size_t length)
 {
 }
-
-int SendPacket( int fd , int callIndex, int streamIndex, const char* buffer, size_t size)
-{
-}
-
-
 

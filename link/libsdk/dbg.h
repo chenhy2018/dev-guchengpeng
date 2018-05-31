@@ -1,8 +1,8 @@
-// Last Update:2018-05-27 17:11:54
+// Last Update:2018-05-31 15:49:35
 /**
  * @file dbg.h
  * @brief 
- * @author liyq
+ * @author 
  * @version 0.1.00
  * @date 2018-05-27
  */
@@ -22,6 +22,14 @@
 #define DBG_LOG(args...) 
 #define DBG_LINE(args...) 
 #define DBG_ERROR(args...) 
+#endif
+
+#if SDK_DBG
+void DumpUAList();
+void DbgBacktrace();
+#else
+#define DumpUAList()
+#define DbgBacktrace()
 #endif
 
 #endif  /*DBG_H*/
