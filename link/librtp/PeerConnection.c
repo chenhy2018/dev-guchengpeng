@@ -871,7 +871,7 @@ static void dealWithTimestamp(IN OUT MediaStreamTrack *_pMediaTrack, IN pj_times
 }
 
 static pj_status_t sendPacket(IN OUT MediaStreamTrack *_pMediaTrack, IN TransportIce * _pTransportIce,
-                              IN int _nRtpType, IN int _nRtpTsLen, IN const void *_pData, IN int _nDataLen)
+                              IN int _nRtpType, IN int _nMarker, IN int _nRtpTsLen, IN const void *_pData, IN int _nDataLen)
 {
         //start to send rtp
         pj_status_t status;
@@ -882,7 +882,7 @@ static pj_status_t sendPacket(IN OUT MediaStreamTrack *_pMediaTrack, IN Transpor
         
         /* Format RTP header */
         status = pjmedia_rtp_encode_rtp( &_pMediaTrack->rtpSession, _nRtpType,
-                                        0, /* marker bit */
+                                        _nMarker,
                                         _nDataLen,
                                         _nRtpTsLen,
                                         &pVoidHeader, &nHeaderLen);
@@ -947,7 +947,7 @@ static int SendAudioPacket(IN PeerConnection *_pPeerConnection, IN RtpPacket * _
         dealWithTimestamp(pMediaTrack, now, nSampleRate, _pPacket, &nRtpTsLen);
 
         pj_status_t status;
-        status =  sendPacket(pMediaTrack, pTransportIce, nRtpType, nRtpTsLen, _pPacket->pData, _pPacket->nDataLen);
+        status =  sendPacket(pMediaTrack, pTransportIce, nRtpType, 0, nRtpTsLen, _pPacket->pData, _pPacket->nDataLen);
         STATUS_CHECK(pjmedia_rtp_encode_rtp, status);
 
         return 0;
@@ -1017,7 +1017,7 @@ static int SendVideoPacket(IN PeerConnection *_pPeerConnection, IN OUT RtpPacket
                 if(nOffset != nBitsPos)
                         nTsLlen = 0;
 
-                status =  sendPacket(pMediaTrack, pTransportIce, nRtpType, nTsLlen, pPayload, nPayloadLen);
+                status =  sendPacket(pMediaTrack, pTransportIce, nRtpType, marker, nTsLlen, pPayload, nPayloadLen);
                 STATUS_CHECK(pjmedia_rtp_encode_rtp, status);
         }
         
