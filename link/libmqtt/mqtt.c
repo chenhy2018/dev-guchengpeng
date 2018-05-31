@@ -1,24 +1,5 @@
 #include "mqtt.h"
-#include <mosquitto.h>
-#include <stdio.h>
-#include <pthread.h>
-#include <stdlib.h>
-#include <errno.h>
-#include <string.h>
-#include <unistd.h>
-
-#define STATUS_IDLE 0
-#define STATUS_CONNECTING 1
-#define STATUS_CONNACK_RECVD 2
-#define STATUS_WAITING 3
-#define STATUS_CONNECT_ERROR 4
-#define MAX_MQTT_TOPIC_SIZE 128
-
-typedef struct Node
-{
-        char topic[MAX_MQTT_TOPIC_SIZE];
-        struct Node *pNext;
-}Node;
+#include "mqtt_internal.h"
 
 static int MqttErrorStatusChange(int nStatus)
 {
@@ -120,16 +101,6 @@ static void ClearNode(Node* PHead)
         }
 }
 
-struct MqttInstance
-{
-        struct mosquitto *mosq;
-        struct MqttOptions options;
-        int status;
-        bool connected;
-        bool isDestroying;
-        Node pSubsribeList;
-};
-
 void OnEventCallback(struct MqttInstance* _pInstance, int rc, const char* _pStr)
 {
         if (_pInstance->options.callbacks.OnEvent != NULL) {
@@ -162,11 +133,13 @@ void OnConnectCallback(struct mosquitto* _pMosq, void* _pObj, int result)
         }
         else {
                 pInstance->status = STATUS_CONNACK_RECVD;
+                pthread_mutex_lock(&pInstance->listMutex);
                 Node* p = pInstance->pSubsribeList.pNext;
                 while (p) {
                         mosquitto_subscribe(pInstance->mosq, NULL, p->topic, pInstance->options.nQos);
                         p = p->pNext;
                 }
+                pthread_mutex_unlock(&pInstance->listMutex);
         }
         OnEventCallback(pInstance,
                         (result == 0) ? MQTT_CONNECT_SUCCESS : MqttErrorStatusChange(result),
@@ -227,6 +200,7 @@ static void MqttInstanceInit(struct MqttInstance* _pInstance, const struct MqttO
         _pInstance->status = STATUS_IDLE;
         _pInstance->isDestroying = false;
         _pInstance->pSubsribeList.pNext = NULL;
+        pthread_mutex_init(&_pInstance->listMutex, NULL);
 }
 
 bool ClientOptSet(struct MqttInstance* _pInstance, struct mosquitto* _pMosq, struct MqttUserInfo info)
@@ -329,6 +303,7 @@ void * Mqttthread(void* _pData)
         SafeFree(pInstance->options.secondaryUserInfo.pCafile);
         SafeFree(pInstance->options.secondaryUserInfo.pCertfile);
         SafeFree(pInstance->options.secondaryUserInfo.pKeyfile);
+        pthread_mutex_destroy(&pInstance->listMutex);
         if (pInstance) free(pInstance);
         if (rc) {
                 fprintf(stderr, "Error: %s\n", mosquitto_strerror(rc));
@@ -393,7 +368,9 @@ int MqttSubscribe(IN const void* _pInstance, IN char* _pTopic)
         int rc = mosquitto_subscribe(pInstance->mosq, NULL, _pTopic, pInstance->options.nQos);
         fprintf(stderr, "mos sub %d", rc);
         if (!rc) {
+                pthread_mutex_lock(&pInstance->listMutex);
                 InsertNode(&pInstance->pSubsribeList, _pTopic);
+                pthread_mutex_unlock(&pInstance->listMutex);
         }
         else {
                switch (rc) {
@@ -417,13 +394,15 @@ int MqttSubscribe(IN const void* _pInstance, IN char* _pTopic)
         return MqttErrorStatusChange(rc);
 }
 
-int MqttUnsubscribe(IN const void* _pInstance, IN char* _pSub)
+int MqttUnsubscribe(IN const void* _pInstance, IN char* _pTopic)
 {
         struct MqttInstance* pInstance = (struct MqttInstance*)(_pInstance);
-        int rc = mosquitto_unsubscribe(pInstance->mosq, NULL, _pSub);
+        int rc = mosquitto_unsubscribe(pInstance->mosq, NULL, _pTopic);
         fprintf(stderr, "mos sub %d", rc);
         if (!rc) {
-               DeleteNode(&pInstance->pSubsribeList, _pSub);
+               pthread_mutex_lock(&pInstance->listMutex);
+               DeleteNode(&pInstance->pSubsribeList, _pTopic);
+               pthread_mutex_unlock(&pInstance->listMutex);
         }
         else {
                switch (rc) {

@@ -75,9 +75,9 @@ extern int MqttLibInit();
 extern int MqttLibCleanup();
 
 /* step 2 : create mosquitto instance */
-extern void* MqttCreateInstance(IN const struct MqttOptions* pOption);
+extern void* MqttCreateInstance(IN const struct MqttOptions* _pOption);
 
-extern void MqttDestroy(IN const void* pInstance);
+extern void MqttDestroy(IN const void* _pInstance);
 
 /* step 3 : mosquitto pub/sub */
 
@@ -85,6 +85,6 @@ extern int MqttPublish(IN const void* _pInstance, IN char* _pTopic, IN int _nPay
 
 extern int MqttSubscribe(IN const void* _pInstance, IN char* _pTopic);
 
-extern int MqttUnsubscribe(IN const void* _pInstance, IN char* pSub);
+extern int MqttUnsubscribe(IN const void* _pInstance, IN char* _pTopic);
 
 #endif
