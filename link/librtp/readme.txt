@@ -27,12 +27,26 @@ TODO 已解决
     pjmedia_sdp_neg 可以获取这个消息。目前能获取了
     但是没有通知调用者, 如何通知: 回调函数，PeerConnection加了一个IceNegInfo的成员，这个成员的附值在checkAndNeg里面
     可能的问题：作为answerer，active_remote 得到的sdp似乎不正确, active_local 和预期一致
+6. 发送数据的接受到数据和rtcp的回调函数, 已完成
+    pcmu能正常接收数据了
 
 TODO 未解决
-6. 发送数据的接受到数据和rtcp的回调函数，参考siprtp. pcmu完成，h264待做
-   添加上了，还没有测试，并且还需要缓冲并拼接成一个完整的帧
-   目前pcmu传输和接收没有问题
-7. 时间戳维护, rtp时间戳溢出问题？
+7. 发送h264的时候rtp marker字段设置，packetizer并不会设置这个字段 
+     ffmpeg推流，wireshark抓包分析，发现marker位不能单独判断帧的起始， 并且奇怪的时候stap有时候设置marker有时候不设置
+	 如果是stap-a类型，就是完整的一帧， 如果是fu-a类型，就要结合fu header和marker位来判断了
+     所以在发送的时候也这样设置
+8. 接收数据的回调函数分别处理音频和视频
+     1) 音视频分别处理
+     2) 根据samplerate或者clockrate还原时间戳
+     目前pcmu传输和接收没有问题, 时间戳未还原
+     初步的想法， 维护一个 解包的结构，包含时间戳等信息
+  h264_packetizer是可以同时pack和unpack的，但是h264来看，packetizer不会维护完整一帧的数据
+
+9. rtp丢包了怎么办。可能是通过rtp的序列号来判断是否丢包
+
+
+10. 音频的rtp marker位是否需要设置?
+11.  时间戳维护, rtp时间戳溢出问题？
 
 
 
