@@ -63,16 +63,16 @@ typedef struct _MediaConfig{
         int nUseIndex;
 }MediaConfig;
 
-struct MediaPacketier;
+typedef struct _MediaPacketier MediaPacketier;
 typedef struct _PacketierOperation {
-        pj_status_t (*packetize)(IN OUT struct MediaPacketier *pKtz,
+        pj_status_t (*packetize)(IN OUT MediaPacketier *pKtz,
                                  IN pj_uint8_t *pBitstream,
                                  IN pj_size_t nBitstreamLen,
                                  IN unsigned *pBitstreamPos,
                                  OUT const pj_uint8_t **pPayload,
                                  OUT pj_size_t *nPlyloadLen);
 
-        pj_status_t (*unpacketize)(IN OUT struct MediaPacketier *pKtz,
+        pj_status_t (*unpacketize)(IN OUT MediaPacketier *pKtz,
                                    IN const pj_uint8_t *pPayload,
                                    IN pj_size_t   nPlyloadLen,
                                    OUT pj_uint8_t **pBitstream,
@@ -112,8 +112,7 @@ typedef struct _MediaStreamTrack
         pjmedia_rtp_session  rtpSession;
         pjmedia_rtcp_session rtcpSession;
         MediaPacketier *pMediaPacketier;
-        pj_pool_t *pH264PacketizerPool;
-        pjmedia_h264_packetizer *pH264Packetizer;
+        pj_pool_t *pPacketizerPool;
         void *pPeerConnection;
 }MediaStreamTrack;
 
@@ -135,4 +134,10 @@ int SetActiveCodec( IN OUT MediaStream *pMediaStream, IN const pjmedia_sdp_sessi
 MediaStreamTrack * GetAudioTrack(IN MediaStream * pMediaStream);
 MediaStreamTrack * GetVideoTrack(IN MediaStream * pMediaStream);
 int GetMediaTrackIndex(IN MediaStream * pMediaStream, IN MediaStreamTrack *pMediaStreamTrack);
+
+pj_status_t createPacketizer(IN char *pName, IN int nNameLen, IN pj_pool_t *pPktzPool, OUT MediaPacketier **pPktz);
+pj_status_t MediaPacketize(IN MediaPacketier *pPktz,IN pj_uint8_t *pBitstream, IN pj_size_t nBitstreamLen,
+                           IN unsigned *pBitstreamPos, OUT const pj_uint8_t **pPayload, OUT pj_size_t *nPlyloadLen);
+pj_status_t MediaUnPacketize(IN OUT MediaPacketier *pKtz, IN const pj_uint8_t *pPayload, IN pj_size_t nPlyloadLen,
+                           OUT pj_uint8_t **pBitstream, OUT unsigned *pBitstreamPos, IN int nRtpMarker);
 #endif

@@ -398,10 +398,10 @@ void ReleasePeerConnectoin(IN OUT PeerConnection * _pPeerConnection)
         }
         
         for ( int i = 0 ; i < _pPeerConnection->mediaStream.nCount; i++) {
-                pj_pool_t *pTmp = _pPeerConnection->mediaStream.streamTracks[i].pH264PacketizerPool;
+                pj_pool_t *pTmp = _pPeerConnection->mediaStream.streamTracks[i].pPacketizerPool;
                 if (pTmp) {
                         pj_pool_release(pTmp);
-                        _pPeerConnection->mediaStream.streamTracks[i].pH264PacketizerPool = NULL;
+                        _pPeerConnection->mediaStream.streamTracks[i].pPacketizerPool = NULL;
                 }
         }
 }
@@ -754,13 +754,13 @@ static int checkAndNeg(IN OUT PeerConnection * _pPeerConnection)
         if (pVideoTrack) {
                 int nIdx = pVideoTrack->mediaConfig.nUseIndex;
                 if (pVideoTrack->mediaConfig.configs[nIdx].format == MEDIA_FORMAT_H264){
+
                         pjmedia_h264_packetizer_cfg cfg;
                         cfg.mode = PJMEDIA_H264_PACKETIZER_MODE_NON_INTERLEAVED;
                         cfg.mtu = PJMEDIA_MAX_MTU;
-                        pVideoTrack->pH264PacketizerPool = pj_pool_create(_pPeerConnection->pPoolFactory, NULL, 2048, 2048, NULL);
-                        status = pjmedia_h264_packetizer_create(pVideoTrack->pH264PacketizerPool,
-                                                                NULL, &pVideoTrack->pH264Packetizer);
-                        STATUS_CHECK(pjmedia_sdp_neg_get_active_remote, status);
+                        pVideoTrack->pPacketizerPool = pj_pool_create(_pPeerConnection->pPoolFactory, NULL, 200*1024, 200*1024, NULL);
+                        status = createPacketizer("h264", 4, pVideoTrack->pPacketizerPool, &pVideoTrack->pMediaPacketier);
+                        STATUS_CHECK(createPacketizer, status);
                 }
         }
         
@@ -994,7 +994,7 @@ static int SendVideoPacket(IN PeerConnection *_pPeerConnection, IN OUT RtpPacket
                 nBitsPos = 0;
 
                 pj_status_t status;
-                status = pjmedia_h264_packetize(pMediaTrack->pH264Packetizer,
+                status = MediaPacketize(pMediaTrack->pMediaPacketier,
                                                 (pj_uint8_t *)_pPacket->pData + nOffset,
                                                 nLeft,
                                                 &nBitsPos,
