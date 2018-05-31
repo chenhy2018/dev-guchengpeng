@@ -844,10 +844,75 @@ static inline uint32_t calcRtpTimestampLen(uint64_t _nPktTimestampGap, int nRate
         return _nPktTimestampGap * nRate / rate;
 }
 
+static void dealWithTimestamp(IN OUT MediaStreamTrack *_pMediaTrack, IN pj_timestamp _now,
+                              IN int _nRate, IN RtpPacket * _pPacket, IN uint32_t *pRtpTsLen)
+{
+        uint64_t nPktTimestampGap = getTimestampGapFromLastPacket(_pMediaTrack, _pPacket->nTimestamp);
+        
+        *pRtpTsLen = calcRtpTimestampLen(nPktTimestampGap, _nRate);
+        
+        uint32_t nElapse = getMediaTrackElapseTime(_pMediaTrack, _pPacket->nTimestamp);
+        pj_timestamp exptectNow;
+        _now.u64 = _now.u64 + nElapse * _pMediaTrack->hzPerSecond.u64 / 1000;
+        exptectNow = _now;
+        
+        pj_uint64_t nLate = 0;
+        if (exptectNow.u64 > _now.u64) {
+                nLate = ((exptectNow.u64 - _now.u64) * 1000) / _pMediaTrack->hzPerSecond.u64;
+                if ( nLate > 1) {
+                        PJ_LOG(4,(__FILE__, "audio data late:%lld-%lld=%lld",exptectNow.u64, _now.u64, nLate));
+                }
+        } else {
+                nLate = ((_now.u64 - exptectNow.u64) * 1000) / _pMediaTrack->hzPerSecond.u64;
+                if ( nLate > 1) {
+                        PJ_LOG(4,(__FILE__, "audio data early:%lld-%lld=%lld",_now.u64, exptectNow.u64, nLate));
+                }
+        }
+}
+
+static pj_status_t sendPacket(IN OUT MediaStreamTrack *_pMediaTrack, IN TransportIce * _pTransportIce,
+                              IN int _nRtpType, IN int _nRtpTsLen, IN void *_pData, IN int _nDataLen)
+{
+        //start to send rtp
+        pj_status_t status;
+        const void *pVoidHeader;
+        const pjmedia_rtp_hdr *pRtpHeader;
+        pj_ssize_t size;
+        int nHeaderLen;
+        
+        /* Format RTP header */
+        status = pjmedia_rtp_encode_rtp( &_pMediaTrack->rtpSession, _nRtpType,
+                                        0, /* marker bit */
+                                        _nDataLen,
+                                        _nRtpTsLen,
+                                        &pVoidHeader, &nHeaderLen);
+        STATUS_CHECK(pjmedia_rtp_encode_rtp, status);
+        
+        
+        //PJ_LOG(4,(THIS_FILE, "\t\tTx seq=%d", pj_ntohs(hdr->seq)));
+        pRtpHeader = (const pjmedia_rtp_hdr*) pVoidHeader;
+        
+        char packet[1500];
+        /* Copy RTP header to packet */
+        pj_memcpy(packet, pRtpHeader, nHeaderLen);
+        
+        /* Zero the payload */
+        pj_memcpy(packet+nHeaderLen, _pData, _nDataLen);
+        
+        /* Send RTP packet */
+        size = nHeaderLen + _nDataLen;
+        status = pjmedia_transport_send_rtp(_pTransportIce->pTransport,
+                                            packet, size);
+        STATUS_CHECK(pjmedia_transport_send_rtp, status);
+        
+        /* Update RTCP SR */
+        pjmedia_rtcp_tx_rtp( &_pMediaTrack->rtcpSession, _nDataLen);
+        
+        return PJ_SUCCESS;
+}
+
 static int SendAudioPacket(IN PeerConnection *_pPeerConnection, IN RtpPacket * _pPacket)
 {
-        char packet[1500];
-        
         MediaStreamTrack * pMediaTrack = GetAudioTrack(&_pPeerConnection->mediaStream);
         if (pMediaTrack == NULL) {
                 PJ_LOG(3, (__FILE__, "no audio track in stream"));
@@ -867,10 +932,10 @@ static int SendAudioPacket(IN PeerConnection *_pPeerConnection, IN RtpPacket * _
         //int nChannel = pAudioConfig->configs[nIdx].nChannel;
         //int nBitDepth = pAudioConfig->configs[nIdx].nBitDepth;
         //unsigned nMsecInterval = _pPacket->nDataLen * 1000 /nChannel / (nBitDepth / 8) / nSampleRate;
-        
+
         pj_timestamp now;
         pj_get_timestamp(&now);
-
+        
         if (pMediaTrack->nSysTimeBase.u64 == 0) {
                 pMediaTrack->nSysTimeBase = now;
                 pMediaTrack->nFirstPktTimestamp = _pPacket->nTimestamp;
@@ -878,66 +943,13 @@ static int SendAudioPacket(IN PeerConnection *_pPeerConnection, IN RtpPacket * _
 
         checkAndSendRtcp(pMediaTrack, pTransportIce, now);
 
-        uint64_t nPktTimestampGap = getTimestampGapFromLastPacket(pMediaTrack, _pPacket->nTimestamp);
+        uint32_t nRtpTsLen = 0;
+        dealWithTimestamp(pMediaTrack, now, nSampleRate, _pPacket, &nRtpTsLen);
 
-        uint32_t nRtpTsLen = calcRtpTimestampLen(nPktTimestampGap, nSampleRate);
-
-        uint32_t nElapse = getMediaTrackElapseTime(pMediaTrack, _pPacket->nTimestamp);
-        pj_timestamp exptectNow;
-        now.u64 = now.u64 + nElapse * pMediaTrack->hzPerSecond.u64 / 1000;
-        exptectNow = now;
-
-        pj_uint64_t nLate = 0;
-        if (exptectNow.u64 > now.u64) {
-                nLate = ((exptectNow.u64 - now.u64) * 1000) / pMediaTrack->hzPerSecond.u64;
-                if ( nLate > 1) {
-                        PJ_LOG(4,(__FILE__, "audio data late:%lld-%lld=%lld",exptectNow.u64, now.u64, nLate));
-                }
-        } else {
-                nLate = ((now.u64 - exptectNow.u64) * 1000) / pMediaTrack->hzPerSecond.u64;
-                if ( nLate > 1) {
-                        PJ_LOG(4,(__FILE__, "audio data early:%lld-%lld=%lld",now.u64, exptectNow.u64, nLate));
-                }
-        }
-
-        
-
-        //start to send rtp
         pj_status_t status;
-        const void *pVoidHeader;
-        const pjmedia_rtp_hdr *pRtpHeader;
-        pj_ssize_t size;
-        int nHeaderLen;
-        
-        /* Format RTP header */
-        status = pjmedia_rtp_encode_rtp( &pMediaTrack->rtpSession, nRtpType,
-                                        0, /* marker bit */
-                                        _pPacket->nDataLen,
-                                        nRtpTsLen,
-                                        &pVoidHeader, &nHeaderLen);
+        status =  sendPacket(pMediaTrack, pTransportIce, nRtpType, nRtpTsLen, _pPacket->pData, _pPacket->nDataLen);
         STATUS_CHECK(pjmedia_rtp_encode_rtp, status);
-        
-        
-        //PJ_LOG(4,(THIS_FILE, "\t\tTx seq=%d", pj_ntohs(hdr->seq)));
-        pRtpHeader = (const pjmedia_rtp_hdr*) pVoidHeader;
-        
-        /* Copy RTP header to packet */
-        pj_memcpy(packet, pRtpHeader, nHeaderLen);
-        
-        /* Zero the payload */
-        pj_memcpy(packet+nHeaderLen, _pPacket->pData, _pPacket->nDataLen);
-        
-        /* Send RTP packet */
-        size = nHeaderLen + _pPacket->nDataLen;
-        status = pjmedia_transport_send_rtp(pTransportIce->pTransport,
-                                            packet, size);
-        STATUS_CHECK(pjmedia_transport_send_rtp, status);
-        
-        
-        
-        /* Update RTCP SR */
-        pjmedia_rtcp_tx_rtp( &pMediaTrack->rtcpSession, _pPacket->nDataLen);
-        
+
         return 0;
 }
 
