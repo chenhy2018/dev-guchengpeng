@@ -53,6 +53,8 @@ typedef struct SipAccount {
         pjsip_transport *KaTransport;
         pj_sockaddr     KaTarget;
         unsigned     KaTargetLen;
+
+        void *pUserData;
 } SipAccount;
 
 /* Call info */
@@ -77,7 +79,7 @@ struct SipData {
         pj_str_t LocalIp;
         int LocalPort;
 
-        pjsip_endpoint*pSipEndPoint;
+        pjsip_endpoint *pSipEndPoint;
         pj_bool_t bThreadQuit;
         pj_thread_t* pSipThread[1];
 
@@ -90,9 +92,9 @@ struct SipData {
         SipCall Calls[SIP_MAX_CALLS];
 
 
-        void (*OnRegStateChange)(int nAccountId, SipAnswerCode Code);
-        void (*OnCallStateChange)(IN const int nCallId,IN const int nAccountId, IN const SipInviteState State, IN const SipAnswerCode StatusCode);
-        SipAnswerCode (*OnIncomingCall)(IN const int nAccountId, IN const int nCallId, IN const char *From);
+        void (*OnRegStateChange)(IN const int nAccountId, IN const SipAnswerCode Code, IN const void *pUser);
+        void (*OnCallStateChange)(IN const int nCallId,IN const int nAccountId, IN const SipInviteState State, IN const SipAnswerCode StatusCode, IN const void *pUser);
+        SipAnswerCode (*OnIncomingCall)(IN const int nAccountId, IN const int nCallId, IN const char *From, IN const void *pUser);
 
 };
 extern struct SipData sipData;

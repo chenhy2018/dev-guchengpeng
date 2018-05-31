@@ -1,21 +1,22 @@
 #include "sip.h"
 #include <unistd.h>
 #include <stdio.h>
+#include <stdlib.h>
 
-SipAnswerCode cbOnIncomingCall(int _nAccountId, int _nCallId, const char *_pFrom)
+SipAnswerCode cbOnIncomingCall(int _nAccountId, int _nCallId, const char *_pFrom, const void *_pUser)
 {
-        printf("------------------------------------------------------------------->incoming call From %s to %d\n", _pFrom, _nAccountId);
+        printf("----->incoming call From %s to %d--------------userdata = %d\n", _pFrom, _nAccountId, *(int*)_pUser);
 	return OK ;
 }
 
-void cbOnRegStatusChange(int _nAccountId, SipAnswerCode _StatusCode)
+void cbOnRegStatusChange(const int _nAccountId, const SipAnswerCode _StatusCode, const void *_pUser)
 {
-        printf("------------------------------------------------------------------->reg status = %d\n", _StatusCode);
+        printf("---->>reg status = %d------------------------>userdata = %d\n", _StatusCode,  *(int*)_pUser);
 }
 
-void cbOnCallStateChange(int _nCallId, int _nAccountId, SipInviteState _State, SipAnswerCode _StatusCode)
+void cbOnCallStateChange(const int _nCallId, const int _nAccountId, const SipInviteState _State, const SipAnswerCode _StatusCode, const void *_pUser)
 {
-        printf("------------------------------------------------------------------->state = %d, status code = %d\n", _State, _StatusCode);
+        printf("----->state = %d, status code = %d------------>userdata = %d\n", _State, _StatusCode,  *(int*)_pUser);
 }
 int main()
 {
@@ -26,8 +27,11 @@ int main()
 
         SipCreateInstance(&cb);
         sleep(2);
-        //int nid1 = SipAddNewAccount("1001", "1001", "192.168.56.102");
-        int nid4 = SipAddNewAccount("1004", "1004", "123.59.204.198");
+        int *user = (int *)malloc(sizeof(int));
+        *user = 12345;
+        int nid4 = SipAddNewAccount("1004", "1004", "123.59.204.198", (void*)user);
+
+
         /*
           int nid3 = SipAddNewAccount("1003", "1003", "192.168.56.102");
 
@@ -47,14 +51,13 @@ int main()
         SipRegAccount(nid9, 1);
         SipRegAccount(nid10, 1);
         */
-        SipRegAccount(nid4, 1);
+        int ret1 = SipRegAccount(nid4, 1);
 
         sleep(20);
-        //        int nCallId1 = SipMakeNewCall(nid1, "<sip:1003@192.168.56.102>");
-        //int nCallId1 = SipMakeNewCall(nid4, "<sip:1003@123.59.204.198>");
+        int nCallId1 = SipMakeNewCall(nid4, "<sip:1002@192.168.56.102>");
 
         //sleep(20);
-        //SipHangUp(nCallId1);
+        SipHangUp(nCallId1);
         //SipDestroyInstance();
         while(1) {
         }

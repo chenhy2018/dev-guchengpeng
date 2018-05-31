@@ -110,7 +110,7 @@ typedef struct SipCallBack
          * @param pFrom
          * @return answercode, refer SipAnswercode
          */
-        SipAnswerCode (*OnIncomingCall)(IN const int nAccountId, IN const int nCallId, IN const char *pFrom);
+        SipAnswerCode (*OnIncomingCall)(IN const int nAccountId, IN const int nCallId, IN const char *pFrom, IN const void *pUser);
 
         /**
          * Notify when registration status has changed
@@ -119,7 +119,7 @@ typedef struct SipCallBack
          * @param reg_st_code, registration status code
          *
          */
-        void (*OnRegStatusChange)(IN const int nAccountId, IN const SipAnswerCode RegStatusCode);
+        void (*OnRegStatusChange)(IN const int nAccountId, IN const SipAnswerCode RegStatusCode, IN const void *pUser);
 
         /**
          * Notify application when call state has changed
@@ -128,7 +128,7 @@ typedef struct SipCallBack
          * @param state state of this call see inv_state
          *
          */
-        void (*OnCallStateChange)(IN const int nCallId, IN const int nAccountId, IN const SipInviteState State, IN const SipAnswerCode StatusCode);
+        void (*OnCallStateChange)(IN const int nCallId, IN const int nAccountId, IN const SipInviteState State, IN const SipAnswerCode StatusCode, IN const void *pUser);
 
 } SipCallBack;
 
@@ -152,7 +152,7 @@ int SipCreateInstance(IN const SipCallBack *pCallBack);
  * @return account id, -1 for error
  *
  */
-int SipAddNewAccount(IN const char *pUserName, IN const char *pPassWord, IN const char *pDomain);
+int SipAddNewAccount(IN const char *pUserName, IN const char *pPassWord, IN const char *pDomain, IN void *pUserData);
 
 /**
  * Add new account
@@ -205,6 +205,7 @@ void SipDestroyInstance();
  * Answer the call
  * @param nCallId
  * @param StatusCode, see SipAnswerCode
+ * @param AnswerReason
  **/
-void SipAnswerCall(IN const int nCallId, IN const SipAnswerCode StatusCode);
+int SipAnswerCall(IN const int nCallId, IN const SipAnswerCode StatusCode, IN const char *pReason);
 #endif

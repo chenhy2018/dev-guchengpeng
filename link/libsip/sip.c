@@ -286,7 +286,7 @@ void SipDestroyInstance()
 
         pj_bzero(&SipAppData, sizeof(SipAppData));
 }
-int SipAddNewAccount(IN const char *_pUserName, IN const char *_pPassWord, IN const char *_pDomain)
+int SipAddNewAccount(IN const char *_pUserName, IN const char *_pPassWord, IN const char *_pDomain, IN void *_pUser)
 {
         /* Input check */
         PJ_ASSERT_RETURN(_pUserName && _pPassWord && _pDomain, PJ_EINVAL);
@@ -332,6 +332,7 @@ int SipAddNewAccount(IN const char *_pUserName, IN const char *_pPassWord, IN co
         pj_str_t PJDomain = pj_str((char *)_pDomain);
         pj_str_t PJKeepAliveData = pj_str("\r\n");
 
+        pAccount->pUserData = _pUser;
         pj_strdup_with_null(pAccount->pPool, &pAccount->Config.RegUri, &PJReg);
         pj_strdup_with_null(pAccount->pPool, &pAccount->Config.KaData, &PJKeepAliveData);
         pj_strdup_with_null(pAccount->pPool, &pAccount->Config.Id, &PJID);
@@ -356,9 +357,8 @@ void SipDeleteAccount(IN const int _nAccountId)
         SipAccount *pAccount;
 
         PJ_LOG(4,(THIS_FILE, "Deleting account %d..", _nAccountId));
-        //pj_mutex_lock(SipAppData.pMutex);
+        pj_mutex_lock(SipAppData.pMutex);
         pAccount = &SipAppData.Accounts[_nAccountId];
-
         /* Cancel keep alive timer */
         if (pAccount->KaTimer.id) {
                 pjsip_endpt_cancel_timer(SipAppData.pSipEndPoint, &pAccount->KaTimer);
@@ -382,7 +382,7 @@ void SipDeleteAccount(IN const int _nAccountId)
         }
         pAccount->bValid = PJ_FALSE;
         pAccount->Contact.slen = 0;
-        //pj_mutex_unlock(SipAppData.pMutex);
+        pj_mutex_unlock(SipAppData.pMutex);
 }
 
 int SipRegAccount(IN const int _nAccountId, IN const int _bDeReg)
@@ -580,7 +580,7 @@ static void onSipRegc(IN struct pjsip_regc_cbparam *_pCbData)
         pAccount->nLastRegCode = _pCbData->code;
 
         if (SipAppData.OnRegStateChange) {
-                (*SipAppData.OnRegStateChange)(pAccount->nIndex, (SipAnswerCode)pAccount->nLastRegCode);
+                (*SipAppData.OnRegStateChange)(pAccount->nIndex, (SipAnswerCode)pAccount->nLastRegCode, pAccount->pUserData);
         }
         pj_mutex_unlock(SipAppData.pMutex);
 
@@ -873,6 +873,50 @@ int SipMakeNewCall(IN const int _nFromAccountId, IN const char *_pDestUri)
         return nCallId;
 }
 
+int SipAnswerCall(IN const int _nCallId, IN const SipAnswerCode _StatusCode, IN const char *_pReason)
+{
+        /* Check that callId is valid */
+        PJ_ASSERT_RETURN(_nCallId >=0 || _nCallId <(int)PJ_ARRAY_SIZE(SipAppData.Calls), -1);
+        if (SipAppData.Calls[_nCallId].pInviteSession == NULL)
+                return -1;
+
+        pj_str_t Reason = pj_str((char *)_pReason);
+        pj_str_t *pReason;
+        pj_status_t Status;
+        pjsip_tx_data *pTxData;
+        SipCall *pCall = &SipAppData.Calls[_nCallId];
+
+        if (!_pReason)
+                pReason = NULL;
+        else
+                pReason = &Reason;
+
+        pj_mutex_lock(SipAppData.pMutex);
+        Status = pjsip_inv_answer(pCall->pInviteSession,
+                                  _StatusCode, pReason,
+                                  NULL,
+                                  &pTxData);
+        if (Status != PJ_SUCCESS) {
+                PrintErrorMsg(Status, "Create user response error");
+                goto onError;
+        }
+
+        /*  Send the response.*/
+        Status = pjsip_inv_send_msg(pCall->pInviteSession, pTxData);
+        if (Status != PJ_SUCCESS) {
+                PrintErrorMsg(Status, "Send user response error");
+                goto onError;
+
+        }
+        pj_mutex_unlock(SipAppData.pMutex);
+        return 1;
+
+ onError:
+        /* Release the session */
+        pjsip_inv_terminate(pCall->pInviteSession, 500, PJ_FALSE);
+        pj_mutex_unlock(SipAppData.pMutex);
+        return -1;
+}
 void SipHangUp(IN const int _nCallId)
 {
         pjsip_tx_data *pTxData;
@@ -882,11 +926,12 @@ void SipHangUp(IN const int _nCallId)
                 return;
 
         /* TODO release media resource */
+        pj_mutex_lock(SipAppData.pMutex);
         SipAppData.Calls[_nCallId].bValid = PJ_FALSE;
         Status = pjsip_inv_end_session(SipAppData.Calls[_nCallId].pInviteSession, 603, NULL, &pTxData);
         if (Status == PJ_SUCCESS && pTxData != NULL)
                 pjsip_inv_send_msg(SipAppData.Calls[_nCallId].pInviteSession, pTxData);
-
+        pj_mutex_unlock(SipAppData.pMutex);
 }
 
 void SipHangUpAll()
@@ -997,7 +1042,6 @@ static pj_bool_t onRxRequest(IN pjsip_rx_data *_pRxData )
                 return PJ_TRUE;
         }
         pCall->pInviteSession->mod_data[SipMod.id] = pCall;
-        pj_mutex_unlock(SipAppData.pMutex);
         pjsip_dlg_dec_lock(pDialog);
 
         pj_gettimeofday(&pCall->StartTime);
@@ -1045,7 +1089,7 @@ static pj_bool_t onRxRequest(IN pjsip_rx_data *_pRxData )
 
 
         /* Now create answer with user response */
-        int nAnswerCode = (int)SipAppData.OnIncomingCall(nToAccountId, nCallId,  From);
+        int nAnswerCode = (int)SipAppData.OnIncomingCall(nToAccountId, nCallId,  From, SipAppData.Accounts[pCall->nAccountId].pUserData);
         Status = pjsip_inv_answer(pCall->pInviteSession,
                                    nAnswerCode, NULL,
                                    NULL,
@@ -1062,6 +1106,7 @@ static pj_bool_t onRxRequest(IN pjsip_rx_data *_pRxData )
                 goto onError;
 
         }
+        pj_mutex_unlock(SipAppData.pMutex);
         return PJ_TRUE;
 
  onError:
@@ -1139,7 +1184,7 @@ static void onSipCallOnStateChanged(IN pjsip_inv_session *_pInviteSession,
                 _pInviteSession->mod_data[SipMod.id] = NULL;
                 /* TODO destory media */
         }
-        SipAppData.OnCallStateChange(pCall->nIndex, pCall->nAccountId, (SipInviteState)_pInviteSession->state, (SipAnswerCode)_pInviteSession->cause);
+        SipAppData.OnCallStateChange(pCall->nIndex, pCall->nAccountId, (SipInviteState)_pInviteSession->state, (SipAnswerCode)_pInviteSession->cause, SipAppData.Accounts[pCall->nAccountId].pUserData);
 }
 
 /* Callback to be called when dialog has forked: */
