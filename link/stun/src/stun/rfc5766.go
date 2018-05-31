@@ -110,7 +110,7 @@ type allocation struct {
 
 	// permission list
 	perms       map[string]time.Time
-	permsLck    *sync.Mutex
+	permsLck    *sync.RWMutex
 
 	// server
 	server      *relayserver
@@ -574,7 +574,7 @@ func newAllocation(r *address) (*allocation, error) {
 		key:      key,
 		source:   *r,
 		perms:    map[string]time.Time{},
-		permsLck: &sync.Mutex{},
+		permsLck: &sync.RWMutex{},
 		channels: map[string]*channel{},
 		chanLck:  &sync.Mutex{},
 	}, nil
@@ -682,6 +682,10 @@ func (alloc *allocation) addPerm(addr *address) (err error) {
 func (alloc *allocation) checkPerms(addr *address) error {
 
 	key := addr.IP.String()
+
+	alloc.permsLck.RLock()
+	defer alloc.permsLck.RUnlock()
+
 	item, ok := alloc.perms[key]
 	if !ok {
 		return fmt.Errorf("permission not exists")
