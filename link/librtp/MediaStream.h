@@ -63,6 +63,43 @@ typedef struct _MediaConfig{
         int nUseIndex;
 }MediaConfig;
 
+struct MediaPacketier;
+typedef struct _PacketierOperation {
+        pj_status_t (*packetize)(IN OUT struct MediaPacketier *pKtz,
+                                 IN pj_uint8_t *pBitstream,
+                                 IN pj_size_t nBitstreamLen,
+                                 IN unsigned *pBitstreamPos,
+                                 OUT const pj_uint8_t **pPayload,
+                                 OUT pj_size_t *nPlyloadLen);
+
+        pj_status_t (*unpacketize)(IN OUT struct MediaPacketier *pKtz,
+                                   IN const pj_uint8_t *pPayload,
+                                   IN pj_size_t   nPlyloadLen,
+                                   OUT pj_uint8_t **pBitstream,
+                                   OUT unsigned   *pBitstreamPos,
+                                   IN int nRtpMarker);
+
+}PacketierOperation;
+
+typedef struct _MediaPacketier {
+        PacketierOperation *pOperation;
+}MediaPacketier;
+
+typedef struct _PcmuPacketizer {
+        MediaPacketier base;
+        pj_pool_t *pPcmuPacketizerPool;
+}PcmuPacketizer;
+
+typedef struct _H264Packetizer {
+        MediaPacketier base;
+        pj_pool_t *pH264PacketizerPool;
+        pjmedia_h264_packetizer *pH264Packetizer;
+        uint8_t *pUnpackBuf;
+        unsigned nUnpackBufCap;
+        unsigned nUnpackBufLen;
+        pj_bool_t bShouldReset; //rtp FU-A
+}H264Packetizer;
+
 typedef struct _MediaStreamTrack
 {
         MediaType   type;
@@ -74,6 +111,7 @@ typedef struct _MediaStreamTrack
         MediaConfig mediaConfig;
         pjmedia_rtp_session  rtpSession;
         pjmedia_rtcp_session rtcpSession;
+        MediaPacketier *pMediaPacketier;
         pj_pool_t *pH264PacketizerPool;
         pjmedia_h264_packetizer *pH264Packetizer;
         void *pPeerConnection;

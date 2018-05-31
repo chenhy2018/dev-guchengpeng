@@ -175,3 +175,172 @@ int SetActiveCodec(IN OUT MediaStream *_pMediaStream, IN const pjmedia_sdp_sessi
         
         return PJ_SUCCESS;
 }
+
+
+//packetizer
+static pj_str_t pcmuPktzName = {"pcmu", 4};
+static pj_str_t pcmaPktzName = {"pcma", 4};
+static pj_str_t aacPktzName  = {"aac", 3};
+static pj_str_t h264PktzName = {"h264", 4};
+static pj_str_t h265PktzName = {"h265", 4};
+
+static pj_status_t createPcmuPacketizer(IN pj_pool_t *_pPktzPool, OUT MediaPacketier **_pPktz)
+{
+        PcmuPacketizer *pPktz = pj_pool_alloc(_pPktzPool, sizeof(PcmuPacketizer));
+        PJ_ASSERT_RETURN(pPktz, -2);
+        pj_bzero(pPktz, sizeof(PcmuPacketizer));
+        pPktz->pPcmuPacketizerPool = _pPktzPool;
+
+        *_pPktz = (MediaPacketier *)pPktz;
+        return PJ_SUCCESS;
+}
+
+pj_status_t pcmu_packetize(IN struct MediaPacketier *_pKtz,
+                           IN pj_uint8_t *_pBitstream,
+                           IN pj_size_t _nBitstreamLen,
+                           IN unsigned *_pBitstreamPos,
+                           OUT const pj_uint8_t **_pPayload,
+                           OUT pj_size_t *_nPayloadLen)
+{
+        pj_assert(_nBitstreamLen >= *_pBitstreamPos);
+
+        *_pPayload = _pBitstream + *_pBitstreamPos;
+        if (_nBitstreamLen - *_pBitstreamPos <= 1300){
+                *_nPayloadLen = _nBitstreamLen - *_pBitstreamPos;
+        } else {
+                *_nPayloadLen = 1300;
+                *_pBitstreamPos = *_pBitstreamPos + 1300;
+        }
+
+        return PJ_SUCCESS;
+}
+
+pj_status_t pcmu_unpacketize(IN OUT struct MediaPacketier *_pKtz,
+                             IN const pj_uint8_t *_pPayload,
+                             IN pj_size_t   _nPlyloadLen,
+                             OUT pj_uint8_t **_pBitstream,
+                             OUT unsigned   *_pBitstreamPos,
+                             IN int _nRtpMarker)
+{
+        *_pBitstream = (pj_uint8_t *)_pPayload;
+        *_pBitstreamPos = _nPlyloadLen;
+        return PJ_SUCCESS;
+}
+
+static pj_status_t createH264Packetizer(IN pj_pool_t *_pPktzPool, OUT MediaPacketier **_pPktz)
+{
+        H264Packetizer *pPktz = pj_pool_alloc(_pPktzPool, sizeof(H264Packetizer));
+        PJ_ASSERT_RETURN(pPktz, -2);
+        pj_bzero(pPktz, sizeof(H264Packetizer));
+        pPktz->pH264PacketizerPool = _pPktzPool;
+
+        pjmedia_h264_packetizer_cfg cfg;
+        cfg.mode = PJMEDIA_H264_PACKETIZER_MODE_NON_INTERLEAVED;
+        cfg.mtu = PJMEDIA_MAX_MTU;
+
+        pj_status_t status;
+        status = pjmedia_h264_packetizer_create(_pPktzPool,
+                                                NULL, &pPktz->pH264Packetizer);
+        STATUS_CHECK(pjmedia_h264_packetizer_create, status);
+
+        *_pPktz = (MediaPacketier *)pPktz;
+        return PJ_SUCCESS;
+}
+
+pj_status_t h264_packetize(IN struct MediaPacketier *_pKtz,
+                           IN pj_uint8_t *_pBitstream,
+                           IN pj_size_t _nBitstreamLen,
+                           IN unsigned *_pBitstreamPos,
+                           OUT const pj_uint8_t **_pPayload,
+                           OUT pj_size_t *_nPlyloadLen)
+{
+        H264Packetizer *pPktz = (H264Packetizer *)_pKtz;
+        pj_status_t status;
+        status = pjmedia_h264_packetize(pPktz->pH264Packetizer, _pBitstream, _nBitstreamLen,
+                                        _pBitstreamPos, _pPayload, _nPlyloadLen);
+
+        return status;
+}
+
+pj_status_t h264_unpacketize(IN OUT struct MediaPacketier *_pKtz,
+                             IN const pj_uint8_t *_pPayload,
+                             IN pj_size_t   _nPlyloadLen,
+                             OUT pj_uint8_t **_pBitstream,
+                             OUT unsigned   *_pBitstreamPos,
+                             IN int _nRtpMarker)
+{
+        H264Packetizer *pPktz = (H264Packetizer *)_pKtz;
+
+        pj_status_t status = PJ_SUCCESS;
+
+        if (pPktz->pUnpackBuf == NULL) {
+                pj_pool_alloc(pPktz->pH264PacketizerPool, 100*1024);
+                pPktz->nUnpackBufCap = 100*1024;
+                pPktz->nUnpackBufLen = 0;
+        }
+        if (pPktz->bShouldReset) {
+                pPktz->nUnpackBufLen = 0;
+                pPktz->bShouldReset = PJ_FALSE;
+                _pBitstreamPos = 0;
+        }
+
+        //32. because h264 will insert into 0x000001 delimiter
+        if (pPktz->nUnpackBufLen + _nPlyloadLen + 32 > pPktz->nUnpackBufCap) {
+                void * pTmp = pj_pool_alloc(pPktz->pH264PacketizerPool, pPktz->nUnpackBufCap * 2);
+                pj_memcpy(pTmp, pPktz->pUnpackBuf, pPktz->nUnpackBufLen);
+                pPktz->pUnpackBuf = pTmp;
+                pPktz->nUnpackBufCap *= 2;
+        }
+
+        unsigned nUnpackLen = 0;
+        status = pjmedia_h264_unpacketize(pPktz->pH264Packetizer, _pPayload, _nPlyloadLen,
+                                          pPktz->pUnpackBuf, pPktz->nUnpackBufCap, &nUnpackLen);
+        pPktz->nUnpackBufLen += nUnpackLen;
+
+        int nType = _pPayload[0] & 0x1F;
+        if (nType == 24) { //stap-A
+                pPktz->nUnpackBufLen = 0;
+                *_pBitstreamPos = pPktz->nUnpackBufLen;
+                *_pBitstream = pPktz->pUnpackBuf;
+        } else if (nType == 28) { //FU-A
+                if (_nRtpMarker) {
+                        pPktz->bShouldReset = PJ_TRUE;
+                        *_pBitstreamPos = pPktz->nUnpackBufLen;
+                        *_pBitstream = pPktz->pUnpackBuf;
+                } else {
+                        *_pBitstreamPos = 0;
+                }
+        }
+        return status;
+}
+
+pj_status_t createPacketizer(IN char *_pName, IN int _nNameLen, IN pj_pool_t *_pPktzPool, OUT MediaPacketier **_pPktz)
+{
+        pj_assert(_nNameLen < 5);
+
+        //to lowercase
+        char lowerCase[4];
+        for (int i = 0; i < _nNameLen; i++) {
+                if (_pName[i] >= 'A' && _pName[i] <= 'Z') {
+                        lowerCase[i] = _pName[i] + 32;
+                } else {
+                        lowerCase[i] = _pName[i];
+                }
+        }
+
+        pj_str_t pktzName = {lowerCase, _nNameLen};
+
+        if (pj_memcmp(&pktzName, &pcmuPktzName, pcmuPktzName.slen) == 0) {
+                return createPcmuPacketizer(_pPktzPool, _pPktz);
+        } else if (pj_memcmp(&pktzName, &pcmaPktzName, pcmaPktzName.slen) == 0) {
+                
+        } else if (pj_memcmp(&pktzName, &aacPktzName, aacPktzName.slen) == 0) {
+                
+        } else if (pj_memcmp(&pktzName, &h264PktzName, h264PktzName.slen) == 0) {
+                return createH264Packetizer(_pPktzPool, _pPktz);
+        } else if (pj_memcmp(&pktzName, &h265PktzName, h265PktzName.slen) == 0) {
+                
+        }
+
+        return -1;;
+}
