@@ -485,6 +485,10 @@ int main(int argc, char **argv)
                         return status;
                 }
                 int aok = 1;
+                pj_timestamp nextTime;
+                pj_get_timestamp(&nextTime);
+                pj_timestamp hzPerSecond;
+                pj_get_timestamp_freq(&hzPerSecond);
                 while(aok){
                         pj_ssize_t readLen = 160;
                         char abuf[1500] = {0};
@@ -505,11 +509,21 @@ int main(int argc, char **argv)
                         rtpPacket.type = TYPE_AUDIO;
                         rtpPacket.pData = (uint8_t *)abuf;
                         rtpPacket.nDataLen = readLen;
-                        rtpPacket.nTimestamp = 0;// TODO SendPacket deal timestamp
+                        rtpPacket.nTimestamp = nextTime.u64;// TODO SendPacket deal timestamp
                         status = SendPacket(&app.peerConnection, &rtpPacket);
                         if(status != 0)
                                 break;
-                        pj_thread_sleep(19);
+
+                        pj_timestamp now;
+                        pj_get_timestamp(&now);
+                        nextTime.u64 += (20 * hzPerSecond.u64 / 1000);
+                        if (nextTime.u64 > now.u64) {
+                                int sleepTime = (nextTime.u64 - now.u64) * 1000 / hzPerSecond.u64;
+                                printf("sleep %d ms\n", sleepTime);
+                                if(sleepTime > 1) {
+                                        pj_thread_sleep(sleepTime - 1);
+                                }
+                        }
                 }
         }
         
