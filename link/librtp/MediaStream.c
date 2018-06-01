@@ -250,7 +250,7 @@ pj_status_t h264_unpacketize(IN OUT MediaPacketier *_pKtz,
         if (pPktz->bShouldReset) {
                 pPktz->nUnpackBufLen = 0;
                 pPktz->bShouldReset = PJ_FALSE;
-                _pBitstreamPos = 0;
+                *_pBitstreamPos = 0;
         }
 
         //32. because h264 will insert into 0x000001 delimiter
