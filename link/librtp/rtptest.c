@@ -21,7 +21,7 @@ return status;}
 #include <unistd.h>
 #define THIS_IS_AUDIO 1
 #define THIS_IS_VIDEO 2
-typedef int (*DataCallback)(void *pData, int nDataLen, int nFlag, uint64_t timestamp);
+typedef int (*DataCallback)(void *pData, int nDataLen, int nFlag, int64_t timestamp);
 static const uint8_t *ff_avc_find_startcode_internal(const uint8_t *p, const uint8_t *end)
 {
         const uint8_t *a = p + 4 - ((intptr_t)p & 3);
@@ -207,14 +207,14 @@ int start_file_test(char * _pAudioFile, char * _pVideoFile, DataCallback callbac
 
                                 if(type == 1 || type == 5 ){
                                         if(cntNalu == 1){
-                                                printf("send one video packet:%ld\n", end - sendp);
+                                                printf("send one video frame packet:%ld\n", end - sendp);
                                                 cbRet = callback(sendp, end - sendp, THIS_IS_VIDEO, nNextVideoTime-nSysTimeBase);
                                                 if (cbRet != 0) {
                                                         bVideoOk = 0;
                                                 }
                                                 nNextVideoTime += 40; //这里才加时间戳，其它都不是视频帧
                                         }else{ // pps sps sei etc
-                                                printf("send one video packet:%ld\n", start - sendp);
+                                                printf("send one video nonframe packet:%ld\n", start - sendp);
                                                 cbRet = callback(sendp, start - sendp, THIS_IS_VIDEO, nNextVideoTime-nSysTimeBase);
                                                 if (cbRet != 0) {
                                                         bVideoOk = 0;
@@ -594,15 +594,17 @@ static void onRxRtp(void *_pUserData, CallbackType _type, void *_pCbData)
         }
 }
 
-static int receive_data_callback(void *pData, int nDataLen, int nFlag, uint64_t timestamp)
+static int receive_data_callback(void *pData, int nDataLen, int nFlag, int64_t timestamp)
 {
-        printf("send %d to rtp\n", nDataLen);
         RtpPacket rtpPacket;
         pj_bzero(&rtpPacket, sizeof(rtpPacket));
-        if (nFlag == THIS_IS_AUDIO)
+        if (nFlag == THIS_IS_AUDIO) {
+                printf("send %d bytes audio data to rtp with timestamp:%lld\n", nDataLen, timestamp);
                 rtpPacket.type = TYPE_AUDIO;
-        else
+        } else {
+                printf("send %d bytes vidoe data to rtp with timestamp:%lld\n", nDataLen, timestamp);
                 rtpPacket.type = TYPE_VIDEO;
+        }
         rtpPacket.pData = (uint8_t *)pData;
         rtpPacket.nDataLen = nDataLen;
         rtpPacket.nTimestamp = timestamp;
@@ -794,7 +796,7 @@ int main(int argc, char **argv)
                         nextTime.u64 += (20 * hzPerSecond.u64 / 1000);
                         if (nextTime.u64 > now.u64) {
                                 int sleepTime = (nextTime.u64 - now.u64) * 1000 / hzPerSecond.u64;
-                                printf("sleep %d ms\n", sleepTime);
+                                printf("--->sleep %d/ms\n", sleepTime);
                                 if(sleepTime > 1) {
                                         pj_thread_sleep(sleepTime - 1);
                                 }

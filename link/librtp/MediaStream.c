@@ -276,7 +276,7 @@ pj_status_t h264_unpacketize(IN OUT MediaPacketier *_pKtz,
                         *_pBitstreamPos = 0;
                 }
                 
-        } else { //stap-A(nType == 24) or //single NAL unit packets
+        } else { //stap-A(nType == 24) or single NAL unit packets
                 *_pBitstreamPos = pPktz->nUnpackBufLen;
                 *_pBitstream = pPktz->pUnpackBuf;
                 pPktz->nUnpackBufLen = 0;
