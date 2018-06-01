@@ -628,7 +628,7 @@ static void on_rx_rtp(void *pUserData, void *pPkt, pj_ssize_t size)
         unsigned nBitstreamPos = 0;
         status = MediaUnPacketize(pMediaTrack->pMediaPacketier, pPayload, nPayloadLen, &pBitstream, &nBitstreamPos, pRtpHeader->m);
         if (nBitstreamPos == 0) {
-                PJ_LOG(3, (__FILE__, "MediaUnPacketize:%d", status));
+                PJ_LOG(3, (__FILE__, "MediaUnPacketize:%d, receiveSize:%d", status, size));
                 return;
         }
 

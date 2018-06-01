@@ -243,7 +243,7 @@ pj_status_t h264_unpacketize(IN OUT MediaPacketier *_pKtz,
         pj_status_t status = PJ_SUCCESS;
 
         if (pPktz->pUnpackBuf == NULL) {
-                pj_pool_alloc(pPktz->pH264PacketizerPool, 100*1024);
+                pPktz->pUnpackBuf = pj_pool_alloc(pPktz->pH264PacketizerPool, 100*1024);
                 pPktz->nUnpackBufCap = 100*1024;
                 pPktz->nUnpackBufLen = 0;
         }
@@ -261,16 +261,16 @@ pj_status_t h264_unpacketize(IN OUT MediaPacketier *_pKtz,
                 pPktz->nUnpackBufCap *= 2;
         }
 
-        unsigned nUnpackLen = 0;
+        unsigned nUnpackLen = pPktz->nUnpackBufLen;
         status = pjmedia_h264_unpacketize(pPktz->pH264Packetizer, _pPayload, _nPlyloadLen,
                                           pPktz->pUnpackBuf, pPktz->nUnpackBufCap, &nUnpackLen);
         pPktz->nUnpackBufLen += nUnpackLen;
 
         int nType = _pPayload[0] & 0x1F;
         if (nType == 24) { //stap-A
-                pPktz->nUnpackBufLen = 0;
                 *_pBitstreamPos = pPktz->nUnpackBufLen;
                 *_pBitstream = pPktz->pUnpackBuf;
+                pPktz->nUnpackBufLen = 0;
         } else if (nType == 28) { //FU-A
                 if (_nRtpMarker) {
                         pPktz->bShouldReset = PJ_TRUE;
