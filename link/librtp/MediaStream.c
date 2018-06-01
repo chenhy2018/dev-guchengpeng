@@ -247,11 +247,6 @@ pj_status_t h264_unpacketize(IN OUT MediaPacketier *_pKtz,
                 pPktz->nUnpackBufCap = 100*1024;
                 pPktz->nUnpackBufLen = 0;
         }
-        if (pPktz->bShouldReset) {
-                pPktz->nUnpackBufLen = 0;
-                pPktz->bShouldReset = PJ_FALSE;
-                *_pBitstreamPos = 0;
-        }
 
         //32. because h264 will insert into 0x000001 delimiter
         if (pPktz->nUnpackBufLen + _nPlyloadLen + 32 > pPktz->nUnpackBufCap) {
@@ -264,18 +259,19 @@ pj_status_t h264_unpacketize(IN OUT MediaPacketier *_pKtz,
         unsigned nUnpackLen = pPktz->nUnpackBufLen;
         status = pjmedia_h264_unpacketize(pPktz->pH264Packetizer, _pPayload, _nPlyloadLen,
                                           pPktz->pUnpackBuf, pPktz->nUnpackBufCap, &nUnpackLen);
-        pPktz->nUnpackBufLen += nUnpackLen;
+        pPktz->nUnpackBufLen = nUnpackLen;
 
         int nType = _pPayload[0] & 0x1F;
         if (nType == 28) { //FU-A
-                if (_nRtpMarker) {
-                        pPktz->bShouldReset = PJ_TRUE;
+                int nStartBit = _pPayload[1] & 0x80;
+                int nEndBit = _pPayload[1] & 0x40;
+                if (nStartBit) {
+                        pPktz->bFuAStartbit = PJ_TRUE;
+                } else if (nEndBit && pPktz->bFuAStartbit) {
+                        pPktz->bFuAStartbit = PJ_FALSE;
                         *_pBitstreamPos = pPktz->nUnpackBufLen;
                         *_pBitstream = pPktz->pUnpackBuf;
-                } else {
-                        *_pBitstreamPos = 0;
                 }
-                
         } else { //stap-A(nType == 24) or single NAL unit packets
                 *_pBitstreamPos = pPktz->nUnpackBufLen;
                 *_pBitstream = pPktz->pUnpackBuf;

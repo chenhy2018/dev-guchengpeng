@@ -100,7 +100,7 @@ typedef struct _H264Packetizer {
         uint8_t *pUnpackBuf;
         unsigned nUnpackBufCap;
         unsigned nUnpackBufLen;
-        pj_bool_t bShouldReset; //rtp FU-A
+        pj_bool_t bFuAStartbit;
 }H264Packetizer;
 
 typedef struct _MediaStreamTrack
