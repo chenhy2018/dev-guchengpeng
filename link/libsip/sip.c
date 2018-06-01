@@ -1080,6 +1080,7 @@ static pj_bool_t onRxRequest(IN pjsip_rx_data *_pRxData )
                 pRemoteSdp = pSdpInfo->sdp;
         SipAppData.OnIncomingCall(nToAccountId, nCallId,  From, SipAppData.Accounts[pCall->nAccountId].pUserData, (void *)pRemoteSdp);
         /*
+        int nAnswerCode = (int)SipAppData.OnIncomingCall(nToAccountId, nCallId,  From, SipAppData.Accounts[pCall->nAccountId].pUserData);
         Status = pjsip_inv_answer(pCall->pInviteSession,
                                    nAnswerCode, NULL,
                                    NULL,
