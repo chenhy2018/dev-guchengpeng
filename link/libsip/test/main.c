@@ -3,21 +3,13 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-// for test off/answer sdp
-#include <pjsip.h>
-#include <pjmedia.h>
 SipAnswerCode cbOnIncomingCall(int _nAccountId, int _nCallId, const char *_pFrom, const void *_pUser, const void *_pMedia)
 {
         printf("----->incoming call From %s to %d--------------userdata = %d\n", _pFrom, _nAccountId, *(int*)_pUser);
-        if (_pMedia){
-                char buf[500];
-                const pjmedia_sdp_session *pRemoteSdp = (pjmedia_sdp_session *)_pMedia;
-                pjmedia_sdp_print(pRemoteSdp, buf, 500);
-                printf("remote SDP = SDP = %s\n", buf);
-        }
+        PrintSdp(_pMedia);
         void *pLocalSdp;
         CreateTmpSDP(&pLocalSdp);
-        SipAnswerCall(_nCallId, 486, NULL, pLocalSdp);
+        SipAnswerCall(_nCallId, 200, NULL, pLocalSdp);
 	return OK ;
 }
 
@@ -28,12 +20,7 @@ void cbOnRegStatusChange(const int _nAccountId, const SipAnswerCode _StatusCode,
 
 void cbOnCallStateChange(const int _nCallId, const int _nAccountId, const SipInviteState _State, const SipAnswerCode _StatusCode, const void *_pUser, const void *_pMedia)
 {
-        if (_pMedia){
-                char buf[500];
-                const pjmedia_sdp_session *pRemoteSdp = (pjmedia_sdp_session *)_pMedia;
-                pjmedia_sdp_print(pRemoteSdp, buf, 500);
-                printf("remote SDP ==========SDP = %s\n", buf);
-        }
+        PrintSdp(_pMedia);
         printf("----->state = %d, status code = %d------------>userdata = %d\n", _State, _StatusCode,  *(int*)_pUser);
 }
 int main()

@@ -1080,6 +1080,7 @@ static pj_bool_t onRxRequest(IN pjsip_rx_data *_pRxData )
                 pRemoteSdp = pSdpInfo->sdp;
         SipAppData.OnIncomingCall(nToAccountId, nCallId,  From, SipAppData.Accounts[pCall->nAccountId].pUserData, (void *)pRemoteSdp);
         /*
+        int nAnswerCode = (int)SipAppData.OnIncomingCall(nToAccountId, nCallId,  From, SipAppData.Accounts[pCall->nAccountId].pUserData);
         Status = pjsip_inv_answer(pCall->pInviteSession,
                                    nAnswerCode, NULL,
                                    NULL,
@@ -1281,7 +1282,16 @@ int CreateTmpSDP(OUT void **_pSdp)
 
 }
 
-void SipSetLogLevel(int _nLevel)
+void SipSetLogLevel(IN const int _nLevel)
 {
         pj_log_set_level(_nLevel);
+}
+void PrintSdp(IN const void *_pSdp)
+{
+        if (_pSdp){
+                char buf[500];
+                const pjmedia_sdp_session *pRemoteSdp = (pjmedia_sdp_session *)_pSdp;
+                pjmedia_sdp_print(pRemoteSdp, buf, 500);
+                printf("remote SDP = SDP = %s\n", buf);
+        }
 }

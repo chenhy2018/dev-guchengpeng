@@ -214,10 +214,11 @@ int SipAnswerCall(IN const int nCallId, IN const SipAnswerCode StatusCode, IN co
  * set log level the maximum level of verbosity of the logging messages (6=very detailed..1=error only, 0=disabled)
  */
 
-void SipSetLogLevel(int nLevel);
+void SipSetLogLevel(IN const int nLevel);
 /**
  * !!!! for test offer/answer sdp
  * create tmp sdp
  */
 int CreateTmpSDP(OUT void **pSdp);
+void PrintSdp(IN const void *pSdp);
 #endif
