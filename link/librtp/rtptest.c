@@ -146,8 +146,6 @@ int start_file_test(char * _pAudioFile, char * _pVideoFile, DataCallback callbac
 
         uint8_t * nextstart = (uint8_t *)pVideoData;
         uint8_t * endptr = nextstart + nVideoDataLen;
-        uint8_t * backupstart = NULL;// sps pps Iframe frame2
-        uint8_t * backupend = NULL;
         int cbRet = 0;
         
         while (bAudioOk || bVideoOk) {
@@ -170,23 +168,14 @@ int start_file_test(char * _pAudioFile, char * _pVideoFile, DataCallback callbac
                         uint8_t * end = NULL;
                         uint8_t * sendp = NULL;
                         int eof = 0;
-                        int cntNalu = 0;
                         int type = -1;
-                        RESEND:
                         do{
-                                if(backupstart){
-                                        start = backupstart;
-                                        end = backupend;
-                                        backupstart = NULL;
-                                        backupend = NULL;
-                                }else{
-                                        start = (uint8_t *)ff_avc_find_startcode((const uint8_t *)nextstart, (const uint8_t *)endptr);
-                                        end = (uint8_t *)ff_avc_find_startcode(start+4, endptr);
-                                }
+                                start = (uint8_t *)ff_avc_find_startcode((const uint8_t *)nextstart, (const uint8_t *)endptr);
+                                end = (uint8_t *)ff_avc_find_startcode(start+4, endptr);
+
                                 nextstart = end;
                                 if(sendp == NULL)
                                         sendp = start;
-                                cntNalu++;
 
                                 if(start == end){
                                         eof = 1;
@@ -206,31 +195,12 @@ int start_file_test(char * _pAudioFile, char * _pVideoFile, DataCallback callbac
                                 }
 
                                 if(type == 1 || type == 5 ){
-                                        if(cntNalu == 1){
-                                                printf("send one video frame packet:%ld\n", end - sendp);
-                                                cbRet = callback(sendp, end - sendp, THIS_IS_VIDEO, nNextVideoTime-nSysTimeBase);
-                                                if (cbRet != 0) {
-                                                        bVideoOk = 0;
-                                                }
-                                                nNextVideoTime += 40; //这里才加时间戳，其它都不是视频帧
-                                        }else{ // pps sps sei etc
-                                                printf("send one video nonframe packet:%ld\n", start - sendp);
-                                                cbRet = callback(sendp, start - sendp, THIS_IS_VIDEO, nNextVideoTime-nSysTimeBase);
-                                                if (cbRet != 0) {
-                                                        bVideoOk = 0;
-                                                }
-                                                backupstart = start;
-                                                backupend = end;
-                                                cntNalu--;// 这次保存了起来，需要少算一次
-
-                                                start = NULL;
-                                                end = NULL;
-                                                sendp = NULL;
-                                                cntNalu = 0;
-                                                if (!eof) {
-                                                        goto RESEND;
-                                                }
+                                        printf("send one video(%d) frame packet:%ld\n", type, end - sendp);
+                                        cbRet = callback(sendp, end - sendp, THIS_IS_VIDEO, nNextVideoTime-nSysTimeBase);
+                                        if (cbRet != 0) {
+                                                bVideoOk = 0;
                                         }
+                                        nNextVideoTime += 40;
                                         break;
                                 }
                         }while(1);
@@ -239,10 +209,10 @@ int start_file_test(char * _pAudioFile, char * _pVideoFile, DataCallback callbac
                 int64_t nSleepTime = 0;
                 if (nNextAudioTime > nNextVideoTime) {
                         if (nNextVideoTime - nNow >  1)
-                                nSleepTime = (nNextVideoTime - nNow) * 1000;
+                                nSleepTime = (nNextVideoTime - nNow - 1) * 1000;
                 } else {
                         if (nNextAudioTime - nNow > 1)
-                                nSleepTime = (nNextAudioTime - nNow) * 1000;
+                                nSleepTime = (nNextAudioTime - nNow - 1) * 1000;
                 }
                 if (nSleepTime != 0) {
                         printf("sleeptime:%lld\n", nSleepTime);
@@ -656,7 +626,7 @@ int main(int argc, char **argv)
         
         InitIceConfig(&app.userConfig);
         strcpy(app.userConfig.turnHost, "127.0.0.1");
-        strcpy(app.userConfig.turnHost, "123.59.204.198");
+        //strcpy(app.userConfig.turnHost, "123.59.204.198");
         strcpy(app.userConfig.turnUsername, "root");
         strcpy(app.userConfig.turnPassword, "root");
         app.userConfig.userCallback = onRxRtp;
