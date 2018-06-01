@@ -7,6 +7,9 @@
 #include <pjlib-util.h>
 #include <pjlib.h>
 #include <pjmedia-codec/h264_packetizer.h>
+#ifndef __APPLE__
+#include <inttypes.h>
+#endif
 
 #define _s_l_(x) #x
 #define _str_line_(x) _s_l_(x)
