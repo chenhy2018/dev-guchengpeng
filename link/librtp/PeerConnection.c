@@ -645,19 +645,9 @@ static void on_rx_rtp(void *pUserData, void *pPkt, pj_ssize_t size)
         fprintf(stderr, "rtp data receive:%ld, payLen:%d\n", size, nPayloadLen);
 
         PeerConnection * pPeerConnection = (PeerConnection *)pMediaTrack->pPeerConnection;
-        switch (pAvParam->format) {
-                case MEDIA_FORMAT_PCMU:
-                case MEDIA_FORMAT_PCMA:
-                        pPeerConnection->userIceConfig.userCallback(pPeerConnection->userIceConfig.pCbUserData,
-                                                                    CALLBACK_RTP,
-                                                                    &rtpPacket);
-                        break;
-                case MEDIA_FORMAT_G729:
-                        break;
-                case MEDIA_FORMAT_H264:
-                case MEDIA_FORMAT_H265:
-                        break;
-        }
+        pPeerConnection->userIceConfig.userCallback(pPeerConnection->userIceConfig.pCbUserData,
+                                                    CALLBACK_RTP,
+                                                    &rtpPacket);
         
         return;
 }
