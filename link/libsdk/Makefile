@@ -1,11 +1,10 @@
-
 ARCH:=x86
 HOST:=
 ifeq ($(ARCH), x86)
 	CC=gcc
 else ifeq ($(ARCH), mstar)
-	CC=arm-none-linux-gnueabihf-gcc
-	HOST=arm-none-linux-gnueabihf
+	CC=arm-linux-gnueabihf-gcc
+	HOST=arm-linux-gnueabihf
 else ifeq ($(ARCH), A12)
 	CC=arm-none-linux-gnueabi-gcc
 	HOST=arm-none-linux-gnueabi
@@ -13,22 +12,50 @@ else
 	CC=gcc
 endif
 
-LIBS=libs
 PROJECT_PATH=../../third_party
-TARGET_LIBRARY=$(LIBS)/$(ARCH)/libua.a
 PJSIP_PATH=$(PROJECT_PATH)/pjproject-2.7.2
 LDFLAGS=
+INSTALL_DIR=/home/work-linking/linking/link/libsdk/output/pjsip
 PJ_CONFIG=--disable-sdl --disable-ffmpeg --disable-v4l2 \
-		  --disable-openh264 --disable-libwebrtc --disable-sound
+		  --disable-openh264 --disable-libwebrtc --disable-sound \
+		  --disable-libyuv \
+		  --prefix=$(INSTALL_DIR)
 INCLUDE_PATH=-I$(PJSIP_PATH)/pjlib/include \
 			 -I$(PJSIP_PATH)/pjlib-util/include \
 			 -I$(PJSIP_PATH)/pjsip/include \
 			 -I$(PJSIP_PATH)/pjmedia/include \
-			 -I$(PJSIP_PATH)/pjnath/include 
+			 -I$(PJSIP_PATH)/pjnath/include \
+			 -I../libsip
 
-OBJS=sip.o sdk_interface.o queue.o framework.o test.o dbg.o mock_api.o
+find= && find . -name "*.depend" -print -delete 
+SIP_PATH=../libsip
+OUTPUT=output
+SIP_OUT_PATH=$(OUTPUT)/libsip
+LIBSIP=$(SIP_OUT_PATH)/sip.o
+SDK_OBJS_PATH=$(OUTPUT)/libsdk
+LIBSDK=queue.o sdk_interface.o \
+		framework.o test.o dbg.o mock_api.o
+TARGET_LIBRARY=$(OUTPUT)/lib/$(ARCH)/libua.a
+LIBPJ=$(OUTPUT)/ori/$(ARCH)
+LIBMQTT=
+LIBRTP=
 
-pjlib :
+all : $(TARGET_LIBRARY)
+
+depclean:
+	cd $(PJSIP_PATH); \
+	find . -name "*.depend" -print -delete  
+
+pjclean :
+	rm -rvf $(OUTPUT)/pjsip
+
+pjsip $(LIBPJ) : #pjclean depclean
+	@echo "compile pjsip"
+	mkdir -p $(INSTALL_DIR)
+	cd $(PJSIP_PATH); \
+	make distclean && \
+	make clean && \
+	make realclean && \
 	cd $(PJSIP_PATH); \
 	if [ "$(HOST)" = "" ]; then \
 		./configure $(PJ_CONFIG); \
@@ -36,18 +63,24 @@ pjlib :
 		./configure --host=$(HOST) $(PJ_CONFIG); \
 	fi \
 	&& make dep \
-	&& make 
-
-$(TARGET_LIBRARY) : pjlib
-
-.c.o:
-	$(CC) $(INCLUDE_PATH) -c $(HOST)
+	&& make clean \
+	&& make \
+	&& make install
 
 
-test:$(OBJS)
-	$(CC) -o $@ $^ $(LDFLAGS)
+$(LIBSIP):$(SIP_PATH)/sip.c
+	mkdir -p $(SIP_OUT_PATH)
+	$(CC) $(INCLUDE_PATH) -c $< -o $@
+
+# set .o file search path
+vpath %.o $(SDK_OBJS_PATH)
+sdk $(TARGET_LIBRARY) : $(LIBPJ) $(LIBSIP) $(LIBSDK) $(LIBMQTT) $(LIBRTP)
+	./merge-lib.sh $(ARCH)
+
+$(LIBSDK) : %.o : %.c
+	mkdir -p $(SDK_OBJS_PATH) 
+	$(CC) $(INCLUDE_PATH) -c $< -o $(SDK_OBJS_PATH)/$@
 
 clean:
-	rm *.o 
 
 
