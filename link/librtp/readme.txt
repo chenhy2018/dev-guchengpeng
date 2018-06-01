@@ -43,6 +43,7 @@ TODO 未解决
   h264_packetizer是可以同时pack和unpack的，但是h264来看，packetizer不会维护完整一帧的数据
 
 9. rtp丢包了怎么办。可能是通过rtp的序列号来判断是否丢包
+   pjmedia h264 packetizer接口说明，貌似丢包了以null去调用，会更新内部状态， 每丢一个包调用一次吗？
 
 
 10. 音频的rtp marker位是否需要设置?
