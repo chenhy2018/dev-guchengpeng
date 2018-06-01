@@ -177,14 +177,9 @@ int start_file_test(char * _pAudioFile, char * _pVideoFile, DataCallback callbac
                                 if(sendp == NULL)
                                         sendp = start;
 
-                                if(start == end){
+                                if(start == end || end > endptr){
                                         eof = 1;
                                         bVideoOk = 0;
-                                        end = endptr + 1;
-                                        cbRet = callback(sendp, end - start, THIS_IS_VIDEO, nNextVideoTime-nSysTimeBase);
-                                        if (cbRet != 0) {
-                                                bVideoOk = 0;
-                                        }
                                         break;
                                 }
 
