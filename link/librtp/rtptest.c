@@ -17,7 +17,11 @@ return status;}
 
 
 //read audio video from file start
-typedef void (*DataCallback)(void *pData, uint64_t timestamp);
+#include <sys/time.h>
+#include <unistd.h>
+#define THIS_IS_AUDIO 1
+#define THIS_IS_VIDEO 2
+typedef int (*DataCallback)(void *pData, int nDataLen, int nFlag, uint64_t timestamp);
 static const uint8_t *ff_avc_find_startcode_internal(const uint8_t *p, const uint8_t *end)
 {
         const uint8_t *a = p + 4 - ((intptr_t)p & 3);
@@ -61,7 +65,7 @@ const uint8_t *ff_avc_find_startcode(const uint8_t *p, const uint8_t *end){
         return out;
 }
 
-static int getFileAndLenght(char *_pFname, FILE **_pFile, int *_pLen)
+static int getFileAndLength(char *_pFname, FILE **_pFile, int *_pLen)
 {
         FILE * f = fopen(_pFname, "r");
         if ( f == NULL ) {
@@ -79,7 +83,7 @@ static int readFileToBuf(char * _pFilename, char ** _pBuf, int *_pLen)
         int ret;
         FILE * pFile;
         int nLen = 0;
-        ret = getFileAndLenght(_pFilename, &pFile, &nLen);
+        ret = getFileAndLength(_pFilename, &pFile, &nLen);
         if (ret != 0) {
                 fprintf(stderr, "open file %s fail\n", _pFilename);
                 return -1;
@@ -96,17 +100,20 @@ static int readFileToBuf(char * _pFilename, char ** _pBuf, int *_pLen)
         return 0;
 }
 
-int start_file_test(char * _pAudioFile, char * _pVideoFile)
+static inline int64_t getCurrentMilliSecond(){
+        struct timeval tv;
+        gettimeofday(&tv, NULL);
+        return (tv.tv_sec*1000 + tv.tv_usec/1000);
+}
+
+int start_file_test(char * _pAudioFile, char * _pVideoFile, DataCallback callback)
 {
         assert(_pAudioFile != NULL && _pVideoFile != NULL);
+
         int ret;
-        
-        
+
         char * pAudioData = NULL;
         int nAudioDataLen = 0;
-        char * pVideoData = NULL;
-        int nVideoDataLen = 0;
-        
         if(_pAudioFile != NULL){
                 ret = readFileToBuf(_pAudioFile, &pAudioData, &nAudioDataLen);
                 if (ret != 0) {
@@ -114,14 +121,121 @@ int start_file_test(char * _pAudioFile, char * _pVideoFile)
                         return -1;
                 }
         }
+
+        char * pVideoData = NULL;
+        int nVideoDataLen = 0;
         if(_pVideoFile != NULL){
                 ret = readFileToBuf(_pVideoFile, &pVideoData, &nVideoDataLen);
                 if (ret != 0) {
+                        free(pAudioData);
                         fprintf(stderr, "map data to buffer fail:%s\n", _pVideoFile);
                         return -2;
                 }
         }
-        
+
+        int bAudioOk = 1;
+        int bVideoOk = 1;
+        int64_t nSysTimeBase = getCurrentMilliSecond();
+        int64_t nNextAudioTime = nSysTimeBase;
+        int64_t nNextVideoTime = nSysTimeBase;
+        int64_t nNow = nSysTimeBase;
+        int audioOffset = 0;
+
+        uint8_t * nextstart = (uint8_t *)pVideoData;
+        uint8_t * endptr = nextstart + nVideoDataLen;
+        uint8_t * backupstart = NULL;// sps pps Iframe frame2
+        uint8_t * backupend = NULL;
+        int cbRet = 0;
+        while (bAudioOk || bVideoOk) {
+                if (bAudioOk && nNextAudioTime + 1 >= nNow) {
+                        if(audioOffset+160 < nAudioDataLen) {
+                                cbRet = callback(pAudioData + audioOffset, 160, THIS_IS_AUDIO, nNextAudioTime-nSysTimeBase);
+                                if (cbRet != 0) {
+                                        bAudioOk = 0;
+                                        continue;
+                                }
+                                audioOffset += 160;
+                                nNextAudioTime += 20;
+                        } else {
+                                bAudioOk = 0;
+                        }
+                }
+                if (bVideoOk && nNextAudioTime + 1 >= nNow) {
+                        uint8_t * start = NULL;
+                        uint8_t * end = NULL;
+                        uint8_t * sendp = NULL;
+                        int eof = 0;
+                        int cntNalu = 0;
+                        do{
+                                if(backupstart){
+                                        start = backupstart;
+                                        end = backupend;
+                                        backupstart = NULL;
+                                        backupend = NULL;
+                                }else{
+                                        start = (uint8_t *)ff_avc_find_startcode((const uint8_t *)nextstart, (const uint8_t *)endptr);
+                                        end = (uint8_t *)ff_avc_find_startcode(start+4, endptr);
+                                }
+                                nextstart = end;
+                                if(sendp == NULL)
+                                        sendp = start;
+                                cntNalu++;
+
+                                if(start == end){
+                                        eof = 1;
+                                        end = endptr + 1;
+                                        cbRet = callback(sendp, end - start, THIS_IS_VIDEO, nNextVideoTime-nSysTimeBase);
+                                        if (cbRet != 0) {
+                                                bVideoOk = 0;
+                                                continue;
+                                        }
+                                        break;
+                                }
+
+                                int type = -1;
+                                if(start[2] == 0x01){//0x 00 00 01
+                                        type = start[3] & 0x1F;
+                                }else{ // 0x 00 00 00 01
+                                        type = start[4] & 0x1F;
+                                }
+
+                                if(type == 1 || type == 5 ){
+                                        if(cntNalu == 1){
+                                                printf("send one video packet:%ld\n", end - sendp);
+                                                cbRet = callback(sendp, end - sendp, THIS_IS_VIDEO, nNextVideoTime-nSysTimeBase);
+                                                if (cbRet != 0) {
+                                                        bVideoOk = 0;
+                                                }
+                                                nNextVideoTime += 40; //这里才加时间戳，其它都不是视频帧
+                                        }else{ // pps sps sei etc
+                                                printf("send one video packet:%ld\n", start - sendp);
+                                                cbRet = callback(sendp, start - sendp, THIS_IS_VIDEO, nNextVideoTime-nSysTimeBase);
+                                                if (cbRet != 0) {
+                                                        bVideoOk = 0;
+                                                }
+                                                backupstart = start;
+                                                backupend = end;
+                                                cntNalu--;// 这次保存了起来，需要少算一次
+                                        }
+                                        break;
+                                }
+                        }while(1);
+                }
+
+                if (nNextAudioTime > nNextVideoTime) {
+                        usleep((nNextVideoTime - nNow - 1) * 1000);
+                } else {
+                        usleep((nNextAudioTime - nNow - 1) * 1000);
+                }
+                nNow = getCurrentMilliSecond();
+        }
+
+        if (pAudioData) {
+                free(pAudioData);
+        }
+        if (pVideoData) {
+                free(pVideoData);
+        }
         return 0;
 }
 //read audio video from file end
@@ -431,6 +545,7 @@ void pjmedia_sdp_neg_test_as_answer(pj_pool_factory *_pFactory)
 
 
 pj_oshandle_t gPcmuFd;
+pj_oshandle_t gH264Fd;
 static void onRxRtp(void *_pUserData, CallbackType _type, void *_pCbData)
 {
         switch (_type){
@@ -445,10 +560,10 @@ static void onRxRtp(void *_pUserData, CallbackType _type, void *_pCbData)
                 case CALLBACK_RTP:{
                         RtpPacket *pPkt = (RtpPacket *)_pCbData;
                         pj_ssize_t nLen = pPkt->nDataLen;
-                        if (nLen == 160) {
+                        if (pPkt->type == TYPE_AUDIO && nLen == 160) {
                                 pj_file_write(gPcmuFd, pPkt->pData, &nLen);
-                        } else {
-                                printf("-------========>%ld\n", nLen);
+                        } else if (pPkt->type == TYPE_VIDEO) {
+                                pj_file_write(gH264Fd, pPkt->pData, &nLen);
                         }
                 }
                         break;
@@ -456,6 +571,21 @@ static void onRxRtp(void *_pUserData, CallbackType _type, void *_pCbData)
                         fprintf(stderr, "==========>callback_rtcp\n");
                         break;
         }
+}
+
+static int receive_data_callback(void *pData, int nDataLen, int nFlag, uint64_t timestamp)
+{
+        printf("send %d to rtp\n", nDataLen);
+        RtpPacket rtpPacket;
+        pj_bzero(&rtpPacket, sizeof(rtpPacket));
+        if (nFlag == THIS_IS_AUDIO)
+                rtpPacket.type = TYPE_AUDIO;
+        else
+                rtpPacket.type = TYPE_VIDEO;
+        rtpPacket.pData = (uint8_t *)pData;
+        rtpPacket.nDataLen = nDataLen;
+        rtpPacket.nTimestamp = timestamp;
+        return SendPacket(&app.peerConnection, &rtpPacket);
 }
 
 int main(int argc, char **argv)
@@ -482,13 +612,21 @@ int main(int argc, char **argv)
         pj_caching_pool_init(&app.cachingPool, &pj_pool_factory_default_policy, 0);
 
         //test receive pcmu
-        pj_pool_t * apool = pj_pool_create(&app.cachingPool.factory, "rxrtp", 2000, 2000, NULL);
+        pj_pool_t * apool = pj_pool_create(&app.cachingPool.factory, "rxrtpa", 2000, 2000, NULL);
         status = pj_file_open(apool, "/Users/liuye/Documents/p2p/build/src/work/Debug/rxrtp.mulaw", PJ_O_WRONLY, &gPcmuFd);
         if(status != PJ_SUCCESS){
                 printf("pj_file_open fail:%d\n", status);
                 return status;
         }
-        //end test recive pcmu
+        //end test recive h264
+        //test receive pcmu
+        pj_pool_t * vpool = pj_pool_create(&app.cachingPool.factory, "rxrtpv", 2000, 2000, NULL);
+        status = pj_file_open(vpool, "/Users/liuye/Documents/p2p/build/src/work/Debug/rxrtp.h264", PJ_O_WRONLY, &gH264Fd);
+        if(status != PJ_SUCCESS){
+                printf("pj_file_open fail:%d\n", status);
+                return status;
+        }
+        //end test recive h264
         
         InitIceConfig(&app.userConfig);
         strcpy(app.userConfig.turnHost, "127.0.0.1");
@@ -588,6 +726,10 @@ int main(int argc, char **argv)
                 }
         } else {
                 input_confirm("confirm to sendfile:");
+                start_file_test("/Users/liuye/Documents/p2p/build/src/mysiprtp/Debug/8000_1.mulaw",
+                                "/Users/liuye/Documents/p2p/build/src/mysiprtp/Debug/hks.h264",
+                                receive_data_callback);
+#if 0
                 pj_oshandle_t audioFd;
                 pj_pool_t * apool = pj_pool_create(&app.cachingPool.factory, "afiletest", 2000, 2000, NULL);
                 status = pj_file_open(apool, "/Users/liuye/Documents/p2p/build/src/mysiprtp/Debug/8000_1.mulaw", PJ_O_RDONLY, &audioFd);
@@ -636,6 +778,7 @@ int main(int argc, char **argv)
                                 }
                         }
                 }
+#endif
         }
         
         input_confirm("quit");
