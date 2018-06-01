@@ -480,7 +480,7 @@ int main(int argc, char **argv)
         char textSdpBuf[2048] = {0};
         
         pj_caching_pool_init(&app.cachingPool, &pj_pool_factory_default_policy, 0);
-        
+
         //test receive pcmu
         pj_pool_t * apool = pj_pool_create(&app.cachingPool.factory, "rxrtp", 2000, 2000, NULL);
         status = pj_file_open(apool, "/Users/liuye/Documents/p2p/build/src/work/Debug/rxrtp.mulaw", PJ_O_WRONLY, &gPcmuFd);
@@ -497,7 +497,7 @@ int main(int argc, char **argv)
         strcpy(app.userConfig.turnPassword, "root");
         app.userConfig.userCallback = onRxRtp;
         //there is default ice config
-        InitPeerConnectoin(&app.peerConnection, &app.cachingPool.factory, &app.userConfig); //&app.userConfig
+        InitPeerConnectoin(&app.peerConnection, &app.userConfig); //&app.userConfig
         
         //start pjmedia_sdp_neg test
         printf("pjmedia_sdp_neg_test\n");

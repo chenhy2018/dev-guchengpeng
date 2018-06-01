@@ -90,6 +90,7 @@ typedef struct _PeerConnection
         IceConfig         userIceConfig;
         TransportIce      transportIce[2]; //audio and video
         int               nAvIndex[2];
+        pj_caching_pool   cachingPool;
         pj_pool_factory   *pPoolFactory;
         pjmedia_endpt     *pMediaEndpt;
         MediaStream       mediaStream;
@@ -116,7 +117,7 @@ typedef struct _RtpPacket{
 
 void InitIceConfig(IN OUT IceConfig *pIceConfig);
 
-void InitPeerConnectoin(IN OUT PeerConnection * pPeerConnectoin, IN pj_pool_factory * pPoolFactory,
+void InitPeerConnectoin(IN OUT PeerConnection * pPeerConnectoin,
                         IN IceConfig *pIceConfig);
 
 int AddAudioTrack(IN OUT PeerConnection * pPeerConnection, IN MediaConfig *pAudioConfig);

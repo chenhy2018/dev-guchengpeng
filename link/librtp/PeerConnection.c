@@ -343,7 +343,7 @@ void InitIceConfig(IN OUT IceConfig *_pIceConfig)
         _pIceConfig->nKeepAlive = 300;
 }
 
-void InitPeerConnectoin(IN OUT PeerConnection * _pPeerConnection, IN pj_pool_factory * _pPoolFactory, IN IceConfig *_pIceConfig)
+void InitPeerConnectoin(IN OUT PeerConnection * _pPeerConnection, IN IceConfig *_pIceConfig)
 {
         pj_memset(_pPeerConnection, 0, sizeof(PeerConnection));
         
@@ -357,7 +357,9 @@ void InitPeerConnectoin(IN OUT PeerConnection * _pPeerConnection, IN pj_pool_fac
         }
         
         _pPeerConnection->userIceConfig = *_pIceConfig;
-        _pPeerConnection->pPoolFactory = _pPoolFactory;
+
+        pj_caching_pool_init(&_pPeerConnection->cachingPool, &pj_pool_factory_default_policy, 0);
+        _pPeerConnection->pPoolFactory = &_pPeerConnection->cachingPool.factory;
         
         peerConnectInitIceConfig(_pPeerConnection);
         
