@@ -995,6 +995,7 @@ static int SendVideoPacket(IN PeerConnection *_pPeerConnection, IN OUT RtpPacket
         const pj_uint8_t * pPayload;
         pj_size_t nPayloadLen;
         unsigned nBitsPos;
+        int nTsLlen = nRtpTsLen;
 
         while (nLeft != 0) {
 
@@ -1016,18 +1017,14 @@ static int SendVideoPacket(IN PeerConnection *_pPeerConnection, IN OUT RtpPacket
                 
                 
                 int marker = 0;
-                int nTsLlen = nRtpTsLen;
                 if (nOffset == _pPacket->nDataLen && nOffset != nBitsPos){
                         marker = 1;
                 }
-                int type = _pPacket->pData[0] & 0x1F;
-                if(type != 1 && type != 5 )
-                        nTsLlen = 0;
-                if(nOffset != nBitsPos)
-                        nTsLlen = 0;
-
+                printf("send one video frame with %ld bytes\n", nPayloadLen);
                 status =  sendPacket(pMediaTrack, pTransportIce, nRtpType, marker, nTsLlen, pPayload, nPayloadLen);
                 STATUS_CHECK(pjmedia_rtp_encode_rtp, status);
+
+                nTsLlen = 0;
         }
         
         return PJ_SUCCESS;
