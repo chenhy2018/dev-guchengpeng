@@ -5,8 +5,6 @@
 #include <pjlib-util.h>
 #include <pjlib.h>
 
-#include <stdlib.h>
-#include <stdio.h>
 #include "sip.h"
 #include "sip_internal.h"
 
@@ -58,8 +56,6 @@ static void onSipCallOnForked(IN pjsip_inv_session *pInviteSession, IN pjsip_eve
 static int SipGetAccountIdFromRxData(IN const pjsip_rx_data *_pRxData);
 
 static pj_bool_t SipUpdateContactIfNat(IN SipAccount *_pAccount, IN struct pjsip_regc_cbparam *_pCbData);
-
-static int CreateTmpSDP(pj_pool_t *pPool, SipCall *pCall, pjmedia_sdp_session **pSdp);
 
 /* This is a PJSIP module to be registered by application to handle
  * incoming requests outside any dialogs/transactions. The main purpose
@@ -176,7 +172,7 @@ int SipCreateInstance(IN const SipCallBack *_pSipCallBack)
         SipAppData.LocalPort = tp->local_name.port;
         PJ_ASSERT_RETURN(Status == PJ_SUCCESS, Status);
 
-        PJ_LOG(3,(THIS_FILE, "SIP UDP listening on %.*s:%d",
+        PJ_LOG(4,(THIS_FILE, "SIP UDP listening on %.*s:%d",
                   (int)tp->local_name.host.slen, tp->local_name.host.ptr,
                   tp->local_name.port));
 
@@ -240,7 +236,7 @@ int SipCreateInstance(IN const SipCallBack *_pSipCallBack)
 void SipDestroyInstance()
 {
         if (SipAppData.pSipEndPoint) {
-                PJ_LOG(3, (THIS_FILE, "Destroy libSip instance ..."));
+                PJ_LOG(4, (THIS_FILE, "Destroy libSip instance ..."));
         }
 
         /* Hangup all calls */
@@ -280,13 +276,13 @@ void SipDestroyInstance()
                 pj_caching_pool_destroy(&SipAppData.Cp);
         }
 
-        PJ_LOG(3, (THIS_FILE, "LibSip destroyed..."));
+        PJ_LOG(4, (THIS_FILE, "LibSip destroyed..."));
 
         pj_shutdown();
 
         pj_bzero(&SipAppData, sizeof(SipAppData));
 }
-int SipAddNewAccount(IN const char *_pUserName, IN const char *_pPassWord, IN const char *_pDomain)
+int SipAddNewAccount(IN const char *_pUserName, IN const char *_pPassWord, IN const char *_pDomain, IN void *_pUser)
 {
         /* Input check */
         PJ_ASSERT_RETURN(_pUserName && _pPassWord && _pDomain, PJ_EINVAL);
@@ -332,6 +328,7 @@ int SipAddNewAccount(IN const char *_pUserName, IN const char *_pPassWord, IN co
         pj_str_t PJDomain = pj_str((char *)_pDomain);
         pj_str_t PJKeepAliveData = pj_str("\r\n");
 
+        pAccount->pUserData = _pUser;
         pj_strdup_with_null(pAccount->pPool, &pAccount->Config.RegUri, &PJReg);
         pj_strdup_with_null(pAccount->pPool, &pAccount->Config.KaData, &PJKeepAliveData);
         pj_strdup_with_null(pAccount->pPool, &pAccount->Config.Id, &PJID);
@@ -356,9 +353,8 @@ void SipDeleteAccount(IN const int _nAccountId)
         SipAccount *pAccount;
 
         PJ_LOG(4,(THIS_FILE, "Deleting account %d..", _nAccountId));
-        //pj_mutex_lock(SipAppData.pMutex);
+        pj_mutex_lock(SipAppData.pMutex);
         pAccount = &SipAppData.Accounts[_nAccountId];
-
         /* Cancel keep alive timer */
         if (pAccount->KaTimer.id) {
                 pjsip_endpt_cancel_timer(SipAppData.pSipEndPoint, &pAccount->KaTimer);
@@ -382,7 +378,7 @@ void SipDeleteAccount(IN const int _nAccountId)
         }
         pAccount->bValid = PJ_FALSE;
         pAccount->Contact.slen = 0;
-        //pj_mutex_unlock(SipAppData.pMutex);
+        pj_mutex_unlock(SipAppData.pMutex);
 }
 
 int SipRegAccount(IN const int _nAccountId, IN const int _bDeReg)
@@ -420,7 +416,7 @@ int SipRegAccount(IN const int _nAccountId, IN const int _bDeReg)
                 Status = pjsip_regc_register(pAccount->pRegc, 1, &pTransData);
                 /* Add authorization header */
                 if (Status == PJ_SUCCESS && pAccount->nCredCnt) {
-                        PJ_LOG(3, (THIS_FILE, "Add Credentials info"));
+                        PJ_LOG(4, (THIS_FILE, "Add Credentials info"));
                         pjsip_authorization_hdr *pAuthHeader;
                         pAuthHeader = pjsip_authorization_hdr_create(pTransData->pool);
                         pAuthHeader->scheme = pj_str("Digest");
@@ -434,7 +430,7 @@ int SipRegAccount(IN const int _nAccountId, IN const int _bDeReg)
                 }
         } else {
                 if (pAccount->pRegc == NULL) {
-                        PJ_LOG(3, (THIS_FILE, "Currently not registered"));
+                        PJ_LOG(4, (THIS_FILE, "Currently not registered"));
                         pj_mutex_unlock(SipAppData.pMutex);
                         return 1;
                 }
@@ -512,7 +508,7 @@ static pj_status_t SipRegcInit(IN const int _nAccountId)
                                  &pAccount->Contact,
                                  pAccount->Config.nRegTimeout);
         if (Status != PJ_SUCCESS) {
-                PJ_LOG(3, (THIS_FILE, "Client registration initialization error", Status));
+                PJ_LOG(4, (THIS_FILE, "Client registration initialization error", Status));
                 pjsip_regc_destroy(pAccount->pRegc);
                 pAccount->pRegc = NULL;
                 pAccount->Contact.slen = 0;
@@ -536,13 +532,12 @@ static pj_status_t SipRegcInit(IN const int _nAccountId)
  */
 static void onSipRegc(IN struct pjsip_regc_cbparam *_pCbData)
 {
-        PJ_LOG(3, (THIS_FILE, "call onSipRegc"));
         SipAccount *pAccount = (SipAccount *)_pCbData->token;
         pj_mutex_lock(SipAppData.pMutex);
 
         /* Print registration Status */
         if (_pCbData->status != PJ_SUCCESS) {
-                PJ_LOG(3, (THIS_FILE, "SIP registration error, status = %d", _pCbData->status));
+                PJ_LOG(4, (THIS_FILE, "SIP registration error, status = %d", _pCbData->status));
                 pjsip_regc_destroy(pAccount->pRegc);
                 pAccount->pRegc = NULL;
                 pAccount->Contact.slen = 0;
@@ -565,9 +560,9 @@ static void onSipRegc(IN struct pjsip_regc_cbparam *_pCbData)
                         pAccount->Contact.slen = 0;
                         /* Stop keep alive timer */
                         UpdateKeepAlive(pAccount, PJ_FALSE, NULL);
-                        PJ_LOG(3, (THIS_FILE, "%s: un-registration success", pAccount->Config.Id.ptr));
+                        PJ_LOG(4, (THIS_FILE, "%s: un-registration success", pAccount->Config.Id.ptr));
                 } else {
-                        PJ_LOG(3, (THIS_FILE, "%s: registration success, status = %d(%.*s)"
+                        PJ_LOG(4, (THIS_FILE, "%s: registration success, status = %d(%.*s)"
                                    "will re-register in %d seconds", pAccount->Config.Id.ptr,
                                    _pCbData->code,
                                    (int)_pCbData->reason.slen, _pCbData->reason.ptr,
@@ -580,7 +575,7 @@ static void onSipRegc(IN struct pjsip_regc_cbparam *_pCbData)
         pAccount->nLastRegCode = _pCbData->code;
 
         if (SipAppData.OnRegStateChange) {
-                (*SipAppData.OnRegStateChange)(pAccount->nIndex, (SipAnswerCode)pAccount->nLastRegCode);
+                (*SipAppData.OnRegStateChange)(pAccount->nIndex, (SipAnswerCode)pAccount->nLastRegCode, pAccount->pUserData);
         }
         pj_mutex_unlock(SipAppData.pMutex);
 
@@ -597,7 +592,6 @@ static void onSipRegc(IN struct pjsip_regc_cbparam *_pCbData)
 }
 static void UpdateKeepAlive(INOUT SipAccount *_pAccount, IN const pj_bool_t _Start, IN const struct pjsip_regc_cbparam *_pCbData)
 {
-        PJ_LOG(3, (THIS_FILE, "call UpdateKeepAlive"));
         if (_pAccount->KaTimer.id) {
                 pjsip_endpt_cancel_timer(SipAppData.pSipEndPoint, &_pAccount->KaTimer);
                 _pAccount->KaTimer.id = PJ_FALSE;
@@ -641,7 +635,7 @@ static void UpdateKeepAlive(INOUT SipAccount *_pAccount, IN const pj_bool_t _Sta
                 Status = pjsip_endpt_schedule_timer(SipAppData.pSipEndPoint, &_pAccount->KaTimer, &Delay);
                 if (Status == PJ_SUCCESS) {
                         _pAccount->KaTimer.id = PJ_TRUE;
-                        PJ_LOG(3,(THIS_FILE, "Keep-alive timer started for acc %d, "
+                        PJ_LOG(4,(THIS_FILE, "Keep-alive timer started for acc %d, "
                                   "destination:%s:%d, interval:%ds",
                                   _pAccount->nIndex,
                                   _pCbData->rdata->pkt_info.src_name,
@@ -659,7 +653,6 @@ static void UpdateKeepAlive(INOUT SipAccount *_pAccount, IN const pj_bool_t _Sta
 /* Keep alive timer callback */
 static void KeepAliveTimerCallBack(IN pj_timer_heap_t *_pTimerHeap, IN pj_timer_entry *_pTimerEntry)
 {
-        PJ_LOG(3, (THIS_FILE, "call KeepAliveTimerCallBack"));
         SipAccount *pAccount;
         pjsip_tpselector TransportSelect;
         pj_time_val Delay;
@@ -679,9 +672,9 @@ static void KeepAliveTimerCallBack(IN pj_timer_heap_t *_pTimerHeap, IN pj_timer_
         TransportSelect.type = PJSIP_TPSELECTOR_TRANSPORT;
         TransportSelect.u.transport = pAccount->KaTransport;
 
-        PJ_LOG(4,(THIS_FILE,
-                  "Sending %d bytes keep-alive packet for acc %d",
-                  pAccount->Config.KaData.slen, pAccount->nIndex));
+        //        PJ_LOG(4,(THIS_FILE,
+        //"Sending %d bytes keep-alive packet for acc %d",
+                          //        pAccount->Config.KaData.slen, pAccount->nIndex));
 
         /* Send keepalive raw(\r\n) packet */
         Status = pjsip_tpmgr_send_raw(pjsip_endpt_get_tpmgr(SipAppData.pSipEndPoint),
@@ -713,7 +706,7 @@ static void KeepAliveTimerCallBack(IN pj_timer_heap_t *_pTimerHeap, IN pj_timer_
         if (Status == PJ_SUCCESS) {
                 _pTimerEntry->id = PJ_TRUE;
         } else {
-                PJ_LOG(3, (THIS_FILE, "Error sending keep-alive packet, Status = %d", Status));
+                PJ_LOG(4, (THIS_FILE, "Error sending keep-alive packet, Status = %d", Status));
         }
         pj_mutex_unlock(SipAppData.pMutex);
 }
@@ -721,8 +714,6 @@ static void KeepAliveTimerCallBack(IN pj_timer_heap_t *_pTimerHeap, IN pj_timer_
 /* On registration transaction callback */
 static void onSipRegcTsx(IN struct pjsip_regc_tsx_cb_param *_pCbData)
 {
-        PJ_LOG(3, (THIS_FILE, "call onSipRegcTsx"));
-        // TODO update concat
         if (_pCbData->cbparam.code >= 400 && _pCbData->cbparam.rdata) {
                 SipAccount *pAccount = (SipAccount *)_pCbData->cbparam.token;
                 if (SipUpdateContactIfNat(pAccount, &_pCbData->cbparam)) {
@@ -760,8 +751,8 @@ static pj_bool_t SipUpdateContactIfNat(IN SipAccount *_pAccount, IN struct pjsip
         int nRport;
         pjsip_via_hdr *pVia;
 
-        if (!isPrivateIp(&SipAppData.LocalIp))
-                return PJ_FALSE;
+        //if (!isPrivateIp(&SipAppData.LocalIp))
+        //      return PJ_FALSE;
 
         pVia = _pCbData->rdata->msg_info.via;
         if (pVia->rport_param < 1 || (pVia->recvd_param.slen ==0))
@@ -796,7 +787,7 @@ static int SipGetFreeCallId(void)
         }
         return -1;
 }
-int SipMakeNewCall(IN const int _nFromAccountId, IN const char *_pDestUri)
+int SipMakeNewCall(IN const int _nFromAccountId, IN const char *_pDestUri, IN const void *pMedia)
 {
         int nCallId;
         SipCall *pCall;
@@ -817,7 +808,7 @@ int SipMakeNewCall(IN const int _nFromAccountId, IN const char *_pDestUri)
         /* Find free call id */
         nCallId = SipGetFreeCallId();
         if (nCallId == -1) {
-                PJ_LOG(3, (THIS_FILE, "Too many calls"));
+                PJ_LOG(4, (THIS_FILE, "Too many calls"));
                 pj_mutex_unlock(SipAppData.pMutex);
                 return -1;
         }
@@ -836,7 +827,8 @@ int SipMakeNewCall(IN const int _nFromAccountId, IN const char *_pDestUri)
                 return -1;
         }
         /* TODO get Local SDP */
-        CreateTmpSDP(pDialog->pool, pCall, &pMediaSession);
+        //CreateTmpSDP(pDialog->pool, pCall, &pMediaSession);
+        pMediaSession = (pjmedia_sdp_session *)pMedia;
         /* Create invite session */
         Status = pjsip_inv_create_uac(pDialog, pMediaSession, 0, &pCall->pInviteSession);
         if (Status != PJ_SUCCESS) {
@@ -873,6 +865,55 @@ int SipMakeNewCall(IN const int _nFromAccountId, IN const char *_pDestUri)
         return nCallId;
 }
 
+int SipAnswerCall(IN const int _nCallId, IN const SipAnswerCode _StatusCode, IN const char *_pReason, IN const void *_pMedia)
+{
+        /* Check that callId is valid */
+        PJ_ASSERT_RETURN(_nCallId >=0 || _nCallId <(int)PJ_ARRAY_SIZE(SipAppData.Calls), -1);
+        if (SipAppData.Calls[_nCallId].pInviteSession == NULL)
+                return -1;
+
+        pj_str_t Reason = pj_str((char *)_pReason);
+        pj_str_t *pReason;
+        pj_status_t Status;
+        pjsip_tx_data *pTxData;
+        SipCall *pCall = &SipAppData.Calls[_nCallId];
+        pjmedia_sdp_session *pSdp;
+
+        if (!_pReason)
+                pReason = NULL;
+        else
+                pReason = &Reason;
+
+        if (_StatusCode == OK)
+                pSdp = (pjmedia_sdp_session*)_pMedia;
+        else
+                pSdp = NULL;
+        pj_mutex_lock(SipAppData.pMutex);
+        Status = pjsip_inv_answer(pCall->pInviteSession,
+                                  _StatusCode, pReason,
+                                  pSdp,
+                                  &pTxData);
+        if (Status != PJ_SUCCESS) {
+                PrintErrorMsg(Status, "Create user response error");
+                goto onError;
+        }
+
+        /*  Send the response.*/
+        Status = pjsip_inv_send_msg(pCall->pInviteSession, pTxData);
+        if (Status != PJ_SUCCESS) {
+                PrintErrorMsg(Status, "Send user response error");
+                goto onError;
+
+        }
+        pj_mutex_unlock(SipAppData.pMutex);
+        return 1;
+
+ onError:
+        /* Release the session */
+        pjsip_inv_terminate(pCall->pInviteSession, 500, PJ_FALSE);
+        pj_mutex_unlock(SipAppData.pMutex);
+        return -1;
+}
 void SipHangUp(IN const int _nCallId)
 {
         pjsip_tx_data *pTxData;
@@ -882,11 +923,12 @@ void SipHangUp(IN const int _nCallId)
                 return;
 
         /* TODO release media resource */
+        pj_mutex_lock(SipAppData.pMutex);
         SipAppData.Calls[_nCallId].bValid = PJ_FALSE;
-        Status = pjsip_inv_end_session(SipAppData.Calls[_nCallId].pInviteSession, 603, NULL, &pTxData);
+        Status = pjsip_inv_end_session(SipAppData.Calls[_nCallId].pInviteSession, 0, NULL, &pTxData);
         if (Status == PJ_SUCCESS && pTxData != NULL)
                 pjsip_inv_send_msg(SipAppData.Calls[_nCallId].pInviteSession, pTxData);
-
+        pj_mutex_unlock(SipAppData.pMutex);
 }
 
 void SipHangUpAll()
@@ -902,7 +944,7 @@ void SipHangUpByAccountId(int _nAccountId)
         int i;
         for (i = 0; i < SIP_MAX_CALLS; ++i) {
                 if (SipAppData.Calls[i].bValid == PJ_TRUE && SipAppData.Calls[i].nAccountId == _nAccountId)
-                        PJ_LOG(3, (THIS_FILE, "Disconnecting call of account #%d, after reregistration attempt failed", _nAccountId));
+                        PJ_LOG(4, (THIS_FILE, "Disconnecting call of account #%d, after reregistration attempt failed", _nAccountId));
                         SipHangUp(SipAppData.Calls[i].nIndex);
         }
 }
@@ -918,7 +960,6 @@ static pj_bool_t onRxRequest(IN pjsip_rx_data *_pRxData )
         pj_status_t Status;
         unsigned nOption;
         pjsip_tx_data *pTxData;
-        pjmedia_sdp_session *pSdp;
 
         /* Only accept INVITE method */
         if (pMessage->line.req.method.id != PJSIP_INVITE_METHOD) {
@@ -985,8 +1026,8 @@ static pj_bool_t onRxRequest(IN pjsip_rx_data *_pRxData )
         }
 
         /* Creat Invite Session */
-        CreateTmpSDP(pDialog->pool, pCall, &pSdp);
-        Status = pjsip_inv_create_uas(pDialog, _pRxData, pSdp, 0, &pCall->pInviteSession);
+        //CreateTmpSDP(pDialog->pool, pCall, &pSdp);
+        Status = pjsip_inv_create_uas(pDialog, _pRxData, NULL, 0, &pCall->pInviteSession);
         if (Status != PJ_SUCCESS) {
                 PrintErrorMsg(Status, "Create UAS invite session failed");
                 pj_str_t Reason = pj_str("Sorry we can't create Invite session");
@@ -997,20 +1038,9 @@ static pj_bool_t onRxRequest(IN pjsip_rx_data *_pRxData )
                 return PJ_TRUE;
         }
         pCall->pInviteSession->mod_data[SipMod.id] = pCall;
-        pj_mutex_unlock(SipAppData.pMutex);
         pjsip_dlg_dec_lock(pDialog);
 
         pj_gettimeofday(&pCall->StartTime);
-
-        /* TODO put remote SDP to mengke */
-        int nContentLen = _pRxData->msg_info.clen->len;
-        if (nContentLen != 0) {
-                char buf[nContentLen];
-                const pjmedia_sdp_session *pRemoteSdp;
-                pjmedia_sdp_neg_get_neg_remote(pCall->pInviteSession->neg, &pRemoteSdp);
-                pjmedia_sdp_print(pRemoteSdp, buf, nContentLen);
-                PJ_LOG(4, (THIS_FILE, "remote SDP\n%s", buf));
-        }
         pCall->bValid = PJ_TRUE;
 
         /* Create a 180 response */
@@ -1041,11 +1071,15 @@ static pj_bool_t onRxRequest(IN pjsip_rx_data *_pRxData )
                 From[i] = pFrom[i];
         }
         From[i] = 0;
-        /*TODO Create local SDP */
 
-
-        /* Now create answer with user response */
-        int nAnswerCode = (int)SipAppData.OnIncomingCall(nToAccountId, nCallId,  From);
+        /* TODO put remote SDP to mengke */
+        const pjmedia_sdp_session *pRemoteSdp = NULL;
+        pjsip_rdata_sdp_info *pSdpInfo = NULL;
+        pSdpInfo = pjsip_rdata_get_sdp_info(_pRxData);
+        if (pSdpInfo)
+                pRemoteSdp = pSdpInfo->sdp;
+        SipAppData.OnIncomingCall(nToAccountId, nCallId,  From, SipAppData.Accounts[pCall->nAccountId].pUserData, (void *)pRemoteSdp);
+        /*
         Status = pjsip_inv_answer(pCall->pInviteSession,
                                    nAnswerCode, NULL,
                                    NULL,
@@ -1055,13 +1089,13 @@ static pj_bool_t onRxRequest(IN pjsip_rx_data *_pRxData )
                 goto onError;
         }
 
-        /*  Send the response.*/
         Status = pjsip_inv_send_msg(pCall->pInviteSession, pTxData);
         if (Status != PJ_SUCCESS) {
                 PrintErrorMsg(Status, "Send user response error");
                 goto onError;
-
         }
+        */
+        pj_mutex_unlock(SipAppData.pMutex);
         return PJ_TRUE;
 
  onError:
@@ -1115,8 +1149,11 @@ static void onSipCallOnStateChanged(IN pjsip_inv_session *_pInviteSession,
                                    IN pjsip_event *_pEvent)
 {
         SipCall *pCall = (SipCall *)_pInviteSession->mod_data[SipMod.id];
-        PJ_LOG(3, (THIS_FILE, "call state = %d, last answer = %d, callId = %d",
-                   _pInviteSession->state, _pInviteSession->cause, pCall->nIndex));
+        const pjmedia_sdp_session *pRemoteSdp = NULL;
+        pjsip_rx_data *RxData = NULL;
+        pjsip_rdata_sdp_info *pSdpInfo = NULL;
+        PJ_LOG(4, (THIS_FILE, "call state = %d, last answer = %d, callId = %d, eventId = %d",
+                   _pInviteSession->state, _pInviteSession->cause, pCall->nIndex, _pEvent->type));
         if (_pInviteSession->state == PJSIP_INV_STATE_EARLY ||
             _pInviteSession->state == PJSIP_INV_STATE_CONNECTING) {
                 pj_gettimeofday(&pCall->ResponseTime);
@@ -1129,7 +1166,7 @@ static void onSipCallOnStateChanged(IN pjsip_inv_session *_pInviteSession,
                 PJ_TIME_VAL_SUB(t, pCall->StartTime);
                 PJ_LOG(4, (THIS_FILE, "Call conFirmed in %d ms",PJ_TIME_VAL_MSEC(t)));
         } else if (_pInviteSession->state == PJSIP_INV_STATE_DISCONNECTED) {
-                PJ_LOG(3,(THIS_FILE, "Call #%d disconnected. Reason=%d (%.*s)",
+                PJ_LOG(4,(THIS_FILE, "Call #%d disconnected. Reason=%d (%.*s)",
                           pCall->nIndex,
                           _pInviteSession->cause,
                           (int)_pInviteSession->cause_text.slen,
@@ -1137,9 +1174,14 @@ static void onSipCallOnStateChanged(IN pjsip_inv_session *_pInviteSession,
 
                 pCall->pInviteSession = NULL;
                 _pInviteSession->mod_data[SipMod.id] = NULL;
-                /* TODO destory media */
         }
-        SipAppData.OnCallStateChange(pCall->nIndex, pCall->nAccountId, (SipInviteState)_pInviteSession->state, (SipAnswerCode)_pInviteSession->cause);
+        if (_pInviteSession->state == PJSIP_INV_STATE_CONNECTING && _pInviteSession->role == PJSIP_ROLE_UAC) {
+                RxData = _pEvent->body.rx_msg.rdata;
+                pSdpInfo = pjsip_rdata_get_sdp_info(RxData);
+                if (pSdpInfo)
+                        pRemoteSdp = pSdpInfo->sdp;
+        }
+        SipAppData.OnCallStateChange(pCall->nIndex, pCall->nAccountId, (SipInviteState)_pInviteSession->state, (SipAnswerCode)_pInviteSession->cause, SipAppData.Accounts[pCall->nAccountId].pUserData, (void*)pRemoteSdp);
 }
 
 /* Callback to be called when dialog has forked: */
@@ -1148,8 +1190,9 @@ static void onSipCallOnForked(pjsip_inv_session *pInviteSession, pjsip_event *pE
 
 }
 
-static int CreateTmpSDP(pj_pool_t *_pPool, SipCall *_pCall, pjmedia_sdp_session **_pSdp)
+int CreateTmpSDP(OUT void **_pSdp)
 {
+        pj_pool_t *_pPool = SipAppData.pPool;
         pj_time_val TimeVal;
         pjmedia_sdp_session *pSdp;
         pjmedia_sdp_media *pMedia;
@@ -1232,8 +1275,13 @@ static int CreateTmpSDP(pj_pool_t *_pPool, SipCall *_pCall, pjmedia_sdp_session 
         pMedia->attr[pMedia->attr_count++] = pAttr;
 
         /* Done */
-        *_pSdp = pSdp;
+        *_pSdp = (void *)pSdp;
 
         return PJ_SUCCESS;
 
+}
+
+void SipSetLogLevel(int _nLevel)
+{
+        pj_log_set_level(_nLevel);
 }
