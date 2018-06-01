@@ -271,11 +271,13 @@ pj_status_t h264_unpacketize(IN OUT MediaPacketier *_pKtz,
                         pPktz->bFuAStartbit = PJ_FALSE;
                         *_pBitstreamPos = pPktz->nUnpackBufLen;
                         *_pBitstream = pPktz->pUnpackBuf;
+                        pPktz->nUnpackBufLen = 0;
                 }
         } else { //stap-A(nType == 24) or single NAL unit packets
                 *_pBitstreamPos = pPktz->nUnpackBufLen;
                 *_pBitstream = pPktz->pUnpackBuf;
                 pPktz->nUnpackBufLen = 0;
+                pPktz->bFuAStartbit = PJ_FALSE;
         }
 
         return status;
