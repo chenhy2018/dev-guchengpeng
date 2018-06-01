@@ -71,6 +71,7 @@ static int getFileAndLength(char *_pFname, FILE **_pFile, int *_pLen)
         if ( f == NULL ) {
                 return -1;
         }
+        *_pFile = f;
         fseek(f, 0, SEEK_END);
         long nLen = ftell(f);
         fseek(f, 0, SEEK_SET);
@@ -90,13 +91,15 @@ static int readFileToBuf(char * _pFilename, char ** _pBuf, int *_pLen)
         }
         char *pData = malloc(nLen);
         assert(pData != NULL);
-        ret = fread(_pBuf, 1, nLen, pFile);
+        ret = fread(pData, 1, nLen, pFile);
         if (ret <= 0) {
                 fprintf(stderr, "open file %s fail\n", _pFilename);
                 fclose(pFile);
                 free(pData);
                 return -2;
         }
+        *_pBuf = pData;
+        *_pLen = nLen;
         return 0;
 }
 
@@ -146,8 +149,9 @@ int start_file_test(char * _pAudioFile, char * _pVideoFile, DataCallback callbac
         uint8_t * backupstart = NULL;// sps pps Iframe frame2
         uint8_t * backupend = NULL;
         int cbRet = 0;
+        
         while (bAudioOk || bVideoOk) {
-                if (bAudioOk && nNextAudioTime + 1 >= nNow) {
+                if (bAudioOk && nNow+1 > nNextAudioTime) {
                         if(audioOffset+160 < nAudioDataLen) {
                                 cbRet = callback(pAudioData + audioOffset, 160, THIS_IS_AUDIO, nNextAudioTime-nSysTimeBase);
                                 if (cbRet != 0) {
@@ -160,12 +164,15 @@ int start_file_test(char * _pAudioFile, char * _pVideoFile, DataCallback callbac
                                 bAudioOk = 0;
                         }
                 }
-                if (bVideoOk && nNextAudioTime + 1 >= nNow) {
+                if (bVideoOk && nNow+1 > nNextVideoTime) {
+
                         uint8_t * start = NULL;
                         uint8_t * end = NULL;
                         uint8_t * sendp = NULL;
                         int eof = 0;
                         int cntNalu = 0;
+                        int type = -1;
+                        RESEND:
                         do{
                                 if(backupstart){
                                         start = backupstart;
@@ -183,16 +190,15 @@ int start_file_test(char * _pAudioFile, char * _pVideoFile, DataCallback callbac
 
                                 if(start == end){
                                         eof = 1;
+                                        bVideoOk = 0;
                                         end = endptr + 1;
                                         cbRet = callback(sendp, end - start, THIS_IS_VIDEO, nNextVideoTime-nSysTimeBase);
                                         if (cbRet != 0) {
                                                 bVideoOk = 0;
-                                                continue;
                                         }
                                         break;
                                 }
 
-                                int type = -1;
                                 if(start[2] == 0x01){//0x 00 00 01
                                         type = start[3] & 0x1F;
                                 }else{ // 0x 00 00 00 01
@@ -216,16 +222,31 @@ int start_file_test(char * _pAudioFile, char * _pVideoFile, DataCallback callbac
                                                 backupstart = start;
                                                 backupend = end;
                                                 cntNalu--;// 这次保存了起来，需要少算一次
+
+                                                start = NULL;
+                                                end = NULL;
+                                                sendp = NULL;
+                                                cntNalu = 0;
+                                                if (!eof) {
+                                                        goto RESEND;
+                                                }
                                         }
                                         break;
                                 }
                         }while(1);
                 }
 
+                int64_t nSleepTime = 0;
                 if (nNextAudioTime > nNextVideoTime) {
-                        usleep((nNextVideoTime - nNow - 1) * 1000);
+                        if (nNextVideoTime - nNow >  1)
+                                nSleepTime = (nNextVideoTime - nNow) * 1000;
                 } else {
-                        usleep((nNextAudioTime - nNow - 1) * 1000);
+                        if (nNextAudioTime - nNow > 1)
+                                nSleepTime = (nNextAudioTime - nNow) * 1000;
+                }
+                if (nSleepTime != 0) {
+                        printf("sleeptime:%lld\n", nSleepTime);
+                        usleep(nSleepTime);
                 }
                 nNow = getCurrentMilliSecond();
         }
@@ -611,22 +632,25 @@ int main(int argc, char **argv)
         
         pj_caching_pool_init(&app.cachingPool, &pj_pool_factory_default_policy, 0);
 
-        //test receive pcmu
-        pj_pool_t * apool = pj_pool_create(&app.cachingPool.factory, "rxrtpa", 2000, 2000, NULL);
-        status = pj_file_open(apool, "/Users/liuye/Documents/p2p/build/src/work/Debug/rxrtp.mulaw", PJ_O_WRONLY, &gPcmuFd);
-        if(status != PJ_SUCCESS){
-                printf("pj_file_open fail:%d\n", status);
-                return status;
+        //offer send to answer
+        if (role == ANSWER) {
+                //test receive pcmu
+                pj_pool_t * apool = pj_pool_create(&app.cachingPool.factory, "rxrtpa", 2000, 2000, NULL);
+                status = pj_file_open(apool, "/Users/liuye/Documents/p2p/build/src/work/Debug/rxrtp.mulaw", PJ_O_WRONLY, &gPcmuFd);
+                if(status != PJ_SUCCESS){
+                        printf("pj_file_open fail:%d\n", status);
+                        return status;
+                }
+                //end test recive h264
+                //test receive pcmu
+                pj_pool_t * vpool = pj_pool_create(&app.cachingPool.factory, "rxrtpv", 2000, 2000, NULL);
+                status = pj_file_open(vpool, "/Users/liuye/Documents/p2p/build/src/work/Debug/rxrtp.h264", PJ_O_WRONLY, &gH264Fd);
+                if(status != PJ_SUCCESS){
+                        printf("pj_file_open fail:%d\n", status);
+                        return status;
+                }
+                //end test recive h264
         }
-        //end test recive h264
-        //test receive pcmu
-        pj_pool_t * vpool = pj_pool_create(&app.cachingPool.factory, "rxrtpv", 2000, 2000, NULL);
-        status = pj_file_open(vpool, "/Users/liuye/Documents/p2p/build/src/work/Debug/rxrtp.h264", PJ_O_WRONLY, &gH264Fd);
-        if(status != PJ_SUCCESS){
-                printf("pj_file_open fail:%d\n", status);
-                return status;
-        }
-        //end test recive h264
         
         InitIceConfig(&app.userConfig);
         strcpy(app.userConfig.turnHost, "127.0.0.1");
@@ -648,10 +672,8 @@ int main(int argc, char **argv)
         
         InitMediaConfig(&app.audioConfig);
         app.audioConfig.configs[0].nSampleOrClockRate = 8000;
-        app.audioConfig.configs[0].nRtpDynamicType = 0;
         app.audioConfig.configs[0].format = MEDIA_FORMAT_PCMU;
         app.audioConfig.configs[1].nSampleOrClockRate = 8000;
-        app.audioConfig.configs[1].nRtpDynamicType = 8;
         app.audioConfig.configs[1].format = MEDIA_FORMAT_PCMA;
         app.audioConfig.nCount = 2;
         if ( role == ANSWER ){
@@ -673,7 +695,7 @@ int main(int argc, char **argv)
         app.videoConfig.nCount = 2;
         if ( role == ANSWER ){
                 app.videoConfig.nCount = 1;
-                app.videoConfig.configs[0] = app.videoConfig.configs[1];
+                //app.videoConfig.configs[0] = app.videoConfig.configs[1];
         }
         status = AddVideoTrack(&app.peerConnection, &app.videoConfig);
         TESTCHECK(status, app);
