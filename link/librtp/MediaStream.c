@@ -267,11 +267,7 @@ pj_status_t h264_unpacketize(IN OUT MediaPacketier *_pKtz,
         pPktz->nUnpackBufLen += nUnpackLen;
 
         int nType = _pPayload[0] & 0x1F;
-        if (nType == 24) { //stap-A
-                *_pBitstreamPos = pPktz->nUnpackBufLen;
-                *_pBitstream = pPktz->pUnpackBuf;
-                pPktz->nUnpackBufLen = 0;
-        } else if (nType == 28) { //FU-A
+        if (nType == 28) { //FU-A
                 if (_nRtpMarker) {
                         pPktz->bShouldReset = PJ_TRUE;
                         *_pBitstreamPos = pPktz->nUnpackBufLen;
@@ -279,7 +275,13 @@ pj_status_t h264_unpacketize(IN OUT MediaPacketier *_pKtz,
                 } else {
                         *_pBitstreamPos = 0;
                 }
+                
+        } else { //stap-A(nType == 24) or //single NAL unit packets
+                *_pBitstreamPos = pPktz->nUnpackBufLen;
+                *_pBitstream = pPktz->pUnpackBuf;
+                pPktz->nUnpackBufLen = 0;
         }
+
         return status;
 }
 
