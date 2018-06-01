@@ -15,6 +15,117 @@ App app;
 ReleasePeerConnectoin(&a.peerConnection);\
 return status;}
 
+
+//read audio video from file start
+typedef void (*DataCallback)(void *pData, uint64_t timestamp);
+static const uint8_t *ff_avc_find_startcode_internal(const uint8_t *p, const uint8_t *end)
+{
+        const uint8_t *a = p + 4 - ((intptr_t)p & 3);
+        
+        for (end -= 3; p < a && p < end; p++) {
+                if (p[0] == 0 && p[1] == 0 && p[2] == 1)
+                        return p;
+        }
+        
+        for (end -= 3; p < end; p += 4) {
+                uint32_t x = *(const uint32_t*)p;
+                //      if ((x - 0x01000100) & (~x) & 0x80008000) // little endian
+                //      if ((x - 0x00010001) & (~x) & 0x00800080) // big endian
+                if ((x - 0x01010101) & (~x) & 0x80808080) { // generic
+                        if (p[1] == 0) {
+                                if (p[0] == 0 && p[2] == 1)
+                                        return p;
+                                if (p[2] == 0 && p[3] == 1)
+                                        return p+1;
+                        }
+                        if (p[3] == 0) {
+                                if (p[2] == 0 && p[4] == 1)
+                                        return p+2;
+                                if (p[4] == 0 && p[5] == 1)
+                                        return p+3;
+                        }
+                }
+        }
+        
+        for (end += 3; p < end; p++) {
+                if (p[0] == 0 && p[1] == 0 && p[2] == 1)
+                        return p;
+        }
+        
+        return end + 3;
+}
+
+const uint8_t *ff_avc_find_startcode(const uint8_t *p, const uint8_t *end){
+        const uint8_t *out= ff_avc_find_startcode_internal(p, end);
+        if(p<out && out<end && !out[-1]) out--;
+        return out;
+}
+
+static int getFileAndLenght(char *_pFname, FILE **_pFile, int *_pLen)
+{
+        FILE * f = fopen(_pFname, "r");
+        if ( f == NULL ) {
+                return -1;
+        }
+        fseek(f, 0, SEEK_END);
+        long nLen = ftell(f);
+        fseek(f, 0, SEEK_SET);
+        *_pLen = (int)nLen;
+        return 0;
+}
+
+static int readFileToBuf(char * _pFilename, char ** _pBuf, int *_pLen)
+{
+        int ret;
+        FILE * pFile;
+        int nLen = 0;
+        ret = getFileAndLenght(_pFilename, &pFile, &nLen);
+        if (ret != 0) {
+                fprintf(stderr, "open file %s fail\n", _pFilename);
+                return -1;
+        }
+        char *pData = malloc(nLen);
+        assert(pData != NULL);
+        ret = fread(_pBuf, 1, nLen, pFile);
+        if (ret <= 0) {
+                fprintf(stderr, "open file %s fail\n", _pFilename);
+                fclose(pFile);
+                free(pData);
+                return -2;
+        }
+        return 0;
+}
+
+int start_file_test(char * _pAudioFile, char * _pVideoFile)
+{
+        assert(_pAudioFile != NULL && _pVideoFile != NULL);
+        int ret;
+        
+        
+        char * pAudioData = NULL;
+        int nAudioDataLen = 0;
+        char * pVideoData = NULL;
+        int nVideoDataLen = 0;
+        
+        if(_pAudioFile != NULL){
+                ret = readFileToBuf(_pAudioFile, &pAudioData, &nAudioDataLen);
+                if (ret != 0) {
+                        fprintf(stderr, "map data to buffer fail:%s\n", _pAudioFile);
+                        return -1;
+                }
+        }
+        if(_pVideoFile != NULL){
+                ret = readFileToBuf(_pVideoFile, &pVideoData, &nVideoDataLen);
+                if (ret != 0) {
+                        fprintf(stderr, "map data to buffer fail:%s\n", _pVideoFile);
+                        return -2;
+                }
+        }
+        
+        return 0;
+}
+//read audio video from file end
+
 static void input_confirm(char * pmt)
 {
         char input[10];
