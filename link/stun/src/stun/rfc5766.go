@@ -65,7 +65,7 @@ const (
 type turnpool struct {
 	// allocation struct map
 	table      map[string]*allocation
-	tableLck   *sync.Mutex
+	tableLck   *sync.RWMutex
 
 	// available port number cursor
 	availPort  int
@@ -149,7 +149,7 @@ type channelData struct {
 var (
 	allocPool = &turnpool{
 		table: map[string]*allocation{},
-		tableLck: &sync.Mutex{},
+		tableLck: &sync.RWMutex{},
 		availPort: TURN_SRV_MIN_PORT,
 		portLck: &sync.Mutex{},
 	}
@@ -966,8 +966,8 @@ func (pool *turnpool) remove(key string) {
 
 func (pool *turnpool) find(key string) (alloc *allocation, ok bool) {
 
-	pool.tableLck.Lock()
-	defer pool.tableLck.Unlock()
+	pool.tableLck.RLock()
+	defer pool.tableLck.RUnlock()
 	alloc, ok = pool.table[key]
 	return
 }
@@ -988,14 +988,13 @@ func (pool *turnpool) nextPort() (p int) {
 
 func (pool *turnpool) printTable() (result string) {
 
-	pool.tableLck.Lock()
-	defer pool.tableLck.Unlock()
+	pool.tableLck.RLock()
+	defer pool.tableLck.RUnlock()
 
 	for _, alloc := range pool.table {
 		result += fmt.Sprintf("alloc=%s relay=%s\n", alloc.key, keygen(&alloc.relay))
 		result += fmt.Sprintf("  owner=%s\n", alloc.username)
-		result += fmt.Sprintf("  lifetime=%d\n", alloc.lifetime)
-		result += fmt.Sprintf("  expiry=%s\n", alloc.expiry.Format("2006-01-02 15:04:05"))
+		result += fmt.Sprintf("  lifetime=%d before %s\n", alloc.lifetime, alloc.expiry.Format("2006-01-02 15:04:05"))
 		result += fmt.Sprintf("  nonce=%s before %s\n", alloc.nonce, alloc.nonceExp.Format("2006-01-02 15:04:05"))
 
 		// permissions
