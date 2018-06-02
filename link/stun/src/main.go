@@ -9,6 +9,8 @@ import (
 	"strings"
 	"os"
 	"crypto/md5"
+	"net/http"
+	"io"
 )
 
 var (
@@ -19,6 +21,7 @@ func init() {
 	conf.Args.IP = flag.String("ip", "127.0.0.1", "udp server binding IP address")
 	conf.Args.Port = flag.String("port", "3478", "specific port to bind")
 	conf.Args.Realm = flag.String("realm", "link", "used for long-term cred for TURN")
+	conf.Args.Http = flag.String("http", "8080", "port to receive http api request")
 	flag.Var(&conf.Args.Users, "u", "add one user to TURN server")
 
 	flag.Parse()
@@ -54,6 +57,12 @@ func main() {
 		}
 	}(wg)
 
+	go func () {
+		for {
+			listenHTTP(*conf.Args.IP, *conf.Args.Http)
+		}
+	}()
+
 	wg.Wait()
 
 	return
@@ -70,4 +79,16 @@ func loadUsers() {
 		}
 		fmt.Println("user", pair[0], "added")
 	}
+}
+
+func listenHTTP(ip, port string) error {
+
+	http.HandleFunc("/get/alloc", httpGetAlloc)
+	err := http.ListenAndServe(ip + ":" + port, nil)
+	return err
+}
+
+func httpGetAlloc(w http.ResponseWriter, req *http.Request) {
+
+	io.WriteString(w, stun.AllocTable());
 }

@@ -986,6 +986,37 @@ func (pool *turnpool) nextPort() (p int) {
 	return
 }
 
+func (pool *turnpool) printTable() (result string) {
+
+	pool.tableLck.Lock()
+	defer pool.tableLck.Unlock()
+
+	for _, alloc := range pool.table {
+		result += fmt.Sprintf("alloc=%s relay=%s\n", alloc.key, keygen(&alloc.relay))
+		result += fmt.Sprintf("  owner=%s\n", alloc.username)
+		result += fmt.Sprintf("  lifetime=%d\n", alloc.lifetime)
+		result += fmt.Sprintf("  expiry=%s\n", alloc.expiry.Format("2006-01-02 15:04:05"))
+		result += fmt.Sprintf("  nonce=%s before %s\n", alloc.nonce, alloc.nonceExp.Format("2006-01-02 15:04:05"))
+
+		// permissions
+		perms := ""
+		for p, t := range alloc.perms {
+			perms += fmt.Sprintf("  perm=%s before %s\n", p, t.Format("2006-01-02 15:04:05"))
+		}
+		result += perms
+
+		// channels
+		chs := ""
+		for _, ch := range alloc.channels {
+			chs += fmt.Sprintf("  chan=no.%d -> %s before %s\n", ch.number, keygen(ch.peer),
+				ch.expiry.Format("2006-01-02 15:04:05"))
+		}
+		result += chs
+	}
+
+	return
+}
+
 // -------------------------------------------------------------------------------------------------
 
 func newChannelData(channel uint16, data []byte) *channelData {
