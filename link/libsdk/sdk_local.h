@@ -1,4 +1,4 @@
-// Last Update:2018-05-31 15:04:31
+// Last Update:2018-06-03 18:10:48
 /**
  * @file sdk_local.h
  * @brief 
@@ -10,10 +10,12 @@
 #ifndef SDK_LOCAL_H
 #define SDK_LOCAL_H
 
+#include "list.h"
+#include "sdk_interface.h"
+#include "queue.h"
+
 #define MESSAGE_QUEUE_MAX 256
 #define CODECS_MAX 128
-
-extern UA UaList;
 
 typedef struct {
     Codec codecs[CODECS_MAX];
@@ -25,9 +27,11 @@ typedef struct {
     struct list_head list;
     MessageQueue *pQueue;
     Message *pLastMessage;
-    AccountId id;
+    AccountID id;
     void *pMqttInstance;
     StreamInfo streamInfo;
 } UA;
+
+extern UA UaList;
 
 #endif  /*SDK_LOCAL_H*/

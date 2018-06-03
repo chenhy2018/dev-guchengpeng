@@ -10,3 +10,6 @@ tags
 cscope*
 *.swo
 *.swp
+third_party
+output
+.DS_Store

@@ -1,4 +1,4 @@
-// Last Update:2018-05-31 18:34:13
+// Last Update:2018-06-03 21:05:47
 /**
  * @file sdk_interface.h
  * @brief 
@@ -12,11 +12,11 @@
 
 typedef enum {
     CALL_STATUS_INCOMING,
-    CALL_STATUS_RING_TIMEOUT,
+    CALL_STATUS_TIMEOUT,
     CALL_STATUS_ESTABLISHED,
     CALL_STATUS_RING,
     CALL_STATUS_REJECT,
-    CALL_STATUS_DISCONNECTED,
+    CALL_STATUS_HANGUP,
 } CallStatus;
 
 typedef enum {
@@ -39,7 +39,7 @@ typedef enum {
     STREAM_AUDIO,
     STREAM_VIDEO,
     STREAM_DATA
-} StreamType;
+} Stream;
 
 typedef enum {
     CODEC_NONE,
@@ -76,7 +76,7 @@ typedef struct {
 typedef struct {
     int callID;
     CallStatus status;
-    char From[URL_LEN_MAX];
+    char *pFromAccount;
 } CallEvent;
 
 typedef struct {
@@ -91,31 +91,41 @@ typedef struct {
     union {
         CallEvent callEvent;
         DataEvent dataEvent;
-        Message messageEvent;
+        MessageEvent messageEvent;
     } body;
 } Event;
 
+typedef struct {
+    Stream streamType;
+    Codec codecType;
+    int sampleRate;
+    int channels;
+} Media;
+
 // library initial, application only need to call one time
-Status LibraryInit();
+ErrorID InitSDK(  Media* mediaConfigs, int size);
+ErrorID UninitSDK();
 // register a account
-AccountID Register( IN char* id, IN char* host, IN char* password, int nDeReg );
+AccountID Register(const char* id, const char* password, const char* sigHost,
+                   const char* mediaHost, const char* imHost, int deReg );
 ErrorID UnRegister( AccountID id );
 // make a call, user need to save call id
-ErrorID MakeCall( AccountID id, IN char* pDestUri, OUT int *pCallId );
+ErrorID MakeCall(AccountID accountID, const char* id, const char* host, OUT int* callID);
 ErrorID AnswerCall( AccountID id, int nCallId );
 ErrorID RejectCall( AccountID id, int nCallId );
 // hangup a call
 ErrorID HangupCall( AccountID id, int nCallId );
 // send a packet
-ErrorID SendPacket( AccountID id , int nCallId, int streamIndex, IN char* buffer, int size);
+ErrorID SendPacket(AccountID id, int callID, Stream streamID, const char* buffer, int size);
 // poll a event
 // if the EventData have video or audio data
 // the user shuould copy the the packet data as soon as possible
-ErrorID PollEvents( AccountID id, OUT int* eventID, OUT EventData* data, int nTimeOut );
-ErrorID AddCodec( AccountID id, Codec codecs[], int size, int samplerate, int channels);
+ErrorID PollEvent(AccountID id, EventType* type, Event* event, int timeOut );
 
 // mqtt report
-int Report( int fd, const char* message, size_t length );
+ErrorID Report(AccountID id, const char* topic, const char* message, int length);
+ErrorID RegisterTopic(AccountID id, const char* topic);
+ErrorID UnregisterTopic(AccountID id, const char* topic);
 
 #endif  /*SDK_INTERFACE_H*/
 

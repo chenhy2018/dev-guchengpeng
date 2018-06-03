@@ -1,4 +1,4 @@
-// Last Update:2018-05-31 15:53:41
+// Last Update:2018-06-03 20:20:48
 /**
  * @file framework.h
  * @brief 
@@ -10,8 +10,10 @@
 #ifndef FRAMEWORK_H
 #define FRAMEWORK_H
 
-SipAnswerCode cbOnIncomingCall(int _nAccountId, int _nCallId, const char *_pFrom);
-void cbOnRegStatusChange(int _nAccountId, SipAnswerCode _StatusCode);
-void cbOnCallStateChange(int _nCallId, IN const int _nAccountId, SipInviteState _State, SipAnswerCode _StatusCode);
+SipAnswerCode cbOnIncomingCall(IN const int _nAccountId, IN const int _nCallId,
+                               IN const char *pFrom, IN const void *pUser, IN const void *pMedia);
+void cbOnRegStatusChange(IN const int nAccountId, IN const SipAnswerCode RegStatusCode, IN const void *pUser);
+void cbOnCallStateChange(IN const int nCallId, IN const int nAccountId, IN const SipInviteState State,
+                         IN const SipAnswerCode StatusCode, IN const void *pUser, IN const void *pMedia);
 
 #endif  /*FRAMEWORK_H*/

@@ -1,4 +1,4 @@
-// Last Update:2018-05-31 15:34:58
+// Last Update:2018-06-03 21:27:04
 /**
  * @file framework.c
  * @brief 
@@ -6,64 +6,86 @@
  * @version 0.1.00
  * @date 2018-05-25
  */
+#include <string.h>
 #include "queue.h"
 #include "sdk_interface.h"
+#include "sdk_local.h"
 #include "sip.h"
+#include "dbg.h"
 
-SipAnswerCode cbOnIncomingCall(int _nAccountId, int _nCallId, const char *_pFrom)
+SipAnswerCode cbOnIncomingCall(IN const int _nAccountId, IN const int _nCallId,
+                               IN const char *_pFrom, IN const void *_pUser, IN const void *_pMedia)
 {
     Message *pMessage = (Message *) malloc( sizeof(Message) );
-    EventData *pData = (EventData *) malloc( sizeof(EventData) );
+    Event *pEvent = (Event *) malloc( sizeof(Event) );
+    CallEvent *pCallEvent = NULL;
+    const UA *pUA = _pUser;
 
     DBG_LOG("incoming call From %s to %d\n", _pFrom, _nAccountId);
 
-    if ( !pMessage || !pData ) {
+    if ( !pMessage || !pEvent ) {
         DBG_ERROR("malloc error\n");
-        return;
+        return 0;
     }
 
     memset( pMessage, 0, sizeof(Message) );
-    memset( pData, 0, sizeof(pData) );
-    pMessage->nMessageID = EVENT_TYPE_INCOMING_CALL;
-    pData->nAccountId = _nAccountId;
-    pData->nCallId = _nCallId;
-    if ( _pFrom )
-        memcpy( pData->body.callEvent.From, _pFrom, strlen(_pFrom) );
+    memset( pEvent, 0, sizeof(Event) );
+    pMessage->nMessageID = EVENT_CALL;
+    pCallEvent = &pEvent->body.callEvent;
+    pCallEvent->callID = _nCallId;
+    pCallEvent->status = CALL_STATUS_INCOMING;
+    if ( _pFrom ) {
+        pCallEvent->pFromAccount = (char *) malloc ( strlen(_pFrom) + 1);
+        memset( pCallEvent->pFromAccount, 0, strlen(_pFrom) + 1 );
+        memcpy( pCallEvent->pFromAccount, _pFrom, strlen(_pFrom) );
+    }
 
-    pMessage->pMessage = pData;
-    SendMessage( pUA->pQueue, pMessage );
+    pMessage->pMessage = pEvent;
+    if ( pUA )
+        SendMessage( pUA->pQueue, pMessage );
+    else {
+        DBG_ERROR("pUA is NULL\n");
+    }
 
 	return OK;
 }
 
-void cbOnRegStatusChange(int _nAccountId, SipAnswerCode _StatusCode)
+void cbOnRegStatusChange(IN const int _nAccountId, IN const SipAnswerCode _regStatusCode, IN const void *_pUser)
 {
-    DBG_LOG("reg status = %d\n", _StatusCode);
+    DBG_LOG("reg status = %d\n", _regStatusCode);
 }
 
-void cbOnCallStateChange(int _nCallId, IN const int _nAccountId, SipInviteState _State, SipAnswerCode _StatusCode)
+void cbOnCallStateChange(IN const int _nCallId, IN const int _nAccountId, IN const SipInviteState _State,
+                         IN const SipAnswerCode _StatusCode, IN const void *pUser, IN const void *pMedia)
 {
     Message *pMessage = (Message *) malloc ( sizeof(Message) );
-    EventData *pData = (EventData *) malloc( sizeof(EventData) );
+    Event *pEvent = (Event *) malloc( sizeof(Event) );
+    CallEvent *pCallEvent = NULL;
+    const UA *pUA = pUser;
 
     DBG_LOG("state = %d, status code = %d\n", _State, _StatusCode);
 
-    if ( !pMessage || !pData ) {
+    if ( !pMessage || !pEvent ) {
         DBG_ERROR("malloc error\n");
         return;
     }
 
     memset( pMessage, 0, sizeof(Message) );
-    memset( pData, 0, sizeof(pData) );
+    memset( pEvent, 0, sizeof(Event) );
+    pMessage->nMessageID = EVENT_CALL;
+    pCallEvent = &pEvent->body.callEvent;
+    pCallEvent->callID = _nCallId;
     if ( _State == INV_STATE_CONFIRMED ) {
-        pMessage->nMessageID = EVENT_TYPE_SESSION_ESTABLISHED;
-        pData->nCallId = _nCallId;
+        pCallEvent->status = CALL_STATUS_ESTABLISHED;
     } else if ( _State == INV_STATE_DISCONNECTED ) {
-        pMessage->nMessageID = EVENT_TYPE_SESSION_ESTABLISHED;
-        pEvent->nCallId = _nCallId;
+        pCallEvent->status = CALL_STATUS_HANGUP;
     } else {
     }
     pMessage->pMessage  = (void *)pEvent;
-    SendMessage( pUA->pQueue, pMessage );
+    if ( pUA )
+        SendMessage( pUA->pQueue, pMessage );
+    else {
+        DBG_ERROR("pUA is NULL\n");
+    }
 }
 

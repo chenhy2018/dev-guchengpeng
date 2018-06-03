@@ -32,6 +32,8 @@ mkdir -p ./${OUTPUT}/lib/$1/
 
 # 1. copy all the .a file from pjproject to libs/ori directory
 cp -rvf ${OUTPUT}/pjsip/lib/* ${OUTPUT}/ori/$1
+rm -rvf ${OUTPUT}/ori/$1/libpjsua2-x86_64-unknown-linux-gnu.a
+
 cp -rvf ${OUTPUT}/libsip/*.o ${OUTPUT}/objs
 cp -rvf ${OUTPUT}/libsdk/*.o ${OUTPUT}/objs
 
@@ -65,4 +67,4 @@ cd ../../objs
 # 4. strip all the .o files
 ${prefix}strip *.o --strip-unneeded
 # 5. gen new library
-${prefix}ar r ${target} *.o
+${prefix}ar r ../../${target} *.o

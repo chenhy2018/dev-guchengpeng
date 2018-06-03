@@ -1,4 +1,4 @@
-// Last Update:2018-05-29 09:48:17
+// Last Update:2018-06-03 18:08:59
 /**
  * @file mqtt.h
  * @brief 
@@ -10,10 +10,20 @@
 #ifndef MQTT_H
 #define MQTT_H
 
+#include <stdlib.h>
+#include <stdbool.h>
+#include "sdk_interface.h"
+
 static const int MOSQUITTO_AUTHENTICATION_NULL = 0x0;
 static const int MOSQUITTO_AUTHENTICATION_USER = 0x1;
 static const int MOSQUITTO_AUTHENTICATION_ONEWAY_SSL = 0x2;
 static const int MOSQUITTO_AUTHENTICATION_TWOWAY_SSL = 0x4;
+
+#define MAX_MOSQUITTO_USR_SIZE 1024
+#define MAX_MOSQUITTO_PWD_SIZE 1024
+#define MAX_MOSQUITTO_HOST_SIZE 1024
+#define MAX_MOSQUITTO_FILE_SIZE 1024
+#define MAX_MOSQUITTO_ID_SIZE 1024
 
 struct MosquittoUserInfo
 {
@@ -55,6 +65,6 @@ extern void MosquittoDestroy(IN const void* pInstance);
 /* step 3 : mosquitto pub/sub */
 extern int MosquittoPublish(IN const void* _pInstance, OUT int* _pMid, IN char* _pTopic, IN int _nPayloadlen, IN const void* _pPayload);
 extern int MosquittoSubscribe(IN const void* _pInstance, OUT int* _pMid, IN char* _pTopic);
-extern int MosquittoUnsubscribe(IN const void* _pInstance, OUT Int* _pMid, IN char* pSub);
+extern int MosquittoUnsubscribe(IN const void* _pInstance, OUT int* _pMid, IN char* pSub);
 
 #endif  /*MQTT_H*/

@@ -12,10 +12,11 @@ else
 	CC=gcc
 endif
 
+CURRENT_DIR:=$(shell pwd)
 PROJECT_PATH=../../third_party
 PJSIP_PATH=$(PROJECT_PATH)/pjproject-2.7.2
 LDFLAGS=
-INSTALL_DIR=/home/work-linking/linking/link/libsdk/output/pjsip
+INSTALL_DIR=$(CURRENT_DIR)/output/pjsip
 PJ_CONFIG=--disable-sdl --disable-ffmpeg --disable-v4l2 \
 		  --disable-openh264 --disable-libwebrtc --disable-sound \
 		  --disable-libyuv \
@@ -27,7 +28,6 @@ INCLUDE_PATH=-I$(PJSIP_PATH)/pjlib/include \
 			 -I$(PJSIP_PATH)/pjnath/include \
 			 -I../libsip
 
-find= && find . -name "*.depend" -print -delete 
 SIP_PATH=../libsip
 OUTPUT=output
 SIP_OUT_PATH=$(OUTPUT)/libsip
@@ -48,6 +48,7 @@ depclean:
 
 pjclean :
 	rm -rvf $(OUTPUT)/pjsip
+	rm -rvf $(LIBPJ)
 
 pjsip $(LIBPJ) : #pjclean depclean
 	@echo "compile pjsip"
@@ -80,7 +81,9 @@ sdk $(TARGET_LIBRARY) : $(LIBPJ) $(LIBSIP) $(LIBSDK) $(LIBMQTT) $(LIBRTP)
 $(LIBSDK) : %.o : %.c
 	mkdir -p $(SDK_OBJS_PATH) 
 	$(CC) $(INCLUDE_PATH) -c $< -o $(SDK_OBJS_PATH)/$@
+libsdk : $(LIBSDK)
 
 clean:
+	rm -rvf output
 
 

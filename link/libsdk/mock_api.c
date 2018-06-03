@@ -1,4 +1,4 @@
-// Last Update:2018-05-29 09:53:43
+// Last Update:2018-06-03 21:28:36
 /**
  * @file mock_api.c
  * @brief 
@@ -6,6 +6,9 @@
  * @version 0.1.00
  * @date 2018-05-29
  */
+
+#include "mqtt.h"
+#include "sdk_interface.h"
 
 int MosquittoLibInit()
 {
@@ -47,7 +50,7 @@ int MosquittoSubscribe(IN const void* _pInstance, OUT int* _pMid, IN char* _pTop
     return 0;
 }
 
-int MosquittoUnsubscribe(IN const void* _pInstance, OUT Int* _pMid, IN char* pSub)
+int MosquittoUnsubscribe(IN const void* _pInstance, OUT int* _pMid, IN char* pSub)
 {
     (void)_pInstance;
     (void)_pMid;
