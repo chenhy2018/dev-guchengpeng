@@ -520,11 +520,18 @@ static int createSdp(IN OUT PeerConnection * _pPeerConnection, IN pj_pool_t * _p
         return PJ_SUCCESS;
 }
 
-int createOffer(IN OUT PeerConnection * _pPeerConnection, IN pj_pool_t * _pPool, OUT pjmedia_sdp_session **_pOffer)
+int createOffer(IN OUT PeerConnection * _pPeerConnection, OUT pjmedia_sdp_session **_pOffer)
 {
         pj_status_t  status;
+
+        pj_pool_t *pPool = _pPeerConnection->pSdpPool;
+        if(pPool == NULL) {
+                pj_pool_t *pPool = pj_pool_create(&_pPeerConnection->cachingPool.factory,
+                                                  NULL, 2048, 512, NULL);
+                ASSERT_RETURN_CHECK(pPool, pj_pool_create);
+        }
         
-        status = createSdp(_pPeerConnection, _pPool, _pOffer);
+        status = createSdp(_pPeerConnection, pPool, _pOffer);
         STATUS_CHECK(createSdp, status);
         
         char sdpStr[2048];
@@ -535,10 +542,10 @@ int createOffer(IN OUT PeerConnection * _pPeerConnection, IN pj_pool_t * _pPool,
         int nMaxTracks = sizeof(_pPeerConnection->nAvIndex) / sizeof(int);
         for ( int i = 0; i < nMaxTracks; i++) {
                 if (_pPeerConnection->nAvIndex[i] != -1) {
-                        status = pjmedia_transport_media_create(_pPeerConnection->transportIce[i].pTransport, _pPool, 0, NULL, 0);
+                        status = pjmedia_transport_media_create(_pPeerConnection->transportIce[i].pTransport, pPool, 0, NULL, 0);
                         STATUS_CHECK(pjmedia_transport_media_create, status);
                         
-                        status = pjmedia_transport_encode_sdp(_pPeerConnection->transportIce[i].pTransport, _pPool, *_pOffer, NULL, i);
+                        status = pjmedia_transport_encode_sdp(_pPeerConnection->transportIce[i].pTransport, pPool, *_pOffer, NULL, i);
                         STATUS_CHECK(pjmedia_transport_encode_sdp, status);
                 }
         }
@@ -552,21 +559,27 @@ int createOffer(IN OUT PeerConnection * _pPeerConnection, IN pj_pool_t * _pPool,
         return PJ_SUCCESS;
 }
 
-int createAnswer(IN OUT PeerConnection * _pPeerConnection, IN pj_pool_t * _pPool,
-                 IN pjmedia_sdp_session *_pOffer, OUT pjmedia_sdp_session **_pAnswer)
+int createAnswer(IN OUT PeerConnection * _pPeerConnection, IN pjmedia_sdp_session *_pOffer, OUT pjmedia_sdp_session **_pAnswer)
 {
         pj_status_t  status;
+
+        pj_pool_t *pPool = _pPeerConnection->pSdpPool;
+        if(pPool == NULL) {
+                pj_pool_t *pPool = pj_pool_create(&_pPeerConnection->cachingPool.factory,
+                                                  NULL, 2048, 512, NULL);
+                ASSERT_RETURN_CHECK(pPool, pj_pool_create);
+        }
         
-        status = createSdp(_pPeerConnection, _pPool, _pAnswer);
+        status = createSdp(_pPeerConnection, pPool, _pAnswer);
         STATUS_CHECK(createSdp, status);
         
         int nMaxTracks = sizeof(_pPeerConnection->nAvIndex) / sizeof(int);
         for ( int i = 0; i < nMaxTracks; i++) {
                 if (_pPeerConnection->nAvIndex[i] != -1) {
-                        status = pjmedia_transport_media_create(_pPeerConnection->transportIce[i].pTransport, _pPool, 0, _pOffer, 0);
+                        status = pjmedia_transport_media_create(_pPeerConnection->transportIce[i].pTransport, pPool, 0, _pOffer, 0);
                         STATUS_CHECK(pjmedia_transport_media_create, status);
                         
-                        status = pjmedia_transport_encode_sdp(_pPeerConnection->transportIce[i].pTransport, _pPool, *_pAnswer, _pOffer, i);
+                        status = pjmedia_transport_encode_sdp(_pPeerConnection->transportIce[i].pTransport, pPool, *_pAnswer, _pOffer, i);
                         STATUS_CHECK(pjmedia_transport_encode_sdp, status);
                 }
         }

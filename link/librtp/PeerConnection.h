@@ -99,6 +99,7 @@ typedef struct _PeerConnection
         pjmedia_sdp_neg *pIceNeg;
         pj_pool_t *pNegPool;
         IceNegInfo iceNegInfo;
+        pj_pool_t *pSdpPool;
         int nNegFail;
         int nNegSuccess;
         pj_mutex_t *pMutex;
@@ -122,9 +123,9 @@ void InitPeerConnectoin(IN OUT PeerConnection * pPeerConnectoin,
 
 int AddAudioTrack(IN OUT PeerConnection * pPeerConnection, IN MediaConfig *pAudioConfig);
 int AddVideoTrack(IN OUT PeerConnection * pPeerConnection, IN MediaConfig *pVideoConfig);
-int createOffer(IN OUT PeerConnection * pPeerConnection, IN pj_pool_t * pPool, OUT pjmedia_sdp_session **pOffer);
-int createAnswer(IN OUT PeerConnection * pPeerConnection, IN pj_pool_t * pPool,
-                 IN pjmedia_sdp_session *pOffer, OUT pjmedia_sdp_session **pAnswer);
+int createOffer(IN OUT PeerConnection * pPeerConnection,  OUT pjmedia_sdp_session **pOffer);
+int createAnswer(IN OUT PeerConnection * pPeerConnection, IN pjmedia_sdp_session *pOffer,
+                 OUT pjmedia_sdp_session **pAnswer);
 int setLocalDescription(IN OUT PeerConnection * pPeerConnection, IN pjmedia_sdp_session * pSdp);
 int setRemoteDescription(IN OUT PeerConnection * pPeerConnection, IN pjmedia_sdp_session * pSdp);
 int StartNegotiation(IN PeerConnection * pPeerConnection);

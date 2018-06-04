@@ -210,7 +210,7 @@ int start_file_test(char * _pAudioFile, char * _pVideoFile, DataCallback callbac
                                 nSleepTime = (nNextAudioTime - nNow - 1) * 1000;
                 }
                 if (nSleepTime != 0) {
-                        printf("sleeptime:%lld\n", nSleepTime);
+                        printf("sleeptime:%ld\n", nSleepTime);
                         usleep(nSleepTime);
                 }
                 nNow = getCurrentMilliSecond();
@@ -564,10 +564,10 @@ static int receive_data_callback(void *pData, int nDataLen, int nFlag, int64_t t
         RtpPacket rtpPacket;
         pj_bzero(&rtpPacket, sizeof(rtpPacket));
         if (nFlag == THIS_IS_AUDIO) {
-                printf("send %d bytes audio data to rtp with timestamp:%lld\n", nDataLen, timestamp);
+                printf("send %d bytes audio data to rtp with timestamp:%ld\n", nDataLen, timestamp);
                 rtpPacket.type = TYPE_AUDIO;
         } else {
-                printf("send %d bytes vidoe data to rtp with timestamp:%lld\n", nDataLen, timestamp);
+                printf("send %d bytes vidoe data to rtp with timestamp:%ld\n", nDataLen, timestamp);
                 rtpPacket.type = TYPE_VIDEO;
         }
         rtpPacket.pData = (uint8_t *)pData;
@@ -667,11 +667,10 @@ int main(int argc, char **argv)
         status = AddVideoTrack(&app.peerConnection, &app.videoConfig);
         TESTCHECK(status, app);
         
-        pj_pool_t * pSdpPool = pj_pool_create(&app.cachingPool.factory, NULL, 1024, 512, NULL);
-        ASSERT_RETURN_CHECK(pSdpPool, pj_pool_create);
+
         if (role == OFFER) {
                 pjmedia_sdp_session *pOffer = NULL;
-                status = createOffer(&app.peerConnection, pSdpPool, &pOffer);
+                status = createOffer(&app.peerConnection, &pOffer);
                 TESTCHECK(status, app);
                 setLocalDescription(&app.peerConnection, pOffer);
                 write_sdp(pOffer, OFFERFILE);
@@ -689,7 +688,7 @@ int main(int argc, char **argv)
                 setRemoteDescription(&app.peerConnection, pOffer);
                 
                 pjmedia_sdp_session *pAnswer = NULL;
-                status = createAnswer(&app.peerConnection, pSdpPool, pOffer, &pAnswer);
+                status = createAnswer(&app.peerConnection, pOffer, &pAnswer);
                 TESTCHECK(status, app);
                 setLocalDescription(&app.peerConnection, pAnswer);
                 write_sdp(pAnswer, ANSWERFILE);
