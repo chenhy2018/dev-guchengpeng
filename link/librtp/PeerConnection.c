@@ -137,6 +137,23 @@ static int iceWorkerThread(void * _pArg)
         return 0;
 }
 
+static pj_str_t parseIpAndPort(char *_pHosStr, pj_uint16_t *_pPort)
+{
+        pj_str_t ret;
+
+        char *pPosition;
+        pj_str_t host = pj_str(_pHosStr);
+        if ((pPosition = pj_strchr(&host, ':')) != NULL) {
+                ret.ptr = _pHosStr;
+                ret.slen = (pPosition - _pHosStr);
+                *_pPort = (pj_uint16_t)atoi(pPosition + 1);
+        } else {
+                ret = pj_str(_pHosStr);
+                *_pPort = PJ_STUN_PORT;
+        }
+        return ret;
+}
+
 static int peerConnectInitIceConfig(IN OUT PeerConnection * _pPeerConnectoin)
 {
         for (int i = 0; i < sizeof(_pPeerConnectoin->transportIce) / sizeof(TransportIce); i++) {
@@ -163,7 +180,9 @@ static int peerConnectInitIceConfig(IN OUT PeerConnection * _pPeerConnectoin)
                         
                         pIceCfg->stun_tp[0].max_host_cands = pUserIceConfig->nMaxHosts;
                         if (pUserIceConfig->stunHost[0] != '\0') {
-                                pIceCfg->stun_tp[0].server = pj_str(pUserIceConfig->stunHost);
+                                pj_uint16_t nPort;
+                                pIceCfg->stun_tp[0].server = parseIpAndPort(pUserIceConfig->stunHost, &nPort);
+                                pIceCfg->stun_tp[0].port = nPort;
                         }
                         if (pUserIceConfig->nKeepAlive > 0) {
                                 pIceCfg->stun_tp[0].cfg.ka_interval = pUserIceConfig->nKeepAlive;
@@ -174,10 +193,13 @@ static int peerConnectInitIceConfig(IN OUT PeerConnection * _pPeerConnectoin)
                 if (pUserIceConfig->turnHost[0] != '\0') {
                         pIceCfg->turn_tp_cnt = 1;
                         pj_ice_strans_turn_cfg_default(&pIceCfg->turn_tp[0]);
-                        
-                        pIceCfg->turn_tp[0].server = pj_str(pUserIceConfig->turnHost);
-                        pIceCfg->turn_tp[0].port = PJ_STUN_PORT;
-                        
+
+                        if (pUserIceConfig->turnHost[0] != '\0') {
+                                pj_uint16_t nPort;
+                                pIceCfg->turn_tp[0].server = parseIpAndPort(pUserIceConfig->turnHost, &nPort);
+                                pIceCfg->turn_tp[0].port = nPort;
+                        }
+
                         if (pUserIceConfig->turnUsername[0] != '\0') {
                                 pIceCfg->turn_tp[0].auth_cred.type = PJ_STUN_AUTH_CRED_STATIC;
                                 pIceCfg->turn_tp[0].auth_cred.data.static_cred.username = pj_str(pUserIceConfig->turnUsername);
