@@ -1,4 +1,4 @@
-// Last Update:2018-06-03 21:27:04
+// Last Update:2018-06-04 14:08:15
 /**
  * @file framework.c
  * @brief 
@@ -50,9 +50,21 @@ SipAnswerCode cbOnIncomingCall(IN const int _nAccountId, IN const int _nCallId,
 	return OK;
 }
 
-void cbOnRegStatusChange(IN const int _nAccountId, IN const SipAnswerCode _regStatusCode, IN const void *_pUser)
+void cbOnRegStatusChange( IN const int _nAccountId, IN const SipAnswerCode _regStatusCode, IN const void *_pUser )
 {
+    UA *pUA = ( UA *)_pUser;
+
     DBG_LOG("reg status = %d\n", _regStatusCode);
+    if ( pUA ) {
+        if ( _regStatusCode == OK ||
+             _regStatusCode == UNAUTHORIZED ||
+             _regStatusCode == REQUEST_TIMEOUT ) {
+            pUA->regStatus = _regStatusCode;
+            pthread_cond_signal( &pUA->registerCond );
+        }
+    } else {
+        DBG_ERROR("pUser is NULL\n");
+    }
 }
 
 void cbOnCallStateChange(IN const int _nCallId, IN const int _nAccountId, IN const SipInviteState _State,

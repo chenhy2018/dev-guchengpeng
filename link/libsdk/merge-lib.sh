@@ -46,7 +46,7 @@ do
         cp $f ../../tmp/$f
         cd ../../tmp/$f/
         # 2. release all the .o to tmp directory
-        echo $f
+#        echo $f
         ${prefix}ar x $f
         for bin in ./*.o
         do

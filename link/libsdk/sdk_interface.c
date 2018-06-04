@@ -1,4 +1,4 @@
-// Last Update:2018-06-03 20:04:08
+// Last Update:2018-06-04 14:18:25
 /**
  * @file sdk_interface.c
  * @brief 
@@ -17,45 +17,84 @@
 #include "framework.h"
 #include "list.h"
 
-UA UaList;
+UAManager gUAManager;
+UAManager *pUAManager = &gUAManager;
 
 ErrorID InitSDK( Media* _pMediaConfigs, int _nSize)
 {
     SipCallBack cb;
 
-    memset( &UaList, 0, sizeof(UA) );
-
+    memset( pUAManager, 0, sizeof(UAManager) );
+    
+    memcpy( pUAManager->mediaConfigs, _pMediaConfigs, _nSize );
     cb.OnIncomingCall  = &cbOnIncomingCall;
     cb.OnCallStateChange = &cbOnCallStateChange;
     cb.OnRegStatusChange = &cbOnRegStatusChange;
     SipCreateInstance(&cb);
+	pthread_mutex_init( &pUAManager->mutex, NULL );
 
     return RET_OK;
 }
 
 ErrorID UninitSDK()
 {
+    struct list_head *pos, *q;
+    UA *pUA;
+
+    list_for_each_safe(pos, q, &pUAManager->UAList.list){
+        pUA = list_entry(pos, UA, list);
+        pthread_cond_destroy( &pUA->registerCond );
+        list_del(pos);
+        free(pUA);
+    }
+	pthread_mutex_destroy( &pUAManager->mutex );
+
+    return RET_OK;
 }
 
-AccountID Register( IN  char* id, IN char* password, IN char* sigHost,
-                   IN char* mediaHost, IN char* imHost, int _nDeReg )
+AccountID Register( IN  char* _id, IN char* _password, IN char* _pSigHost,
+                   IN char* _pMediaHost, IN char* _pImHost, int _nDeReg, int _nTimeOut )
 {
     int nAccountId = 0;
     UA *pUA = ( UA *) malloc ( sizeof(UA) );
+	struct timeval now;
+	struct timespec waitTime;
+    int nReason = 0;
 
     if ( !pUA ) {
         DBG_ERROR("malloc error\n");
         return RET_MEM_ERROR;
     }
     memset( pUA, 0, sizeof(UA) );
+	pthread_cond_init( &pUA->registerCond, NULL);
     pUA->pQueue = CreateMessageQueue( MESSAGE_QUEUE_MAX );
     if ( !pUA->pQueue ) {
         DBG_ERROR("queue malloc fail\n");
         return RET_MEM_ERROR;
     }
-    list_add( &(pUA->list), &(UaList.list) );
-    nAccountId = SipAddNewAccount( id, password, sigHost, (void *)pUA );
-    SipRegAccount( nAccountId, _nDeReg );
+	pthread_mutex_lock( &pUAManager->mutex );
+    list_add( &(pUA->list), &(pUAManager->UAList.list) );
+    nAccountId = SipAddNewAccount( _id, _password, _pSigHost, (void *)pUA );
+    SipRegAccount( nAccountId, 0 );
+    gettimeofday(&now, NULL);
+    waitTime.tv_sec = now.tv_sec;
+    waitTime.tv_nsec = now.tv_usec * 1000 + _nTimeOut * 1000 * 1000;
+    nReason = pthread_cond_timedwait( &pUA->registerCond, &pUAManager->mutex, &waitTime );
+    if (nReason == ETIMEDOUT) {
+        DBG_ERROR("register time out\n");
+        return RET_REGISTER_TIMEOUT;
+    }
+	pthread_mutex_unlock( &pUAManager->mutex );
+
+    if ( pUA->regStatus == REQUEST_TIMEOUT ) {
+        DBG_ERROR("register server return timeout\n");
+        return RET_TIMEOUT_FROM_SERVER;
+    }
+
+    if ( pUA->regStatus == UNAUTHORIZED ) {
+        DBG_ERROR("user unauthorized\n");
+        return RET_USER_UNAUTHORIZED;
+    }
 
     return nAccountId;
 }
@@ -63,13 +102,15 @@ AccountID Register( IN  char* id, IN char* password, IN char* sigHost,
 ErrorID UnRegister( AccountID _nAccountId )
 {
     struct list_head *pos, *q;
-    UA *tmp;
+    UA *pUA = NULL;
 
-    list_for_each_safe(pos, q, &UaList.list){
-        tmp = list_entry(pos, UA, list);
-        if ( tmp->id == _nAccountId ) {
+    SipRegAccount( _nAccountId, 1 );
+    list_for_each_safe(pos, q, &pUAManager->UAList.list){
+        pUA = list_entry(pos, UA, list);
+        if ( pUA->id == _nAccountId ) {
+            pthread_cond_destroy( &pUA->registerCond );
             list_del(pos);
-            free(tmp);
+            free(pUA);
             return RET_OK;
         }
     }
@@ -100,7 +141,7 @@ ErrorID PollEvent(AccountID _nAccountID, EventType* _pType, Event* _pEvent, int 
         return RET_PARAM_ERROR;
     }
 
-    list_for_each_safe(pos, q, &UaList.list){
+    list_for_each_safe(pos, q, &pUAManager->UAList.list){
         pUA = list_entry(pos, UA, list);
         if ( pUA->id == _nAccountID ) {
             break;
@@ -187,6 +228,12 @@ ErrorID Report(AccountID id, const char* topic, const char* message, int length)
 {
 }
 
-ErrorID RegisterTopic(AccountID id, const char* topic);
-ErrorID UnregisterTopic(AccountID id, const char* topic);
+ErrorID RegisterTopic(AccountID id, const char* topic)
+{
+}
+
+ErrorID UnregisterTopic(AccountID id, const char* topic)
+{
+}
+
 

@@ -1,4 +1,4 @@
-// Last Update:2018-06-03 21:05:47
+// Last Update:2018-06-04 14:11:11
 /**
  * @file sdk_interface.h
  * @brief 
@@ -32,6 +32,9 @@ typedef enum {
     RET_MEM_ERROR = -1,
     RET_PARAM_ERROR = -2,
     RET_ACCOUNT_NOT_EXIST = -3,
+    RET_REGISTER_TIMEOUT = -4,
+    RET_TIMEOUT_FROM_SERVER = -5,
+    RET_USER_UNAUTHORIZED = -6,
 } ErrorID;
 
 typedef enum {
@@ -106,8 +109,9 @@ typedef struct {
 ErrorID InitSDK(  Media* mediaConfigs, int size);
 ErrorID UninitSDK();
 // register a account
+// @return if return value > 0, it is the account id, if < 0, it is the ErrorID
 AccountID Register(const char* id, const char* password, const char* sigHost,
-                   const char* mediaHost, const char* imHost, int deReg );
+                   const char* mediaHost, const char* imHost, int deReg, int timeOut );
 ErrorID UnRegister( AccountID id );
 // make a call, user need to save call id
 ErrorID MakeCall(AccountID accountID, const char* id, const char* host, OUT int* callID);

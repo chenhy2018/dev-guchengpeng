@@ -13,3 +13,4 @@ cscope*
 third_party
 output
 .DS_Store
+cscope*
