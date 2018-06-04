@@ -365,6 +365,10 @@ int MqttPublish(IN const void* _pInstance, IN char* _pTopic, IN int _nPayloadlen
 int MqttSubscribe(IN const void* _pInstance, IN char* _pTopic)
 {
         struct MqttInstance* pInstance = (struct MqttInstance*)(_pInstance);
+        if (_pTopic == NULL) {
+               fprintf(stderr, "Error: Invalid input.\n");
+               return MQTT_ERR_INVAL;
+        }
         int rc = mosquitto_subscribe(pInstance->mosq, NULL, _pTopic, pInstance->options.nQos);
         fprintf(stderr, "mos sub %d", rc);
         if (!rc) {
@@ -397,6 +401,10 @@ int MqttSubscribe(IN const void* _pInstance, IN char* _pTopic)
 int MqttUnsubscribe(IN const void* _pInstance, IN char* _pTopic)
 {
         struct MqttInstance* pInstance = (struct MqttInstance*)(_pInstance);
+        if (_pTopic == NULL) {
+               fprintf(stderr, "Error: Invalid input.\n");
+               return MQTT_ERR_INVAL;
+        }
         int rc = mosquitto_unsubscribe(pInstance->mosq, NULL, _pTopic);
         fprintf(stderr, "mos sub %d", rc);
         if (!rc) {
