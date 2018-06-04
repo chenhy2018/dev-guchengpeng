@@ -343,10 +343,14 @@ void InitIceConfig(IN OUT IceConfig *_pIceConfig)
         _pIceConfig->nKeepAlive = 300;
 }
 
-void InitPeerConnectoin(IN OUT PeerConnection * _pPeerConnection, IN IceConfig *_pIceConfig)
+int InitPeerConnectoin(IN OUT PeerConnection ** _pPeerConnection, IN IceConfig *_pIceConfig)
 {
-        pj_memset(_pPeerConnection, 0, sizeof(PeerConnection));
+        PeerConnection * pPeerConnection =  (PeerConnection *)malloc(sizeof(PeerConnection));
+        ASSERT_RETURN_CHECK(pPeerConnection, malloc);
         
+        pj_bzero(pPeerConnection, sizeof(PeerConnection));
+        pj_caching_pool_init(&pPeerConnection->cachingPool, &pj_pool_factory_default_policy, 0);
+
         IceConfig userConfig;
         if ( _pIceConfig == NULL) {
                 InitIceConfig(&userConfig);
@@ -356,18 +360,17 @@ void InitPeerConnectoin(IN OUT PeerConnection * _pPeerConnection, IN IceConfig *
                 _pIceConfig = &userConfig;
         }
         
-        _pPeerConnection->userIceConfig = *_pIceConfig;
+        pPeerConnection->userIceConfig = *_pIceConfig;
 
-        pj_caching_pool_init(&_pPeerConnection->cachingPool, &pj_pool_factory_default_policy, 0);
-        _pPeerConnection->pPoolFactory = &_pPeerConnection->cachingPool.factory;
+        pPeerConnection->pPoolFactory = &pPeerConnection->cachingPool.factory;
         
-        peerConnectInitIceConfig(_pPeerConnection);
+        peerConnectInitIceConfig(pPeerConnection);
         
-        for ( int i = 0; i < sizeof(_pPeerConnection->nAvIndex) / sizeof(int); i++) {
-                _pPeerConnection->nAvIndex[i] = -1;
+        for ( int i = 0; i < sizeof(pPeerConnection->nAvIndex) / sizeof(int); i++) {
+                pPeerConnection->nAvIndex[i] = -1;
         }
-        
-        return ;
+        *_pPeerConnection = pPeerConnection;
+        return 0;
 }
 
 void ReleasePeerConnectoin(IN OUT PeerConnection * _pPeerConnection)
@@ -413,6 +416,8 @@ void ReleasePeerConnectoin(IN OUT PeerConnection * _pPeerConnection)
         }
 
         pj_caching_pool_destroy (&_pPeerConnection->cachingPool);
+
+        free(_pPeerConnection);
 }
 
 int AddAudioTrack(IN OUT PeerConnection * _pPeerConnection, IN MediaConfig * _pAudioConfig)
@@ -533,9 +538,10 @@ int createOffer(IN OUT PeerConnection * _pPeerConnection, OUT pjmedia_sdp_sessio
 
         pj_pool_t *pPool = _pPeerConnection->pSdpPool;
         if(pPool == NULL) {
-                pj_pool_t *pPool = pj_pool_create(&_pPeerConnection->cachingPool.factory,
+                pPool = pj_pool_create(&_pPeerConnection->cachingPool.factory,
                                                   NULL, 2048, 512, NULL);
                 ASSERT_RETURN_CHECK(pPool, pj_pool_create);
+                _pPeerConnection->pSdpPool = pPool;
         }
         
         status = createSdp(_pPeerConnection, pPool, _pOffer);
@@ -572,9 +578,10 @@ int createAnswer(IN OUT PeerConnection * _pPeerConnection, IN pjmedia_sdp_sessio
 
         pj_pool_t *pPool = _pPeerConnection->pSdpPool;
         if(pPool == NULL) {
-                pj_pool_t *pPool = pj_pool_create(&_pPeerConnection->cachingPool.factory,
+                pPool = pj_pool_create(&_pPeerConnection->cachingPool.factory,
                                                   NULL, 2048, 512, NULL);
                 ASSERT_RETURN_CHECK(pPool, pj_pool_create);
+                _pPeerConnection->pSdpPool = pPool;
         }
         
         status = createSdp(_pPeerConnection, pPool, _pAnswer);

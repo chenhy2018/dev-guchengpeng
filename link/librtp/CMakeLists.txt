@@ -7,6 +7,7 @@ set(LIB_SRC
 	PeerConnection.c)
 set(LIB_HEADER
 	MediaStream.h
+	qrtc.h
 	PeerConnection.h)
 set(TEST_SRC
 	rtptest.c)

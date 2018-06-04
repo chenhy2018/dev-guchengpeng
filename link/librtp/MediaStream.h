@@ -7,64 +7,8 @@
 #include <pjlib-util.h>
 #include <pjlib.h>
 #include <pjmedia-codec/h264_packetizer.h>
-#ifndef __APPLE__
-#include <inttypes.h>
-#endif
+#include "qrtc.h"
 
-#define _s_l_(x) #x
-#define _str_line_(x) _s_l_(x)
-#define __STR_LINE__ _str_line_(__LINE__)
-
-#define THIS_FILE "PeerConnection.c"
-#define ASSERT_RETURN_CHECK(expr, errmsg) if ( (expr) == NULL ) { \
-PJ_LOG(3,(__FILE__, "%s", errmsg));;\
-return -1;}
-#if 0
-#define STATUS_CHECK(info, s) if ( s != PJ_SUCCESS) { \
-status_perror(__STR_LINE__, #info, s);\
-return s;}
-#endif
-#define STATUS_CHECK(info, s) if ( s != PJ_SUCCESS) { \
-char errmsg[PJ_ERR_MSG_SIZE];\
-pj_strerror(s, errmsg, sizeof(errmsg));\
-PJ_LOG(3,(__FILE__, "%s: %s [code=%d]", #info, errmsg, s));\
-return s;}
-
-#ifndef IN
-#define IN
-#endif
-#ifndef OUT
-#define OUT
-#endif
-
-typedef enum _MediaFormat
-{
-        MEDIA_FORMAT_PCMU = 0,
-        MEDIA_FORMAT_PCMA = 8,
-        MEDIA_FORMAT_G729 = 18,
-        MEDIA_FORMAT_H264 = 96,
-        MEDIA_FORMAT_H265 = 98,
-}MediaFromat;
-
-typedef enum _MediaType
-{
-        TYPE_AUDIO,
-        TYPE_VIDEO,
-}MediaType;
-
-#define MAX_CODEC_LEN 3
-typedef struct _AvParam{
-        int nRtpDynamicType;
-        MediaFromat format;
-        int nSampleOrClockRate;
-        int nChannel;
-        int nBitDepth;
-}AvParam;
-typedef struct _MediaConfig{
-        AvParam configs[MAX_CODEC_LEN];
-        int nCount;
-        int nUseIndex;
-}MediaConfig;
 
 typedef struct _MediaPacketier MediaPacketier;
 typedef struct _PacketierOperation {
@@ -125,7 +69,6 @@ typedef struct _MediaStream
         MediaStreamTrack streamTracks[2]; //for audio and video
 }MediaStream;
 
-void InitMediaConfig(IN MediaConfig * pMediaConfig);
 void InitMediaStream(IN MediaStream *pMediaStraem);
 void AddMediaTrack(IN OUT MediaStream *pMediaStraem, IN MediaConfig *pMediaConfig, IN int nIndex, IN MediaType type,
                    IN void * pPeerConnection);

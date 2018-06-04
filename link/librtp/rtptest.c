@@ -1,9 +1,14 @@
-#include "PeerConnection.h"
+#include <pjsip.h>
+#include <pjmedia.h>
+#include <pjmedia-codec.h>
+#include <pjlib-util.h>
+#include <pjlib.h>
+#include "qrtc.h"
 
 //#define SDP_NEG_TESG
 
 typedef struct _App{
-        PeerConnection peerConnection;
+        PeerConnection *pPeerConnection;
         pj_caching_pool cachingPool;
         MediaConfig audioConfig;
         MediaConfig videoConfig;
@@ -12,7 +17,7 @@ typedef struct _App{
 App app;
 
 #define TESTCHECK(status, a) if(status != 0){\
-ReleasePeerConnectoin(&a.peerConnection);\
+ReleasePeerConnectoin(a.pPeerConnection);\
 return status;}
 
 
@@ -573,7 +578,7 @@ static int receive_data_callback(void *pData, int nDataLen, int nFlag, int64_t t
         rtpPacket.pData = (uint8_t *)pData;
         rtpPacket.nDataLen = nDataLen;
         rtpPacket.nTimestamp = timestamp;
-        return SendPacket(&app.peerConnection, &rtpPacket);
+        return SendPacket(app.pPeerConnection, &rtpPacket);
 }
 
 int main(int argc, char **argv)
@@ -626,7 +631,8 @@ int main(int argc, char **argv)
         strcpy(app.userConfig.turnPassword, "root");
         app.userConfig.userCallback = onRxRtp;
         //there is default ice config
-        InitPeerConnectoin(&app.peerConnection, &app.userConfig); //&app.userConfig
+        status = InitPeerConnectoin(&app.pPeerConnection, &app.userConfig); //&app.userConfig
+        pj_assert(status == 0);
         
         //start pjmedia_sdp_neg test
         printf("pjmedia_sdp_neg_test\n");
@@ -649,7 +655,7 @@ int main(int argc, char **argv)
                 app.audioConfig.configs[1].nRtpDynamicType = 18;
                 app.audioConfig.configs[1].format = MEDIA_FORMAT_G729;
         }
-        status = AddAudioTrack(&app.peerConnection, &app.audioConfig);
+        status = AddAudioTrack(app.pPeerConnection, &app.audioConfig);
         TESTCHECK(status, app);
         
         InitMediaConfig(&app.videoConfig);
@@ -664,38 +670,38 @@ int main(int argc, char **argv)
                 app.videoConfig.nCount = 1;
                 //app.videoConfig.configs[0] = app.videoConfig.configs[1];
         }
-        status = AddVideoTrack(&app.peerConnection, &app.videoConfig);
+        status = AddVideoTrack(app.pPeerConnection, &app.videoConfig);
         TESTCHECK(status, app);
         
 
         if (role == OFFER) {
                 pjmedia_sdp_session *pOffer = NULL;
-                status = createOffer(&app.peerConnection, &pOffer);
+                status = createOffer(app.pPeerConnection, &pOffer);
                 TESTCHECK(status, app);
-                setLocalDescription(&app.peerConnection, pOffer);
+                setLocalDescription(app.pPeerConnection, pOffer);
                 write_sdp(pOffer, OFFERFILE);
                 
                 pjmedia_sdp_session *pAnswer = NULL;
                 pRemoteSdpPool =pj_pool_create(&app.cachingPool.factory, "sdpremote", 2048, 1024, NULL);
                 sdp_from_file(&pAnswer, ANSWERFILE,  pRemoteSdpPool, textSdpBuf, sizeof(textSdpBuf));
-                setRemoteDescription(&app.peerConnection, pAnswer);
+                setRemoteDescription(app.pPeerConnection, pAnswer);
         }
         
         if (role == ANSWER) {
                 pjmedia_sdp_session *pOffer = NULL;
                 pRemoteSdpPool =pj_pool_create(&app.cachingPool.factory, "sdpremote", 2048, 1024, NULL);
                 sdp_from_file(&pOffer, OFFERFILE,  pRemoteSdpPool, textSdpBuf, sizeof(textSdpBuf));
-                setRemoteDescription(&app.peerConnection, pOffer);
+                setRemoteDescription(app.pPeerConnection, pOffer);
                 
                 pjmedia_sdp_session *pAnswer = NULL;
-                status = createAnswer(&app.peerConnection, pOffer, &pAnswer);
+                status = createAnswer(app.pPeerConnection, pOffer, &pAnswer);
                 TESTCHECK(status, app);
-                setLocalDescription(&app.peerConnection, pAnswer);
+                setLocalDescription(app.pPeerConnection, pAnswer);
                 write_sdp(pAnswer, ANSWERFILE);
         }
         
         input_confirm("confirm to negotiation:");
-        StartNegotiation(&app.peerConnection);
+        StartNegotiation(app.pPeerConnection);
         
         char packet[120];
         
@@ -708,9 +714,9 @@ int main(int argc, char **argv)
                         if(packet[12] == 'q'){
                                 break;
                         }
-                        pjmedia_transport_send_rtp(app.peerConnection.transportIce[0].pTransport, packet, strlen(packet));
+                        //pjmedia_transport_send_rtp(app.pPeerConnection->transportIce[0].pTransport, packet, strlen(packet));
                         memset(packet, 0x31, 12);
-                        pjmedia_transport_send_rtp(app.peerConnection.transportIce[1].pTransport, packet, strlen(packet));
+                        //pjmedia_transport_send_rtp(app.pPeerConnection->transportIce[1].pTransport, packet, strlen(packet));
                 }
         } else {
                 input_confirm("confirm to sendfile:");
@@ -770,6 +776,6 @@ int main(int argc, char **argv)
         }
         
         input_confirm("quit");
-        ReleasePeerConnectoin(&app.peerConnection);
+        ReleasePeerConnectoin(app.pPeerConnection);
         return 0;
 }
