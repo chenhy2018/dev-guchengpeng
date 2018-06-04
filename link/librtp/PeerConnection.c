@@ -343,7 +343,7 @@ void InitIceConfig(IN OUT IceConfig *_pIceConfig)
         _pIceConfig->nKeepAlive = 300;
 }
 
-int InitPeerConnectoin(IN OUT PeerConnection ** _pPeerConnection, IN IceConfig *_pIceConfig)
+int InitPeerConnectoin(OUT PeerConnection ** _pPeerConnection, IN IceConfig *_pIceConfig)
 {
         PeerConnection * pPeerConnection =  (PeerConnection *)malloc(sizeof(PeerConnection));
         ASSERT_RETURN_CHECK(pPeerConnection, malloc);

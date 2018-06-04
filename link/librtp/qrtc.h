@@ -115,7 +115,7 @@ void InitMediaConfig(IN MediaConfig * pMediaConfig);
 void InitIceConfig(IN OUT IceConfig *pIceConfig);
 
 typedef struct _PeerConnection PeerConnection;
-int InitPeerConnectoin(IN OUT PeerConnection ** pPeerConnectoin,
+int InitPeerConnectoin(OUT PeerConnection ** pPeerConnectoin,
                         IN IceConfig *pIceConfig);
 
 int AddAudioTrack(IN OUT PeerConnection * pPeerConnection, IN MediaConfig *pAudioConfig);

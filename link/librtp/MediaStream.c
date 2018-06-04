@@ -340,7 +340,7 @@ pj_status_t CreatePacketizer(IN char *_pName, IN int _nNameLen, IN pj_pool_t *_p
         if (pj_strcmp(&pktzName, &pcmuPktzName) == 0) {
                 return createPcmuPacketizer(_pPktzPool, _pPktz);
         } else if (pj_strcmp(&pktzName, &pcmaPktzName) == 0) {
-                
+                return createPcmuPacketizer(_pPktzPool, _pPktz);
         } else if (pj_strcmp(&pktzName, &aacPktzName) == 0) {
                 
         } else if (pj_strcmp(&pktzName, &h264PktzName) == 0) {
