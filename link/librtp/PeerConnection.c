@@ -394,6 +394,11 @@ void ReleasePeerConnectoin(IN OUT PeerConnection * _pPeerConnection)
                 _pPeerConnection->pMutexPool = NULL;
         }
 
+        if (_pPeerConnection->pSdpPool) {
+                pj_pool_release(_pPeerConnection->pSdpPool);
+                _pPeerConnection->pSdpPool = NULL;
+        }
+
         if (_pPeerConnection->pMutex) {
                 pj_mutex_destroy(_pPeerConnection->pMutex);
                 _pPeerConnection->pMutex = NULL;
@@ -406,6 +411,8 @@ void ReleasePeerConnectoin(IN OUT PeerConnection * _pPeerConnection)
                         _pPeerConnection->mediaStream.streamTracks[i].pPacketizerPool = NULL;
                 }
         }
+
+        pj_caching_pool_destroy (&_pPeerConnection->cachingPool);
 }
 
 int AddAudioTrack(IN OUT PeerConnection * _pPeerConnection, IN MediaConfig * _pAudioConfig)
