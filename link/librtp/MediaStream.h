@@ -49,7 +49,7 @@ typedef struct _H264Packetizer {
 
 typedef struct _MediaStreamTrack
 {
-        MediaType   type;
+        StreamType   type;
         pj_timestamp hzPerSecond;
         pj_timestamp nextRtcpTimestamp;
         pj_timestamp nSysTimeBase;
@@ -70,7 +70,7 @@ typedef struct _MediaStream
 }MediaStream;
 
 void InitMediaStream(IN MediaStream *pMediaStraem);
-void AddMediaTrack(IN OUT MediaStream *pMediaStraem, IN MediaConfig *pMediaConfig, IN int nIndex, IN MediaType type,
+void AddMediaTrack(IN OUT MediaStream *pMediaStraem, IN MediaConfig *pMediaConfig, IN int nIndex, IN StreamType type,
                    IN void * pPeerConnection);
 int CreateSdpAudioMLine(IN pjmedia_endpt *pMediaEndpt, IN pjmedia_transport_info *pTransportInfo,
                         IN pj_pool_t * pPool, IN MediaStreamTrack *pMediaTrack, OUT pjmedia_sdp_media ** pAudioSdp);

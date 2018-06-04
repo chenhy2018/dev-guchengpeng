@@ -25,31 +25,31 @@ return s;}
 #define OUT
 #endif
 
-typedef enum _MediaType
+typedef enum _StreamType
 {
-        TYPE_AUDIO,
-        TYPE_VIDEO,
-}MediaType;
+        STREAM_AUDIO,
+        STREAM_VIDEO,
+        STREAM_DATA
+}StreamType;
 
-typedef enum _MediaFormat
+typedef enum _CodecType
 {
         MEDIA_FORMAT_PCMU = 0,
         MEDIA_FORMAT_PCMA = 8,
         MEDIA_FORMAT_G729 = 18,
         MEDIA_FORMAT_H264 = 96,
         MEDIA_FORMAT_H265 = 98,
-}MediaFromat;
+}CodecType;
 
 #define MAX_CODEC_LEN 5
-typedef struct _AvParam{
-        int nRtpDynamicType;
-        MediaFromat format;
+typedef struct _Media{
+        StreamType streamType;
+        CodecType codecType; //also rtp type
         int nSampleOrClockRate;
         int nChannel;
-        int nBitDepth;
-}AvParam;
+}Media;
 typedef struct _MediaConfig{
-        AvParam configs[MAX_CODEC_LEN];
+        Media configs[MAX_CODEC_LEN];
         int nCount;
         int nUseIndex;
 }MediaConfig;
@@ -100,13 +100,13 @@ typedef struct _RtpPacket{
         uint8_t * pData;
         int nDataLen;
         uint64_t nTimestamp;
-        MediaType type;
-        MediaFromat format;
+        StreamType type;
+        CodecType format;
 }RtpPacket;
 
 typedef struct _IceNegInfo {
         IceState state;
-        const AvParam* configs[2];
+        const Media* configs[2];
         int nCount;
 }IceNegInfo;
 

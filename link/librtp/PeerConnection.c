@@ -441,7 +441,7 @@ int AddAudioTrack(IN OUT PeerConnection * _pPeerConnection, IN MediaConfig * _pA
         status = initTransportIce(_pPeerConnection, &_pPeerConnection->transportIce[nAudioIndex]);
         STATUS_CHECK(audio initTransportIce, status);
         
-        AddMediaTrack(&_pPeerConnection->mediaStream, _pAudioConfig, nAudioIndex, TYPE_AUDIO, _pPeerConnection);
+        AddMediaTrack(&_pPeerConnection->mediaStream, _pAudioConfig, nAudioIndex, STREAM_AUDIO, _pPeerConnection);
         _pPeerConnection->nAvIndex[nAudioIndex] = nAudioIndex;
         return PJ_SUCCESS;
 }
@@ -467,7 +467,7 @@ int AddVideoTrack(IN OUT PeerConnection * _pPeerConnection, IN MediaConfig * _pV
         status = initTransportIce(_pPeerConnection, &_pPeerConnection->transportIce[nVideoIndex]);
         STATUS_CHECK(video initTransportIce, status);
         
-        AddMediaTrack(&_pPeerConnection->mediaStream, _pVideoConfig, nVideoIndex, TYPE_VIDEO, _pPeerConnection);
+        AddMediaTrack(&_pPeerConnection->mediaStream, _pVideoConfig, nVideoIndex, STREAM_VIDEO, _pPeerConnection);
         _pPeerConnection->nAvIndex[nVideoIndex] = nVideoIndex;
         return PJ_SUCCESS;
 }
@@ -480,7 +480,7 @@ static int createMediaSdpMLine(IN pjmedia_endpt *_pMediaEndpt, IN pjmedia_transp
         pjmedia_transport_get_info(_pTransport, &tpinfo);
         
         pj_status_t status = PJ_SUCCESS;
-        if (_pMediaTrack->type == TYPE_AUDIO) {
+        if (_pMediaTrack->type == STREAM_AUDIO) {
                 status = CreateSdpAudioMLine(_pMediaEndpt, &tpinfo, _pPool, _pMediaTrack, _pSdp);
         } else {
                 status = CreateSdpVideoMLine(_pMediaEndpt, &tpinfo, _pPool, _pMediaTrack, _pSdp);
@@ -515,7 +515,7 @@ static int createSdp(IN OUT PeerConnection * _pPeerConnection, IN pj_pool_t * _p
                                 return -1;
                         }
                         
-                        if (_pPeerConnection->mediaStream.streamTracks[i].type == TYPE_AUDIO) {
+                        if (_pPeerConnection->mediaStream.streamTracks[i].type == STREAM_AUDIO) {
                                 status = createMediaSdpMLine(_pPeerConnection->pMediaEndpt, _pPeerConnection->transportIce[i].pTransport, _pPool,
                                                              &_pPeerConnection->mediaStream.streamTracks[i], &pAudioSdp);
                                 STATUS_CHECK(pjmedia_endpt_create_audio_sdp, status);
@@ -666,8 +666,8 @@ static void on_rx_rtp(void *pUserData, void *pPkt, pj_ssize_t size)
         rtpPacket.nDataLen = nBitstreamPos;
         rtpPacket.nTimestamp = pRtpHeader->ts;
         int nIdx = pMediaTrack->mediaConfig.nUseIndex;
-        AvParam * pAvParam = &pMediaTrack->mediaConfig.configs[nIdx];
-        rtpPacket.format = pAvParam->format;
+        Media * pAvParam = &pMediaTrack->mediaConfig.configs[nIdx];
+        rtpPacket.format = pAvParam->codecType;
 
         fprintf(stderr, "rtp data receive:%ld, payLen:%d\n", size, nPayloadLen);
 
@@ -718,7 +718,7 @@ int StartNegotiation(IN PeerConnection * _pPeerConnection)
                         //init rtp sesstoin
                         MediaStreamTrack * pMediaTrack = &_pPeerConnection->mediaStream.streamTracks[i];
                         int nIdx = pMediaTrack->mediaConfig.nUseIndex;
-                        int nRtpDynamicType = pMediaTrack->mediaConfig.configs[nIdx].nRtpDynamicType;
+                        int nRtpDynamicType = pMediaTrack->mediaConfig.configs[nIdx].codecType;
                         pjmedia_rtp_session_init(&pMediaTrack->rtpSession, nRtpDynamicType, pj_rand());
                         
                         int nSampleOrClockRate = pMediaTrack->mediaConfig.configs[nIdx].nSampleOrClockRate;
@@ -780,7 +780,7 @@ static int checkAndNeg(IN OUT PeerConnection * _pPeerConnection)
         MediaStreamTrack *pVideoTrack = GetVideoTrack(&_pPeerConnection->mediaStream);
         if (pVideoTrack) {
                 int nIdx = pVideoTrack->mediaConfig.nUseIndex;
-                if (pVideoTrack->mediaConfig.configs[nIdx].format == MEDIA_FORMAT_H264){
+                if (pVideoTrack->mediaConfig.configs[nIdx].codecType == MEDIA_FORMAT_H264){
 
                         pVideoTrack->pPacketizerPool = pj_pool_create(_pPeerConnection->pPoolFactory, NULL, 200*1024, 200*1024, NULL);
                         status = CreatePacketizer("h264", 4, pVideoTrack->pPacketizerPool, &pVideoTrack->pMediaPacketier);
@@ -791,8 +791,8 @@ static int checkAndNeg(IN OUT PeerConnection * _pPeerConnection)
         MediaStreamTrack *pAudioTrack = GetAudioTrack(&_pPeerConnection->mediaStream);
         if (pAudioTrack) {
                 int nIdx = pAudioTrack->mediaConfig.nUseIndex;
-                if (pAudioTrack->mediaConfig.configs[nIdx].format == MEDIA_FORMAT_PCMU ||
-                    pAudioTrack->mediaConfig.configs[nIdx].format == MEDIA_FORMAT_PCMA){
+                if (pAudioTrack->mediaConfig.configs[nIdx].codecType == MEDIA_FORMAT_PCMU ||
+                    pAudioTrack->mediaConfig.configs[nIdx].codecType == MEDIA_FORMAT_PCMA){
 
                         pAudioTrack->pPacketizerPool = pj_pool_create(_pPeerConnection->pPoolFactory, NULL, 512, 512, NULL);
                         status = CreatePacketizer("pcmu", 4, pAudioTrack->pPacketizerPool, &pAudioTrack->pMediaPacketier);
@@ -964,7 +964,7 @@ static int SendAudioPacket(IN PeerConnection *_pPeerConnection, IN RtpPacket * _
         MediaConfig *pAudioConfig = &pMediaTrack->mediaConfig;
         int nIdx = pMediaTrack->mediaConfig.nUseIndex;
         int nSampleRate = pAudioConfig->configs[nIdx].nSampleOrClockRate;
-        int nRtpType = pAudioConfig->configs[nIdx].nRtpDynamicType;
+        int nRtpType = pAudioConfig->configs[nIdx].codecType;
         //int nChannel = pAudioConfig->configs[nIdx].nChannel;
         //int nBitDepth = pAudioConfig->configs[nIdx].nBitDepth;
         //unsigned nMsecInterval = _pPacket->nDataLen * 1000 /nChannel / (nBitDepth / 8) / nSampleRate;
@@ -1002,7 +1002,7 @@ static int SendVideoPacket(IN PeerConnection *_pPeerConnection, IN OUT RtpPacket
         MediaConfig *pVideoConfig = &pMediaTrack->mediaConfig;
         int nIdx = pMediaTrack->mediaConfig.nUseIndex;
         int nClockRate = pVideoConfig->configs[nIdx].nSampleOrClockRate;
-        int nRtpType = pVideoConfig->configs[nIdx].nRtpDynamicType;
+        int nRtpType = pVideoConfig->configs[nIdx].codecType;
 
         pj_timestamp now;
         pj_get_timestamp(&now);
@@ -1060,7 +1060,7 @@ static int SendVideoPacket(IN PeerConnection *_pPeerConnection, IN OUT RtpPacket
 int SendPacket(IN PeerConnection *_pPeerConnection, IN OUT RtpPacket * _pPacket)
 {
         pj_assert(_pPacket);
-        if (_pPacket->type == TYPE_AUDIO) {
+        if (_pPacket->type == STREAM_AUDIO) {
                 return SendAudioPacket(_pPeerConnection, _pPacket);
         } else {
                 return SendVideoPacket(_pPeerConnection, _pPacket);

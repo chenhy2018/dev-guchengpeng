@@ -544,16 +544,16 @@ static void onRxRtp(void *_pUserData, CallbackType _type, void *_pCbData)
                         IceNegInfo *pInfo = (IceNegInfo *)_pCbData;
                         fprintf(stderr, "==========>callback_ice: state:%d\n", pInfo->state);
                         for ( int i = 0; i < pInfo->nCount; i++) {
-                                fprintf(stderr, "           codec type:%d\n", pInfo->configs[i]->nRtpDynamicType);
+                                fprintf(stderr, "           codec type:%d\n", pInfo->configs[i]->codecType);
                         }
                 }
                         break;
                 case CALLBACK_RTP:{
                         RtpPacket *pPkt = (RtpPacket *)_pCbData;
                         pj_ssize_t nLen = pPkt->nDataLen;
-                        if (pPkt->type == TYPE_AUDIO && nLen == 160) {
+                        if (pPkt->type == STREAM_AUDIO && nLen == 160) {
                                 pj_file_write(gPcmuFd, pPkt->pData, &nLen);
-                        } else if (pPkt->type == TYPE_VIDEO) {
+                        } else if (pPkt->type == STREAM_VIDEO) {
                                 pj_file_write(gH264Fd, pPkt->pData, &nLen);
                         }
                 }
@@ -570,10 +570,10 @@ static int receive_data_callback(void *pData, int nDataLen, int nFlag, int64_t t
         pj_bzero(&rtpPacket, sizeof(rtpPacket));
         if (nFlag == THIS_IS_AUDIO) {
                 printf("send %d bytes audio data to rtp with timestamp:%ld\n", nDataLen, timestamp);
-                rtpPacket.type = TYPE_AUDIO;
+                rtpPacket.type = STREAM_AUDIO;
         } else {
                 printf("send %d bytes vidoe data to rtp with timestamp:%ld\n", nDataLen, timestamp);
-                rtpPacket.type = TYPE_VIDEO;
+                rtpPacket.type = STREAM_VIDEO;
         }
         rtpPacket.pData = (uint8_t *)pData;
         rtpPacket.nDataLen = nDataLen;
@@ -625,13 +625,15 @@ int main(int argc, char **argv)
         }
         
         InitIceConfig(&app.userConfig);
+#ifdef LOCAL_TEST
         strcpy(app.userConfig.turnHost, "127.0.0.1");
-        //strcpy(app.userConfig.turnHost, "123.59.204.198");
+#else
+        strcpy(app.userConfig.turnHost, "123.59.204.198");
         strcpy(app.userConfig.turnUsername, "root");
         strcpy(app.userConfig.turnPassword, "root");
+#endif
         app.userConfig.userCallback = onRxRtp;
-        //there is default ice config
-        status = InitPeerConnectoin(&app.pPeerConnection, &app.userConfig); //&app.userConfig
+        status = InitPeerConnectoin(&app.pPeerConnection, &app.userConfig);
         pj_assert(status == 0);
         
         //start pjmedia_sdp_neg test
@@ -645,26 +647,23 @@ int main(int argc, char **argv)
         
         InitMediaConfig(&app.audioConfig);
         app.audioConfig.configs[0].nSampleOrClockRate = 8000;
-        app.audioConfig.configs[0].format = MEDIA_FORMAT_PCMU;
+        app.audioConfig.configs[0].codecType = MEDIA_FORMAT_PCMU;
         app.audioConfig.configs[1].nSampleOrClockRate = 8000;
-        app.audioConfig.configs[1].format = MEDIA_FORMAT_PCMA;
+        app.audioConfig.configs[1].codecType = MEDIA_FORMAT_PCMA;
         app.audioConfig.nCount = 2;
         if ( role == ANSWER ){
                 app.audioConfig.configs[0] = app.audioConfig.configs[1];
                 app.audioConfig.configs[1].nSampleOrClockRate = 8000;
-                app.audioConfig.configs[1].nRtpDynamicType = 18;
-                app.audioConfig.configs[1].format = MEDIA_FORMAT_G729;
+                app.audioConfig.configs[1].codecType = MEDIA_FORMAT_G729;
         }
         status = AddAudioTrack(app.pPeerConnection, &app.audioConfig);
         TESTCHECK(status, app);
         
         InitMediaConfig(&app.videoConfig);
         app.videoConfig.configs[0].nSampleOrClockRate = 90000;
-        app.videoConfig.configs[0].nRtpDynamicType = 98;
-        app.videoConfig.configs[0].format = MEDIA_FORMAT_H264;
+        app.videoConfig.configs[0].codecType = MEDIA_FORMAT_H264;
         app.videoConfig.configs[1].nSampleOrClockRate = 90000;
-        app.videoConfig.configs[1].nRtpDynamicType = 99;
-        app.videoConfig.configs[1].format = MEDIA_FORMAT_H265;
+        app.videoConfig.configs[1].codecType = MEDIA_FORMAT_H265;
         app.videoConfig.nCount = 2;
         if ( role == ANSWER ){
                 app.videoConfig.nCount = 1;
