@@ -1,4 +1,4 @@
-// Last Update:2018-06-05 10:40:13
+// Last Update:2018-06-04 14:11:11
 /**
  * @file sdk_interface.h
  * @brief 
@@ -10,7 +10,10 @@
 #ifndef SDK_INTERFACE_H
 #define SDK_INTERFACE_H
 
+#include <stdint.h>
+
 typedef enum {
+    CALL_STATUS_REGISTERED,
     CALL_STATUS_INCOMING,
     CALL_STATUS_TIMEOUT,
     CALL_STATUS_ESTABLISHED,
@@ -29,13 +32,17 @@ typedef enum {
     RET_OK,
     RET_FAIL,
     RET_RETRY,
-    RET_MEM_ERROR = -1,
-    RET_PARAM_ERROR = -2,
-    RET_ACCOUNT_NOT_EXIST = -3,
-    RET_REGISTER_TIMEOUT = -4,
-    RET_TIMEOUT_FROM_SERVER = -5,
-    RET_USER_UNAUTHORIZED = -6,
-    RET_SDK_NOT_INIT = -7,
+    RET_MEM_ERROR = 1001,
+    RET_PARAM_ERROR,
+    RET_INIT_ERROR,
+    RET_ACCOUNT_NOT_EXIST,
+    RET_CALL_NOT_EXIST,
+    RET_REGISTER_TIMEOUT,
+    RET_TIMEOUT_FROM_SERVER,
+    RET_USER_UNAUTHORIZED,
+    RET_CALL_INVAILD_CONNECTION,
+    RET_CALL_INVAILD_SDP,
+    RET_CALL_INVAILD_OPERATING
 } ErrorID;
 
 typedef enum {
@@ -58,7 +65,7 @@ typedef enum {
 typedef int AccountID;
 
 #undef IN
-#define IN const
+#define IN
 
 #undef OUT
 #define OUT
@@ -92,6 +99,7 @@ typedef struct {
 typedef struct {
     int eventID;
     int time;
+    EventType type;
     union {
         CallEvent callEvent;
         DataEvent dataEvent;
@@ -121,16 +129,14 @@ ErrorID RejectCall( AccountID id, int nCallId );
 // hangup a call
 ErrorID HangupCall( AccountID id, int nCallId );
 // send a packet
-ErrorID SendPacket(AccountID id, int callID, Stream streamID, const char* buffer, int size);
+ErrorID SendPacket(AccountID id, int callID, Stream streamID, const uint8_t* buffer, int size, int64_t nTimestamp);
 // poll a event
 // if the EventData have video or audio data
 // the user shuould copy the the packet data as soon as possible
 ErrorID PollEvent(AccountID id, EventType* type, Event* event, int timeOut );
 
 // mqtt report
-ErrorID Report(AccountID id, const char* topic, const char* message, int length);
-ErrorID RegisterTopic(AccountID id, const char* topic);
-ErrorID UnregisterTopic(AccountID id, const char* topic);
+ErrorID Report(AccountID id, const char* message, int length);
 
 #endif  /*SDK_INTERFACE_H*/
 

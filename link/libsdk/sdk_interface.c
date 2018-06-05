@@ -1,4 +1,4 @@
-// Last Update:2018-06-05 17:41:33
+// Last Update:2018-06-04 14:18:25
 /**
  * @file sdk_interface.c
  * @brief 
@@ -14,8 +14,9 @@
 #include "sdk_interface.h"
 #include "mqtt.h"
 #include "sdk_local.h"
-#include "framework.h"
 #include "list.h"
+#include "framework.h"
+#include "uaMgr.h"
 
 UAManager gUAManager;
 UAManager *pUAManager = &gUAManager;
@@ -24,114 +25,91 @@ ErrorID InitSDK( Media* _pMediaConfigs, int _nSize)
 {
     SipCallBack cb;
 
-    DBG_LINE();
-    memset( pUAManager, 0, sizeof(UAManager) );
-    INIT_LIST_HEAD( &(pUAManager->UAList.list) );
-
-    memcpy( pUAManager->mediaConfigs, _pMediaConfigs, _nSize );
+    memset(pUAManager, 0, sizeof(UAManager));
+    
+    memcpy(pUAManager->mediaConfigs, _pMediaConfigs, _nSize);
     cb.OnIncomingCall  = &cbOnIncomingCall;
     cb.OnCallStateChange = &cbOnCallStateChange;
     cb.OnRegStatusChange = &cbOnRegStatusChange;
     SipCreateInstance(&cb);
-    pthread_mutex_init( &pUAManager->mutex, NULL );
-
+    pUAManager->bInitSdk = true;
     return RET_OK;
 }
 
 ErrorID UninitSDK()
 {
-    struct list_head *pos, *q;
-    UA *pUA;
-
-    list_for_each_safe(pos, q, &pUAManager->UAList.list){
-        pUA = list_entry(pos, UA, list);
-        pthread_cond_destroy( &pUA->registerCond );
-        list_del(pos);
-        free(pUA);
-    }
-    pthread_mutex_destroy( &pUAManager->mutex );
-
-    return RET_OK;
+        struct list_head *pos, *q;
+        UA *pUA;
+        if (!pUAManager->bInitSdk) {
+                DBG_ERROR("not init sdk\n");
+                return RET_INIT_ERROR;
+        }
+        list_for_each_safe(pos, q, &pUAManager->UAList.list){
+                pUA = list_entry(pos, UA, list);
+                list_del(pos);
+                UAUnRegister(pUA);
+        }
+        pUAManager->bInitSdk = false;
+        return RET_OK;
 }
 
-AccountID Register( IN  char* _id, IN char* _password, IN char* _pSigHost,
-                    IN char* _pMediaHost, IN char* _pImHost, int _nTimeOut )
+static UA* FindUA(UAManager* _pUAManager, AccountID _nAccountId, struct list_head *pos)
+{
+        UA* pUA;
+        struct list_head *q;
+        list_for_each_safe(pos, q, &_pUAManager->UAList.list) {
+                pUA = list_entry(pos, UA, list);
+                if (pUA->id == _nAccountId) {
+                        return pUA;
+                }
+        }
+        return NULL;
+}
+
+AccountID Register(const char* _id, const char* _password, const char* _pSigHost,
+                   const char* _pMediaHost, const char* _pImHost, int _nTimeOut)
 {
     int nAccountId = 0;
-    UA *pUA = ( UA *) malloc ( sizeof(UA) );
-    struct timeval now;
-    struct timespec waitTime;
+    UA *pUA = UARegister(_id, _password, _pSigHost, _pMediaHost, _pImHost, _nTimeOut);
     int nReason = 0;
 
-    DBG_LINE();
-    if ( !pUA ) {
+    if (!pUAManager->bInitSdk) {
+        DBG_ERROR("not init sdk\n");
+        return RET_INIT_ERROR;
+    }
+    if (pUA == NULL) {
         DBG_ERROR("malloc error\n");
         return RET_MEM_ERROR;
     }
-    memset( pUA, 0, sizeof(UA) );
-    pthread_cond_init( &pUA->registerCond, NULL);
-    pUA->pQueue = CreateMessageQueue( MESSAGE_QUEUE_MAX );
-    if ( !pUA->pQueue ) {
-        DBG_ERROR("queue malloc fail\n");
-        return RET_MEM_ERROR;
-    }
-    pthread_mutex_lock( &pUAManager->mutex );
-    list_add( &(pUA->list), &(pUAManager->UAList.list) );
-    nAccountId = SipAddNewAccount( _id, _password, _pSigHost, (void *)pUA );
-    SipRegAccount( nAccountId, 0 );
-    gettimeofday(&now, NULL);
-    waitTime.tv_sec = now.tv_sec;
-    waitTime.tv_nsec = now.tv_usec * 1000 + _nTimeOut * 1000 * 1000;
-    nReason = pthread_cond_timedwait( &pUA->registerCond, &pUAManager->mutex, &waitTime );
-    if (nReason == ETIMEDOUT) {
-        DBG_ERROR("register time out\n");
-        return RET_REGISTER_TIMEOUT;
-    }
-    pthread_mutex_unlock( &pUAManager->mutex );
-
-    if ( pUA->regStatus == REQUEST_TIMEOUT ) {
-        DBG_ERROR("register server return timeout\n");
-        return RET_TIMEOUT_FROM_SERVER;
-    }
-
-    if ( pUA->regStatus == UNAUTHORIZED ) {
-        DBG_ERROR("user unauthorized\n");
-        return RET_USER_UNAUTHORIZED;
-    }
-
-    return nAccountId;
+    list_add(&(pUA->list), &(pUAManager->UAList.list));
+    return pUA->id;
 }
 
 ErrorID UnRegister( AccountID _nAccountId )
 {
-    struct list_head *pos, *q;
-    UA *pUA = NULL;
-
-    SipRegAccount( _nAccountId, 1 );
-    list_for_each_safe(pos, q, &pUAManager->UAList.list){
-        pUA = list_entry(pos, UA, list);
-        if ( pUA->id == _nAccountId ) {
-            pthread_cond_destroy( &pUA->registerCond );
+    struct list_head *pos;
+    UA *pUA = FindUA(pUAManager, _nAccountId, pos);
+    if (pUA != NULL) {
             list_del(pos);
-            free(pUA);
+            UAUnRegister(pUA);
             return RET_OK;
-        }
     }
 
     return RET_ACCOUNT_NOT_EXIST;
 }
 
-ErrorID MakeCall(AccountID _nAccountId, const char* id, const char* _pDestUri, OUT int* _pCallId )
+ErrorID MakeCall(AccountID _nAccountId, const char* id, const char* _pDestUri, OUT int* _pCallId)
 {
-    int nCallId = 0;
-    void *pMedia = NULL;
-
+    struct list_head *pos;
     if ( !_pDestUri || !_pCallId )
         return RET_PARAM_ERROR;
 
-    *_pCallId = SipMakeNewCall( _nAccountId, _pDestUri, pMedia );
+    UA *pUA = FindUA(pUAManager, _nAccountId, pos);
+    if (pUA != NULL) {
+            return UAMakeCall(pUA, id, _pDestUri, _pCallId);
+    }
 
-    return RET_OK;
+    return RET_ACCOUNT_NOT_EXIST;
 }
 
 ErrorID PollEvent(AccountID _nAccountID, EventType* _pType, Event* _pEvent, int _nTimeOut )
@@ -144,16 +122,10 @@ ErrorID PollEvent(AccountID _nAccountID, EventType* _pType, Event* _pEvent, int 
         return RET_PARAM_ERROR;
     }
 
-    list_for_each_safe(pos, q, &pUAManager->UAList.list){
-        pUA = list_entry(pos, UA, list);
-        if ( pUA->id == _nAccountID ) {
-            break;
-        }
-    }
 
-    if ( !pUA ) {
-        DBG_ERROR("account id not exist, id = %d\n", _nAccountID );
-        return RET_ACCOUNT_NOT_EXIST;
+    pUA = FindUA(pUAManager, _nAccountID, pos);
+    if (pUA == NULL) {
+            return RET_ACCOUNT_NOT_EXIST;
     }
 
     // pLastMessage use to free last message
@@ -167,13 +139,13 @@ ErrorID PollEvent(AccountID _nAccountID, EventType* _pType, Event* _pEvent, int 
         pEvent = NULL;
     }
 
-    if ( _nTimeOut ) {
+    if (_nTimeOut) {
         pMessage = ReceiveMessageTimeout( pUA->pQueue, _nTimeOut );
     } else {
         pMessage = ReceiveMessage( pUA->pQueue );
     }
 
-    if ( !pMessage ) {
+    if (!pMessage) {
         return RET_RETRY;
     }
 
@@ -184,59 +156,190 @@ ErrorID PollEvent(AccountID _nAccountID, EventType* _pType, Event* _pEvent, int 
         // we can free the last one
         pUA->pLastMessage = pMessage;
     }
-
+    if (UAPollEvent(pUA, _pType, _pEvent, _nTimeOut) == RET_CALL_NOT_EXIST) {
+        fprintf(stderr, "Call is not exist, poll next event\n");
+        return PollEvent(_nAccountID, _pType,  _pEvent, _nTimeOut);
+    }
     return RET_OK;
 }
 
-ErrorID AnswerCall( AccountID id, int _nCallId )
+ErrorID AnswerCall(AccountID id, int _nCallId)
 {
-    int ret = 0;
-    char *pReason = NULL;
-    void *pMedia = NULL;
+    struct list_head *pos;
+    
+    UA *pUA = FindUA(pUAManager, id, pos);
+    if (pUA != NULL) {
+            return UAAnswerCall(pUA, _nCallId);
+    }
 
-    (void)id;
-
-    ret = SipAnswerCall( _nCallId, OK, pReason,  pMedia );
-
-    return RET_OK;
+    return RET_ACCOUNT_NOT_EXIST;
 }
 
 ErrorID RejectCall( AccountID id, int _nCallId )
 {
-    int ret = 0;
-    char *pReason = NULL;
-    void *pMedia = NULL;
+    struct list_head *pos;
 
-    (void)id;
+    UA *pUA = FindUA(pUAManager, id, pos);
+    if (pUA != NULL) {
+            return UAAnswerCall(pUA, _nCallId);
+    }
 
-    ret = SipAnswerCall( _nCallId, BUSY_HERE, pReason,  pMedia );
-
-    return RET_OK;
+    return RET_ACCOUNT_NOT_EXIST;
 }
 
 ErrorID HangupCall( AccountID id, int _nCallId )
 {
-    (void)id;
+    struct list_head *pos;
 
-    SipHangUp( _nCallId );
+    UA *pUA = FindUA(pUAManager, id, pos);
+    if (pUA != NULL) {
+            return UAHangupCall(pUA, _nCallId);
+    }
 
-    return RET_OK;
+    return RET_ACCOUNT_NOT_EXIST;
 }
 
-ErrorID SendPacket(AccountID id, int callID, Stream streamID, const char* buffer, int size)
+ErrorID SendPacket(AccountID id, int _nCallId, Stream streamID, const uint8_t* buffer, int size, int64_t nTimestamp)
 {
+    struct list_head *pos;
+
+    UA *pUA = FindUA(pUAManager, id, pos);
+    if (pUA != NULL) {
+            return UASendPacket(pUA, _nCallId, streamID, buffer, size, nTimestamp);
+    }
+
+    return RET_ACCOUNT_NOT_EXIST;
 }
 
-ErrorID Report(AccountID id, const char* topic, const char* message, int length)
+ErrorID Report(AccountID id, const char* message, int length)
 {
+    struct list_head *pos;
+
+    UA *pUA = FindUA(pUAManager, id, pos);
+    if (pUA != NULL) {
+            return UAReport(pUA, message, length);
+    }
+
+    return RET_ACCOUNT_NOT_EXIST;
 }
 
-ErrorID RegisterTopic(AccountID id, const char* topic)
+SipAnswerCode cbOnIncomingCall(const const int _nAccountId, const int _nCallId,
+                               const const char *_pFrom, const void *_pUser, IN const void *_pMedia)
+{   
+    Message *pMessage = (Message *) malloc( sizeof(Message) );
+    Event *pEvent = (Event *) malloc( sizeof(Event) );
+    CallEvent *pCallEvent = NULL;
+    const UA *_pUA = _pUser;
+    struct list_head *pos;
+    
+    UA *pUA = FindUA(pUAManager, _nAccountId, pos);
+    if (pUA == NULL && _pUA == pUA) {
+            return DOES_NOT_EXIST_ANYWHERE;
+    }
+    
+    DBG_LOG("incoming call From %s to %d\n", _pFrom, _nAccountId);
+
+    UAOnIncomingCall(pUA, _nCallId, _pFrom, _pMedia);
+  
+    if ( !pMessage || !pEvent ) {
+        DBG_ERROR("malloc error\n");
+        return 0;
+    }
+    
+    memset( pMessage, 0, sizeof(Message) );
+    memset( pEvent, 0, sizeof(Event) );
+    pMessage->nMessageID = EVENT_CALL;
+    pCallEvent = &pEvent->body.callEvent;
+    pCallEvent->callID = _nCallId;
+    pCallEvent->status = CALL_STATUS_INCOMING;
+    if ( _pFrom ) {
+        pCallEvent->pFromAccount = (char *) malloc ( strlen(_pFrom) + 1);
+        memset( pCallEvent->pFromAccount, 0, strlen(_pFrom) + 1 );
+        memcpy( pCallEvent->pFromAccount, _pFrom, strlen(_pFrom) );
+    }
+    
+    pMessage->pMessage = pEvent;
+    if ( pUA )
+        SendMessage( pUA->pQueue, pMessage );
+    else {
+        DBG_ERROR("pUA is NULL\n");
+    }
+        
+    return OK;
+}
+
+void cbOnRegStatusChange(const int _nAccountId, const SipAnswerCode _regStatusCode, const void *_pUser )
 {
+    Message *pMessage = (Message *) malloc( sizeof(Message) );
+    Event *pEvent = (Event *) malloc( sizeof(Event) );
+    CallEvent *pCallEvent = NULL;
+    UA *_pUA = ( UA *)_pUser;
+    struct list_head *pos;
+
+    UA *pUA = FindUA(pUAManager, _nAccountId, pos);
+    if (pUA == NULL && _pUA == pUA) {
+            DBG_ERROR("pUser is NULL\n");
+    }
+
+    memset( pMessage, 0, sizeof(Message) );
+    memset( pEvent, 0, sizeof(Event) );
+    pMessage->nMessageID = EVENT_CALL;
+    pCallEvent = &pEvent->body.callEvent;
+    pCallEvent->callID = 0;
+    pCallEvent->status = CALL_STATUS_REGISTERED;
+    pCallEvent->pFromAccount = NULL;
+    pMessage->pMessage = pEvent;
+    if ( pUA )
+        SendMessage( pUA->pQueue, pMessage );
+    else {
+        DBG_ERROR("pUA is NULL\n");
+    }
+
+    DBG_LOG("reg status = %d\n", _regStatusCode);
+    UAOnRegStatusChange(pUA, _regStatusCode);
+    if ( pUA ) {
+        if ( _regStatusCode == OK ||
+             _regStatusCode == UNAUTHORIZED ||
+             _regStatusCode == REQUEST_TIMEOUT ) {
+            pUA->regStatus = _regStatusCode;
+        }
+    }
 }
 
-ErrorID UnregisterTopic(AccountID id, const char* topic)
+void cbOnCallStateChange(const int _nCallId, const int _nAccountId, const SipInviteState _State,
+                         const SipAnswerCode _StatusCode, const void *pUser, const void *pMedia)
 {
+    Message *pMessage = (Message *) malloc ( sizeof(Message) );
+    Event *pEvent = (Event *) malloc( sizeof(Event) );
+    CallEvent *pCallEvent = NULL;
+    const UA *_pUA = pUser;
+    struct list_head *pos;
+
+    DBG_LOG("state = %d, status code = %d\n", _State, _StatusCode);
+
+    if ( !pMessage || !pEvent ) {
+            DBG_ERROR("malloc error\n");
+            return;
+    }
+
+    UA *pUA = FindUA(pUAManager, _nAccountId, pos);
+    if (pUA == NULL && _pUA == pUA) {
+            DBG_ERROR("pUser is NULL\n");
+            return;
+    }
+
+    memset( pMessage, 0, sizeof(Message) );
+    memset( pEvent, 0, sizeof(Event) );
+    pMessage->nMessageID = EVENT_CALL;
+    pCallEvent = &pEvent->body.callEvent;
+    pCallEvent->callID = _nCallId;
+    if ( _State == INV_STATE_CONFIRMED ) {
+            pCallEvent->status = CALL_STATUS_ESTABLISHED;
+    } else if ( _State == INV_STATE_DISCONNECTED ) {
+            pCallEvent->status = CALL_STATUS_HANGUP;
+    } else {
+    }
+    pMessage->pMessage  = (void *)pEvent;
+    SendMessage(pUA->pQueue, pMessage);
+    UAOnCallStateChange(pUA, _nCallId, _State, _StatusCode, pMedia);
 }
-
-
