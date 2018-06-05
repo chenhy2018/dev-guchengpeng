@@ -1,4 +1,4 @@
-// Last Update:2018-06-04 14:18:25
+// Last Update:2018-06-05 17:28:24
 /**
  * @file sdk_interface.c
  * @brief 
@@ -25,13 +25,14 @@ ErrorID InitSDK( Media* _pMediaConfigs, int _nSize)
     SipCallBack cb;
 
     memset( pUAManager, 0, sizeof(UAManager) );
-    
+    INIT_LIST_HEAD( &(pUAManager->UAList.list) );
+
     memcpy( pUAManager->mediaConfigs, _pMediaConfigs, _nSize );
     cb.OnIncomingCall  = &cbOnIncomingCall;
     cb.OnCallStateChange = &cbOnCallStateChange;
     cb.OnRegStatusChange = &cbOnRegStatusChange;
     SipCreateInstance(&cb);
-	pthread_mutex_init( &pUAManager->mutex, NULL );
+    pthread_mutex_init( &pUAManager->mutex, NULL );
 
     return RET_OK;
 }
@@ -47,18 +48,18 @@ ErrorID UninitSDK()
         list_del(pos);
         free(pUA);
     }
-	pthread_mutex_destroy( &pUAManager->mutex );
+    pthread_mutex_destroy( &pUAManager->mutex );
 
     return RET_OK;
 }
 
 AccountID Register( IN  char* _id, IN char* _password, IN char* _pSigHost,
-                   IN char* _pMediaHost, IN char* _pImHost, int _nTimeOut )
+                    IN char* _pMediaHost, IN char* _pImHost, int _nTimeOut )
 {
     int nAccountId = 0;
     UA *pUA = ( UA *) malloc ( sizeof(UA) );
-	struct timeval now;
-	struct timespec waitTime;
+    struct timeval now;
+    struct timespec waitTime;
     int nReason = 0;
 
     if ( !pUA ) {
@@ -66,13 +67,13 @@ AccountID Register( IN  char* _id, IN char* _password, IN char* _pSigHost,
         return RET_MEM_ERROR;
     }
     memset( pUA, 0, sizeof(UA) );
-	pthread_cond_init( &pUA->registerCond, NULL);
+    pthread_cond_init( &pUA->registerCond, NULL);
     pUA->pQueue = CreateMessageQueue( MESSAGE_QUEUE_MAX );
     if ( !pUA->pQueue ) {
         DBG_ERROR("queue malloc fail\n");
         return RET_MEM_ERROR;
     }
-	pthread_mutex_lock( &pUAManager->mutex );
+    pthread_mutex_lock( &pUAManager->mutex );
     list_add( &(pUA->list), &(pUAManager->UAList.list) );
     nAccountId = SipAddNewAccount( _id, _password, _pSigHost, (void *)pUA );
     SipRegAccount( nAccountId, 0 );
@@ -84,7 +85,7 @@ AccountID Register( IN  char* _id, IN char* _password, IN char* _pSigHost,
         DBG_ERROR("register time out\n");
         return RET_REGISTER_TIMEOUT;
     }
-	pthread_mutex_unlock( &pUAManager->mutex );
+    pthread_mutex_unlock( &pUAManager->mutex );
 
     if ( pUA->regStatus == REQUEST_TIMEOUT ) {
         DBG_ERROR("register server return timeout\n");
