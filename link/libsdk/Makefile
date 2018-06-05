@@ -77,6 +77,7 @@ $(LIBSIP):$(SIP_PATH)/sip.c
 vpath %.o $(SDK_OBJS_PATH)
 sdk $(TARGET_LIBRARY) : $(LIBPJ) $(LIBSIP) $(LIBSDK) $(LIBMQTT) $(LIBRTP)
 	./merge-lib.sh $(ARCH)
+	make -C test
 
 $(LIBSDK) : %.o : %.c
 	mkdir -p $(SDK_OBJS_PATH) 
