@@ -11,6 +11,8 @@
 #define SIP_REG_DELAY_BEFORE_REFRESH  5 // 5 seconds
 #define SIP_UNREG_TIMEOUT 4000 // 4 seconds
 #define SIP_KEEP_ALIVE_INTERVAL 15 // 15 seconds
+#define SIP_SESSION_EXPIRES 600 // 10 minutes
+#define SIP_MIN_SE 90 //90 seconds
 
 /**
  * This structure describes SIP account connfigure to be specified when
@@ -26,11 +28,13 @@ typedef struct SipAccountConfig {
         pj_str_t Realm;
         pj_str_t KaData;
 
-        unsigned    nRegTimeout;
-        unsigned    nUnRegTimeout;
-        unsigned    nRegDelayBeforeRefresh;
-        unsigned    nRegRetryInterval;
-        unsigned    nKaInterval;
+        unsigned nRegTimeout;
+        unsigned nUnRegTimeout;
+        unsigned nRegDelayBeforeRefresh;
+        unsigned nRegRetryInterval;
+        unsigned nKaInterval;
+
+        pjsip_timer_setting TimerSetting;
 } SipAccountConfig;
 
 /**

@@ -201,6 +201,10 @@ int SipCreateInstance(IN const SipCallBack *_pSipCallBack)
         Status = pjsip_100rel_init_module(SipAppData.pSipEndPoint);
         PJ_ASSERT_RETURN(Status == PJ_SUCCESS, Status);
 
+        /* Initialize session timer support */
+        Status = pjsip_timer_init_module(SipAppData.pSipEndPoint);
+        PJ_ASSERT_RETURN(Status == PJ_SUCCESS, Status);
+
         /*  Register our module to receive incoming requests */
         Status = pjsip_endpt_register_module(SipAppData.pSipEndPoint, &SipMod);
         PJ_ASSERT_RETURN(Status == PJ_SUCCESS, Status);
@@ -314,7 +318,8 @@ int SipAddNewAccount(IN const char *_pUserName, IN const char *_pPassWord, IN co
         pAccount->Config.nRegTimeout = SIP_REG_INTERVAL;
         pAccount->Config.nUnRegTimeout = SIP_UNREG_TIMEOUT;
         pAccount->Config.nKaInterval = SIP_KEEP_ALIVE_INTERVAL;
-
+        pAccount->Config.TimerSetting.sess_expires = SIP_SESSION_EXPIRES;
+        pAccount->Config.TimerSetting.min_se = SIP_MIN_SE;
         /* Copy account info */
         char ID[80], Registrar[80];
         sprintf(ID, "sip:%s@%s", _pUserName, _pDomain);
@@ -830,9 +835,20 @@ int SipMakeNewCall(IN const int _nFromAccountId, IN const char *_pDestUri, IN co
         //CreateTmpSDP(pDialog->pool, pCall, &pMediaSession);
         pMediaSession = (pjmedia_sdp_session *)pMedia;
         /* Create invite session */
-        Status = pjsip_inv_create_uac(pDialog, pMediaSession, 0, &pCall->pInviteSession);
+        unsigned nOptions = 0;
+        nOptions |= PJSIP_INV_SUPPORT_100REL;
+        nOptions |= PJSIP_INV_SUPPORT_TIMER;
+        Status = pjsip_inv_create_uac(pDialog, pMediaSession, nOptions, &pCall->pInviteSession);
         if (Status != PJ_SUCCESS) {
                 PrintErrorMsg(Status, "Create uac invite session");
+                pjsip_dlg_terminate(pDialog);
+                /* TODO destory media resouce */
+                pj_mutex_unlock(SipAppData.pMutex);
+                return -1;
+        }
+        Status = pjsip_timer_init_session(pCall->pInviteSession, &SipAppData.Accounts[_nFromAccountId].Config.TimerSetting);
+        if (Status != PJ_SUCCESS) {
+                PrintErrorMsg(Status, "Session Timer init failed");
                 pjsip_dlg_terminate(pDialog);
                 /* TODO destory media resouce */
                 pj_mutex_unlock(SipAppData.pMutex);
@@ -958,7 +974,6 @@ static pj_bool_t onRxRequest(IN pjsip_rx_data *_pRxData )
         int nCallId;
         SipCall *pCall;
         pj_status_t Status;
-        unsigned nOption;
         pjsip_tx_data *pTxData;
 
         /* Only accept INVITE method */
@@ -990,7 +1005,7 @@ static pj_bool_t onRxRequest(IN pjsip_rx_data *_pRxData )
 
 
         /* Verify that we can handle this request */
-        nOption = 0;
+        unsigned nOption = 0;
         Status = pjsip_inv_verify_request(_pRxData, &nOption, NULL, NULL, SipAppData.pSipEndPoint, &pTxData);
         if (Status != PJ_SUCCESS) {
                 PrintErrorMsg(Status, "Verify request failed");
@@ -1027,10 +1042,24 @@ static pj_bool_t onRxRequest(IN pjsip_rx_data *_pRxData )
 
         /* Creat Invite Session */
         //CreateTmpSDP(pDialog->pool, pCall, &pSdp);
-        Status = pjsip_inv_create_uas(pDialog, _pRxData, NULL, 0, &pCall->pInviteSession);
+        unsigned nOptions = 0;
+        nOptions |= PJSIP_INV_SUPPORT_100REL;
+        nOptions |= PJSIP_INV_SUPPORT_TIMER;
+        Status = pjsip_inv_create_uas(pDialog, _pRxData, NULL, nOptions, &pCall->pInviteSession);
         if (Status != PJ_SUCCESS) {
                 PrintErrorMsg(Status, "Create UAS invite session failed");
                 pj_str_t Reason = pj_str("Sorry we can't create Invite session");
+                pjsip_dlg_create_response(pDialog, _pRxData, PJSIP_SC_INTERNAL_SERVER_ERROR, &Reason, &pTxData);
+                pjsip_dlg_send_response(pDialog, pjsip_rdata_get_tsx(_pRxData), pTxData);
+                pjsip_dlg_dec_lock(pDialog);
+                pj_mutex_unlock(SipAppData.pMutex);
+                return PJ_TRUE;
+        }
+
+        Status = pjsip_timer_init_session(pCall->pInviteSession, &SipAppData.Accounts[nToAccountId].Config.TimerSetting);
+        if (Status != PJ_SUCCESS) {
+                PrintErrorMsg(Status, "Session Timer init failed");
+                pj_str_t Reason = pj_str("Sorry Init Session Timer Falied");
                 pjsip_dlg_create_response(pDialog, _pRxData, PJSIP_SC_INTERNAL_SERVER_ERROR, &Reason, &pTxData);
                 pjsip_dlg_send_response(pDialog, pjsip_rdata_get_tsx(_pRxData), pTxData);
                 pjsip_dlg_dec_lock(pDialog);

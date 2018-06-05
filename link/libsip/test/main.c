@@ -59,14 +59,14 @@ int main()
         */
         int ret1 = SipRegAccount(nid4, 1);
 
-        sleep(10);
+        sleep(5);
 
         void *pLocalSdp;
         CreateTmpSDP(&pLocalSdp);
-        int nCallId1 = SipMakeNewCall(nid4, "<sip:1003@192.168.56.102>", pLocalSdp);
+        //int nCallId1 = SipMakeNewCall(nid4, "<sip:1003@192.168.56.102>", pLocalSdp);
 
         sleep(20);
-        SipHangUp(nCallId1);
+        //SipHangUp(nCallId1);
         //SipDestroyInstance();
         while(1) {
         }
