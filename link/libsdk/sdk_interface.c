@@ -53,7 +53,7 @@ ErrorID UninitSDK()
 }
 
 AccountID Register( IN  char* _id, IN char* _password, IN char* _pSigHost,
-                   IN char* _pMediaHost, IN char* _pImHost, int _nDeReg, int _nTimeOut )
+                   IN char* _pMediaHost, IN char* _pImHost, int _nTimeOut )
 {
     int nAccountId = 0;
     UA *pUA = ( UA *) malloc ( sizeof(UA) );
