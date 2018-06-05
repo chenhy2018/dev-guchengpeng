@@ -34,7 +34,7 @@ SIP_OUT_PATH=$(OUTPUT)/libsip
 LIBSIP=$(SIP_OUT_PATH)/sip.o
 SDK_OBJS_PATH=$(OUTPUT)/libsdk
 LIBSDK=queue.o sdk_interface.o \
-		framework.o test.o dbg.o mock_api.o
+       test.o dbg.o mock_api.o uaMgr.o callMgr.o mock_rtc.o
 TARGET_LIBRARY=$(OUTPUT)/lib/$(ARCH)/libua.a
 LIBPJ=$(OUTPUT)/ori/$(ARCH)
 LIBMQTT=

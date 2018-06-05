@@ -8,32 +8,30 @@
  */
 
 #include "mqtt.h"
-#include "sdk_interface.h"
 
-int MosquittoLibInit()
+int MqttLibInit()
 {
 }
 
-int MosquittoLibCleanup()
+int MqttLibCleanup()
 {
 }
 
-void* MosquittoCreateInstance(IN const struct MosquittoOptions* pOption)
+void* MqttCreateInstance(IN const struct MqttOptions* pOption)
 {
     (void)pOption;
 
     return NULL;
 }
-void MosquittoDestroy(IN const void* pInstance)
+void MqttDestroy(IN const void* pInstance)
 {
     (void)pInstance;
 }
 
-int MosquittoPublish(IN const void* _pInstance, OUT int* _pMid, IN char* _pTopic, 
+int MqttPublish(IN const void* _pInstance, IN char* _pTopic, 
                      IN int _nPayloadlen, IN const void* _pPayload)
 {
     (void)_pInstance;
-    (void)_pMid;
     (void)_pTopic;
     (void)_nPayloadlen;
     (void)_pPayload;
@@ -41,19 +39,17 @@ int MosquittoPublish(IN const void* _pInstance, OUT int* _pMid, IN char* _pTopic
     return 0;
 }
 
-int MosquittoSubscribe(IN const void* _pInstance, OUT int* _pMid, IN char* _pTopic)
+int MqttSubscribe(IN const void* _pInstance, IN char* _pTopic)
 {
     (void)_pInstance;
-    (void)_pMid;
     (void)_pTopic;
 
     return 0;
 }
 
-int MosquittoUnsubscribe(IN const void* _pInstance, OUT int* _pMid, IN char* pSub)
+int MqttUnsubscribe(IN const void* _pInstance, IN char* pSub)
 {
     (void)_pInstance;
-    (void)_pMid;
     (void)pSub;
     
     return 0;

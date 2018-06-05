@@ -1,70 +1,89 @@
-// Last Update:2018-06-03 18:08:59
-/**
- * @file mqtt.h
- * @brief 
- * @author liyq
- * @version 0.1.00
- * @date 2018-05-29
- */
+#ifndef __MQTT__
+#define __MQTT__
 
-#ifndef MQTT_H
-#define MQTT_H
-
-#include <stdlib.h>
 #include <stdbool.h>
+#include <stddef.h>
 #include "sdk_interface.h"
 
-static const int MOSQUITTO_AUTHENTICATION_NULL = 0x0;
-static const int MOSQUITTO_AUTHENTICATION_USER = 0x1;
-static const int MOSQUITTO_AUTHENTICATION_ONEWAY_SSL = 0x2;
-static const int MOSQUITTO_AUTHENTICATION_TWOWAY_SSL = 0x4;
-
-#define MAX_MOSQUITTO_USR_SIZE 1024
-#define MAX_MOSQUITTO_PWD_SIZE 1024
-#define MAX_MOSQUITTO_HOST_SIZE 1024
-#define MAX_MOSQUITTO_FILE_SIZE 1024
-#define MAX_MOSQUITTO_ID_SIZE 1024
-
-struct MosquittoUserInfo
-{
-    int nAuthenicatinMode;
-    char username[MAX_MOSQUITTO_USR_SIZE];
-    char password[MAX_MOSQUITTO_PWD_SIZE];
-    char hostname[MAX_MOSQUITTO_HOST_SIZE];
-    int nPort;
-    char cafile[MAX_MOSQUITTO_FILE_SIZE];
-    char certfile[MAX_MOSQUITTO_FILE_SIZE];
-    char keyfile[MAX_MOSQUITTO_FILE_SIZE];
-    //char bindaddress[MAX_MOSQUITTO_HOST_SIZE]; //not used in current time.
+enum MQTT_ERR_STATUS {
+        MQTT_SUCCESS = 3000,
+        MQTT_CONNECT_SUCCESS = 3001,
+        MQTT_DISCONNECT_SUCCESS = 3002,
+        MQTT_ERR_NOMEM,
+        MQTT_ERR_PROTOCOL,
+        MQTT_ERR_INVAL,
+        MQTT_ERR_NO_CONN,
+        MQTT_ERR_CONN_REFUSED,
+        MQTT_ERR_NOT_FOUND,
+        MQTT_ERR_CONN_LOST,
+        MQTT_ERR_TLS,
+        MQTT_ERR_PAYLOAD_SIZE,
+        MQTT_ERR_NOT_SUPPORTED,
+        MQTT_ERR_AUTH,
+        MQTT_ERR_ACL_DENIED,
+        MQTT_ERR_UNKNOWN,
+        MQTT_ERR_ERRNO,
+        MQTT_ERR_EAI,
+        MQTT_ERR_PROXY,
+        MQTT_ERR_CONN_PENDING,
+        MQTT_ERR_OTHERS
 };
 
-struct MosquittoCallback
+static const int MQTT_AUTHENTICATION_NULL = 0x0;
+static const int MQTT_AUTHENTICATION_USER = 0x1;
+static const int MQTT_AUTHENTICATION_ONEWAY_SSL = 0x2;
+static const int MQTT_AUTHENTICATION_TWOWAY_SSL = 0x4;
+
+typedef struct MqttOptions MqttOptions;
+
+struct MqttCallback
 {
-    void (*onMessage)(IN const void* instance, IN const char* message, IN size_t length);
-    void (*onEvent)(IN const void* instance, IN int code, const char* reason);
+        void (*OnMessage)(IN const void* _pInstance, IN const char* _pTopic, IN const char* _pMessage, IN size_t nLength);
+        void (*OnEvent)(IN const void* _pInstance, IN int nCode, const char* _pReason);
 };
 
-struct MosquittoOptions
+struct MqttUserInfo
 {
-    char id[MAX_MOSQUITTO_ID_SIZE];
-    bool bCleanSession;
-    struct MosquittoUserInfo primaryUserInfo;
-    struct MosquittoUserInfo secondaryUserInfo;
-    int nKeepalive;
-    struct MosquittoCallback callbacks; // A user pointer that will be passed as an argument to any callbacks that are specified.
-    int nQos;
-    bool bRetain;
+        int nAuthenicatinMode;
+        char* pUsername;
+        char* pPassword;
+        char* pHostname;
+        int nPort;
+        char* pCafile;
+        char* pCertfile;
+        char* pKeyfile;
+        //char* pBindaddress; //not used in current time.
+};
+
+struct MqttOptions
+{
+        char* pId;
+        bool bCleanSession;
+        struct MqttUserInfo primaryUserInfo;
+        struct MqttUserInfo secondaryUserInfo;
+        int nKeepalive;
+        struct MqttCallback callbacks; // A user pointer that will be passed as an argument to any callbacks that are specified.
+        int nQos;
+        bool bRetain;
 };
 
 /* step 1 : Init mosquitto lib */
-extern int MosquittoLibInit();
-extern int MosquittoLibCleanup();
-/* step 2 : create mosquitto instance */
-extern void* MosquittoCreateInstance(IN const struct MosquittoOptions* pOption);
-extern void MosquittoDestroy(IN const void* pInstance);
-/* step 3 : mosquitto pub/sub */
-extern int MosquittoPublish(IN const void* _pInstance, OUT int* _pMid, IN char* _pTopic, IN int _nPayloadlen, IN const void* _pPayload);
-extern int MosquittoSubscribe(IN const void* _pInstance, OUT int* _pMid, IN char* _pTopic);
-extern int MosquittoUnsubscribe(IN const void* _pInstance, OUT int* _pMid, IN char* pSub);
+extern int MqttLibInit();
 
-#endif  /*MQTT_H*/
+extern int MqttLibCleanup();
+
+/* step 2 : create mosquitto instance */
+extern void* MqttCreateInstance(IN const struct MqttOptions* _pOption);
+
+extern void MqttDestroy(IN const void* _pInstance);
+
+/* step 3 : mosquitto pub/sub */
+
+extern int MqttPublish(IN const void* _pInstance, IN char* _pTopic, IN int _nPayloadlen, IN const void* _pPayload);
+
+extern int MqttSubscribe(IN const void* _pInstance, IN char* _pTopic);
+
+extern int MqttUnsubscribe(IN const void* _pInstance, IN char* _pTopic);
+
+#endif
+
