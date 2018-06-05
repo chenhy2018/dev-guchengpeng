@@ -1,4 +1,4 @@
-// Last Update:2018-06-04 14:11:11
+// Last Update:2018-06-05 10:40:13
 /**
  * @file sdk_interface.h
  * @brief 
@@ -35,6 +35,7 @@ typedef enum {
     RET_REGISTER_TIMEOUT = -4,
     RET_TIMEOUT_FROM_SERVER = -5,
     RET_USER_UNAUTHORIZED = -6,
+    RET_SDK_NOT_INIT = -7,
 } ErrorID;
 
 typedef enum {
