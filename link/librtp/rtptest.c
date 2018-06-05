@@ -162,7 +162,7 @@ int start_file_test(char * _pAudioFile, char * _pVideoFile, DataCallback callbac
         
         while (bAudioOk || bVideoOk) {
                 if (bAudioOk && nNow+1 > nNextAudioTime) {
-                        if(audioOffset+160 < nAudioDataLen) {
+                        if(audioOffset+160 <= nAudioDataLen) {
                                 cbRet = callback(pAudioData + audioOffset, 160, THIS_IS_AUDIO, nNextAudioTime-nSysTimeBase);
                                 if (cbRet != 0) {
                                         bAudioOk = 0;
