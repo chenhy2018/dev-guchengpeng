@@ -596,31 +596,9 @@ void log_to_file(int _nLevel, const char *_pData, int _nLen)
         pj_file_write(gLogFd, _pData, &nLen);
 }
 
-
-int main(int argc, char **argv)
+void set_log_to_file(int role)
 {
-        if(argc != 2){
-                printf("usage as:%s [1 for offer|2 for answer]\n", argv[0]);
-                return -1;
-        }
-        int role = atoi(argv[1]);
-        if(role != OFFER && role != ANSWER){
-                printf("usage as:%s [1 for offer|2 for answer]\n", argv[0]);
-                return -1;
-        }
-        
         pj_status_t status;
-        status = pj_init();
-        PJ_ASSERT_RETURN(status == PJ_SUCCESS, 1);
-        status = pjlib_util_init();
-        PJ_ASSERT_RETURN(status == PJ_SUCCESS, 1);
-
-        pj_pool_t * pRemoteSdpPool = NULL;
-        char textSdpBuf[2048] = {0};
-        
-        pj_caching_pool_init(&app.cachingPool, &pj_pool_factory_default_policy, 0);
-
-        // set log
         if (role == ANSWER) {
                 pLogFileName = "answer.log";
         } else {
@@ -634,9 +612,63 @@ int main(int argc, char **argv)
                 char errmsg[PJ_ERR_MSG_SIZE] = {0};
                 pj_strerror(status, errmsg, PJ_ERR_MSG_SIZE);
                 printf("pj_file_open %s fail:%s\n", logfileName, errmsg);
-                return status;
+                assert(status == PJ_SUCCESS);
         }
         pj_log_set_log_func(log_to_file);
+}
+
+void test_sdp_neg()
+{
+        //start pjmedia_sdp_neg test
+        printf("--------pjmedia_sdp_neg_test1----------\n");
+        pjmedia_sdp_neg_test_as_offer(&app.cachingPool.factory);
+        printf("--------pjmedia_sdp_neg_test2----------\n");
+        pjmedia_sdp_neg_test_as_answer(&app.cachingPool.factory);
+        printf("%s\n", sdpNegOffer);
+        printf("%s\n", sdpNegAnswer);
+        printf("--------end pjmedia_sdp_neg_test----------\n");
+        //end pjmedia_sdp_neg test
+}
+
+#define HAS_AUDIO 0x01
+#define HAS_VIDEO 0x02
+int main(int argc, char **argv)
+{
+        if(argc == 1){
+                printf("usage as:%s (1 for offer|2 for answer) [1for audio|2for video|3 audio and vido] [turnip] [tcp|udp]\n", argv[0]);
+                return -1;
+        }
+        int role = atoi(argv[1]);
+        if(role != OFFER && role != ANSWER){
+                printf("usage as:%s (1 for offer|2 for answer)  [1for audio|2for video|3 audio and vido] [turnip]  [tcp|udp]\n", argv[0]);
+                return -1;
+        }
+        int hasAudioVideo = 3;
+        if (argc > 2) {
+                hasAudioVideo = atoi(argv[2]);
+        }
+        if (hasAudioVideo < 0 || hasAudioVideo > 3) {
+                printf("usage as:%s (1 for offer|2 for answer)  [1for audio|2for video|3 audio and vido] [turnip]  [tcp|udp]\n", argv[0]);
+                return -1;
+        }
+        char * pTurnHost = NULL;
+        if (argc > 3) {
+                pTurnHost = argv[3];
+        }
+        
+        
+        pj_status_t status;
+        status = pj_init();
+        PJ_ASSERT_RETURN(status == PJ_SUCCESS, 1);
+        status = pjlib_util_init();
+        PJ_ASSERT_RETURN(status == PJ_SUCCESS, 1);
+
+        pj_caching_pool_init(&app.cachingPool, &pj_pool_factory_default_policy, 0);
+
+        set_log_to_file(role);
+
+        test_sdp_neg();
+        //---------------------start------------
 
         //offer send to answer
         if (role == ANSWER) {
@@ -659,58 +691,55 @@ int main(int argc, char **argv)
         }
         
         InitIceConfig(&app.userConfig);
-//#define LOCAL_TEST
-#ifdef LOCAL_TEST
-        strcpy(app.userConfig.turnHost, "127.0.0.1");
-        strcpy(app.userConfig.turnHost, "123.59.204.198:4478");
-#else
         strcpy(app.userConfig.turnHost, "123.59.204.198");
         strcpy(app.userConfig.turnUsername, "root");
         strcpy(app.userConfig.turnPassword, "root");
-#endif
-        app.userConfig.bTurnTcp = 1;
+        if (pTurnHost != NULL) {
+                strcpy(app.userConfig.turnHost, pTurnHost);
+        }
+        if (argc > 4) {
+                if (strcmp(argv[4], "tcp") == 0) {
+                        MY_PJ_LOG(3, "use tcp");
+                        app.userConfig.bTurnTcp = 1;
+                }
+        }
         app.userConfig.userCallback = onRxRtp;
         status = InitPeerConnectoin(&app.pPeerConnection, &app.userConfig);
         pj_assert(status == 0);
         
-        //start pjmedia_sdp_neg test
-        printf("pjmedia_sdp_neg_test\n");
-        pjmedia_sdp_neg_test_as_offer(&app.cachingPool.factory);
-        printf("--------pjmedia_sdp_neg_test2----------\n");
-        pjmedia_sdp_neg_test_as_answer(&app.cachingPool.factory);
-        printf("%s\n", sdpNegOffer);
-        printf("%s\n", sdpNegAnswer);
-        //end pjmedia_sdp_neg test
         
-        InitMediaConfig(&app.audioConfig);
-        app.audioConfig.configs[0].nSampleOrClockRate = 8000;
-        app.audioConfig.configs[0].codecType = MEDIA_FORMAT_PCMU;
-        app.audioConfig.configs[1].nSampleOrClockRate = 8000;
-        app.audioConfig.configs[1].codecType = MEDIA_FORMAT_PCMA;
-        app.audioConfig.nCount = 2;
-        if ( role == ANSWER ){
-                app.audioConfig.configs[0] = app.audioConfig.configs[1];
+        if(hasAudioVideo & HAS_AUDIO){
+                InitMediaConfig(&app.audioConfig);
+                app.audioConfig.configs[0].nSampleOrClockRate = 8000;
+                app.audioConfig.configs[0].codecType = MEDIA_FORMAT_PCMU;
                 app.audioConfig.configs[1].nSampleOrClockRate = 8000;
-                app.audioConfig.configs[1].codecType = MEDIA_FORMAT_G729;
+                app.audioConfig.configs[1].codecType = MEDIA_FORMAT_PCMA;
+                app.audioConfig.nCount = 2;
+                if ( role == ANSWER ){
+                        app.audioConfig.configs[0] = app.audioConfig.configs[1];
+                        app.audioConfig.configs[1].nSampleOrClockRate = 8000;
+                        app.audioConfig.configs[1].codecType = MEDIA_FORMAT_G729;
+                }
+                status = AddAudioTrack(app.pPeerConnection, &app.audioConfig);
+                TESTCHECK(status, app);
         }
-        status = AddAudioTrack(app.pPeerConnection, &app.audioConfig);
-        TESTCHECK(status, app);
         
-//#define HAS_VIDEO 1
-#ifdef HAS_VIDEO
-        InitMediaConfig(&app.videoConfig);
-        app.videoConfig.configs[0].nSampleOrClockRate = 90000;
-        app.videoConfig.configs[0].codecType = MEDIA_FORMAT_H264;
-        app.videoConfig.configs[1].nSampleOrClockRate = 90000;
-        app.videoConfig.configs[1].codecType = MEDIA_FORMAT_H265;
-        app.videoConfig.nCount = 2;
-        if ( role == ANSWER ){
-                app.videoConfig.nCount = 1;
-                //app.videoConfig.configs[0] = app.videoConfig.configs[1];
+        pj_pool_t * pRemoteSdpPool = NULL;
+        char textSdpBuf[2048] = {0};
+        if(hasAudioVideo & HAS_VIDEO){
+                InitMediaConfig(&app.videoConfig);
+                app.videoConfig.configs[0].nSampleOrClockRate = 90000;
+                app.videoConfig.configs[0].codecType = MEDIA_FORMAT_H264;
+                app.videoConfig.configs[1].nSampleOrClockRate = 90000;
+                app.videoConfig.configs[1].codecType = MEDIA_FORMAT_H265;
+                app.videoConfig.nCount = 2;
+                if ( role == ANSWER ){
+                        app.videoConfig.nCount = 1;
+                        //app.videoConfig.configs[0] = app.videoConfig.configs[1];
+                }
+                status = AddVideoTrack(app.pPeerConnection, &app.videoConfig);
+                TESTCHECK(status, app);
         }
-        status = AddVideoTrack(app.pPeerConnection, &app.videoConfig);
-        TESTCHECK(status, app);
-#endif
         
 
         if (role == OFFER) {
@@ -760,63 +789,17 @@ int main(int argc, char **argv)
 #endif
         } else {
                 input_confirm("confirm to sendfile:");
-                start_file_test("/Users/liuye/Documents/p2p/build/src/mysiprtp/Debug/8000_1.mulaw",
-#ifdef HAS_VIDEO
-                                "/Users/liuye/Documents/p2p/build/src/mysiprtp/Debug/hks.h264",
-#else
-                                NULL,
-#endif
-                                receive_data_callback);
-#if 0
-                pj_oshandle_t audioFd;
-                pj_pool_t * apool = pj_pool_create(&app.cachingPool.factory, "afiletest", 2000, 2000, NULL);
-                status = pj_file_open(apool, "/Users/liuye/Documents/p2p/build/src/mysiprtp/Debug/8000_1.mulaw", PJ_O_RDONLY, &audioFd);
-                if(status != PJ_SUCCESS){
-                        printf("pj_file_open fail:%d\n", status);
-                        return status;
+                if ((hasAudioVideo & HAS_AUDIO) && (hasAudioVideo & HAS_VIDEO)) {
+                        start_file_test("/Users/liuye/Documents/p2p/build/src/mysiprtp/Debug/8000_1.mulaw",
+                                        "/Users/liuye/Documents/p2p/build/src/mysiprtp/Debug/hks.h264",
+                                        receive_data_callback);
+                } else if (hasAudioVideo & HAS_AUDIO) {
+                        start_file_test("/Users/liuye/Documents/p2p/build/src/mysiprtp/Debug/8000_1.mulaw",
+                                        NULL, receive_data_callback);
+                } else {
+                        start_file_test(NULL, "/Users/liuye/Documents/p2p/build/src/mysiprtp/Debug/hks.h264",
+                                        receive_data_callback);
                 }
-                int aok = 1;
-                pj_timestamp nextTime;
-                pj_get_timestamp(&nextTime);
-                pj_timestamp hzPerSecond;
-                pj_get_timestamp_freq(&hzPerSecond);
-                while(aok){
-                        pj_ssize_t readLen = 160;
-                        char abuf[1500] = {0};
-                        status = pj_file_read(audioFd, abuf, &readLen);
-                        if(status != PJ_SUCCESS){
-                                printf("pj_file_read fail:%d\n", status);
-                                aok = 0;
-                                continue;
-                        }
-                        if(readLen != 160){
-                                printf("pj_file_read less than one frame length:\n");
-                                aok = 0;
-                                continue;
-                        }
-                        printf("send %ld to rtp\n", readLen);
-                        RtpPacket rtpPacket;
-                        pj_bzero(&rtpPacket, sizeof(rtpPacket));
-                        rtpPacket.type = TYPE_AUDIO;
-                        rtpPacket.pData = (uint8_t *)abuf;
-                        rtpPacket.nDataLen = readLen;
-                        rtpPacket.nTimestamp = nextTime.u64;// TODO SendPacket deal timestamp
-                        status = SendPacket(&app.peerConnection, &rtpPacket);
-                        if(status != 0)
-                                break;
-
-                        pj_timestamp now;
-                        pj_get_timestamp(&now);
-                        nextTime.u64 += (20 * hzPerSecond.u64 / 1000);
-                        if (nextTime.u64 > now.u64) {
-                                int sleepTime = (nextTime.u64 - now.u64) * 1000 / hzPerSecond.u64;
-                                printf("--->sleep %d/ms\n", sleepTime);
-                                if(sleepTime > 1) {
-                                        pj_thread_sleep(sleepTime - 1);
-                                }
-                        }
-                }
-#endif
         }
         
         input_confirm("quit");
