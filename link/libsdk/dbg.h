@@ -1,4 +1,4 @@
-// Last Update:2018-05-31 15:49:35
+// Last Update:2018-06-05 17:53:14
 /**
  * @file dbg.h
  * @brief 
@@ -13,15 +13,19 @@
 #define SDK_DBG 1
 
 #if SDK_DBG
-#define DBG_BASIC() printf("[%s %s() +%d] ", __FILE__, __FUNCTION__, __LINE__)
+#define DBG_BASIC() printf("[ %s %s() +%d ] ", __FILE__, __FUNCTION__, __LINE__)
 #define DBG_LOG(args...) DBG_BASIC();printf(args)
 #define DBG_LINE(args...) DBG_LOG("++++++++++\n")
 #define DBG_ERROR(args...) DBG_BASIC();printf("###error#### ");printf(args)
+#define DBG_VAL(val) DBG_LOG(#val" = %d\n", val )
+#define DBG_STR(str) DBG_LOG(#str" = %s\n", str)
 #else
 #define DBG_BASIC() 
 #define DBG_LOG(args...) 
 #define DBG_LINE(args...) 
 #define DBG_ERROR(args...) 
+#define DBG_VAL(val) 
+#define DBG_STR(str)
 #endif
 
 #if SDK_DBG

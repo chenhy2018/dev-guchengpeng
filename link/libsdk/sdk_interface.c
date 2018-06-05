@@ -1,4 +1,4 @@
-// Last Update:2018-06-05 17:28:24
+// Last Update:2018-06-05 17:41:33
 /**
  * @file sdk_interface.c
  * @brief 
@@ -24,6 +24,7 @@ ErrorID InitSDK( Media* _pMediaConfigs, int _nSize)
 {
     SipCallBack cb;
 
+    DBG_LINE();
     memset( pUAManager, 0, sizeof(UAManager) );
     INIT_LIST_HEAD( &(pUAManager->UAList.list) );
 
@@ -62,6 +63,7 @@ AccountID Register( IN  char* _id, IN char* _password, IN char* _pSigHost,
     struct timespec waitTime;
     int nReason = 0;
 
+    DBG_LINE();
     if ( !pUA ) {
         DBG_ERROR("malloc error\n");
         return RET_MEM_ERROR;

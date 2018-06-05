@@ -1,4 +1,4 @@
-// Last Update:2018-06-05 17:26:45
+// Last Update:2018-06-05 17:53:51
 /**
  * @file test.c
  * @brief 
@@ -33,12 +33,12 @@ typedef struct {
     RegisterData data;
 } RegisterTestCase;
 
-#define HOST "192.168.1.103"
+#define HOST "123.59.204.198"
 RegisterTestCase gRegisterTestCases[] =
 {
     {
-        { "sdk_not_init", RET_SDK_NOT_INIT },
-        { "USER", "PASSWD", HOST, HOST, HOST, 100, 1 }
+        { "normal", RET_OK },
+        { "1006", "1006", HOST, HOST, HOST, 100, 1 }
     },
 };
 
@@ -98,6 +98,9 @@ int RegisterTestSuitCallback( TestSuit *this )
         }
     }
 
+    DBG_STR( pData->id );
+    DBG_STR( pData->password );
+    DBG_STR( pData->sigHost );
     sts = Register( pData->id, pData->password, pData->sigHost, pData->mediaHost, pData->imHost, pData->timeOut );
     return TEST_EQUAL( sts, pTestCases->father.expact );
 }
