@@ -1,4 +1,4 @@
-// Last Update:2018-06-05 17:53:51
+// Last Update:2018-06-05 22:52:26
 /**
  * @file test.c
  * @brief 
@@ -40,6 +40,10 @@ RegisterTestCase gRegisterTestCases[] =
         { "normal", RET_OK },
         { "1006", "1006", HOST, HOST, HOST, 100, 1 }
     },
+    {
+        { "invalid_account", RET_ACCOUNT_NOT_EXIST },
+        { "1006", "1007", HOST, HOST, HOST, 100, 0 }
+    }
 };
 
 TestSuit gRegisterTestSuit =
@@ -115,6 +119,7 @@ int InitAllTestSuit()
 int main()
 {
     DBG_LOG("+++++ enter main...\n");
+    TestSuitManagerInit();
     InitAllTestSuit();
     RunAllTestSuits();
 

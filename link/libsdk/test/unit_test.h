@@ -1,4 +1,4 @@
-// Last Update:2018-06-05 16:51:28
+// Last Update:2018-06-05 22:43:40
 /**
  * @file unit_test.h
  * @brief 
@@ -41,4 +41,6 @@ typedef struct {
 
 extern int AddTestSuit( TestSuit *pTestSuit );
 extern int RunAllTestSuits();
+extern int TestSuitManagerInit();
+
 #endif  /*UNIT_TEST_H*/

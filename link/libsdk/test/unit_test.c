@@ -1,4 +1,4 @@
-// Last Update:2018-06-05 17:14:38
+// Last Update:2018-06-05 22:54:19
 /**
  * @file unit_test.c
  * @brief 
@@ -25,36 +25,44 @@ int AddTestSuit( TestSuit *pTestSuit )
         return -1;
     }
 
-    for ( i=0; i<TEST_SUIT_MAX; i++ ) {
-        pTestSuitManager->testSuits[pTestSuitManager->num++] = *pTestSuit;
-    }
+    pTestSuitManager->testSuits[pTestSuitManager->num++] = *pTestSuit;
 
     return 0;
 }
 
 int RunAllTestSuits()
 {
-    int i = 0;
+    int i = 0, j=0;
     TestSuit *pTestSuit = NULL;
     int res = 0;
     TestCase *pTestCase = NULL;
 
+    DBG_VAL( pTestSuitManager->num );
     for ( i=0; i<pTestSuitManager->num; i++ ) {
         pTestSuit = &pTestSuitManager->testSuits[i];
-        pTestSuit->index = i;
         LOG("run the test suit : %s\n", pTestSuit->suitName );
         if ( pTestSuit->OnInit ) {
             pTestSuit->OnInit( pTestSuit );
         }
         if ( pTestSuit->TestCaseCb ) {
-            res = pTestSuit->TestCaseCb( pTestSuit );
-            if ( pTestSuit->GetTestCase ) {
-                pTestSuit->GetTestCase( pTestSuit, &pTestCase );
-                LOG("----- test case [%s] result (%s) \n", pTestCase->caseName, 
-                    res == TEST_PASS ? "pass" : "fail" );
+            for ( j=0; j<pTestSuit->total; j++ ) {
+                pTestSuit->index = j;
+                res = pTestSuit->TestCaseCb( pTestSuit );
+                if ( pTestSuit->GetTestCase ) {
+                    pTestSuit->GetTestCase( pTestSuit, &pTestCase );
+                    LOG("----- test case [ %s ] result ( %s ) \n", pTestCase->caseName, 
+                        res == TEST_PASS ? "pass" : "fail" );
+                }
             }
         }
     }
+
+    return 0;
+}
+
+int TestSuitManagerInit()
+{
+    memset( pTestSuitManager, 0, sizeof(*pTestSuitManager) );
 
     return 0;
 }
