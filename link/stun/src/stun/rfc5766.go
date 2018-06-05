@@ -824,7 +824,7 @@ func (svr *relayserver) spawn() error {
 			defer svr.conn.Close()
 
 			for {
-				buf := make([]byte, 1024)
+				buf := make([]byte, DEFAULT_MTU)
 				nr, rm, err := svr.conn.ReadFromUDP(buf)
 				if err != nil {
 					ech <- err
