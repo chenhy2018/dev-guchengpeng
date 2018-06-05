@@ -208,7 +208,7 @@ pj_status_t pcmu_unpacketize(IN OUT MediaPacketier *_pKtz,
                              IN pj_size_t   _nPlyloadLen,
                              OUT pj_uint8_t **_pBitstream,
                              OUT unsigned   *_pBitstreamPos,
-                             IN int _nRtpMarker)
+                             IN int _nRtpMarker, OUT pj_bool_t *_pTryAgain)
 {
         *_pBitstream = (pj_uint8_t *)_pPayload;
         *_pBitstreamPos = _nPlyloadLen;
@@ -235,11 +235,21 @@ pj_status_t h264_unpacketize(IN OUT MediaPacketier *_pKtz,
                              IN pj_size_t   _nPlyloadLen,
                              OUT pj_uint8_t **_pBitstream,
                              OUT unsigned   *_pBitstreamPos,
-                             IN int _nRtpMarker)
+                             IN int _nRtpMarker, OUT pj_bool_t *_pTryAgain)
 {
+        pj_status_t status = PJ_SUCCESS;
         H264Packetizer *pPktz = (H264Packetizer *)_pKtz;
 
-        pj_status_t status = PJ_SUCCESS;
+        int nType = _pPayload[0] & 0x1F;
+        if (nType != 28 && pPktz->nUnpackBufLen != 0) {
+                *_pBitstreamPos = pPktz->nUnpackBufLen;
+                *_pBitstream = pPktz->pUnpackBuf;
+                pPktz->nUnpackBufLen = 0;
+                pPktz->bFuAStartbit = PJ_FALSE;
+                *_pTryAgain = PJ_TRUE;
+                return status;
+        }
+        *_pTryAgain = PJ_FALSE;
 
         if (pPktz->pUnpackBuf == NULL) {
                 pPktz->pUnpackBuf = pj_pool_alloc(pPktz->pH264PacketizerPool, 100*1024);
@@ -260,7 +270,6 @@ pj_status_t h264_unpacketize(IN OUT MediaPacketier *_pKtz,
                                           pPktz->pUnpackBuf, pPktz->nUnpackBufCap, &nUnpackLen);
         pPktz->nUnpackBufLen = nUnpackLen;
 
-        int nType = _pPayload[0] & 0x1F;
         if (nType == 28) { //FU-A
                 int nStartBit = _pPayload[1] & 0x80;
                 int nEndBit = _pPayload[1] & 0x40;
@@ -358,7 +367,7 @@ pj_status_t MediaPacketize(IN MediaPacketier *_pPktz,IN pj_uint8_t *_pBitstream,
 }
 
 pj_status_t MediaUnPacketize(IN OUT MediaPacketier *_pPKtz, IN const pj_uint8_t *_pPayload, IN pj_size_t _nPlyloadLen,
-                             OUT pj_uint8_t **_pBitstream, OUT unsigned *_pBitstreamPos, IN int _nRtpMarker)
+                             OUT pj_uint8_t **_pBitstream, OUT unsigned *_pBitstreamPos, IN int _nRtpMarker, IN pj_bool_t *_pTryAgain)
 {
-        return _pPKtz->pOperation.unpacketize(_pPKtz, _pPayload, _nPlyloadLen, _pBitstream, _pBitstreamPos, _nRtpMarker);
+        return _pPKtz->pOperation.unpacketize(_pPKtz, _pPayload, _nPlyloadLen, _pBitstream, _pBitstreamPos, _nRtpMarker, _pTryAgain);
 }

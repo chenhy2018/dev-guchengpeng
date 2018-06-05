@@ -675,30 +675,33 @@ static void on_rx_rtp(void *pUserData, void *pPkt, pj_ssize_t size)
         pjmedia_rtp_session_update(&pMediaTrack->rtpSession, pRtpHeader, NULL);
 
         //deal with payload
-        pj_uint8_t *pBitstream = NULL;
-        unsigned nBitstreamPos = 0;
-        status = MediaUnPacketize(pMediaTrack->pMediaPacketier, pPayload, nPayloadLen, &pBitstream, &nBitstreamPos, pRtpHeader->m);
-        if (nBitstreamPos == 0) {
-                //MY_PJ_LOG(3, "MediaUnPacketize:%d, receiveSize:%d", status, size);
-                return;
-        }
+        pj_bool_t bTryAgain = PJ_FALSE;
+        do{
+                pj_uint8_t *pBitstream = NULL;
+                unsigned nBitstreamPos = 0;
+                status = MediaUnPacketize(pMediaTrack->pMediaPacketier, pPayload, nPayloadLen, &pBitstream, &nBitstreamPos, pRtpHeader->m, &bTryAgain);
+                if (nBitstreamPos == 0) {
+                        //MY_PJ_LOG(3, "MediaUnPacketize:%d, receiveSize:%d", status, size);
+                        return;
+                }
 
-        RtpPacket rtpPacket;
-        pj_bzero(&rtpPacket, sizeof(rtpPacket));
-        rtpPacket.type = pMediaTrack->type;
-        rtpPacket.pData = pBitstream;
-        rtpPacket.nDataLen = nBitstreamPos;
-        rtpPacket.nTimestamp = pRtpHeader->ts;
-        int nIdx = pMediaTrack->mediaConfig.nUseIndex;
-        Media * pAvParam = &pMediaTrack->mediaConfig.configs[nIdx];
-        rtpPacket.format = pAvParam->codecType;
+                RtpPacket rtpPacket;
+                pj_bzero(&rtpPacket, sizeof(rtpPacket));
+                rtpPacket.type = pMediaTrack->type;
+                rtpPacket.pData = pBitstream;
+                rtpPacket.nDataLen = nBitstreamPos;
+                rtpPacket.nTimestamp = pRtpHeader->ts;
+                int nIdx = pMediaTrack->mediaConfig.nUseIndex;
+                Media * pAvParam = &pMediaTrack->mediaConfig.configs[nIdx];
+                rtpPacket.format = pAvParam->codecType;
 
-        MY_PJ_LOG(5, "rtp data receive:%ld, payLen:%dn", size, nPayloadLen);
+                //MY_PJ_LOG(5, "rtp data receive:%ld, payLen:%d", size, nPayloadLen);
 
-        PeerConnection * pPeerConnection = (PeerConnection *)pMediaTrack->pPeerConnection;
-        pPeerConnection->userIceConfig.userCallback(pPeerConnection->userIceConfig.pCbUserData,
-                                                    CALLBACK_RTP,
-                                                    &rtpPacket);
+                PeerConnection * pPeerConnection = (PeerConnection *)pMediaTrack->pPeerConnection;
+                pPeerConnection->userIceConfig.userCallback(pPeerConnection->userIceConfig.pCbUserData,
+                                                            CALLBACK_RTP,
+                                                            &rtpPacket);
+        }while(bTryAgain);
         
         return;
 }

@@ -24,7 +24,7 @@ typedef struct _PacketierOperation {
                                    IN pj_size_t   nPlyloadLen,
                                    OUT pj_uint8_t **pBitstream,
                                    OUT unsigned   *pBitstreamPos,
-                                   IN int nRtpMarker);
+                                   IN int nRtpMarker, OUT pj_bool_t *pTryAgain);
 
 }PacketierOperation;
 
@@ -46,6 +46,13 @@ typedef struct _H264Packetizer {
         unsigned nUnpackBufLen;
         pj_bool_t bFuAStartbit;
 }H264Packetizer;
+
+//TODO JitterBuffer add to MediaStreamTrack
+typedef struct _JitterBuffer {
+        pj_pool_t *pJbufPool;
+        pjmedia_jbuf *pJbuf;
+        pj_uint16_t nLastRecvRtpSeq;
+}JitterBuffer;
 
 typedef struct _MediaStreamTrack
 {
@@ -85,5 +92,5 @@ pj_status_t CreatePacketizer(IN char *pName, IN int nNameLen, IN pj_pool_t *pPkt
 pj_status_t MediaPacketize(IN MediaPacketier *pPktz,IN pj_uint8_t *pBitstream, IN pj_size_t nBitstreamLen,
                            IN unsigned *pBitstreamPos, OUT const pj_uint8_t **pPayload, OUT pj_size_t *nPlyloadLen);
 pj_status_t MediaUnPacketize(IN OUT MediaPacketier *pKtz, IN const pj_uint8_t *pPayload, IN pj_size_t nPlyloadLen,
-                           OUT pj_uint8_t **pBitstream, OUT unsigned *pBitstreamPos, IN int nRtpMarker);
+                           OUT pj_uint8_t **pBitstream, OUT unsigned *pBitstreamPos, IN int nRtpMarker, IN pj_bool_t *pTryAgain);
 #endif
