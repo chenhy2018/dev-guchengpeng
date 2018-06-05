@@ -117,7 +117,7 @@ static inline int64_t getCurrentMilliSecond(){
 
 int start_file_test(char * _pAudioFile, char * _pVideoFile, DataCallback callback)
 {
-        assert(_pAudioFile != NULL && _pVideoFile != NULL);
+        assert(!(_pAudioFile == NULL && _pVideoFile == NULL));
 
         int ret;
 
@@ -144,6 +144,12 @@ int start_file_test(char * _pAudioFile, char * _pVideoFile, DataCallback callbac
 
         int bAudioOk = 1;
         int bVideoOk = 1;
+        if (_pVideoFile == NULL) {
+                bVideoOk = 0;
+        }
+        if (_pAudioFile == NULL) {
+                bAudioOk = 0;
+        }
         int64_t nSysTimeBase = getCurrentMilliSecond();
         int64_t nNextAudioTime = nSysTimeBase;
         int64_t nNextVideoTime = nSysTimeBase;
@@ -662,6 +668,7 @@ int main(int argc, char **argv)
         strcpy(app.userConfig.turnUsername, "root");
         strcpy(app.userConfig.turnPassword, "root");
 #endif
+        app.userConfig.bTurnTcp = 1;
         app.userConfig.userCallback = onRxRtp;
         status = InitPeerConnectoin(&app.pPeerConnection, &app.userConfig);
         pj_assert(status == 0);
@@ -689,6 +696,8 @@ int main(int argc, char **argv)
         status = AddAudioTrack(app.pPeerConnection, &app.audioConfig);
         TESTCHECK(status, app);
         
+//#define HAS_VIDEO 1
+#ifdef HAS_VIDEO
         InitMediaConfig(&app.videoConfig);
         app.videoConfig.configs[0].nSampleOrClockRate = 90000;
         app.videoConfig.configs[0].codecType = MEDIA_FORMAT_H264;
@@ -701,6 +710,7 @@ int main(int argc, char **argv)
         }
         status = AddVideoTrack(app.pPeerConnection, &app.videoConfig);
         TESTCHECK(status, app);
+#endif
         
 
         if (role == OFFER) {
@@ -731,10 +741,10 @@ int main(int argc, char **argv)
         
         input_confirm("confirm to negotiation:");
         StartNegotiation(app.pPeerConnection);
-        
-        char packet[120];
-        
+
         if (role == ANSWER) {
+#if 0
+                char packet[120];
                 while(1){
                         memset(packet, 0, sizeof(packet));
                         memset(packet, 0x30, 12);
@@ -747,10 +757,15 @@ int main(int argc, char **argv)
                         memset(packet, 0x31, 12);
                         //pjmedia_transport_send_rtp(app.pPeerConnection->transportIce[1].pTransport, packet, strlen(packet));
                 }
+#endif
         } else {
                 input_confirm("confirm to sendfile:");
                 start_file_test("/Users/liuye/Documents/p2p/build/src/mysiprtp/Debug/8000_1.mulaw",
+#ifdef HAS_VIDEO
                                 "/Users/liuye/Documents/p2p/build/src/mysiprtp/Debug/hks.h264",
+#else
+                                NULL,
+#endif
                                 receive_data_callback);
 #if 0
                 pj_oshandle_t audioFd;
@@ -805,6 +820,12 @@ int main(int argc, char **argv)
         }
         
         input_confirm("quit");
+        if (role == ANSWER) {
+                pj_file_close(gPcmuFd);
+#ifdef HAS_VIDEO
+                pj_file_close(gH264Fd);
+#endif
+        }
         ReleasePeerConnectoin(app.pPeerConnection);
         return 0;
 }
