@@ -1,4 +1,5 @@
 #include "MediaStream.h"
+#define THIS_FILE "MediaStream.c"
 
 void InitMediaConfig(IN MediaConfig * pMediaConfig)
 {
@@ -33,7 +34,7 @@ void AddMediaTrack(IN OUT MediaStream *_pMediaStraem, IN MediaConfig *_pMediaCon
         
         for (int i = 0; i < _pMediaStraem->nCount; i++) {
                 if ( _pMediaStraem->streamTracks[i].type == _type ){
-                        PJ_LOG(3, (__FILE__, "media type exists"));
+                        MY_PJ_LOG(3, "media type exists");
                         return;
                 }
         }

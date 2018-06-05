@@ -8,6 +8,10 @@
 #define _str_line_(x) _s_l_(x)
 #define __STR_LINE__ _str_line_(__LINE__)
 
+#define MY_PJ_LOG(level,fmt,...) \
+if(level <= pj_log_get_level()) pj_log_wrapper_##level((THIS_FILE ":" __STR_LINE__ ": ", fmt, ##__VA_ARGS__))
+
+
 #define ASSERT_RETURN_CHECK(expr, errmsg) if ( (expr) == NULL ) { \
 PJ_LOG(3,(__FILE__, "%s", errmsg));;\
 return -1;}

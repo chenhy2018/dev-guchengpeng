@@ -4,6 +4,7 @@
 #include <pjlib-util.h>
 #include <pjlib.h>
 #include "qrtc.h"
+#define THIS_FILE "rtptest.c"
 
 //#define SDP_NEG_TESG
 
@@ -125,7 +126,7 @@ int start_file_test(char * _pAudioFile, char * _pVideoFile, DataCallback callbac
         if(_pAudioFile != NULL){
                 ret = readFileToBuf(_pAudioFile, &pAudioData, &nAudioDataLen);
                 if (ret != 0) {
-                        fprintf(stderr, "map data to buffer fail:%s\n", _pAudioFile);
+                        MY_PJ_LOG(3, "map data to buffer fail:%s", _pAudioFile);
                         return -1;
                 }
         }
@@ -136,7 +137,7 @@ int start_file_test(char * _pAudioFile, char * _pVideoFile, DataCallback callbac
                 ret = readFileToBuf(_pVideoFile, &pVideoData, &nVideoDataLen);
                 if (ret != 0) {
                         free(pAudioData);
-                        fprintf(stderr, "map data to buffer fail:%s\n", _pVideoFile);
+                        MY_PJ_LOG(3, "map data to buffer fail:%s", _pVideoFile);
                         return -2;
                 }
         }
@@ -195,7 +196,7 @@ int start_file_test(char * _pAudioFile, char * _pVideoFile, DataCallback callbac
                                 }
 
                                 if(type == 1 || type == 5 ){
-                                        printf("send one video(%d) frame packet:%ld\n", type, end - sendp);
+                                        MY_PJ_LOG(3, "send one video(%d) frame packet:%ld", type, end - sendp);
                                         cbRet = callback(sendp, end - sendp, THIS_IS_VIDEO, nNextVideoTime-nSysTimeBase);
                                         if (cbRet != 0) {
                                                 bVideoOk = 0;
@@ -215,7 +216,7 @@ int start_file_test(char * _pAudioFile, char * _pVideoFile, DataCallback callbac
                                 nSleepTime = (nNextAudioTime - nNow - 1) * 1000;
                 }
                 if (nSleepTime != 0) {
-                        printf("sleeptime:%ld\n", nSleepTime);
+                        MY_PJ_LOG(3, "sleeptime:%ld\n", nSleepTime);
                         usleep(nSleepTime);
                 }
                 nNow = getCurrentMilliSecond();
@@ -581,6 +582,15 @@ static int receive_data_callback(void *pData, int nDataLen, int nFlag, int64_t t
         return SendPacket(app.pPeerConnection, &rtpPacket);
 }
 
+char * pLogFileName = NULL;
+pj_oshandle_t gLogFd;
+void log_to_file(int _nLevel, const char *_pData, int _nLen)
+{
+        pj_ssize_t nLen = _nLen;
+        pj_file_write(gLogFd, _pData, &nLen);
+}
+
+
 int main(int argc, char **argv)
 {
         if(argc != 2){
@@ -598,11 +608,29 @@ int main(int argc, char **argv)
         PJ_ASSERT_RETURN(status == PJ_SUCCESS, 1);
         status = pjlib_util_init();
         PJ_ASSERT_RETURN(status == PJ_SUCCESS, 1);
-        
+
         pj_pool_t * pRemoteSdpPool = NULL;
         char textSdpBuf[2048] = {0};
         
         pj_caching_pool_init(&app.cachingPool, &pj_pool_factory_default_policy, 0);
+
+        // set log
+        if (role == ANSWER) {
+                pLogFileName = "answer.log";
+        } else {
+                pLogFileName = "offer.log";
+        }
+        pj_pool_t * logpool = pj_pool_create(&app.cachingPool.factory, "log", 2000, 2000, NULL);
+        char logfileName[128] = {0};
+        sprintf(logfileName, "/Users/liuye/Documents/p2p/build/src/work/Debug/%s", pLogFileName);
+        status = pj_file_open(logpool, logfileName, PJ_O_WRONLY, &gLogFd);
+        if(status != PJ_SUCCESS){
+                char errmsg[PJ_ERR_MSG_SIZE] = {0};
+                pj_strerror(status, errmsg, PJ_ERR_MSG_SIZE);
+                printf("pj_file_open %s fail:%s\n", logfileName, errmsg);
+                return status;
+        }
+        pj_log_set_log_func(log_to_file);
 
         //offer send to answer
         if (role == ANSWER) {
@@ -625,8 +653,10 @@ int main(int argc, char **argv)
         }
         
         InitIceConfig(&app.userConfig);
+//#define LOCAL_TEST
 #ifdef LOCAL_TEST
         strcpy(app.userConfig.turnHost, "127.0.0.1");
+        strcpy(app.userConfig.turnHost, "123.59.204.198:4478");
 #else
         strcpy(app.userConfig.turnHost, "123.59.204.198");
         strcpy(app.userConfig.turnUsername, "root");

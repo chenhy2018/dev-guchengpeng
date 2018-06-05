@@ -1,4 +1,5 @@
 #include "PeerConnection.h"
+#define THIS_FILE "PeerConnection.c"
 
 enum { RTCP_INTERVAL = 5000, RTCP_RAND = 2000 };
 
@@ -40,7 +41,7 @@ static void onIceComplete2(pjmedia_transport *pTransport, pj_ice_strans_op op,
                         /** Initialization (candidate gathering) */
                 case PJ_ICE_STRANS_OP_INIT:
                         pTransportIce->iceState = ICE_STATE_GATHERING_OK;
-                        printf("--->gathering candidates finish\n");
+                        MY_PJ_LOG(3, "--->gathering candidates finish");
                         break;
                         
                         /** Negotiation */
@@ -49,7 +50,7 @@ static void onIceComplete2(pjmedia_transport *pTransport, pj_ice_strans_op op,
                         pPeerConnection->iceNegInfo.state = ICE_STATE_NEGOTIATION_OK;
                         pj_mutex_lock(pPeerConnection->pMutex);
                         pPeerConnection->nNegSuccess++;
-                        fprintf(stderr, "--->PJ_ICE_STRANS_OP_NEGOTIATION:%d\n", pPeerConnection->nNegSuccess);
+                        MY_PJ_LOG(3, "--->PJ_ICE_STRANS_OP_NEGOTIATION:%d", pPeerConnection->nNegSuccess);
                         if (pPeerConnection->userIceConfig.userCallback && pPeerConnection->nNegFail == 0 &&
                             pPeerConnection->nNegSuccess == pPeerConnection->mediaStream.nCount) {
                                 pj_mutex_unlock(pPeerConnection->pMutex);
@@ -63,12 +64,12 @@ static void onIceComplete2(pjmedia_transport *pTransport, pj_ice_strans_op op,
                         /** This operation is used to report failure in keep-alive operation.
                          *  Currently it is only used to report TURN Refresh failure.  */
                 case PJ_ICE_STRANS_OP_KEEP_ALIVE:
-                        printf("--->PJ_ICE_STRANS_OP_KEEP_ALIVE\n");
+                        MY_PJ_LOG(3, "--->PJ_ICE_STRANS_OP_KEEP_ALIVE");
                         break;
                         
                         /** IP address change notification from STUN keep-alive operation.  */
                 case PJ_ICE_STRANS_OP_ADDR_CHANGE:
-                        printf("--->PJ_ICE_STRANS_OP_ADDR_CHANGE\n");
+                        MY_PJ_LOG(3, "--->PJ_ICE_STRANS_OP_ADDR_CHANGE");
                         break;
         }
 }
@@ -533,7 +534,7 @@ static int createSdp(IN OUT PeerConnection * _pPeerConnection, IN pj_pool_t * _p
         for ( int i = 0; i < nMaxTracks; i++) {
                 if (_pPeerConnection->nAvIndex[i] != -1) {
                         if (waitState(&_pPeerConnection->transportIce[i], ICE_STATE_INIT)) {
-                                PJ_LOG(3,(__FILE__, "wait ICE_STATE_GATHERING_OK timeout"));
+                                MY_PJ_LOG(3, "wait ICE_STATE_GATHERING_OK timeout");
                                 return -1;
                         }
                         
@@ -572,7 +573,7 @@ int createOffer(IN OUT PeerConnection * _pPeerConnection, OUT pjmedia_sdp_sessio
         char sdpStr[2048];
         memset(sdpStr, 0, 2048);
         pjmedia_sdp_print(*_pOffer, sdpStr, sizeof(sdpStr));
-        printf("%s\n", sdpStr);
+        MY_PJ_LOG(5, "%s", sdpStr);
         
         int nMaxTracks = sizeof(_pPeerConnection->nAvIndex) / sizeof(int);
         for ( int i = 0; i < nMaxTracks; i++) {
@@ -587,7 +588,7 @@ int createOffer(IN OUT PeerConnection * _pPeerConnection, OUT pjmedia_sdp_sessio
         
         memset(sdpStr, 0, 2048);
         pjmedia_sdp_print(*_pOffer, sdpStr, sizeof(sdpStr));
-        printf("----------------\n%s\n", sdpStr);
+        MY_PJ_LOG(5, "----------------\n%s", sdpStr);
         
         _pPeerConnection->role = ICE_ROLE_OFFERER;
         
@@ -631,7 +632,7 @@ static void on_rx_rtcp(void *pUserData, void *pPkt, pj_ssize_t size)
         MediaStreamTrack *pMediaTrack = (MediaStreamTrack *)pUserData;
         
         if (size < 0) {
-                PJ_LOG(3, (__FILE__, "Error receiving RTCP packet:%d", size));
+                MY_PJ_LOG(3, "Error receiving RTCP packet:%d", size);
                 return;
         }
         
@@ -651,7 +652,7 @@ static void on_rx_rtp(void *pUserData, void *pPkt, pj_ssize_t size)
 
         /* Check for errors */
         if (size < 0) {
-                PJ_LOG(3, (__FILE__, "RTP recv() error:%d", size));
+                MY_PJ_LOG(3, "RTP recv() error:%d", size);
                 return;
         }
         
@@ -660,11 +661,12 @@ static void on_rx_rtp(void *pUserData, void *pPkt, pj_ssize_t size)
                                         pPkt, (int)size,
                                         &pRtpHeader, &pPayload, &nPayloadLen);
         if (status != PJ_SUCCESS) {
-                PJ_LOG(3, (__FILE__, "RTP decode error:%d", status));
+                MY_PJ_LOG(3, "RTP decode error:%d", status);
                 return;
         }
+        MY_PJ_LOG(3, "-->receiveSize:%d  rtp seq:%d", size, pj_ntohs(pRtpHeader->seq));
         
-        //PJ_LOG(4,(THIS_FILE, "Rx seq=%d", pj_ntohs(hdr->seq)));
+        //MY_PJ_LOG(4, "Rx seq=%d", pj_ntohs(hdr->seq));
         /* Update the RTCP session. */
         pjmedia_rtcp_rx_rtp(&pMediaTrack->rtcpSession, pj_ntohs(pRtpHeader->seq),
                             pj_ntohl(pRtpHeader->ts), nPayloadLen);
@@ -677,7 +679,7 @@ static void on_rx_rtp(void *pUserData, void *pPkt, pj_ssize_t size)
         unsigned nBitstreamPos = 0;
         status = MediaUnPacketize(pMediaTrack->pMediaPacketier, pPayload, nPayloadLen, &pBitstream, &nBitstreamPos, pRtpHeader->m);
         if (nBitstreamPos == 0) {
-                PJ_LOG(3, (__FILE__, "MediaUnPacketize:%d, receiveSize:%d", status, size));
+                //MY_PJ_LOG(3, "MediaUnPacketize:%d, receiveSize:%d", status, size);
                 return;
         }
 
@@ -691,7 +693,7 @@ static void on_rx_rtp(void *pUserData, void *pPkt, pj_ssize_t size)
         Media * pAvParam = &pMediaTrack->mediaConfig.configs[nIdx];
         rtpPacket.format = pAvParam->codecType;
 
-        fprintf(stderr, "rtp data receive:%ld, payLen:%d\n", size, nPayloadLen);
+        MY_PJ_LOG(5, "rtp data receive:%ld, payLen:%dn", size, nPayloadLen);
 
         PeerConnection * pPeerConnection = (PeerConnection *)pMediaTrack->pPeerConnection;
         pPeerConnection->userIceConfig.userCallback(pPeerConnection->userIceConfig.pCbUserData,
@@ -719,7 +721,7 @@ int StartNegotiation(IN PeerConnection * _pPeerConnection)
                         STATUS_CHECK(pjmedia_transport_media_start, status);
                         
                         if (waitState(&_pPeerConnection->transportIce[i], ICE_STATE_GATHERING_OK)){
-                                PJ_LOG(3,(__FILE__, "wait ICE_STATE_NEGOTIATION_OK timeout"));
+                                MY_PJ_LOG(3, "wait ICE_STATE_NEGOTIATION_OK timeout");
                                 return -1;
                         }
                         
@@ -918,12 +920,12 @@ static void dealWithTimestamp(IN OUT MediaStreamTrack *_pMediaTrack, IN pj_times
         if (exptectNow.u64 > _now.u64) {
                 nLate = ((exptectNow.u64 - _now.u64) * 1000) / _pMediaTrack->hzPerSecond.u64;
                 if ( nLate > 1) {
-                        PJ_LOG(4,(__FILE__, "audio data late:%lld-%lld=%lld",exptectNow.u64, _now.u64, nLate));
+                        MY_PJ_LOG(4, "audio data late:%lld-%lld=%lld",exptectNow.u64, _now.u64, nLate);
                 }
         } else {
                 nLate = ((_now.u64 - exptectNow.u64) * 1000) / _pMediaTrack->hzPerSecond.u64;
                 if ( nLate > 1) {
-                        PJ_LOG(4,(__FILE__, "audio data early:%lld-%lld=%lld",_now.u64, exptectNow.u64, nLate));
+                        MY_PJ_LOG(4, "audio data early:%lld-%lld=%lld",_now.u64, exptectNow.u64, nLate);
                 }
         }
 }
@@ -946,9 +948,8 @@ static pj_status_t sendPacket(IN OUT MediaStreamTrack *_pMediaTrack, IN Transpor
                                         &pVoidHeader, &nHeaderLen);
         STATUS_CHECK(pjmedia_rtp_encode_rtp, status);
         
-        
-        //PJ_LOG(4,(THIS_FILE, "\t\tTx seq=%d", pj_ntohs(hdr->seq)));
         pRtpHeader = (const pjmedia_rtp_hdr*) pVoidHeader;
+        MY_PJ_LOG(5, "send data(%d) len:%d with seq=%d", _nRtpType, _nDataLen, pj_ntohs(pRtpHeader->seq));
         
         char packet[1500];
         /* Copy RTP header to packet */
@@ -973,12 +974,12 @@ static int SendAudioPacket(IN PeerConnection *_pPeerConnection, IN RtpPacket * _
 {
         MediaStreamTrack * pMediaTrack = GetAudioTrack(&_pPeerConnection->mediaStream);
         if (pMediaTrack == NULL) {
-                PJ_LOG(3, (__FILE__, "no audio track in stream"));
+                MY_PJ_LOG(3, "no audio track in stream");
                 return -1;
         }
         int nTransportIndex = GetMediaTrackIndex(&_pPeerConnection->mediaStream, pMediaTrack);
         if (nTransportIndex < 0){
-                PJ_LOG(3, (__FILE__, "no found match track in stream"));
+                MY_PJ_LOG(3, "no found match track in stream");
                 return -2;
         }
         TransportIce * pTransportIce = &_pPeerConnection->transportIce[nTransportIndex];
@@ -1016,7 +1017,7 @@ static int SendVideoPacket(IN PeerConnection *_pPeerConnection, IN OUT RtpPacket
         MediaStreamTrack *pMediaTrack = GetVideoTrack(&_pPeerConnection->mediaStream);
         int nTransportIndex = GetMediaTrackIndex(&_pPeerConnection->mediaStream, pMediaTrack);
         if (nTransportIndex < 0){
-                PJ_LOG(3, (__FILE__, "no found match track in stream"));
+                MY_PJ_LOG(3, "no found match track in stream");
                 return -2;
         }
         TransportIce * pTransportIce = &_pPeerConnection->transportIce[nTransportIndex];
@@ -1069,7 +1070,7 @@ static int SendVideoPacket(IN PeerConnection *_pPeerConnection, IN OUT RtpPacket
                 if (nOffset == _pPacket->nDataLen && nOffset != nBitsPos){
                         marker = 1;
                 }
-                printf("send one video frame with %ld bytes\n", nPayloadLen);
+
                 status =  sendPacket(pMediaTrack, pTransportIce, nRtpType, marker, nTsLlen, pPayload, nPayloadLen);
                 STATUS_CHECK(pjmedia_rtp_encode_rtp, status);
 
