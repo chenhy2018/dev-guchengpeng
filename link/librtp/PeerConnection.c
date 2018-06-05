@@ -649,6 +649,7 @@ static void on_rx_rtp(void *pUserData, void *pPkt, pj_ssize_t size)
         unsigned nPayloadLen;
         
         MediaStreamTrack *pMediaTrack = (MediaStreamTrack *)pUserData;
+        PeerConnection *pPeer = (PeerConnection *)pMediaTrack->pPeerConnection;
 
         /* Check for errors */
         if (size < 0) {
@@ -701,7 +702,7 @@ static void on_rx_rtp(void *pUserData, void *pPkt, pj_ssize_t size)
                 pPeerConnection->userIceConfig.userCallback(pPeerConnection->userIceConfig.pCbUserData,
                                                             CALLBACK_RTP,
                                                             &rtpPacket);
-        }while(bTryAgain);
+        }while(bTryAgain && !pPeer->userIceConfig.bTurnTcp);//tcp not lost packet
         
         return;
 }
