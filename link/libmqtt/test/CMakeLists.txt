@@ -1,0 +1,27 @@
+SET(GCC_COVERAGE_COMPILE_FLAGS "-Wall -Wno-unused -g")
+SET(GCC_INCLUDE_PATH "-I../ ")
+SET(CMAKE_C_FLAGS "${GCC_INCLUDE_PATH} ${GCC_COVERAGE_COMPILE_FLAGS}")
+
+option(WITH_THREADING "Include client library threading support?" ON)
+if (${WITH_THREADING} STREQUAL ON)
+        add_definitions("-DWITH_THREADING")
+        if (WIN32)
+                set (PTHREAD_LIBRARIES C:\\pthreads\\Pre-built.2\\lib\\x86\\pthreadVC2.lib)
+                set (PTHREAD_INCLUDE_DIR C:\\pthreads\\Pre-built.2\\include)
+        else (WIN32)
+                set (PTHREAD_LIBRARIES pthread)
+                set (PTHREAD_INCLUDE_DIR "")
+        endif (WIN32)
+else (${WITH_THREADING} STREQUAL ON)
+        set (PTHREAD_LIBRARIES "")
+        set (PTHREAD_INCLUDE_DIR "")
+endif (${WITH_THREADING} STREQUAL ON)
+
+set (OPENSSL_CRYPTO_LIBRARY /usr/lib/x86_64-linux-gnu/libcrypto.so)
+set (OPENSSL_SSL_LIBRARY /usr/lib/x86_64-linux-gnu/libssl.so)
+set (LIBRARIES ${OPENSSL_CRYPTO_LIBRARY} ${OPENSSL_CRYPTO_LIBRARY})
+
+aux_source_directory(. LIB_MOSQUITTO_TEST)
+add_executable(mos_test ${LIB_MOSQUITTO_TEST})
+
+target_link_libraries(mos_test mqtt pthread ${OPENSSL_CRYPTO_LIBRARY} ${OPENSSL_SSL_LIBRARY})

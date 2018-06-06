@@ -38,8 +38,13 @@ int main(int argc, char** argv)
 	opt.nComponents = 1;
 	opt.nMaxHosts = 1;
 	opt.bRegular = 1;
+	opt.bTurnTcp = 1;
 	char* turnhost = "123.59.204.198:3478";
 	memcpy(&opt.turnHost, turnhost, strlen(turnhost));
+	char* turnuser = "root";
+	memcpy(&opt.turnUsername, turnuser, strlen(turnuser));
+	char* turnpsw = "root";
+	memcpy(&opt.turnPassword, turnpsw, strlen(turnpsw));
 	opt.nKeepAlive = 300;
 
 	IceOptions opta, optb;
@@ -56,7 +61,7 @@ int main(int argc, char** argv)
 	IceInstance* pb = IceCreateInstance(&optb);
 
 	// wait for turn to return relayed ip
-	sleep(10000);
+	sleep(10);
 
 	// set offerer and anwerer
 	IceSetOfferer(pa);
@@ -119,16 +124,25 @@ int main(int argc, char** argv)
 	IceStartNegotiation(pb);
 
 	// send some data to others
+	int nCount = 0;
 	while (1) {
-		const char* stra = "I'm aaaaaaaaa";
-		const char* strb = "I'm bbbbbbbbb";
+		char stra[1500];
+		char strb[1500];
+		memset(stra, ' ', 1400);
+		memset(strb, ' ', 1400);
+		stra[20] = '\0';
+		strb[20] = '\0';
+
+		char count[10];
+		snprintf(count, 8, "%07d ", nCount);
+		memcpy(stra, count, 7);
+		memcpy(strb, count, 7);
+		nCount++;
+
 		int i = IceSendToPeer(pa, 1, stra, strlen(stra));
-		int j = IceSendToPeer(pb, 1, strb, strlen(strb));
-		if (i != 0 || j != 0) {
-			PJ_LOG(1, ("test", "i=%d, j=%d", i, j));
-		}
+//		int j = IceSendToPeer(pb, 1, strb, strlen(strb));
 		int s = (int)pj_ice_strans_get_state(pa->pIceStreamTransport);
-		PJ_LOG(1, ("test", "status=%d", s));
-		sleep(1);
+
+		usleep(1000 * 20);
 	}
 }
