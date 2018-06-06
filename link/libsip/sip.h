@@ -12,7 +12,6 @@
 #ifndef INOUT
 #define INOUT
 #endif
-
 typedef enum SIP_ERROR_CODE {
 
         SIP_SUCCESS,

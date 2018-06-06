@@ -43,6 +43,7 @@ int main()
         AccountConfig.pPassWord = "1004";
         AccountConfig.pDomain = "192.168.56.102";
         AccountConfig.pUserData = (void *)user;
+        AccountConfig.nMaxOngoingCall = 2;
 
         int ret = SipAddNewAccount(&AccountConfig, &nid4);
         if (ret != SIP_SUCCESS)

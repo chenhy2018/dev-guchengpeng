@@ -295,7 +295,7 @@ SIP_ERROR_CODE SipAddNewAccount(IN const SipAccountConfig *_pConfig, OUT int *_p
         PJ_ASSERT_RETURN(_pConfig->pUserName && _pConfig->pPassWord && _pConfig->pDomain, SIP_INVALID_ARG);
 
         /* Account amount check */
-        PJ_ASSERT_RETURN(SipAppData.nAccountCount < SipAppData.nMaxAccount, PJ_ETOOMANY);
+        PJ_ASSERT_RETURN(SipAppData.nAccountCount < SipAppData.nMaxAccount, SIP_TOO_MANY_ACCOUNT);
 
         pj_mutex_lock(SipAppData.pMutex);
         /* Find empty account id. */
@@ -388,6 +388,7 @@ void SipDeleteAccount(IN const int _nAccountId)
         }
         pAccount->bValid = PJ_FALSE;
         pAccount->Contact.slen = 0;
+        SipAppData.nAccountCount--;
         pj_mutex_unlock(SipAppData.pMutex);
 }
 
@@ -818,9 +819,14 @@ SIP_ERROR_CODE SipMakeNewCall(IN const int _nFromAccountId, IN const char *_pDes
         /* Find free call id */
         nCallId = SipGetFreeCallId();
         if (nCallId == -1) {
-                PJ_LOG(4, (THIS_FILE, "Too many calls"));
+                PJ_LOG(1, (THIS_FILE, "Too many calls"));
                 pj_mutex_unlock(SipAppData.pMutex);
                 return SIP_TOO_MANY_CALLS_FOR_INSTANCE;
+        }
+        if ((SipAppData.Accounts[_nFromAccountId].nOngoingCall + 1) >= SipAppData.Accounts[_nFromAccountId].nMaxOngoingCall) {
+                PJ_LOG(1, (THIS_FILE, "Too many call for this account"));
+                pj_mutex_unlock(SipAppData.pMutex);
+                return SIP_TOO_MANY_CALLS_FOR_ACCOUNT;
         }
         pCall = &SipAppData.Calls[nCallId];
         pCall->nAccountId = _nFromAccountId;
@@ -881,6 +887,8 @@ SIP_ERROR_CODE SipMakeNewCall(IN const int _nFromAccountId, IN const char *_pDes
                 SIP_SNED_INV_REQ_FAILED;
         }
 
+        SipAppData.nCallCount++;
+        SipAppData.Accounts[_nFromAccountId].nOngoingCall++;
         SipAppData.Calls[nCallId].bValid = PJ_TRUE;
         pj_mutex_unlock(SipAppData.pMutex);
         *_pCallId = nCallId;
@@ -1000,7 +1008,8 @@ static pj_bool_t onRxRequest(IN pjsip_rx_data *_pRxData )
         pj_mutex_lock(SipAppData.pMutex);
         /* Find free call id */
         nCallId = SipGetFreeCallId();
-        if (nCallId >= SipAppData.nMaxCall) {
+        if (nCallId == -1) {
+                PJ_LOG(1, (THIS_FILE, "Too many calls"));
                 pjsip_endpt_respond_stateless(SipAppData.pSipEndPoint, _pRxData, PJSIP_SC_BUSY_HERE,
                                               NULL, NULL, NULL);
                 pj_mutex_unlock(SipAppData.pMutex);
@@ -1029,13 +1038,20 @@ static pj_bool_t onRxRequest(IN pjsip_rx_data *_pRxData )
         nToAccountId = pCall->nAccountId = SipGetAccountIdFromRxData(_pRxData);
         if (nToAccountId == -1) {
                 PrintErrorMsg(Status, "Can't find correspond account Id");
-                pj_str_t Reason = pj_str("Sorry we can't find right To account Id");
+                pj_str_t Reason = pj_str("Sorry we can't find right account Id");
                 pjsip_endpt_respond_stateless(SipAppData.pSipEndPoint, _pRxData, PJSIP_SC_INTERNAL_SERVER_ERROR,
                                               &Reason, NULL, NULL);
                 pj_mutex_unlock(SipAppData.pMutex);
                 return PJ_TRUE;
         }
 
+        if ((SipAppData.Accounts[nToAccountId].nOngoingCall + 1) >= SipAppData.Accounts[nToAccountId].nMaxOngoingCall) {
+                PJ_LOG(1, (THIS_FILE, "Too many call for this account"));
+                pjsip_endpt_respond_stateless(SipAppData.pSipEndPoint, _pRxData, PJSIP_SC_BUSY_HERE,
+                                              NULL, NULL, NULL);
+                pj_mutex_unlock(SipAppData.pMutex);
+                return PJ_TRUE;
+        }
         /* Create UAS dialog */
         Status = pjsip_dlg_create_uas_and_inc_lock(pjsip_ua_instance(), _pRxData,
                                                    &SipAppData.Accounts[nToAccountId].Contact,
@@ -1134,6 +1150,8 @@ static pj_bool_t onRxRequest(IN pjsip_rx_data *_pRxData )
                 goto onError;
         }
         */
+        SipAppData.nCallCount++;
+        SipAppData.Accounts[nToAccountId].nOngoingCall++;
         pj_mutex_unlock(SipAppData.pMutex);
         return PJ_TRUE;
 
@@ -1213,6 +1231,8 @@ static void onSipCallOnStateChanged(IN pjsip_inv_session *_pInviteSession,
 
                 pCall->pInviteSession = NULL;
                 _pInviteSession->mod_data[SipMod.id] = NULL;
+                SipAppData.nCallCount--;
+                SipAppData.Accounts[pCall->nAccountId].nOngoingCall--;
         }
         if (_pInviteSession->state == PJSIP_INV_STATE_CONNECTING && _pInviteSession->role == PJSIP_ROLE_UAC) {
                 RxData = _pEvent->body.rx_msg.rdata;

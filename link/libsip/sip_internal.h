@@ -32,6 +32,7 @@ typedef struct SipAccount {
         unsigned nRegDelayBeforeRefresh;
         unsigned nRegRetryInterval;
         unsigned nKaInterval;
+        int nMaxOngoingCall;
 
         pjsip_timer_setting TimerSetting;
 
@@ -40,6 +41,7 @@ typedef struct SipAccount {
         pjsip_regc *pRegc;
         pj_str_t Contact;
         int nLastRegCode;
+        int nOngoingCall;
 
         unsigned nCredCnt;
         pjsip_cred_info  Cred[SIP_MAX_CRED];
