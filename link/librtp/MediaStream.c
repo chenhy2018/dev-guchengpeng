@@ -44,7 +44,7 @@ void AddMediaTrack(IN OUT MediaStream *_pMediaStraem, IN MediaConfig *_pMediaCon
         _pMediaStraem->streamTracks[_nIndex].type = _type;
         _pMediaStraem->streamTracks[_nIndex].mediaConfig = *_pMediaConfig;
         _pMediaStraem->streamTracks[_nIndex].pPeerConnection = _pPeerConnection;
-        
+        _pMediaStraem->streamTracks[_nIndex].jbuf.nLastRecvRtpSeq = -1;
         setMediaConfig(&_pMediaStraem->streamTracks[_nIndex].mediaConfig);
 }
 
@@ -372,12 +372,29 @@ pj_status_t MediaUnPacketize(IN OUT MediaPacketier *_pPKtz, IN const pj_uint8_t 
         return _pPKtz->pOperation.unpacketize(_pPKtz, _pPayload, _nPlyloadLen, _pBitstream, _pBitstreamPos, _nRtpMarker, _pTryAgain);
 }
 
+static int getPerFrameSize(CodecType codecType)
+{
+        switch (codecType) {
+                case MEDIA_FORMAT_PCMU:
+                case MEDIA_FORMAT_PCMA:
+                case MEDIA_FORMAT_G729:
+                        return 256;
+                case MEDIA_FORMAT_H264:
+                case MEDIA_FORMAT_H265:
+                        return 1480;
+        }
+        return 1480;
+}
+
 pj_status_t createJitterBuffer(IN MediaStreamTrack *_pMediaTrack, IN pj_pool_factory *_pPoolFactory)
 {
-        pj_pool_t *pPool = pj_pool_create(_pPoolFactory, NULL, 1480*20, 1480, NULL);
-        ASSERT_RETURN_CHECK(pPool, pj_pool_create);
         int nIdx = _pMediaTrack->mediaConfig.nUseIndex;
         pj_assert(nIdx != -1);
+
+        int nPerFrameMaxSize = getPerFrameSize(_pMediaTrack->mediaConfig.configs[nIdx].codecType);
+
+        pj_pool_t *pPool = pj_pool_create(_pPoolFactory, NULL, nPerFrameMaxSize*50, nPerFrameMaxSize * 20, NULL);
+        ASSERT_RETURN_CHECK(pPool, pj_pool_create);
 
         pj_status_t status;
 
@@ -388,11 +405,11 @@ pj_status_t createJitterBuffer(IN MediaStreamTrack *_pMediaTrack, IN pj_pool_fac
                 case MEDIA_FORMAT_PCMU:
                 case MEDIA_FORMAT_PCMA:
                 case MEDIA_FORMAT_G729:
-                        status = pjmedia_jbuf_create (pPool, &name, 160, 20, 30, &_pMediaTrack->jbuf.pJbuf);
+                        status = pjmedia_jbuf_create (pPool, &name, nPerFrameMaxSize, 20, 60, &_pMediaTrack->jbuf.pJbuf);
                         break;
                 case MEDIA_FORMAT_H264:
                 case MEDIA_FORMAT_H265:
-                        status = pjmedia_jbuf_create (pPool, &name, 1480, 40, 30, &_pMediaTrack->jbuf.pJbuf);
+                        status = pjmedia_jbuf_create (pPool, &name, nPerFrameMaxSize, 40, 60, &_pMediaTrack->jbuf.pJbuf);
                         break;
         }
         if (status != PJ_SUCCESS) {
@@ -408,7 +425,7 @@ pj_status_t createJitterBuffer(IN MediaStreamTrack *_pMediaTrack, IN pj_pool_fac
                 return status;
         }
 
-        status = pjmedia_jbuf_set_adaptive(_pMediaTrack->jbuf.pJbuf, 0, 0, 10);
+        status = pjmedia_jbuf_set_adaptive(_pMediaTrack->jbuf.pJbuf, 20, 25, 40);
         if (status != PJ_SUCCESS) {
                 pj_pool_release(pPool);
                 pjmedia_jbuf_destroy(_pMediaTrack->jbuf.pJbuf);

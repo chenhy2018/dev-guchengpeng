@@ -647,16 +647,15 @@ static void on_rx_rtp(void *pUserData, void *pPkt, pj_ssize_t size)
         const pjmedia_rtp_hdr *pRtpHeader;
         const void *pPayload;
         unsigned nPayloadLen;
-        
+
         MediaStreamTrack *pMediaTrack = (MediaStreamTrack *)pUserData;
-        PeerConnection *pPeer = (PeerConnection *)pMediaTrack->pPeerConnection;
 
         /* Check for errors */
         if (size < 0) {
                 MY_PJ_LOG(3, "RTP recv() error:%d", size);
                 return;
         }
-        
+
         /* Decode RTP packet. */
         status = pjmedia_rtp_decode_rtp(&pMediaTrack->rtpSession,
                                         pPkt, (int)size,
@@ -675,58 +674,72 @@ static void on_rx_rtp(void *pUserData, void *pPkt, pj_ssize_t size)
         /* Update RTP session */
         pjmedia_rtp_session_update(&pMediaTrack->rtpSession, pRtpHeader, NULL);
 
-        if (!pPeer->userIceConfig.bTurnTcp) {
-                pjmedia_jbuf_put_frame3(pMediaTrack->jbuf.pJbuf, pPayload, nPayloadLen,
-                                        0, //pj_uint32_t bit_info
-                                        pj_ntohs(pRtpHeader->seq),
-                                        pRtpHeader->ts,
-                                        NULL);
+ 
+        pjmedia_jbuf_put_frame3(pMediaTrack->jbuf.pJbuf, pPayload, nPayloadLen,
+                                0, //pj_uint32_t bit_info
+                                pj_ntohs(pRtpHeader->seq),
+                                pj_ntohs(pRtpHeader->ts),
+                                NULL);
+
+        pj_bool_t bGetFrame = PJ_FALSE;
+        do {
                 char cFrameType;
                 int nSeq = 0;
+                pj_uint32_t nTs;
                 pj_size_t nFrameSize = sizeof(pMediaTrack->jbuf.getBuf);
                 pjmedia_jbuf_get_frame3(pMediaTrack->jbuf.pJbuf, pMediaTrack->jbuf.getBuf,
-                                        &nFrameSize, &cFrameType, NULL, NULL, &nSeq);
+                                        &nFrameSize, &cFrameType, NULL, &nTs, &nSeq);
                 switch (cFrameType) {
                         case PJMEDIA_JB_MISSING_FRAME:
                         case PJMEDIA_JB_ZERO_PREFETCH_FRAME:
                         case PJMEDIA_JB_ZERO_EMPTY_FRAME:
+                                bGetFrame = PJ_FALSE;
                                 return;
                         case PJMEDIA_JB_NORMAL_FRAME:
                                 pPayload = pMediaTrack->jbuf.getBuf;
                                 nPayloadLen = nFrameSize;
+                                bGetFrame = PJ_TRUE;
                                 break;
                 }
-                MY_PJ_LOG(3, "-->get_frame:%d  rtp seq:%d", nPayloadLen, nSeq);
-        }
-
-        //deal with payload
-        pj_bool_t bTryAgain = PJ_FALSE;
-        do{
-                pj_uint8_t *pBitstream = NULL;
-                unsigned nBitstreamPos = 0;
-                status = MediaUnPacketize(pMediaTrack->pMediaPacketier, pPayload, nPayloadLen, &pBitstream, &nBitstreamPos, pRtpHeader->m, &bTryAgain);
-                if (nBitstreamPos == 0) {
-                        //MY_PJ_LOG(3, "MediaUnPacketize:%d, receiveSize:%d", status, size);
-                        return;
+                if (!bGetFrame) {
+                        break;
                 }
+                int nLastRecvRtpSeq = pMediaTrack->jbuf.nLastRecvRtpSeq;
+                if (nLastRecvRtpSeq == -1) {
+                        pMediaTrack->jbuf.nLastRecvRtpSeq = nSeq;
+                        nLastRecvRtpSeq = nSeq;
+                }
+                MY_PJ_LOG(3, "-->get_frame:%d  rtp seq:%d", nPayloadLen, nSeq);
 
-                RtpPacket rtpPacket;
-                pj_bzero(&rtpPacket, sizeof(rtpPacket));
-                rtpPacket.type = pMediaTrack->type;
-                rtpPacket.pData = pBitstream;
-                rtpPacket.nDataLen = nBitstreamPos;
-                rtpPacket.nTimestamp = pRtpHeader->ts;
-                int nIdx = pMediaTrack->mediaConfig.nUseIndex;
-                Media * pAvParam = &pMediaTrack->mediaConfig.configs[nIdx];
-                rtpPacket.format = pAvParam->codecType;
+                //deal with payload
+                pj_bool_t bTryAgain = PJ_FALSE;
+                do{
+                        pj_uint8_t *pBitstream = NULL;
+                        unsigned nBitstreamPos = 0;
+                        status = MediaUnPacketize(pMediaTrack->pMediaPacketier, pPayload, nPayloadLen, &pBitstream, &nBitstreamPos, pRtpHeader->m, &bTryAgain);
+                        if (nBitstreamPos == 0) {
+                                //MY_PJ_LOG(3, "MediaUnPacketize:%d, receiveSize:%d", status, size);
+                                break;
+                        }
 
-                //MY_PJ_LOG(5, "rtp data receive:%ld, payLen:%d", size, nPayloadLen);
+                        RtpPacket rtpPacket;
+                        pj_bzero(&rtpPacket, sizeof(rtpPacket));
+                        rtpPacket.type = pMediaTrack->type;
+                        rtpPacket.pData = pBitstream;
+                        rtpPacket.nDataLen = nBitstreamPos;
 
-                PeerConnection * pPeerConnection = (PeerConnection *)pMediaTrack->pPeerConnection;
-                pPeerConnection->userIceConfig.userCallback(pPeerConnection->userIceConfig.pCbUserData,
-                                                            CALLBACK_RTP,
-                                                            &rtpPacket);
-        }while(bTryAgain && !pPeer->userIceConfig.bTurnTcp);//tcp not lost packet
+                        int nIdx = pMediaTrack->mediaConfig.nUseIndex;
+                        Media * pAvParam = &pMediaTrack->mediaConfig.configs[nIdx];
+                        rtpPacket.format = pAvParam->codecType;
+                        rtpPacket.nTimestamp = nTs * 1000 / pAvParam->nSampleOrClockRate;
+
+                        //MY_PJ_LOG(5, "rtp data receive:%ld, payLen:%d", size, nPayloadLen);
+                        PeerConnection * pPeerConnection = (PeerConnection *)pMediaTrack->pPeerConnection;
+                        pPeerConnection->userIceConfig.userCallback(pPeerConnection->userIceConfig.pCbUserData,
+                                                                    CALLBACK_RTP,
+                                                                    &rtpPacket);
+                }while(bTryAgain);
+        }while(bGetFrame);
         
         return;
 }
@@ -782,10 +795,9 @@ int StartNegotiation(IN PeerConnection * _pPeerConnection)
                                           160, //TODO Average number of samples per frame. I don't know???
                                           //How do I set it if payload is video
                                           0);
-                        if (!_pPeerConnection->userIceConfig.bTurnTcp) {
-                                status = createJitterBuffer(pMediaTrack, _pPeerConnection->pPoolFactory);
-                                STATUS_CHECK(createJitterBuffer_pjmedia_jbuf_create, status);
-                        }
+
+                        status = createJitterBuffer(pMediaTrack, _pPeerConnection->pPoolFactory);
+                        STATUS_CHECK(createJitterBuffer_pjmedia_jbuf_create, status);
                 }
         }
         
