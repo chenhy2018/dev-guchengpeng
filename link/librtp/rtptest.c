@@ -11,8 +11,8 @@
 typedef struct _App{
         PeerConnection *pPeerConnection;
         pj_caching_pool cachingPool;
-        MediaConfig audioConfig;
-        MediaConfig videoConfig;
+        MediaConfigSet audioConfig;
+        MediaConfigSet videoConfig;
         IceConfig userConfig;
 }App;
 App app;
@@ -558,9 +558,9 @@ static void onRxRtp(void *_pUserData, CallbackType _type, void *_pCbData)
                 case CALLBACK_RTP:{
                         RtpPacket *pPkt = (RtpPacket *)_pCbData;
                         pj_ssize_t nLen = pPkt->nDataLen;
-                        if (pPkt->type == STREAM_AUDIO && nLen == 160) {
+                        if (pPkt->type == RTP_STREAM_AUDIO && nLen == 160) {
                                 pj_file_write(gPcmuFd, pPkt->pData, &nLen);
-                        } else if (pPkt->type == STREAM_VIDEO) {
+                        } else if (pPkt->type == RTP_STREAM_VIDEO) {
                                 pj_file_write(gH264Fd, pPkt->pData, &nLen);
                         }
                 }
@@ -577,15 +577,15 @@ static int receive_data_callback(void *pData, int nDataLen, int nFlag, int64_t t
         pj_bzero(&rtpPacket, sizeof(rtpPacket));
         if (nFlag == THIS_IS_AUDIO) {
                 printf("send %d bytes audio data to rtp with timestamp:%ld\n", nDataLen, timestamp);
-                rtpPacket.type = STREAM_AUDIO;
+                rtpPacket.type = RTP_STREAM_AUDIO;
         } else {
                 printf("send %d bytes vidoe data to rtp with timestamp:%ld\n", nDataLen, timestamp);
-                rtpPacket.type = STREAM_VIDEO;
+                rtpPacket.type = RTP_STREAM_VIDEO;
         }
         rtpPacket.pData = (uint8_t *)pData;
         rtpPacket.nDataLen = nDataLen;
         rtpPacket.nTimestamp = timestamp;
-        return SendPacket(app.pPeerConnection, &rtpPacket);
+        return SendRtpPacket(app.pPeerConnection, &rtpPacket);
 }
 
 char * pLogFileName = NULL;

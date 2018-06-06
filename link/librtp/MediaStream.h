@@ -57,13 +57,13 @@ typedef struct _JitterBuffer {
 
 typedef struct _MediaStreamTrack
 {
-        StreamType   type;
+        RtpStreamType   type;
         pj_timestamp hzPerSecond;
         pj_timestamp nextRtcpTimestamp;
         pj_timestamp nSysTimeBase;
         uint64_t nLastPktTimestamp;
         uint64_t nFirstPktTimestamp;
-        MediaConfig mediaConfig;
+        MediaConfigSet mediaConfig;
         pjmedia_rtp_session  rtpSession;
         pjmedia_rtcp_session rtcpSession;
         MediaPacketier *pMediaPacketier;
@@ -79,7 +79,7 @@ typedef struct _MediaStream
 }MediaStream;
 
 void InitMediaStream(IN MediaStream *pMediaStraem);
-void AddMediaTrack(IN OUT MediaStream *pMediaStraem, IN MediaConfig *pMediaConfig, IN int nIndex, IN StreamType type,
+void AddMediaTrack(IN OUT MediaStream *pMediaStraem, IN MediaConfigSet *pMediaConfig, IN int nIndex, IN RtpStreamType type,
                    IN void * pPeerConnection);
 int CreateSdpAudioMLine(IN pjmedia_endpt *pMediaEndpt, IN pjmedia_transport_info *pTransportInfo,
                         IN pj_pool_t * pPool, IN MediaStreamTrack *pMediaTrack, OUT pjmedia_sdp_media ** pAudioSdp);

@@ -1,9 +1,9 @@
 #include "MediaStream.h"
 #define THIS_FILE "MediaStream.c"
 
-void InitMediaConfig(IN MediaConfig * pMediaConfig)
+void InitMediaConfig(IN MediaConfigSet * pMediaConfig)
 {
-        pj_bzero(pMediaConfig, sizeof(MediaConfig));
+        pj_bzero(pMediaConfig, sizeof(MediaConfigSet));
 }
 
 void InitMediaStream(IN MediaStream *_pMediaStraem)
@@ -11,7 +11,7 @@ void InitMediaStream(IN MediaStream *_pMediaStraem)
         pj_bzero(_pMediaStraem, sizeof(MediaStream));
 }
 
-static void setMediaConfig(IN OUT MediaConfig *_pMediaConfig)
+static void setMediaConfig(IN OUT MediaConfigSet *_pMediaConfig)
 {
         for ( int i = 0; i < _pMediaConfig->nCount; i++) {
                 switch (_pMediaConfig->configs[i].codecType) {
@@ -27,7 +27,7 @@ static void setMediaConfig(IN OUT MediaConfig *_pMediaConfig)
         }
 }
 
-void AddMediaTrack(IN OUT MediaStream *_pMediaStraem, IN MediaConfig *_pMediaConfig, IN int _nIndex, IN StreamType _type,
+void AddMediaTrack(IN OUT MediaStream *_pMediaStraem, IN MediaConfigSet *_pMediaConfig, IN int _nIndex, IN RtpStreamType _type,
                    IN void * _pPeerConnection)
 {
         pj_assert(_pMediaStraem && _pMediaConfig);
@@ -51,7 +51,7 @@ void AddMediaTrack(IN OUT MediaStream *_pMediaStraem, IN MediaConfig *_pMediaCon
 int CreateSdpAudioMLine(IN pjmedia_endpt *_pMediaEndpt, IN pjmedia_transport_info *_pTransportInfo,
                         IN pj_pool_t * _pPool, IN MediaStreamTrack *_pMediaTrack, OUT pjmedia_sdp_media ** _pAudioSdp)
 {
-        pj_assert(_pMediaTrack->type == STREAM_AUDIO);
+        pj_assert(_pMediaTrack->type == RTP_STREAM_AUDIO);
         
         pj_status_t status;
         status = pjmedia_endpt_create_audio_sdp(_pMediaEndpt, _pPool, &_pTransportInfo->sock_info, 0, _pAudioSdp);
@@ -79,7 +79,7 @@ int CreateSdpAudioMLine(IN pjmedia_endpt *_pMediaEndpt, IN pjmedia_transport_inf
 int CreateSdpVideoMLine(IN pjmedia_endpt *_pMediaEndpt, IN pjmedia_transport_info *_pTransportInfo,
                         IN pj_pool_t * _pPool, IN MediaStreamTrack *_pMediaTrack, OUT pjmedia_sdp_media ** _pVideoSdp)
 {
-        pj_assert(_pMediaTrack->type == STREAM_VIDEO);
+        pj_assert(_pMediaTrack->type == RTP_STREAM_VIDEO);
         
         pj_status_t status;
         status = pjmedia_endpt_create_video_sdp(_pMediaEndpt, _pPool, &_pTransportInfo->sock_info, 0, _pVideoSdp);
@@ -116,7 +116,7 @@ int CreateSdpVideoMLine(IN pjmedia_endpt *_pMediaEndpt, IN pjmedia_transport_inf
         return PJ_SUCCESS;
 }
 
-static inline MediaStreamTrack * GetTrackByType(IN MediaStream * _pMediaStream, StreamType _type)
+static inline MediaStreamTrack * GetTrackByType(IN MediaStream * _pMediaStream, RtpStreamType _type)
 {
         for (int i = 0; i < sizeof(_pMediaStream->streamTracks) / sizeof(MediaStreamTrack); i++) {
                 if (_pMediaStream->streamTracks[i].type == _type) {
@@ -128,12 +128,12 @@ static inline MediaStreamTrack * GetTrackByType(IN MediaStream * _pMediaStream, 
 
 MediaStreamTrack * GetAudioTrack(IN MediaStream * _pMediaStream)
 {
-        return GetTrackByType(_pMediaStream, STREAM_AUDIO);
+        return GetTrackByType(_pMediaStream, RTP_STREAM_AUDIO);
 }
 
 MediaStreamTrack * GetVideoTrack(IN MediaStream * _pMediaStream)
 {
-        return GetTrackByType(_pMediaStream, STREAM_VIDEO);
+        return GetTrackByType(_pMediaStream, RTP_STREAM_VIDEO);
 }
 
 int GetMediaTrackIndex(IN MediaStream * _pMediaStream, IN MediaStreamTrack *_pMediaStreamTrack)

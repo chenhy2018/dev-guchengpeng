@@ -29,12 +29,12 @@ return s;}
 #define OUT
 #endif
 
-typedef enum _StreamType
+typedef enum _RtpStreamType
 {
-        STREAM_AUDIO,
-        STREAM_VIDEO,
-        STREAM_DATA
-}StreamType;
+        RTP_STREAM_AUDIO,
+        RTP_STREAM_VIDEO,
+        RTP_STREAM_DATA
+}RtpStreamType;
 
 typedef enum _CodecType
 {
@@ -46,17 +46,18 @@ typedef enum _CodecType
 }CodecType;
 
 #define MAX_CODEC_LEN 5
-typedef struct _Media{
-        StreamType streamType;
+typedef struct _MediaConfig{
+        RtpStreamType streamType;
         CodecType codecType; //also rtp type
         int nSampleOrClockRate;
         int nChannel;
-}Media;
-typedef struct _MediaConfig{
-        Media configs[MAX_CODEC_LEN];
+}MediaConfig;
+
+typedef struct _MediaConfigSet{
+        MediaConfig configs[MAX_CODEC_LEN];
         int nCount;
         int nUseIndex;
-}MediaConfig;
+}MediaConfigSet;
 
 typedef enum _CallbackType{
         CALLBACK_ICE,
@@ -104,26 +105,26 @@ typedef struct _RtpPacket{
         uint8_t * pData;
         int nDataLen;
         uint64_t nTimestamp;
-        StreamType type;
+        RtpStreamType type;
         CodecType format;
 }RtpPacket;
 
 typedef struct _IceNegInfo {
         IceState state;
-        const Media* configs[2];
+        const MediaConfig* configs[2];
         int nCount;
 }IceNegInfo;
 
 
-void InitMediaConfig(IN MediaConfig * pMediaConfig);
+void InitMediaConfig(IN MediaConfigSet * pMediaConfig);
 void InitIceConfig(IN OUT IceConfig *pIceConfig);
 
 typedef struct _PeerConnection PeerConnection;
 int InitPeerConnectoin(OUT PeerConnection ** pPeerConnectoin,
                         IN IceConfig *pIceConfig);
 
-int AddAudioTrack(IN OUT PeerConnection * pPeerConnection, IN MediaConfig *pAudioConfig);
-int AddVideoTrack(IN OUT PeerConnection * pPeerConnection, IN MediaConfig *pVideoConfig);
+int AddAudioTrack(IN OUT PeerConnection * pPeerConnection, IN MediaConfigSet *pAudioConfig);
+int AddVideoTrack(IN OUT PeerConnection * pPeerConnection, IN MediaConfigSet *pVideoConfig);
 int createOffer(IN OUT PeerConnection * pPeerConnection,  OUT pjmedia_sdp_session **pOffer);
 int createAnswer(IN OUT PeerConnection * pPeerConnection, IN pjmedia_sdp_session *pOffer,
                  OUT pjmedia_sdp_session **pAnswer);
@@ -131,7 +132,7 @@ int setLocalDescription(IN OUT PeerConnection * pPeerConnection, IN pjmedia_sdp_
 int setRemoteDescription(IN OUT PeerConnection * pPeerConnection, IN pjmedia_sdp_session * pSdp);
 int StartNegotiation(IN PeerConnection * pPeerConnection);
 
-int SendPacket(IN PeerConnection *pPeerConnection, IN OUT RtpPacket * pPacket);
+int SendRtpPacket(IN PeerConnection *pPeerConnection, IN OUT RtpPacket * pPacket);
 
 void ReleasePeerConnectoin(IN OUT PeerConnection * _pPeerConnection);
 
