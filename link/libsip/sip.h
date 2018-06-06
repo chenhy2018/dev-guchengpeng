@@ -180,13 +180,14 @@ typedef struct SipInstanceConfig
 
 typedef struct SipAccountConfig
 {
-        char *pUserName;
-        char *pPassWord;
-        char *pDomain;
+        const char *pUserName;
+        const char *pPassWord;
+        const char *pDomain;
         void *pUserData;
 
         int nMaxOngoingCall;
 } SipAccountConfig;
+
 /**
  * Initialize sip instance
  *
@@ -198,10 +199,7 @@ SIP_ERROR_CODE SipCreateInstance(IN const SipInstanceConfig *pConfig);
 /**
  * Add new account
  *
- * @param pUserName, set the username for authentication. same as username in From header
- * @param pPassoWord, set the plain-text passowrd for authentication
- * @param PDomain, registar server
- * @param RegWhenAdd, whether register when user added or not
+ * @param pConfig, config about this account see #SipAccountConfig
  *
  * @return see #SIP_ERROR_CODE
  *
