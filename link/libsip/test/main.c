@@ -25,18 +25,28 @@ void cbOnCallStateChange(const int _nCallId, const int _nAccountId, const SipInv
 }
 int main()
 {
-        SipCallBack cb;
-        cb.OnIncomingCall  = &cbOnIncomingCall;
-        cb.OnCallStateChange = &cbOnCallStateChange;
-        cb.OnRegStatusChange = &cbOnRegStatusChange;
+        SipInstanceConfig Config;
+        Config.Cb.OnIncomingCall  = &cbOnIncomingCall;
+        Config.Cb.OnCallStateChange = &cbOnCallStateChange;
+        Config.Cb.OnRegStatusChange = &cbOnRegStatusChange;
+        Config.nMaxCall = 15;
+        Config.nMaxAccount = 20;
 
-        SipCreateInstance(&cb);
+        SipCreateInstance(&Config);
         SipSetLogLevel(4);
         sleep(2);
         int *user = (int *)malloc(sizeof(int));
         *user = 12345;
         int nid4 = -1;
-        SipAddNewAccount("1004", "1004", "192.168.56.102", (void*)user, &nid4);
+        SipAccountConfig AccountConfig;
+        AccountConfig.pUserName = "1004";
+        AccountConfig.pPassWord = "1004";
+        AccountConfig.pDomain = "192.168.56.102";
+        AccountConfig.pUserData = (void *)user;
+
+        int ret = SipAddNewAccount(&AccountConfig, &nid4);
+        if (ret != SIP_SUCCESS)
+                printf("Add sip account failed");
 
 
         /*

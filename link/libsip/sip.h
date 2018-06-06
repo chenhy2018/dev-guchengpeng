@@ -13,7 +13,7 @@
 #define INOUT
 #endif
 
-enum SIP_ERROR_CODE {
+typedef enum SIP_ERROR_CODE {
 
         SIP_SUCCESS,
         SIP_INVALID_ARG,
@@ -51,7 +51,7 @@ enum SIP_ERROR_CODE {
         /* SipAnswerCall Error Code */
         SIP_CREATE_RES_FAILED,
         SIP_SEND_RES_FAILED,
-};
+} SIP_ERROR_CODE;
 /**
  * This enumeration lists standard SIP status codes according to RFC 3261.
  * for more info see https://en.wikipedia.org/wiki/List_of_SIP_response_codes
@@ -172,14 +172,29 @@ typedef struct SipCallBack
 
 } SipCallBack;
 
+typedef struct SipInstanceConfig
+{
+        unsigned nMaxCall;
+        unsigned nMaxAccount;
+        SipCallBack Cb;
+}SipInstanceConfig;
+
+typedef struct SipAccountConfig
+{
+        char *pUserName;
+        char *pPassWord;
+        char *pDomain;
+        void *pUserData;
+
+        int nMaxOngoingCall;
+} SipAccountConfig;
 /**
  * Initialize sip instance
  *
- * @param pConfig, configuration for sip instance
- *
+ * @param pConfig, see SipInstanceconfig
  * @return see #SIP_ERROR_CODE
  */
-enum SIP_ERROR_CODE SipCreateInstance(IN const SipCallBack *pCallBack);
+SIP_ERROR_CODE SipCreateInstance(IN const SipInstanceConfig *pConfig);
 
 /**
  * Add new account
@@ -192,7 +207,7 @@ enum SIP_ERROR_CODE SipCreateInstance(IN const SipCallBack *pCallBack);
  * @return see #SIP_ERROR_CODE
  *
  */
-enum SIP_ERROR_CODE SipAddNewAccount(IN const char *pUserName, IN const char *pPassWord, IN const char *pDomain, IN void *pUserData, OUT int *nAccountId);
+SIP_ERROR_CODE SipAddNewAccount(IN const SipAccountConfig *pConfig, OUT int *nAccountId);
 
 /**
  * Delete Account
@@ -211,7 +226,7 @@ void SipDeleteAccount(IN const int nAccountId);
  * @return see #SIP_ERROR_CODE
  */
 
-enum SIP_ERROR_CODE SipRegAccount(IN const int nAccountId, IN const int bDeReg);
+SIP_ERROR_CODE SipRegAccount(IN const int nAccountId, IN const int bDeReg);
 
 /**
  * Make a new call
@@ -220,7 +235,7 @@ enum SIP_ERROR_CODE SipRegAccount(IN const int nAccountId, IN const int bDeReg);
  * @param pCallId
  * @return see #SIP_ERROR_CODE
  **/
-enum SIP_ERROR_CODE SipMakeNewCall(IN const int nFromAccountId, IN const char *pDestUri, IN const void *pMedia, OUT int *pCallId);
+SIP_ERROR_CODE SipMakeNewCall(IN const int nFromAccountId, IN const char *pDestUri, IN const void *pMedia, OUT int *pCallId);
 
 /**
  * Hangup call
@@ -249,7 +264,7 @@ void SipDestroyInstance();
  * @param AnswerReason
  * @return see #SIP_ERROR_CODE
  **/
-enum SIP_ERROR_CODE SipAnswerCall(IN const int nCallId, IN const SipAnswerCode StatusCode, IN const char *pReason, IN const void* pMedia);
+SIP_ERROR_CODE SipAnswerCall(IN const int nCallId, IN const SipAnswerCode StatusCode, IN const char *pReason, IN const void* pMedia);
 
 
 /**

@@ -1,8 +1,6 @@
 #ifndef __SIP_INTERNAL_H__
 #define __SIP_INTERNAL_H__
 
-#define SIP_MAX_CALLS 10
-#define SIP_MAX_ACC 10
 #define SIP_MAX_CRED 1
 #define SIP_PORT 5060
 
@@ -15,10 +13,11 @@
 #define SIP_MIN_SE 90 //90 seconds
 
 /**
- * This structure describes SIP account connfigure to be specified when
- * adding a new acount with #AddNewAccount().
+ * Account info
  */
-typedef struct SipAccountConfig {
+typedef struct SipAccount {
+        pj_pool_t *pPool;
+
         pj_str_t Id;
         pj_str_t RegUri;
         pj_str_t UserName;
@@ -35,14 +34,7 @@ typedef struct SipAccountConfig {
         unsigned nKaInterval;
 
         pjsip_timer_setting TimerSetting;
-} SipAccountConfig;
 
-/**
- * Account info
- */
-typedef struct SipAccount {
-        pj_pool_t *pPool;
-        SipAccountConfig Config;
         int nIndex;
         pj_bool_t bValid;
         pjsip_regc *pRegc;
@@ -82,6 +74,8 @@ struct SipData {
         pj_mutex_t *pMutex;
         pj_str_t LocalIp;
         int LocalPort;
+        int nMaxAccount;
+        int nMaxCall;
 
         pjsip_endpoint *pSipEndPoint;
         pj_bool_t bThreadQuit;
@@ -89,11 +83,11 @@ struct SipData {
 
         /* Accounts: */
         unsigned nAccountCount;
-        SipAccount Accounts[SIP_MAX_ACC];
+        SipAccount *Accounts;
 
         /* Calls: */
         unsigned nCallCount;
-        SipCall Calls[SIP_MAX_CALLS];
+        SipCall *Calls;
 
 
         void (*OnRegStateChange)(IN const int nAccountId, IN const SipAnswerCode Code, IN const void *pUser);
