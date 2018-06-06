@@ -12,6 +12,46 @@
 #ifndef INOUT
 #define INOUT
 #endif
+
+enum SIP_ERROR_CODE {
+
+        SIP_SUCCESS,
+        SIP_INVALID_ARG,
+
+        /* SipCreateInstance Error Code */
+        SIP_PJ_INIT_FAILED,
+        SIP_CREATE_ENDPOINT_FALIED,
+        SIP_START_TP_FAILED,
+        SIP_INIT_TRANS_FAILED,
+        SIP_UA_LAYER_INIT_FAILED,
+        SIP_INIT_INV_SESS_FALIED,
+        SIP_INIT_100_REL_FALIED,
+        SIP_INIT_SESS_TIMER_FAILED,
+        SIP_REG_INCOMING_FAILED,
+        SIP_REG_LOG_FAILED,
+
+        /* SipAddNewAccount Error Code */
+        SIP_TOO_MANY_ACCOUNT,
+
+        /* SipRegAccount Error Code */
+        SIP_CREATE_REG_FAILED,
+        SIP_USR_NOT_REGISTERED,
+        SIP_SEND_REG_FAILED,
+
+
+        /* SipMakeNewCall Error Code */
+        SIP_CREATE_DLG_FAILED,
+        SIP_CREATE_INV_SESS_FAILED,
+        SIP_SESS_TIMER_INIT_FALIED,
+        SIP_CREATE_INV_REQ_FAILED,
+        SIP_SNED_INV_REQ_FAILED,
+        SIP_TOO_MANY_CALLS_FOR_INSTANCE,
+        SIP_TOO_MANY_CALLS_FOR_ACCOUNT,
+
+        /* SipAnswerCall Error Code */
+        SIP_CREATE_RES_FAILED,
+        SIP_SEND_RES_FAILED,
+};
 /**
  * This enumeration lists standard SIP status codes according to RFC 3261.
  * for more info see https://en.wikipedia.org/wiki/List_of_SIP_response_codes
@@ -137,9 +177,9 @@ typedef struct SipCallBack
  *
  * @param pConfig, configuration for sip instance
  *
- * @return 1 on success, 0 for failed
+ * @return see #SIP_ERROR_CODE
  */
-int SipCreateInstance(IN const SipCallBack *pCallBack);
+enum SIP_ERROR_CODE SipCreateInstance(IN const SipCallBack *pCallBack);
 
 /**
  * Add new account
@@ -149,13 +189,13 @@ int SipCreateInstance(IN const SipCallBack *pCallBack);
  * @param PDomain, registar server
  * @param RegWhenAdd, whether register when user added or not
  *
- * @return account id, -1 for error
+ * @return see #SIP_ERROR_CODE
  *
  */
-int SipAddNewAccount(IN const char *pUserName, IN const char *pPassWord, IN const char *pDomain, IN void *pUserData);
+enum SIP_ERROR_CODE SipAddNewAccount(IN const char *pUserName, IN const char *pPassWord, IN const char *pDomain, IN void *pUserData, OUT int *nAccountId);
 
 /**
- * Add new account
+ * Delete Account
  *
  * @param account id
  *
@@ -168,18 +208,19 @@ void SipDeleteAccount(IN const int nAccountId);
  * @param nAccountId, account id returned by add_account
  * @param DeReg, reg or de-reg
  *
- * @return 1 on success, -1 for failed
+ * @return see #SIP_ERROR_CODE
  */
-int SipRegAccount(IN const int nAccountId, IN const int bDeReg);
+
+enum SIP_ERROR_CODE SipRegAccount(IN const int nAccountId, IN const int bDeReg);
 
 /**
  * Make a new call
  * @param nFromAccountid, The account id for caller
  * @param pDestUri, callee sip uri, like sip:1003@host, for tcp case should be sip:1003@host;transport=tcp
- *
- * @return call id, -1 for failed
+ * @param pCallId
+ * @return see #SIP_ERROR_CODE
  **/
-int SipMakeNewCall(IN const int nFromAccountId, IN const char *pDestUri, IN const void *pMedia);
+enum SIP_ERROR_CODE SipMakeNewCall(IN const int nFromAccountId, IN const char *pDestUri, IN const void *pMedia, OUT int *pCallId);
 
 /**
  * Hangup call
@@ -206,8 +247,9 @@ void SipDestroyInstance();
  * @param nCallId
  * @param StatusCode, see SipAnswerCode
  * @param AnswerReason
+ * @return see #SIP_ERROR_CODE
  **/
-int SipAnswerCall(IN const int nCallId, IN const SipAnswerCode StatusCode, IN const char *pReason, IN const void* pMedia);
+enum SIP_ERROR_CODE SipAnswerCall(IN const int nCallId, IN const SipAnswerCode StatusCode, IN const char *pReason, IN const void* pMedia);
 
 
 /**

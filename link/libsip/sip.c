@@ -141,15 +141,15 @@ static pjsip_module SipLogger =
 };
 
 
-int SipCreateInstance(IN const SipCallBack *_pSipCallBack)
+enum SIP_ERROR_CODE SipCreateInstance(IN const SipCallBack *_pSipCallBack)
 {
         pj_log_set_level(6);
         pj_status_t Status;
         Status = pj_init();
-        PJ_ASSERT_RETURN(Status == PJ_SUCCESS, Status);
+        PJ_ASSERT_RETURN(Status == PJ_SUCCESS, SIP_PJ_INIT_FAILED);
 
         Status = pjlib_util_init();
-        PJ_ASSERT_RETURN(Status == PJ_SUCCESS, Status);
+        PJ_ASSERT_RETURN(Status == PJ_SUCCESS, SIP_PJ_INIT_FAILED);
 
         /* create pool factory before allow memory */
         pj_caching_pool_init(&SipAppData.Cp, &pj_pool_factory_default_policy, 0);
@@ -157,12 +157,12 @@ int SipCreateInstance(IN const SipCallBack *_pSipCallBack)
 
         /* Create mutex */
         Status = pj_mutex_create_recursive(SipAppData.pPool, "SipApp", &SipAppData.pMutex);
-        PJ_ASSERT_RETURN(Status == PJ_SUCCESS, Status);
+        PJ_ASSERT_RETURN(Status == PJ_SUCCESS, SIP_PJ_INIT_FAILED);
 
         /* Init global sip endpoint */
         Status = pjsip_endpt_create(&SipAppData.Cp.factory, pj_gethostname()->ptr,
                                     &SipAppData.pSipEndPoint);
-        PJ_ASSERT_RETURN(Status == PJ_SUCCESS, Status);
+        PJ_ASSERT_RETURN(Status == PJ_SUCCESS, SIP_CREATE_ENDPOINT_FALIED);
 
         /* start udp socket on sip port */
         pj_sockaddr Address;
@@ -170,7 +170,7 @@ int SipCreateInstance(IN const SipCallBack *_pSipCallBack)
         pj_sockaddr_init(pj_AF_INET(), &Address, NULL, 0);
         Status = pjsip_udp_transport_start(SipAppData.pSipEndPoint, &Address.ipv4, NULL, 1, &tp);
         SipAppData.LocalPort = tp->local_name.port;
-        PJ_ASSERT_RETURN(Status == PJ_SUCCESS, Status);
+        PJ_ASSERT_RETURN(Status == PJ_SUCCESS, SIP_START_TP_FAILED);
 
         PJ_LOG(4,(THIS_FILE, "SIP UDP listening on %.*s:%d",
                   (int)tp->local_name.host.slen, tp->local_name.host.ptr,
@@ -178,11 +178,11 @@ int SipCreateInstance(IN const SipCallBack *_pSipCallBack)
 
         /* Init transaction layer */
         Status = pjsip_tsx_layer_init_module(SipAppData.pSipEndPoint);
-        PJ_ASSERT_RETURN(Status == PJ_SUCCESS, Status);
+        PJ_ASSERT_RETURN(Status == PJ_SUCCESS, SIP_INIT_TRANS_FAILED);
 
         /* Init UA layer module */
         Status = pjsip_ua_init_module(SipAppData.pSipEndPoint, NULL);
-        PJ_ASSERT_RETURN(Status == PJ_SUCCESS, Status);
+        PJ_ASSERT_RETURN(Status == PJ_SUCCESS, SIP_UA_LAYER_INIT_FAILED);
 
         /* Add Invite  session module */
         pjsip_inv_callback InviteCallBack;
@@ -195,23 +195,23 @@ int SipCreateInstance(IN const SipCallBack *_pSipCallBack)
 
         /* Initialize invite session module:  */
         Status = pjsip_inv_usage_init(SipAppData.pSipEndPoint, &InviteCallBack);
-        PJ_ASSERT_RETURN(Status == PJ_SUCCESS, Status);
+        PJ_ASSERT_RETURN(Status == PJ_SUCCESS, SIP_INIT_INV_SESS_FALIED);
 
         /* Initialize 100rel support */
         Status = pjsip_100rel_init_module(SipAppData.pSipEndPoint);
-        PJ_ASSERT_RETURN(Status == PJ_SUCCESS, Status);
+        PJ_ASSERT_RETURN(Status == PJ_SUCCESS, SIP_INIT_100_REL_FALIED);
 
         /* Initialize session timer support */
         Status = pjsip_timer_init_module(SipAppData.pSipEndPoint);
-        PJ_ASSERT_RETURN(Status == PJ_SUCCESS, Status);
+        PJ_ASSERT_RETURN(Status == PJ_SUCCESS, SIP_INIT_SESS_TIMER_FAILED);
 
         /*  Register our module to receive incoming requests */
         Status = pjsip_endpt_register_module(SipAppData.pSipEndPoint, &SipMod);
-        PJ_ASSERT_RETURN(Status == PJ_SUCCESS, Status);
+        PJ_ASSERT_RETURN(Status == PJ_SUCCESS, SIP_REG_INCOMING_FAILED);
 
         /* Register log module */
         Status = pjsip_endpt_register_module(SipAppData.pSipEndPoint, &SipLogger);
-        PJ_ASSERT_RETURN(Status == PJ_SUCCESS, Status);
+        PJ_ASSERT_RETURN(Status == PJ_SUCCESS, SIP_REG_LOG_FAILED);
 
         /* Add callback */
         SipAppData.OnRegStateChange = _pSipCallBack->OnRegStatusChange;
@@ -234,7 +234,7 @@ int SipCreateInstance(IN const SipCallBack *_pSipCallBack)
 
         /* Create a thraed to pull pjsip endpoint transport event*/
         pj_thread_create(SipAppData.pPool, "SipWorkThread", &PullForEndPointEvent, NULL, 0, 0, &SipAppData.pSipThread[0]);
-        return 1;
+        return SIP_SUCCESS;
 }
 
 void SipDestroyInstance()
@@ -286,10 +286,10 @@ void SipDestroyInstance()
 
         pj_bzero(&SipAppData, sizeof(SipAppData));
 }
-int SipAddNewAccount(IN const char *_pUserName, IN const char *_pPassWord, IN const char *_pDomain, IN void *_pUser)
+enum SIP_ERROR_CODE SipAddNewAccount(IN const char *_pUserName, IN const char *_pPassWord, IN const char *_pDomain, IN void *_pUser, OUT int *_pAccountId)
 {
         /* Input check */
-        PJ_ASSERT_RETURN(_pUserName && _pPassWord && _pDomain, PJ_EINVAL);
+        PJ_ASSERT_RETURN(_pUserName && _pPassWord && _pDomain, SIP_INVALID_ARG);
 
         /* Account amount check */
         PJ_ASSERT_RETURN(SipAppData.nAccountCount < PJ_ARRAY_SIZE(SipAppData.Accounts), PJ_ETOOMANY);
@@ -303,7 +303,7 @@ int SipAddNewAccount(IN const char *_pUserName, IN const char *_pPassWord, IN co
         }
         /* Expect to find a slot */
         PJ_ASSERT_ON_FAIL(id < PJ_ARRAY_SIZE(SipAppData.Accounts),
-                          {pj_mutex_unlock(SipAppData.pMutex); return -1;});
+                          {pj_mutex_unlock(SipAppData.pMutex); return SIP_TOO_MANY_ACCOUNT;});
 
         SipAccount *pAccount = &SipAppData.Accounts[id];
 
@@ -350,7 +350,8 @@ int SipAddNewAccount(IN const char *_pUserName, IN const char *_pPassWord, IN co
 
         pj_mutex_unlock(SipAppData.pMutex);
 
-        return id;
+        *_pAccountId = id;
+        return SIP_SUCCESS;
 }
 
 void SipDeleteAccount(IN const int _nAccountId)
@@ -386,15 +387,15 @@ void SipDeleteAccount(IN const int _nAccountId)
         pj_mutex_unlock(SipAppData.pMutex);
 }
 
-int SipRegAccount(IN const int _nAccountId, IN const int _bDeReg)
+enum SIP_ERROR_CODE SipRegAccount(IN const int _nAccountId, IN const int _bDeReg)
 {
         SipAccount *pAccount;
         pj_status_t Status = 0;
         pjsip_tx_data *pTransData = 0;
 
         PJ_ASSERT_RETURN(_nAccountId >= 0 && _nAccountId < (int)PJ_ARRAY_SIZE(SipAppData.Accounts),
-                         PJ_EINVAL);
-        PJ_ASSERT_RETURN(SipAppData.Accounts[_nAccountId].bValid, PJ_EINVALIDOP);
+                         SIP_INVALID_ARG);
+        PJ_ASSERT_RETURN(SipAppData.Accounts[_nAccountId].bValid, SIP_INVALID_ARG);
 
         PJ_LOG(4,(THIS_FILE, "Acc %d: setting %sregistration..",
                   _nAccountId, (_bDeReg? "" : "un")));
@@ -409,12 +410,12 @@ int SipRegAccount(IN const int _nAccountId, IN const int _bDeReg)
                         if (Status != PJ_SUCCESS) {
                                 PrintErrorMsg(Status, "Unable to create registration, Status");
                                 pj_mutex_unlock(SipAppData.pMutex);
-                                return -1;
+                                return SIP_CREATE_REG_FAILED;
                         }
                 }
                 if (!pAccount->pRegc) {
                         pj_mutex_unlock(SipAppData.pMutex);
-                        return -1;
+                        return SIP_CREATE_REG_FAILED;
                 }
 
                 /* Create register request message */
@@ -437,7 +438,7 @@ int SipRegAccount(IN const int _nAccountId, IN const int _bDeReg)
                 if (pAccount->pRegc == NULL) {
                         PJ_LOG(4, (THIS_FILE, "Currently not registered"));
                         pj_mutex_unlock(SipAppData.pMutex);
-                        return 1;
+                        return SIP_USR_NOT_REGISTERED;
                 }
                 Status = pjsip_regc_unregister(pAccount->pRegc, &pTransData);
         }
@@ -448,14 +449,14 @@ int SipRegAccount(IN const int _nAccountId, IN const int _bDeReg)
         if (Status != PJ_SUCCESS) {
                 PrintErrorMsg(Status, "Unable to create/send register");
                 pj_mutex_unlock(SipAppData.pMutex);
-                return -1;
+                return SIP_SEND_REG_FAILED;
         }
         PJ_LOG(4,(THIS_FILE, "Acc %d: %s sent", _nAccountId,
                   (_bDeReg ? "Registration" : "Unregistration")));
 
         /* Invoke callback function */
         pj_mutex_unlock(SipAppData.pMutex);
-        return 1;
+        return SIP_SUCCESS;
 }
 
 static int PullForEndPointEvent(void *_arg)
@@ -792,7 +793,7 @@ static int SipGetFreeCallId(void)
         }
         return -1;
 }
-int SipMakeNewCall(IN const int _nFromAccountId, IN const char *_pDestUri, IN const void *pMedia)
+enum SIP_ERROR_CODE SipMakeNewCall(IN const int _nFromAccountId, IN const char *_pDestUri, IN const void *_pMedia, OUT int *_pCallId)
 {
         int nCallId;
         SipCall *pCall;
@@ -803,10 +804,10 @@ int SipMakeNewCall(IN const int _nFromAccountId, IN const char *_pDestUri, IN co
 
         /* Check that account is valid */
         PJ_ASSERT_RETURN(_nFromAccountId >=0 || _nFromAccountId <(int)PJ_ARRAY_SIZE(SipAppData.Accounts),
-                         PJ_EINVAL);
+                         SIP_INVALID_ARG);
 
         /* Check arguments */
-        PJ_ASSERT_RETURN(_pDestUri, PJ_EINVAL);
+        PJ_ASSERT_RETURN(_pDestUri, SIP_INVALID_ARG);
         PJ_LOG(4, (THIS_FILE, "Making call with acc %d to %s", _nFromAccountId, _pDestUri));
 
         pj_mutex_lock(SipAppData.pMutex);
@@ -815,7 +816,7 @@ int SipMakeNewCall(IN const int _nFromAccountId, IN const char *_pDestUri, IN co
         if (nCallId == -1) {
                 PJ_LOG(4, (THIS_FILE, "Too many calls"));
                 pj_mutex_unlock(SipAppData.pMutex);
-                return -1;
+                return SIP_TOO_MANY_CALLS_FOR_INSTANCE;
         }
         pCall = &SipAppData.Calls[nCallId];
         pCall->nAccountId = _nFromAccountId;
@@ -829,11 +830,11 @@ int SipMakeNewCall(IN const int _nFromAccountId, IN const char *_pDestUri, IN co
         if (Status != PJ_SUCCESS) {
                 PrintErrorMsg(Status, "Create uac dialg failed");
                 pj_mutex_unlock(SipAppData.pMutex);
-                return -1;
+                return SIP_CREATE_DLG_FAILED;
         }
         /* TODO get Local SDP */
         //CreateTmpSDP(pDialog->pool, pCall, &pMediaSession);
-        pMediaSession = (pjmedia_sdp_session *)pMedia;
+        pMediaSession = (pjmedia_sdp_session *)_pMedia;
         /* Create invite session */
         unsigned nOptions = 0;
         nOptions |= PJSIP_INV_SUPPORT_100REL;
@@ -844,7 +845,7 @@ int SipMakeNewCall(IN const int _nFromAccountId, IN const char *_pDestUri, IN co
                 pjsip_dlg_terminate(pDialog);
                 /* TODO destory media resouce */
                 pj_mutex_unlock(SipAppData.pMutex);
-                return -1;
+                return SIP_CREATE_INV_SESS_FAILED;
         }
         Status = pjsip_timer_init_session(pCall->pInviteSession, &SipAppData.Accounts[_nFromAccountId].Config.TimerSetting);
         if (Status != PJ_SUCCESS) {
@@ -852,7 +853,7 @@ int SipMakeNewCall(IN const int _nFromAccountId, IN const char *_pDestUri, IN co
                 pjsip_dlg_terminate(pDialog);
                 /* TODO destory media resouce */
                 pj_mutex_unlock(SipAppData.pMutex);
-                return -1;
+                return SIP_SESS_TIMER_INIT_FALIED;
         }
         pCall->pInviteSession->mod_data[SipMod.id] = pCall;
 
@@ -865,7 +866,7 @@ int SipMakeNewCall(IN const int _nFromAccountId, IN const char *_pDestUri, IN co
                 pjsip_dlg_terminate(pDialog);
                 /* TODO destory media resouce */
                 pj_mutex_unlock(SipAppData.pMutex);
-                return -1;
+                return SIP_CREATE_INV_REQ_FAILED;
         }
         Status = pjsip_inv_send_msg(pCall->pInviteSession, pTransData);
         if (Status != PJ_SUCCESS) {
@@ -873,20 +874,22 @@ int SipMakeNewCall(IN const int _nFromAccountId, IN const char *_pDestUri, IN co
                 pjsip_dlg_terminate(pDialog);
                 /* TODO destory media resouce */
                 pj_mutex_unlock(SipAppData.pMutex);
-                return -1;
+                SIP_SNED_INV_REQ_FAILED;
         }
 
         SipAppData.Calls[nCallId].bValid = PJ_TRUE;
         pj_mutex_unlock(SipAppData.pMutex);
-        return nCallId;
+        *_pCallId = nCallId;
+        return SIP_SUCCESS;
 }
 
-int SipAnswerCall(IN const int _nCallId, IN const SipAnswerCode _StatusCode, IN const char *_pReason, IN const void *_pMedia)
+enum SIP_ERROR_CODE SipAnswerCall(IN const int _nCallId, IN const SipAnswerCode _StatusCode, IN const char *_pReason, IN const void *_pMedia)
 {
         /* Check that callId is valid */
-        PJ_ASSERT_RETURN(_nCallId >=0 || _nCallId <(int)PJ_ARRAY_SIZE(SipAppData.Calls), -1);
+        PJ_ASSERT_RETURN(_nCallId >=0 || _nCallId <(int)PJ_ARRAY_SIZE(SipAppData.Calls), SIP_INVALID_ARG);
+
         if (SipAppData.Calls[_nCallId].pInviteSession == NULL)
-                return -1;
+                return SIP_INVALID_ARG;
 
         pj_str_t Reason = pj_str((char *)_pReason);
         pj_str_t *pReason;
@@ -911,6 +914,7 @@ int SipAnswerCall(IN const int _nCallId, IN const SipAnswerCode _StatusCode, IN 
                                   &pTxData);
         if (Status != PJ_SUCCESS) {
                 PrintErrorMsg(Status, "Create user response error");
+                Status = SIP_CREATE_RES_FAILED;
                 goto onError;
         }
 
@@ -918,17 +922,18 @@ int SipAnswerCall(IN const int _nCallId, IN const SipAnswerCode _StatusCode, IN 
         Status = pjsip_inv_send_msg(pCall->pInviteSession, pTxData);
         if (Status != PJ_SUCCESS) {
                 PrintErrorMsg(Status, "Send user response error");
+                Status = SIP_SEND_RES_FAILED;
                 goto onError;
 
         }
         pj_mutex_unlock(SipAppData.pMutex);
-        return 1;
+        return SIP_SUCCESS;
 
  onError:
         /* Release the session */
         pjsip_inv_terminate(pCall->pInviteSession, 500, PJ_FALSE);
         pj_mutex_unlock(SipAppData.pMutex);
-        return -1;
+        return Status;
 }
 void SipHangUp(IN const int _nCallId)
 {

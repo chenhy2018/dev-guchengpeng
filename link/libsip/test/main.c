@@ -35,7 +35,8 @@ int main()
         sleep(2);
         int *user = (int *)malloc(sizeof(int));
         *user = 12345;
-        int nid4 = SipAddNewAccount("1004", "1004", "192.168.56.102", (void*)user);
+        int nid4 = -1;
+        SipAddNewAccount("1004", "1004", "192.168.56.102", (void*)user, &nid4);
 
 
         /*
@@ -63,10 +64,11 @@ int main()
 
         void *pLocalSdp;
         CreateTmpSDP(&pLocalSdp);
-        //int nCallId1 = SipMakeNewCall(nid4, "<sip:1003@192.168.56.102>", pLocalSdp);
+        int nCallId1 = -1;
+        SipMakeNewCall(nid4, "<sip:1003@192.168.56.102>", pLocalSdp, &nCallId1);
 
         sleep(20);
-        //SipHangUp(nCallId1);
+        SipHangUp(nCallId1);
         //SipDestroyInstance();
         while(1) {
         }
