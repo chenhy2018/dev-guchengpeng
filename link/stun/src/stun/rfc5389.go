@@ -4,12 +4,16 @@ import (
 	"net"
 	"fmt"
 	"encoding/binary"
+	"crypto/hmac"
+	"crypto/sha1"
 	"util/dbg"
+	"conf"
 )
 
 const (
 	STUN_MSG_HEADER_SIZE  = 20
 	STUN_MSG_MAGIC_COOKIE = 0x2112A442
+	STUN_NONCE_LENGTH     = 32              // < 128, https://tools.ietf.org/html/rfc5389#section-15.8
 )
 
 const (
@@ -72,7 +76,7 @@ func (this *message) buffer() []byte {
 
 	// message type
 	binary.BigEndian.PutUint16(payload[0:], uint16(this.method | this.encoding))
-	
+
 	// message length
 	binary.BigEndian.PutUint16(payload[2:], uint16(this.length))
 
@@ -90,6 +94,55 @@ func (this *message) buffer() []byte {
 		payload = append(payload, bytes...)
 		payload = append(payload, attr.value...)
 	}
+
+	return payload
+}
+
+// this function is only used to compute message integrity value
+func (this *message) bufferExIntegrityAttr() []byte {
+
+	payload := make([]byte, 20)
+
+	// message type
+	binary.BigEndian.PutUint16(payload[0:], uint16(this.method | this.encoding))
+
+	// put magic cookie
+	binary.BigEndian.PutUint32(payload[4:], uint32(STUN_MSG_MAGIC_COOKIE))
+
+	// put transaction ID
+	copy(payload[8:], this.transactionID)
+
+	// this message length should reflect actual bytes above attribute MESSAGE_INTEGRITY
+	msgLen := 0
+
+	// append attributes
+	for _, attr := range this.attributes {
+
+		// fall out of for loop when this message already contains attribute message integrity
+		// otherwise we compute the whole message length, anyway we need involve 24 byte length
+		// of integrity attr to compute the integrity value
+
+		if attr.typevalue == STUN_ATTR_MESSAGE_INTEGRITY {
+			break
+		}
+
+		bytes := make([]byte, 4)
+		binary.BigEndian.PutUint16(bytes[0:], attr.typevalue)
+		binary.BigEndian.PutUint16(bytes[2:], uint16(attr.length))
+		payload = append(payload, bytes...)
+		payload = append(payload, attr.value...)
+
+		// notice: because of paddings inside attr
+		// sometimes len(attr.value) is not equal to attr.length
+		msgLen += 4 + len(attr.value)
+	}
+
+	// message-integrity attribute should not be included in integrity computing
+	// while its attribute length should be counted in stun message length
+	msgLen += 24
+
+	// message length
+	binary.BigEndian.PutUint16(payload[2:], uint16(msgLen))
 
 	return payload
 }
@@ -207,6 +260,36 @@ func (this *message) getAttrXorAddr(attr *attribute) (addr *address, err error) 
 	}
 }
 
+func (this *message) getAttrRealm() (string, error) {
+
+	return this.getAttrStringValue(STUN_ATTR_REALM, "REALM")
+}
+
+func (this *message) getAttrNonce() (string, error) {
+
+	return this.getAttrStringValue(STUN_ATTR_NONCE, "NONCE")
+}
+
+func (this *message) getAttrUsername() (string, error) {
+
+	return this.getAttrStringValue(STUN_ATTR_USERNAME, "USERNAME")
+}
+
+func (this *message) getAttrMsgIntegrity() (string, error) {
+
+	return this.getAttrStringValue(STUN_ATTR_MESSAGE_INTEGRITY, "MESSAGE-INTEGRITY")
+}
+
+func (this *message) getAttrStringValue(typevalue uint16, typename string) (string, error) {
+
+	attr := this.findAttr(typevalue)
+	if attr == nil {
+		return "", fmt.Errorf("%s not found", typename)
+	}
+
+	return string(attr.value[0:attr.length]), nil
+}
+
 func (this *message) addAttrXorAddr(r *address, typeval uint16) int {
 
 	attr := &attribute{}
@@ -262,6 +345,79 @@ func (this *message) addAttrXorMappedAddr(r *address) int {
 	return this.addAttrXorAddr(r, STUN_ATTR_XOR_MAPPED_ADDR)
 }
 
+func (this *message) addAttrRealm(realm string) int {
+
+	attr := &attribute{}
+	attr.typevalue = STUN_ATTR_REALM
+	attr.typename = parseAttributeType(attr.typevalue)
+
+	// realm should be less than 128 characters
+	if len(realm) > 128 {
+		realm = realm[0:128]
+	}
+	attr.length = len(realm)
+
+	// paddings
+	total := attr.length
+	if total % 4 != 0 {
+		total += 4 - total % 4
+	}
+
+	attr.value = make([]byte, total)
+	copy(attr.value[0:], []byte(realm))
+
+	this.attributes = append(this.attributes, attr)
+	return 4 + len(attr.value)
+}
+
+func (this *message) addAttrNonce(nonce string) int {
+
+	attr := &attribute{}
+	attr.typevalue = STUN_ATTR_NONCE
+	attr.typename = parseAttributeType(attr.typevalue)
+	attr.length = len(nonce)
+
+	// nonce should be less than 128 characters
+	if len(nonce) > 128 {
+		nonce = nonce[0:128]
+	}
+	attr.length = len(nonce)
+
+	// paddings
+	total := attr.length
+	if total % 4 != 0 {
+		total += 4 - total % 4
+	}
+
+	attr.value = make([]byte, total)
+	copy(attr.value[0:], []byte(nonce))
+
+	this.attributes = append(this.attributes, attr)
+	return 4 + len(attr.value)
+}
+
+func (this *message) addAttrMsgIntegrity(key string) int {
+
+	attr := &attribute{}
+	attr.typevalue = STUN_ATTR_MESSAGE_INTEGRITY
+	attr.typename = parseAttributeType(attr.typevalue)
+	attr.length = 20
+
+	// refer to https://tools.ietf.org/html/rfc5389#section-15.4
+
+	// msg length should include integrity attribute
+	hash := this.computeIntegrity(key)
+
+	// copy hash result to attribute body
+	attr.value = make([]byte, len(hash))
+	copy(attr.value[0:], hash)
+
+	// add to attribute array
+	this.attributes = append(this.attributes, attr)
+
+	return 4 + len(attr.value)
+}
+
 func getMessage(buf []byte) (*message, error) {
 
 	if err := checkMessage(buf); err != nil {
@@ -285,6 +441,8 @@ func getMessage(buf []byte) (*message, error) {
 	for i := 0; i < msg.length; {
 		attr := &attribute{}
 
+		// TODO check attr length which could overflow
+
 		// first 2 bytes are Type and Length
 		attr.typevalue = binary.BigEndian.Uint16(buf[20+i:])
 		attr.typename = parseAttributeType(attr.typevalue)
@@ -292,14 +450,15 @@ func getMessage(buf []byte) (*message, error) {
 		attr.length = len
 
 		// following bytes are attributes
+		if len % 4 != 0 {
+			// buffer should include padding bytes while attr.length does not
+			len += 4 - len % 4
+		}
 		attr.value = append(attr.value, buf[20+i+4:20+i+4+len]...)
 		msg.attributes = append(msg.attributes, attr)
 
 		// padding for 4 bytes per attribute item
 		i += len + 4
-		if len % 4 != 0 {
-			i += 4 - len % 4
-		}
 	}
 
 	return msg, nil
@@ -320,7 +479,7 @@ func checkMessage(buf []byte) error {
 	// check STUN message length
 	msgLen := int(binary.BigEndian.Uint16(buf[2:]))
 	if msgLen + 20 != len(buf) {
-		return fmt.Errorf("msg length is not correct: len=%d, actual=%d", msgLen, len(buf))
+		return fmt.Errorf("msg length is not correct: len=%d, actual=%d", msgLen, len(buf) - 20)
 	}
 
 	// STUN message is always padded to a multiple of 4 bytes
@@ -367,4 +526,90 @@ func (this *message) findAttrAll(typevalue uint16) []*attribute {
 		}
 	}
 	return list
+}
+
+// -------------------------------------------------------------------------------------------------
+
+// STUN long-term credential
+// https://tools.ietf.org/html/rfc5389#page-24
+
+func (this *message) computeIntegrity(key string) string {
+
+	// hmac, use sha1
+	mac := hmac.New(sha1.New, []byte(key))
+	mac.Write(this.bufferExIntegrityAttr())
+	return string(mac.Sum(nil))
+}
+
+func (this *message) checkIntegrity(key string) error {
+
+	integrity, err := this.getAttrMsgIntegrity()
+	if err != nil {
+		return fmt.Errorf("missing MESSAGE-INTEGRITY attribute")
+	}
+
+	hash := this.computeIntegrity(key)
+
+	if hash != integrity {
+		return fmt.Errorf("wrong message integrity")
+	}
+	return nil
+}
+
+func (this *message) addIntegrity(username string) error {
+
+	key, err := conf.Users.Find(username)
+	if err != nil {
+		return err
+	}
+	this.length += this.addAttrMsgIntegrity(key)
+
+	return nil
+}
+
+func (this *message) getCredential() (username, realm, nonce, integrity string, err error) {
+
+	if username, err = this.getAttrUsername(); err != nil {
+		return
+	}
+	if realm, err = this.getAttrRealm(); err != nil {
+		return
+	}
+	if nonce, err = this.getAttrNonce(); err != nil {
+		return
+	}
+	if integrity, err = this.getAttrMsgIntegrity(); err != nil {
+		return
+	}
+
+	return
+}
+
+func (this *message) checkCredential() (code int, err error) {
+
+	// get username realm nonce integrity
+	username, realm, _, _, err := this.getCredential()
+	if err != nil {
+		return STUN_ERR_BAD_REQUEST, fmt.Errorf("credential error")
+	}
+
+	// check realm
+	if realm != *conf.Args.Realm {
+		return STUN_ERR_WRONG_CRED, fmt.Errorf("realm mismatch")
+	}
+
+	if username == "" {
+		return STUN_ERR_WRONG_CRED, fmt.Errorf("username is empty")
+	}
+
+	// check username and password
+	key, err := conf.Users.Find(username)
+	if err != nil {
+		return STUN_ERR_WRONG_CRED, fmt.Errorf("username or password error")
+	}
+	if err = this.checkIntegrity(key); err != nil {
+		return STUN_ERR_WRONG_CRED, fmt.Errorf("username or password error")
+	}
+
+	return 0, nil
 }

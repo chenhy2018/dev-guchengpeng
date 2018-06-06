@@ -40,6 +40,10 @@ int main(int argc, char** argv)
 	opt.bRegular = 1;
 	char* turnhost = "123.59.204.198:3478";
 	memcpy(&opt.turnHost, turnhost, strlen(turnhost));
+	char* turnuser = "root";
+	memcpy(&opt.turnUsername, turnuser, strlen(turnuser));
+	char* turnpsw = "root";
+	memcpy(&opt.turnPassword, turnpsw, strlen(turnpsw));
 	opt.nKeepAlive = 300;
 
 	IceOptions opta, optb;
@@ -56,7 +60,7 @@ int main(int argc, char** argv)
 	IceInstance* pb = IceCreateInstance(&optb);
 
 	// wait for turn to return relayed ip
-	sleep(10000);
+	sleep(10);
 
 	// set offerer and anwerer
 	IceSetOfferer(pa);
@@ -120,8 +124,12 @@ int main(int argc, char** argv)
 
 	// send some data to others
 	while (1) {
-		const char* stra = "I'm aaaaaaaaa";
-		const char* strb = "I'm bbbbbbbbb";
+		char stra[1500];
+		char strb[1500];
+		memset(stra, 'A', 1400);
+		memset(strb, 'B', 1400);
+		stra[1400] = '\0';
+		strb[1400] = '\0';
 		int i = IceSendToPeer(pa, 1, stra, strlen(stra));
 		int j = IceSendToPeer(pb, 1, strb, strlen(strb));
 		if (i != 0 || j != 0) {

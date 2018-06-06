@@ -15,6 +15,7 @@ const (
 
 const (
 	TCP_MAX_TIMEOUT    = 300
+	DEFAULT_MTU        = 1500
 )
 
 type address struct {
@@ -99,7 +100,7 @@ func ListenTCP(ip, port string) error {
 			for {
 				conn.SetDeadline(time.Now().Add(time.Second * time.Duration(TCP_MAX_TIMEOUT)))
 
-				buf := make([]byte, 1024)
+				buf := make([]byte, DEFAULT_MTU)
 				len, err := conn.Read(buf)
 
 				if err != nil {
@@ -137,7 +138,7 @@ func ListenUDP(ip, port string) error {
 	defer udpConn.Close()
 
 	for {
-		buf := make([]byte, 1024)
+		buf := make([]byte, DEFAULT_MTU)
 		nr, rm, err := udpConn.ReadFromUDP(buf)
 		if err != nil {
 			return fmt.Errorf("read UDP: %s", err)
@@ -200,6 +201,10 @@ func processStunMessage(req []byte, addr *address) []byte {
 
 	if msg == nil {
 		return nil // no response
+	}
+
+	if msg.isIndication() {
+		return nil
 	}
 
 	msg.print("response") // response
@@ -276,9 +281,9 @@ func (this *message) process(r *address) (*message, error) {
 	}
 
 	// general check
-	alloc, msg, err := this.generalRequestCheck(r)
-	if err != nil {
-		return msg, err
+	alloc, msg := this.generalRequestCheck(r)
+	if alloc == nil {
+		return msg, nil
 	}
 
 	if this.isRequest() {

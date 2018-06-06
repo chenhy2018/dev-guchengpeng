@@ -5,6 +5,10 @@ import (
 	"conf"
 	"stun"
 	"sync"
+	"fmt"
+	"strings"
+	"os"
+	"crypto/md5"
 )
 
 var (
@@ -14,6 +18,9 @@ var (
 func init() {
 	conf.Args.IP = flag.String("ip", "127.0.0.1", "udp server binding IP address")
 	conf.Args.Port = flag.String("port", "3478", "specific port to bind")
+	conf.Args.Realm = flag.String("realm", "link", "used for long-term cred for TURN")
+	flag.Var(&conf.Args.Users, "u", "add one user to TURN server")
+
 	flag.Parse()
 }
 
@@ -24,6 +31,9 @@ func main() {
 		flag.Usage()
 		return
 	}
+
+	// handle user account
+	loadUsers()
 
 	wg := &sync.WaitGroup{}
 
@@ -49,3 +59,15 @@ func main() {
 	return
 }
 
+func loadUsers() {
+
+	for _, acc := range conf.Args.Users {
+		pair := strings.Split(acc, ":")
+		key := md5.Sum([]byte(pair[0] + ":" + *conf.Args.Realm + ":" + pair[1]))
+		if err := conf.Users.Add(pair[0], string(key[0:16])); err != nil {
+			fmt.Printf("cannot add user \"%s\" from cmd line: %s\n", pair[0], err.Error())
+			os.Exit(1)
+		}
+		fmt.Println("user", pair[0], "added")
+	}
+}

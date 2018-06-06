@@ -3,6 +3,7 @@ package stun
 import (
 	"fmt"
 	"encoding/binary"
+	"math/rand"
 	"conf"
 	"net"
 	"time"
@@ -17,6 +18,7 @@ const (
 	TURN_PERM_LIFETIME           = 300   // this is fixed (https://tools.ietf.org/html/rfc5766#section-8)
 	TURN_PERM_LIMIT              = 10
 	TURN_CHANN_EXPIRY            = 600   // this is defined (https://tools.ietf.org/html/rfc5766#page-38)
+	TURN_NONCE_EXPIRY            = 3600  // <= 1h is recommended
 )
 
 const (
@@ -116,6 +118,13 @@ type allocation struct {
 	// channels
 	channels    map[string]*channel
 	chanLck     *sync.Mutex
+
+	// nonce
+	nonce       string
+	nonceExp    time.Time
+
+	// username
+	username    string
 }
 
 type channel struct {
@@ -153,17 +162,54 @@ func keygen(r *address) string {
 	return fmt.Sprintf("%d:%s:%d", r.Proto, r.IP.String(), r.Port)
 }
 
+func genNonce(length int) string {
+
+	const dictionary = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+
+	str := make([]byte, length)
+	for i := range str {
+		str[i] = dictionary[rand.Int63() % int64(len(dictionary))]
+	}
+
+	return string(str)
+}
+
 // -------------------------------------------------------------------------------------------------
 
 // general behavior
-func (this *message) generalRequestCheck(r *address) (*allocation, *message, error) {
+func (this *message) generalRequestCheck(r *address) (*allocation, *message) {
 
 	alloc, ok := allocPool.find(keygen(r))
 	if !ok {
 		msg := this.newErrorMessage(STUN_ERR_ALLOC_MISMATCH, "allocation not found")
-		return nil, msg, fmt.Errorf("allocation not found")
+		return nil, msg
 	}
-	return alloc, nil, nil
+
+	// indications in TURN are never authenticated, return success now
+	if this.isIndication() {
+		return alloc, nil
+	}
+
+	// long-term credential
+	if code, err := this.checkCredential(); err != nil {
+		return nil, this.newErrorMessage(code, err.Error())
+	}
+
+	// check username and nocne, according to rfc5766, username could not change since allocate
+	// is created
+	username, _, nonce, _, _ := this.getCredential()
+	if alloc.username != username {
+		msg := this.newErrorMessage(STUN_ERR_WRONG_CRED, "username or password error")
+		return nil, msg
+	}
+
+	// check whether nonce is expired
+	if alloc.nonce != nonce {
+		msg, _ := this.replyUnauth(STUN_ERR_STALE_NONCE, alloc.nonce, "NONCE is expired")
+		return nil, msg
+	}
+
+	return alloc, nil
 }
 
 func (this *message) doChanBindRequest(alloc *allocation) (*message, error) {
@@ -194,6 +240,11 @@ func (this *message) doChanBindRequest(alloc *allocation) (*message, error) {
 	msg.encoding = STUN_MSG_SUCCESS
 	msg.methodName, msg.encodingName = parseMessageType(msg.method, msg.encoding)
 	msg.transactionID = append(msg.transactionID, this.transactionID...)
+
+	// add integrity attribute
+	if err := msg.addIntegrity(alloc.username); err != nil {
+		return this.newErrorMessage(STUN_ERR_WRONG_CRED, err.Error()), nil
+	}
 
 	return msg, nil
 }
@@ -239,6 +290,11 @@ func (this *message) doCreatePermRequest(alloc *allocation) (*message, error) {
 	msg.methodName, msg.encodingName = parseMessageType(msg.method, msg.encoding)
 	msg.transactionID = append(msg.transactionID, this.transactionID...)
 
+	// add integrity attribute
+	if err := msg.addIntegrity(alloc.username); err != nil {
+		return this.newErrorMessage(STUN_ERR_WRONG_CRED, err.Error()), nil
+	}
+
 	return msg, nil
 }
 
@@ -250,6 +306,14 @@ func (this *message) doRefreshRequest(alloc *allocation) (*message, error) {
 	msg.methodName, msg.encodingName = parseMessageType(msg.method, msg.encoding)
 	msg.transactionID = append(msg.transactionID, this.transactionID...)
 
+	// add integrity attribute
+	addIntegrity := func() (*message, error) {
+		if err := msg.addIntegrity(alloc.username); err != nil {
+			return this.newErrorMessage(STUN_ERR_WRONG_CRED, err.Error()), nil
+		}
+		return msg, nil
+	}
+
 	// get lifetime attribute from stun message
 	lifetime, err := this.getAttrLifetime()
 	if err != nil {
@@ -258,17 +322,29 @@ func (this *message) doRefreshRequest(alloc *allocation) (*message, error) {
 		if lifetime == 0 {
 			alloc.free()
 			msg.length += msg.addAttrLifetime(0)
-			return msg, nil
+
+			return addIntegrity()
 		}
 	}
 	alloc.refresh(lifetime)
 	msg.length += msg.addAttrLifetime(alloc.lifetime)
-	return msg, nil
+
+	return addIntegrity()
 }
 
 func (this *message) doAllocationRequest(r *address) (msg *message, err error) {
 
-	// TODO 1. long-term credential
+	// 1. long-term credential
+	username, _, _, _, err := this.getCredential()
+	if err != nil {
+		// handle first alloc request
+		return this.replyUnauth(STUN_ERR_UNAUTHORIZED, genNonce(STUN_NONCE_LENGTH), "missing long-term credential")
+	}
+	// handle subsequent alloc request
+	code, err := this.checkCredential()
+	if err != nil {
+		return this.newErrorMessage(code, err.Error()), nil
+	}
 
 	// 2. find existing allocations
 	alloc, err := newAllocation(r)
@@ -294,6 +370,13 @@ func (this *message) doAllocationRequest(r *address) (msg *message, err error) {
 	// 7. TODO check quota
 
 	// 8. TODO handle ALTERNATE attribute
+
+	// set longterm-credential username
+	alloc.username = username
+
+	// set nonce to expire right now
+	alloc.nonce = genNonce(STUN_NONCE_LENGTH)
+	alloc.nonceExp = time.Now()
 
 	// set lifetime
 	lifetime, err := this.getAttrLifetime()
@@ -455,6 +538,25 @@ func (this *message) replyAllocationRequest(alloc *allocation) (*message, error)
 	msg.length += msg.addAttrXorRelayedAddr(&alloc.relay)
 	msg.length += msg.addAttrLifetime(alloc.lifetime)
 	msg.length += msg.addAttrXorMappedAddr(&alloc.source)
+
+	// add integrity attribute
+	if err := msg.addIntegrity(alloc.username); err != nil {
+		return this.newErrorMessage(STUN_ERR_WRONG_CRED, err.Error()), nil
+	}
+
+	return msg, nil
+}
+
+func (this *message) replyUnauth(code int, nonce, reason string) (*message, error) {
+
+	msg := &message{}
+	msg.method = this.method
+	msg.encoding = STUN_MSG_ERROR
+	msg.methodName, msg.encodingName = parseMessageType(msg.method, msg.encoding)
+	msg.transactionID = append(msg.transactionID, this.transactionID...)
+	msg.length += msg.addAttrErrorCode(code, reason)
+	msg.length += msg.addAttrRealm(*conf.Args.Realm)
+	msg.length += msg.addAttrNonce(nonce)
 
 	return msg, nil
 }
@@ -722,7 +824,7 @@ func (svr *relayserver) spawn() error {
 			defer svr.conn.Close()
 
 			for {
-				buf := make([]byte, 1024)
+				buf := make([]byte, DEFAULT_MTU)
 				nr, rm, err := svr.conn.ReadFromUDP(buf)
 				if err != nil {
 					ech <- err
@@ -735,9 +837,17 @@ func (svr *relayserver) spawn() error {
 		}(svr, ech)
 
 		// poll fds
+		ticker := time.NewTicker(time.Second * 60)
 		timer := time.NewTimer(time.Second * time.Duration(svr.allocRef.lifetime))
 		for quit := false; !quit; {
 			select {
+			case <-ticker.C:
+				// refresh nonce
+				now := time.Now()
+				if now.After(svr.allocRef.nonceExp) {
+					svr.allocRef.nonce = genNonce(STUN_NONCE_LENGTH)
+					svr.allocRef.nonceExp = now.Add(time.Second * time.Duration(TURN_NONCE_EXPIRY))
+				}
 			case <-timer.C:
 				if seconds, err := svr.allocRef.getRestLife(); err == nil {
 					timer = time.NewTimer(time.Second * time.Duration(seconds))
