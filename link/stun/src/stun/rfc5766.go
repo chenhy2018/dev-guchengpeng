@@ -994,25 +994,35 @@ func newChannelData(channel uint16, data []byte) *channelData {
 
 func getChannelData(buf []byte) (*channelData, error) {
 
+	buf, err := checkChannelData(buf)
+	if err != nil {
+		return nil, fmt.Errorf("invalid channel data: %s", err)
+	}
+
+	return &channelData{
+		channel: binary.BigEndian.Uint16(buf[0:]),
+		data:    buf[4:],
+	}, nil
+}
+
+func checkChannelData(buf []byte) ([]byte, error) {
+
 	if len(buf) < 4 {
 		return nil, fmt.Errorf("channelData too short")
 	}
 
-	num := binary.BigEndian.Uint16(buf[0:])
-	if num >= 0x8000 {
+	// check channel number
+	if binary.BigEndian.Uint16(buf[0:]) >= 0x8000 {
 		return nil, fmt.Errorf("invalid channel number")
 	}
 
-	// there may be paddings according to https://tools.ietf.org/html/rfc5766#section-11.5
+	// check length
 	length := binary.BigEndian.Uint16(buf[2:])
-	if 4 + length > uint16(len(buf)) {
+	if 4 + binary.BigEndian.Uint16(buf[2:]) > uint16(len(buf)) {
 		return nil, fmt.Errorf("channelData length is too large")
 	}
 
-	return &channelData{
-		channel: num,
-		data:    buf[4:4+length],
-	}, nil
+	return buf[:4+length], nil
 }
 
 func (ch *channelData) transport(addr *address) {

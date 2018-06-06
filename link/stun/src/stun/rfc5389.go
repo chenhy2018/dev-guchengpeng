@@ -420,7 +420,8 @@ func (this *message) addAttrMsgIntegrity(key string) int {
 
 func getMessage(buf []byte) (*message, error) {
 
-	if err := checkMessage(buf); err != nil {
+	buf, err := checkMessage(buf)
+	if err != nil {
 		return nil, fmt.Errorf("invalid stun msg: %s", err)
 	}
 
@@ -464,30 +465,30 @@ func getMessage(buf []byte) (*message, error) {
 	return msg, nil
 }
 
-func checkMessage(buf []byte) error {
+func checkMessage(buf []byte) ([]byte, error) {
 
 	// STUN message len does not meet the min requirement
 	if len(buf) < STUN_MSG_HEADER_SIZE {
-		return fmt.Errorf("stun msg is too short: size=%d", len(buf))
+		return nil, fmt.Errorf("stun msg is too short: size=%d", len(buf))
 	}
 
 	// first byte should be 0x0 or 0x1
 	if buf[0] != 0x00 && buf[0] != 0x01 {
-		return fmt.Errorf("invalid stun msg type: first_byte=0x%02x", buf[0])
+		return nil, fmt.Errorf("invalid stun msg type: first_byte=0x%02x", buf[0])
 	}
 
 	// check STUN message length
 	msgLen := int(binary.BigEndian.Uint16(buf[2:]))
-	if msgLen + 20 != len(buf) {
-		return fmt.Errorf("msg length is not correct: len=%d, actual=%d", msgLen, len(buf) - 20)
+	if msgLen + 20 > len(buf) {
+		return nil, fmt.Errorf("msg length is too large: len=%d, actual=%d", msgLen, len(buf) - 20)
 	}
 
 	// STUN message is always padded to a multiple of 4 bytes
 	if msgLen & 0x03 != 0 {
-		return fmt.Errorf("stun message is not aligned")
+		return nil, fmt.Errorf("stun message is not aligned")
 	}
 
-	return nil
+	return buf[:msgLen + 20], nil
 }
 
 func (this *message) print(title string) {
