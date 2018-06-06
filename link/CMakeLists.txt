@@ -6,6 +6,8 @@ ExternalProject_Add(stun
         INSTALL_COMMAND ""
         BUILD_IN_SOURCE 1
 )
+
 add_subdirectory(libsip)
 add_subdirectory(libice)
 add_subdirectory(libmqtt)
+add_subdirectory(librtp)
