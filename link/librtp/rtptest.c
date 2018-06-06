@@ -549,9 +549,9 @@ static void onRxRtp(void *_pUserData, CallbackType _type, void *_pCbData)
         switch (_type){
                 case CALLBACK_ICE:{
                         IceNegInfo *pInfo = (IceNegInfo *)_pCbData;
-                        fprintf(stderr, "==========>callback_ice: state:%d\n", pInfo->state);
+                        MY_PJ_LOG(3, "==========>callback_ice: state:%d", pInfo->state);
                         for ( int i = 0; i < pInfo->nCount; i++) {
-                                fprintf(stderr, "           codec type:%d\n", pInfo->configs[i]->codecType);
+                                MY_PJ_LOG(3, "           codec type:%d", pInfo->configs[i]->codecType);
                         }
                 }
                         break;

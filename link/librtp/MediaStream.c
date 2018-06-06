@@ -371,3 +371,52 @@ pj_status_t MediaUnPacketize(IN OUT MediaPacketier *_pPKtz, IN const pj_uint8_t 
 {
         return _pPKtz->pOperation.unpacketize(_pPKtz, _pPayload, _nPlyloadLen, _pBitstream, _pBitstreamPos, _nRtpMarker, _pTryAgain);
 }
+
+pj_status_t createJitterBuffer(IN MediaStreamTrack *_pMediaTrack, IN pj_pool_factory *_pPoolFactory)
+{
+        pj_pool_t *pPool = pj_pool_create(_pPoolFactory, NULL, 1480*20, 1480, NULL);
+        ASSERT_RETURN_CHECK(pPool, pj_pool_create);
+        int nIdx = _pMediaTrack->mediaConfig.nUseIndex;
+        pj_assert(nIdx != -1);
+
+        pj_status_t status;
+
+        char typeName[6] = {0};
+        sprintf(typeName, "jb%d", _pMediaTrack->mediaConfig.configs[nIdx].codecType);
+        pj_str_t name = {typeName, strlen(typeName)};
+        switch (_pMediaTrack->mediaConfig.configs[nIdx].codecType) {
+                case MEDIA_FORMAT_PCMU:
+                case MEDIA_FORMAT_PCMA:
+                case MEDIA_FORMAT_G729:
+                        status = pjmedia_jbuf_create (pPool, &name, 160, 20, 30, &_pMediaTrack->jbuf.pJbuf);
+                        break;
+                case MEDIA_FORMAT_H264:
+                case MEDIA_FORMAT_H265:
+                        status = pjmedia_jbuf_create (pPool, &name, 1480, 40, 30, &_pMediaTrack->jbuf.pJbuf);
+                        break;
+        }
+        if (status != PJ_SUCCESS) {
+                pj_pool_release(pPool);
+                return status;
+        }
+
+        status = pjmedia_jbuf_reset(_pMediaTrack->jbuf.pJbuf);
+        if (status != PJ_SUCCESS) {
+                pj_pool_release(pPool);
+                pjmedia_jbuf_destroy(_pMediaTrack->jbuf.pJbuf);
+                _pMediaTrack->jbuf.pJbuf = NULL;
+                return status;
+        }
+
+        status = pjmedia_jbuf_set_adaptive(_pMediaTrack->jbuf.pJbuf, 0, 0, 10);
+        if (status != PJ_SUCCESS) {
+                pj_pool_release(pPool);
+                pjmedia_jbuf_destroy(_pMediaTrack->jbuf.pJbuf);
+                _pMediaTrack->jbuf.pJbuf = NULL;
+                return status;
+        }
+
+        _pMediaTrack->jbuf.pJbufPool = pPool;
+        _pMediaTrack->jbuf.nLastRecvRtpSeq = -1;
+        return PJ_SUCCESS;
+}

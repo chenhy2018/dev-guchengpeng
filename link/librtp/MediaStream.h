@@ -51,7 +51,8 @@ typedef struct _H264Packetizer {
 typedef struct _JitterBuffer {
         pj_pool_t *pJbufPool;
         pjmedia_jbuf *pJbuf;
-        pj_uint16_t nLastRecvRtpSeq;
+        int nLastRecvRtpSeq;
+        char getBuf[1500];
 }JitterBuffer;
 
 typedef struct _MediaStreamTrack
@@ -68,6 +69,7 @@ typedef struct _MediaStreamTrack
         MediaPacketier *pMediaPacketier;
         pj_pool_t *pPacketizerPool;
         void *pPeerConnection;
+        JitterBuffer jbuf;
 }MediaStreamTrack;
 
 typedef struct _MediaStream
@@ -93,4 +95,5 @@ pj_status_t MediaPacketize(IN MediaPacketier *pPktz,IN pj_uint8_t *pBitstream, I
                            IN unsigned *pBitstreamPos, OUT const pj_uint8_t **pPayload, OUT pj_size_t *nPlyloadLen);
 pj_status_t MediaUnPacketize(IN OUT MediaPacketier *pKtz, IN const pj_uint8_t *pPayload, IN pj_size_t nPlyloadLen,
                            OUT pj_uint8_t **pBitstream, OUT unsigned *pBitstreamPos, IN int nRtpMarker, IN pj_bool_t *pTryAgain);
+pj_status_t createJitterBuffer(IN MediaStreamTrack *pMediaStreamTrack, IN pj_pool_factory *pPoolFactory);
 #endif

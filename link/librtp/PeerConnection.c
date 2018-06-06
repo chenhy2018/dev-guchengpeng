@@ -675,6 +675,30 @@ static void on_rx_rtp(void *pUserData, void *pPkt, pj_ssize_t size)
         /* Update RTP session */
         pjmedia_rtp_session_update(&pMediaTrack->rtpSession, pRtpHeader, NULL);
 
+        if (!pPeer->userIceConfig.bTurnTcp) {
+                pjmedia_jbuf_put_frame3(pMediaTrack->jbuf.pJbuf, pPayload, nPayloadLen,
+                                        0, //pj_uint32_t bit_info
+                                        pj_ntohs(pRtpHeader->seq),
+                                        pRtpHeader->ts,
+                                        NULL);
+                char cFrameType;
+                int nSeq = 0;
+                pj_size_t nFrameSize = sizeof(pMediaTrack->jbuf.getBuf);
+                pjmedia_jbuf_get_frame3(pMediaTrack->jbuf.pJbuf, pMediaTrack->jbuf.getBuf,
+                                        &nFrameSize, &cFrameType, NULL, NULL, &nSeq);
+                switch (cFrameType) {
+                        case PJMEDIA_JB_MISSING_FRAME:
+                        case PJMEDIA_JB_ZERO_PREFETCH_FRAME:
+                        case PJMEDIA_JB_ZERO_EMPTY_FRAME:
+                                return;
+                        case PJMEDIA_JB_NORMAL_FRAME:
+                                pPayload = pMediaTrack->jbuf.getBuf;
+                                nPayloadLen = nFrameSize;
+                                break;
+                }
+                MY_PJ_LOG(3, "-->get_frame:%d  rtp seq:%d", nPayloadLen, nSeq);
+        }
+
         //deal with payload
         pj_bool_t bTryAgain = PJ_FALSE;
         do{
@@ -728,6 +752,10 @@ int StartNegotiation(IN PeerConnection * _pPeerConnection)
                                 MY_PJ_LOG(3, "wait ICE_STATE_NEGOTIATION_OK timeout");
                                 return -1;
                         }
+                        if (pTransportIce->iceState != ICE_STATE_NEGOTIATION_OK) {
+                                MY_PJ_LOG(3, "wait negotiation fail");
+                                return -2;
+                        }
                         
                         pjmedia_transport_info tpinfo;
                         pjmedia_transport_info_init(&tpinfo);
@@ -754,6 +782,10 @@ int StartNegotiation(IN PeerConnection * _pPeerConnection)
                                           160, //TODO Average number of samples per frame. I don't know???
                                           //How do I set it if payload is video
                                           0);
+                        if (!_pPeerConnection->userIceConfig.bTurnTcp) {
+                                status = createJitterBuffer(pMediaTrack, _pPeerConnection->pPoolFactory);
+                                STATUS_CHECK(createJitterBuffer_pjmedia_jbuf_create, status);
+                        }
                 }
         }
         
