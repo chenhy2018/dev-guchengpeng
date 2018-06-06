@@ -30,8 +30,6 @@ typedef struct {
         pjmedia_sdp_session* pOffer;
         pjmedia_sdp_session* pAnswer;
         IceConfig iceConfig;
-        MediaConfig audioConfig;
-        MediaConfig videoConfig;
         void* pMedia;
 }Call;
 
@@ -43,13 +41,19 @@ typedef struct {
         void *pMqttInstance;
         pthread_cond_t registerCond;
         SipAnswerCode regStatus;
+        char turnHost[MAX_TURN_HOST_SIZE];
+        char turnUsername[MAX_TURN_USR_SIZE];
+        char turnPassword[MAX_TURN_PWD_SIZE];
+        MediaConfig* pVideoConfigs;
+        MediaConfig* pAudioConfigs;
         Call callList;
 }UA;
 
 typedef struct {
         UA UAList;
         bool bInitSdk;
-        Media mediaConfigs[MEDIA_CONFIG_MAX];
+        MediaConfig videoConfigs;
+        MediaConfig audioConfigs;
 }UAManager;
 
 extern UAManager *pUAManager;;

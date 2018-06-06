@@ -21,19 +21,48 @@
 UAManager gUAManager;
 UAManager *pUAManager = &gUAManager;
 
+static CodecType ConversionFormat(Codec _nCodec)
+{
+        switch (_nCodec) {
+                case CODEC_H264:
+                        return MEDIA_FORMAT_H264;
+                case CODEC_G711A:
+                        return MEDIA_FORMAT_PCMA;
+                case CODEC_G711U:
+                        return MEDIA_FORMAT_PCMU;
+                default:
+                        return MEDIA_FORMAT_H264;
+        }
+        return MEDIA_FORMAT_H264;
+}
+
 ErrorID InitSDK( Media* _pMediaConfigs, int _nSize)
 {
-    SipCallBack cb;
-
-    memset(pUAManager, 0, sizeof(UAManager));
-    
-    memcpy(pUAManager->mediaConfigs, _pMediaConfigs, _nSize);
-    cb.OnIncomingCall  = &cbOnIncomingCall;
-    cb.OnCallStateChange = &cbOnCallStateChange;
-    cb.OnRegStatusChange = &cbOnRegStatusChange;
-    SipCreateInstance(&cb);
-    pUAManager->bInitSdk = true;
-    return RET_OK;
+       SipCallBack cb;
+       pUAManager->videoConfigs.nCount = 0;
+       pUAManager->audioConfigs.nCount = 0;
+       for (int count = 0; count < _nSize; ++count) {
+               if (_pMediaConfigs[count].streamType == STREAM_VIDEO) {
+                       pUAManager->videoConfigs.configs[pUAManager->videoConfigs.nCount].streamType = STREAM_VIDEO;
+                       pUAManager->videoConfigs.configs[pUAManager->videoConfigs.nCount].codecType = ConversionFormat(_pMediaConfigs[count].codecType);
+                       pUAManager->videoConfigs.configs[pUAManager->videoConfigs.nCount].nSampleOrClockRate = _pMediaConfigs[count].sampleRate;
+                       pUAManager->videoConfigs.configs[pUAManager->videoConfigs.nCount].nChannel = _pMediaConfigs[count].channels;
+                       ++pUAManager->videoConfigs.nCount;
+               }
+               else if (_pMediaConfigs[count].streamType == STREAM_AUDIO) {
+                       pUAManager->audioConfigs.configs[pUAManager->audioConfigs.nCount].streamType = STREAM_AUDIO;
+                       pUAManager->audioConfigs.configs[pUAManager->audioConfigs.nCount].codecType = ConversionFormat(_pMediaConfigs[count].codecType);
+                       pUAManager->audioConfigs.configs[pUAManager->audioConfigs.nCount].nSampleOrClockRate = _pMediaConfigs[count].sampleRate;
+                       pUAManager->audioConfigs.configs[pUAManager->audioConfigs.nCount].nChannel = _pMediaConfigs[count].channels;
+                       ++pUAManager->audioConfigs.nCount;
+               }
+        }
+        cb.OnIncomingCall  = &cbOnIncomingCall;
+        cb.OnCallStateChange = &cbOnCallStateChange;
+        cb.OnRegStatusChange = &cbOnRegStatusChange;
+        SipCreateInstance(&cb);
+        pUAManager->bInitSdk = true;
+        return RET_OK;
 }
 
 ErrorID UninitSDK()
@@ -50,6 +79,9 @@ ErrorID UninitSDK()
                 UAUnRegister(pUA);
         }
         pUAManager->bInitSdk = false;
+        memset(&pUAManager->videoConfigs, 0, sizeof(MediaConfig));
+        memset(&pUAManager->audioConfigs, 0, sizeof(MediaConfig));
+
         return RET_OK;
 }
 
@@ -70,7 +102,7 @@ AccountID Register(const char* _id, const char* _password, const char* _pSigHost
                    const char* _pMediaHost, const char* _pImHost, int _nTimeOut)
 {
     int nAccountId = 0;
-    UA *pUA = UARegister(_id, _password, _pSigHost, _pMediaHost, _pImHost, _nTimeOut);
+    UA *pUA = UARegister(_id, _password, _pSigHost, _pMediaHost, _pImHost, _nTimeOut, &pUAManager->videoConfigs, &pUAManager->audioConfigs);
     int nReason = 0;
 
     if (!pUAManager->bInitSdk) {

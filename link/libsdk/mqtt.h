@@ -45,19 +45,19 @@ struct MqttCallback
 struct MqttUserInfo
 {
         int nAuthenicatinMode;
-        char* pUsername;
-        char* pPassword;
-        char* pHostname;
+        const char* pUsername;
+        const char* pPassword;
+        const char* pHostname;
         int nPort;
-        char* pCafile;
-        char* pCertfile;
-        char* pKeyfile;
+        const char* pCafile;
+        const char* pCertfile;
+        const char* pKeyfile;
         //char* pBindaddress; //not used in current time.
 };
 
 struct MqttOptions
 {
-        char* pId;
+        const char* pId;
         bool bCleanSession;
         struct MqttUserInfo primaryUserInfo;
         struct MqttUserInfo secondaryUserInfo;

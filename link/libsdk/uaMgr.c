@@ -8,6 +8,19 @@
 #include "framework.h"
 #include "list.h"
 #include "callMgr.h"
+#include "qrtc.h"
+
+
+void OnMessage(IN const void* _pInstance, IN const char* _pTopic, IN const char* _pMessage, IN size_t nLength)
+{
+        fprintf(stderr, "%p topic %s message %s \n", _pInstance, _pTopic, _pMessage);
+}
+
+void OnEvent(IN const void* _pInstance, IN int _nId,  IN const char* _pReason)
+{
+        fprintf(stderr, "%p id %d, reason  %s \n",_pInstance, _nId, _pReason);
+        // TODO call back to user.
+}
 
 static Call* FindCall(UA* _pUa, int _nCallId, struct list_head *pos)
 {
@@ -22,17 +35,43 @@ static Call* FindCall(UA* _pUa, int _nCallId, struct list_head *pos)
         return NULL;
 }
 
-void InitMqtt(struct MqttOptions option)
+void InitMqtt(struct MqttOptions options, const char* _pId, const char* _pPassword, const char* _pImHost)
 {
 //Init option.
+        options.pId = _pId;
+        options.bCleanSession = false;
+        options.primaryUserInfo.nAuthenicatinMode = MQTT_AUTHENTICATION_USER;
+        options.primaryUserInfo.pHostname = _pImHost;
+        //strcpy(options.bindaddress, "172.17.0.2");
+        options.secondaryUserInfo.pHostname = NULL;
+        //strcpy(options.secondBindaddress, "172.17.0.2`");
+        options.primaryUserInfo.pUsername = _pId;
+        options.primaryUserInfo.pPassword = _pPassword;
+        options.secondaryUserInfo.pUsername = NULL;
+        options.secondaryUserInfo.pPassword = NULL;
+        options.secondaryUserInfo.nPort = 0;
+        options.primaryUserInfo.nPort = 1883;
+        options.primaryUserInfo.pCafile = NULL;
+        options.primaryUserInfo.pCertfile = NULL;
+        options.primaryUserInfo.pKeyfile = NULL;
+        options.secondaryUserInfo.pCafile = NULL;
+        options.secondaryUserInfo.pCertfile = NULL;
+        options.secondaryUserInfo.pKeyfile = NULL;
+        options.nKeepalive = 10;
+        options.nQos = 0;
+        options.bRetain = false;
+        options.callbacks.OnMessage = &OnMessage;
+        options.callbacks.OnEvent = &OnEvent;
+
 }
 
 // register a account
 // @return UA struct point. If return NULL, error.
 UA* UARegister(const char* _pId, const char* _pPassword, const char* _pSigHost,
-               const char* _pMediaHost, const char* _pImHost, int _nTimeOut)
+               const char* _pMediaHost, const char* _pImHost, int _nTimeOut,
+               MediaConfig* _pVideo, MediaConfig* _pAudio)
 {
-        UA *pUA = ( UA *) malloc ( sizeof(UA) );
+        UA *pUA = (UA *) malloc (sizeof(UA));
         int nReason = 0;
 
         if (!pUA) {
@@ -47,15 +86,27 @@ UA* UARegister(const char* _pId, const char* _pPassword, const char* _pSigHost,
                 free(pUA);
                 return NULL;
         }
-        list_add( &(pUA->list), &(pUAManager->UAList.list) );
-        int nAccountId = SipAddNewAccount( _pId, _pPassword, _pSigHost, (void *)pUA );
-        SipRegAccount( nAccountId, 0 );
-
+        list_add(&(pUA->list), &(pUAManager->UAList.list));
+        SipAccountConfig sipConfig;
+        sipConfig.pUserName = _pId;
+        sipConfig.pPassWord = _pPassword;
+        sipConfig.pDomain = _pSigHost;
+        sipConfig.pUserData = (void *)pUA;
+        int nAccountId = 0;
+        SipAddNewAccount(&sipConfig, &nAccountId);
+        
+        SipRegAccount(nAccountId, 0);
+        pUA->regStatus == TRYING;
         //mqtt create instance.
         struct MqttOptions option;
-        InitMqtt(option);
+        InitMqtt(option, _pId, _pPassword, _pImHost);
         pUA->pMqttInstance = MqttCreateInstance(&option);
         pUA->id = nAccountId;
+        pUA->pVideoConfigs = _pVideo;
+        pUA->pAudioConfigs = _pAudio;
+        strncpy(pUA->turnHost, _pMediaHost, MAX_TURN_HOST_SIZE - 1);
+        strncpy(pUA->turnUsername, _pId, MAX_TURN_USR_SIZE -1);
+        strncpy(pUA->turnPassword, _pPassword, MAX_TURN_PWD_SIZE -1);
         return pUA;
 }
 
@@ -70,9 +121,24 @@ ErrorID UAUnRegister(UA* _pUa)
 // make a call, user need to save call id
 ErrorID UAMakeCall(UA* _pUa, const char* id, const char* host, OUT int* callID)
 {
-        Call* call = CALLMakeCall(_pUa->id, id, host, callID);
-        list_add(&(call->list), &(_pUa->callList.list));
-        return RET_OK;
+        if (_pUa->regStatus == OK) {
+                Call* call = CALLMakeCall(_pUa->id, id, host, callID, _pUa->pVideoConfigs, _pUa->pAudioConfigs,
+                                          _pUa->turnHost, _pUa->turnUsername, _pUa->turnPassword);
+                list_add(&(call->list), &(_pUa->callList.list));
+                return RET_OK;
+        }
+        else if (_pUa->regStatus == UNAUTHORIZED) {
+                return RET_USER_UNAUTHORIZED;
+        }
+        else if (_pUa->regStatus == REQUEST_TIMEOUT) {
+                return RET_REGISTER_TIMEOUT;
+        }
+        else if (_pUa->regStatus == TRYING) {
+                return RET_REGISTERING;
+        }
+        else {
+                return RET_FAIL;
+        }
 }
 
 ErrorID UAAnswerCall(UA* _pUa, int nCallId)
@@ -166,7 +232,8 @@ SipAnswerCode UAOnIncomingCall(UA* _pUa, const int _nCallId, const char *pFrom, 
 {
         struct list_head *pos;
         Call** call;
-        SipAnswerCode code = CallOnIncomingCall(call, _nCallId, pFrom, pMedia);
+        SipAnswerCode code = CALLOnIncomingCall(call, _nCallId, pFrom, pMedia, _pUa->pVideoConfigs, _pUa->pAudioConfigs,
+                                                _pUa->turnHost, _pUa->turnUsername, _pUa->turnPassword);
         list_add(&((*call)->list), &(_pUa->callList.list));
 }
 

@@ -13,6 +13,7 @@
 #include <stdint.h>
 
 typedef enum {
+    CALL_STATUS_IDLE,
     CALL_STATUS_REGISTERED,
     CALL_STATUS_INCOMING,
     CALL_STATUS_TIMEOUT,
@@ -20,6 +21,7 @@ typedef enum {
     CALL_STATUS_RING,
     CALL_STATUS_REJECT,
     CALL_STATUS_HANGUP,
+    CALL_STATUS_ERROR
 } CallStatus;
 
 typedef enum {
@@ -31,6 +33,7 @@ typedef enum {
 typedef enum {
     RET_OK,
     RET_FAIL,
+    RET_REGISTERING,
     RET_RETRY,
     RET_MEM_ERROR = 1001,
     RET_PARAM_ERROR,
@@ -55,11 +58,8 @@ typedef enum {
 typedef enum {
     CODEC_NONE,
     CODEC_H264,
-    CODEC_H265,
     CODEC_G711A,
     CODEC_G711U,
-    CODEC_SPEEX,
-    CODEC_AAC
 } Codec;
 
 typedef int AccountID;

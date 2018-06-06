@@ -4,7 +4,9 @@
 #include "sdk_local.h"
 
 // make a call, user need to save call id
-Call* CALLMakeCall(AccountID _nAccountId, const char* id, const char* host, OUT int* callID);
+Call* CALLMakeCall(AccountID _nAccountId, const char* id, const char* host, OUT int* callID,
+                   MediaConfig* _pVideo, MediaConfig* _pAudio,
+                   const char* _pId, const char* _pPassword, const char* _pHost);
 ErrorID CALLAnswerCall(Call* _pCall);
 ErrorID CALLRejectCall(Call* _pCall);
 // hangup a call
@@ -17,7 +19,9 @@ ErrorID CALLSendPacket(Call* _pCall, Stream streamID, const uint8_t* buffer, int
 ErrorID CALLPollEvent(Call* _pCall, EventType* type, Event* event, int timeOut);
 
 //Callback, asyn
-SipAnswerCode CALLOnIncomingCall(Call** _pCall, const int _nCallId, const char *pFrom, const void *pMedia);
+SipAnswerCode CALLOnIncomingCall(Call** _pCall, const int _nCallId, const char *pFrom,
+                                 const void *pMedia, MediaConfig* _pVideo, MediaConfig* _pAudio,
+                                 const char* _pId, const char* _pPassword, const char* _pHost);
 
 void CALLOnCallStateChange(Call* _pCall, const SipInviteState State, const SipAnswerCode StatusCode, const void *pMedia);
 

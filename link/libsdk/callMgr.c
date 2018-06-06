@@ -1,6 +1,37 @@
 #include <string.h>
 #include "callMgr.h"
 
+
+// Todo send to message queue.
+static void onRxRtp(void *_pUserData, CallbackType _type, void *_pCbData)
+{
+#if 0
+        switch (_type){
+                case CALLBACK_ICE:{
+                        IceNegInfo *pInfo = (IceNegInfo *)_pCbData;
+                        MY_PJ_LOG(3, "==========>callback_ice: state:%d", pInfo->state);
+                        for ( int i = 0; i < pInfo->nCount; i++) {
+                                MY_PJ_LOG(3, " codec type:%d", pInfo->configs[i]->codecType);
+                        }
+                }
+                        break;
+                case CALLBACK_RTP:{
+                        RtpPacket *pPkt = (RtpPacket *)_pCbData;
+                        pj_ssize_t nLen = pPkt->nDataLen;
+                        if (pPkt->type == STREAM_AUDIO && nLen == 160) {
+                                pj_file_write(gPcmuFd, pPkt->pData, &nLen);
+                        } else if (pPkt->type == STREAM_VIDEO) {
+                                pj_file_write(gH264Fd, pPkt->pData, &nLen);
+                        }
+                }
+                        break;
+                case CALLBACK_RTCP:
+                        fprintf(stderr, "==========>callback_rtcp\n");
+                        break;
+        }
+#endif
+}
+
 //to do change the CallStatus to INV_STATE
 ErrorID CheckCallStatus(Call* _pCall, CallStatus expectedState)
 {
@@ -46,20 +77,31 @@ ErrorID CheckCallStatus(Call* _pCall, CallStatus expectedState)
        }
        return RET_FAIL;
 }
+
 // make a call, user need to save call id . add parameter for ice info and media info.
-Call* CALLMakeCall(AccountID _nAccountId, const char* id, const char* _pDestUri, OUT int* _pCallId)
+Call* CALLMakeCall(AccountID _nAccountId, const char* id, const char* _pDestUri,
+                   OUT int* _pCallId, MediaConfig* _pVideo, MediaConfig* _pAudio,
+                   const char* _pId, const char* _pPassword, const char* _pHost) 
 {
         Call* pCall = (Call*)malloc(sizeof(Call));
+        if (pCall) {
+                return NULL;
+        }
         memset(pCall, 0, sizeof(Call));
         // rtp to do. ice config.media info. and check error)
         InitIceConfig(&pCall->iceConfig);
+        strcpy(&pCall->iceConfig.turnHost[0], _pHost);
+        strcpy(&pCall->iceConfig.turnUsername[0], _pId);
+        strcpy(&pCall->iceConfig.turnPassword[0], _pPassword);
+        pCall->iceConfig.userCallback = onRxRtp;
+        //todo check status
         InitPeerConnectoin(&pCall->pPeerConnection, &pCall->iceConfig);
-        AddVideoTrack(pCall->pPeerConnection, &pCall->videoConfig);
-        AddAudioTrack(pCall->pPeerConnection, &pCall->audioConfig);
+        AddVideoTrack(pCall->pPeerConnection, _pVideo);
+        AddAudioTrack(pCall->pPeerConnection, _pAudio);
         createOffer(pCall->pPeerConnection, &pCall->pOffer);
         setLocalDescription(pCall->pPeerConnection, pCall->pOffer);
         pCall->pAnswer = NULL;
-        *_pCallId = SipMakeNewCall(_nAccountId, _pDestUri, pCall->pOffer);
+        SipMakeNewCall(_nAccountId, _pDestUri, pCall->pOffer, _pCallId);
         pCall->id = *_pCallId;
         pCall->callStatus = CALL_STATUS_REGISTERED;
         CheckCallStatus(pCall, CALL_STATUS_RING);
@@ -132,7 +174,9 @@ ErrorID CALLSendPacket(Call* _pCall, Stream streamID, const uint8_t* buffer, int
         //return RET_OK;
 }
 
-SipAnswerCode CALLOnIncomingCall(Call** _pCall, const int _nCallId, const char *pFrom, const void *pMedia)
+SipAnswerCode CALLOnIncomingCall(Call** _pCall, const int _nCallId, const char *pFrom,
+                                 const void *pMedia, MediaConfig* _pVideo, MediaConfig* _pAudio,
+                                 const char* _pId, const char* _pPassword, const char* _pHost)
 {
         Call* pCall = (Call*)malloc(sizeof(Call));
         memset(pCall, 0, sizeof(Call));
@@ -143,8 +187,8 @@ SipAnswerCode CALLOnIncomingCall(Call** _pCall, const int _nCallId, const char *
         // rtp to do. ice config.media info. and check error)
         InitIceConfig(&pCall->iceConfig);
         InitPeerConnectoin(&pCall->pPeerConnection, &pCall->iceConfig);
-        AddVideoTrack(pCall->pPeerConnection, &pCall->videoConfig);
-        AddAudioTrack(pCall->pPeerConnection, &pCall->audioConfig);
+        AddVideoTrack(pCall->pPeerConnection, _pVideo);
+        AddAudioTrack(pCall->pPeerConnection, _pAudio);
         setRemoteDescription(pCall->pPeerConnection, pCall->pOffer);
         createAnswer(pCall->pPeerConnection, pCall->pOffer, &pCall->pAnswer);
         setLocalDescription(pCall->pPeerConnection, pCall->pAnswer);
@@ -158,4 +202,10 @@ void CALLOnCallStateChange(Call* _pCall, const SipInviteState State, const SipAn
                 ReleasePeerConnectoin(_pCall->pPeerConnection);
                 free(_pCall);
         }
+}
+
+ErrorID CALLPollEvent(Call* _pCall, EventType* type, Event* event, int timeOut)
+{
+        //not used in current time.
+        return RET_OK;
 }

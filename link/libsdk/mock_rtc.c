@@ -41,7 +41,7 @@ int StartNegotiation(IN PeerConnection * pPeerConnection)
   return 1;
 }
 
-int SendPacket(IN PeerConnection *pPeerConnection, IN OUT RtpPacket * pPacket)
+int SendPacket_1(IN PeerConnection *pPeerConnection, IN OUT RtpPacket * pPacket)
 {
   return 1;
 }
@@ -51,3 +51,7 @@ void ReleasePeerConnectoin(IN OUT PeerConnection * _pPeerConnection)
   return 1;
 }
 
+void InitIceConfig(IN OUT IceConfig *pIceConfig)
+{
+
+}
