@@ -581,6 +581,7 @@ static void onSipRegc(IN struct pjsip_regc_cbparam *_pCbData)
                         /* Start keep alive timer */
                         UpdateKeepAlive(pAccount, PJ_TRUE, _pCbData);
                 }
+                pAccount->AutoReReg.Active = PJ_FALSE;
         }
 
         pAccount->nLastRegCode = _pCbData->code;
