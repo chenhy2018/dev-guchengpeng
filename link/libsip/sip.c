@@ -57,6 +57,11 @@ static int SipGetAccountIdFromRxData(IN const pjsip_rx_data *_pRxData);
 
 static pj_bool_t SipUpdateContactIfNat(IN SipAccount *_pAccount, IN struct pjsip_regc_cbparam *_pCbData);
 
+/* reregistration if server temporarily falied */
+static void SipScheduleReRegistration(SipAccount *_pAccount);
+static void SipReRegTimerCallBack(pj_timer_heap_t *_pTimerHeap, pj_timer_entry *_pTimerEntry);
+
+
 /* This is a PJSIP module to be registered by application to handle
  * incoming requests outside any dialogs/transactions. The main purpose
  * here is to handle incoming INVITE request message, where we will
@@ -218,6 +223,8 @@ SIP_ERROR_CODE SipCreateInstance(IN const SipInstanceConfig *_pConfig)
         SipAppData.OnIncomingCall = _pConfig->Cb.OnIncomingCall;
         SipAppData.nMaxAccount = _pConfig->nMaxAccount;
         SipAppData.nMaxCall = _pConfig->nMaxCall;
+        SipAppData.nAccountCount = 0;
+        SipAppData.nCallCount = 0;
         /* Init Accounts */
         int i;
 
@@ -245,9 +252,6 @@ void SipDestroyInstance()
         if (SipAppData.pSipEndPoint) {
                 PJ_LOG(4, (THIS_FILE, "Destroy libSip instance ..."));
         }
-
-        /* Hangup all calls */
-        SipHangUpAll();
 
         /* offline all account */
         int i;
@@ -351,6 +355,8 @@ SIP_ERROR_CODE SipAddNewAccount(IN const SipAccountConfig *_pConfig, OUT int *_p
 
         SipAppData.nAccountCount++;
         SipAppData.Accounts[id].bValid = PJ_TRUE;
+        SipAppData.Accounts[id].nMaxOngoingCall = _pConfig->nMaxOngoingCall;
+        SipAppData.Accounts[id].nOngoingCall = 0;
 
         pj_mutex_unlock(SipAppData.pMutex);
 
@@ -363,6 +369,9 @@ void SipDeleteAccount(IN const int _nAccountId)
         SipAccount *pAccount;
 
         PJ_LOG(4,(THIS_FILE, "Deleting account %d..", _nAccountId));
+        /* Hangup all calls */
+        SipHangUpByAccountId(_nAccountId);
+
         pj_mutex_lock(SipAppData.pMutex);
         pAccount = &SipAppData.Accounts[_nAccountId];
         /* Cancel keep alive timer */
@@ -374,7 +383,11 @@ void SipDeleteAccount(IN const int _nAccountId)
                 pjsip_transport_dec_ref(pAccount->KaTransport);
                 pAccount->KaTransport = NULL;
         }
-
+        /* Cancel auto-reregistration timer */
+        if (pAccount->AutoReReg.ReRegTimer.id) {
+                pAccount->AutoReReg.ReRegTimer.id = PJ_FALSE;
+                pjsip_endpt_cancel_timer(SipAppData.pSipEndPoint, &pAccount->AutoReReg.ReRegTimer);
+        }
         /* Offline account */
         if (pAccount->pRegc) {
                 SipRegAccount(_nAccountId, 0);
@@ -408,6 +421,11 @@ SIP_ERROR_CODE SipRegAccount(IN const int _nAccountId, IN const int _bDeReg)
 
         pAccount = &SipAppData.Accounts[_nAccountId];
 
+        /* cancel re-reg timer if any */
+        if (pAccount->AutoReReg.ReRegTimer.id) {
+                pAccount->AutoReReg.ReRegTimer.id = PJ_FALSE;
+                pjsip_endpt_cancel_timer(SipAppData.pSipEndPoint, &pAccount->AutoReReg.ReRegTimer);
+        }
         /* For initial register */
         if (_bDeReg) {
                 if (pAccount->pRegc == NULL) {
@@ -425,20 +443,6 @@ SIP_ERROR_CODE SipRegAccount(IN const int _nAccountId, IN const int _bDeReg)
 
                 /* Create register request message */
                 Status = pjsip_regc_register(pAccount->pRegc, 1, &pTransData);
-                /* Add authorization header */
-                if (Status == PJ_SUCCESS && pAccount->nCredCnt) {
-                        PJ_LOG(4, (THIS_FILE, "Add Credentials info"));
-                        pjsip_authorization_hdr *pAuthHeader;
-                        pAuthHeader = pjsip_authorization_hdr_create(pTransData->pool);
-                        pAuthHeader->scheme = pj_str("Digest");
-                        pAuthHeader->credential.digest.username = pAccount->Cred[0].username;
-                        pAuthHeader->credential.digest.realm = pAccount->SipDomain;
-                        pAuthHeader->credential.digest.uri = pAccount->RegUri;
-                        pAuthHeader->credential.digest.algorithm = pj_str("md5");
-
-                        pjsip_msg_add_hdr(pTransData->msg, (pjsip_hdr*)pAuthHeader);
-
-                }
         } else {
                 if (pAccount->pRegc == NULL) {
                         PJ_LOG(4, (THIS_FILE, "Currently not registered"));
@@ -581,6 +585,7 @@ static void onSipRegc(IN struct pjsip_regc_cbparam *_pCbData)
                         /* Start keep alive timer */
                         UpdateKeepAlive(pAccount, PJ_TRUE, _pCbData);
                 }
+                pAccount->AutoReReg.Active = PJ_FALSE;
         }
 
         pAccount->nLastRegCode = _pCbData->code;
@@ -588,7 +593,6 @@ static void onSipRegc(IN struct pjsip_regc_cbparam *_pCbData)
         if (SipAppData.OnRegStateChange) {
                 (*SipAppData.OnRegStateChange)(pAccount->nIndex, (SipAnswerCode)pAccount->nLastRegCode, pAccount->pUserData);
         }
-        pj_mutex_unlock(SipAppData.pMutex);
 
         /* hangup call if re-registration attempt failed */
         if (_pCbData->code == PJSIP_SC_REQUEST_TIMEOUT ||
@@ -598,8 +602,53 @@ static void onSipRegc(IN struct pjsip_regc_cbparam *_pCbData)
              _pCbData->code == PJSIP_SC_SERVER_TIMEOUT ||
              _pCbData->code == PJSIP_SC_TEMPORARILY_UNAVAILABLE ||
             PJSIP_IS_STATUS_IN_CLASS(_pCbData->code, 600)) {
-                SipHangUpByAccountId(pAccount->nIndex);
+                // SipHangUpByAccountId(pAccount->nIndex); this will trigger by session timer
+                SipScheduleReRegistration(pAccount);
         }
+        pj_mutex_unlock(SipAppData.pMutex);
+}
+static void SipScheduleReRegistration(SipAccount *_pAccount)
+{
+        pj_assert(_pAccount);
+        if (!_pAccount->bValid || _pAccount->nRegRetryInterval == 0)
+                return;
+
+        /* cancel re-reg timer if any */
+        if (_pAccount->AutoReReg.ReRegTimer.id) {
+                _pAccount->AutoReReg.ReRegTimer.id = PJ_FALSE;
+                pjsip_endpt_cancel_timer(SipAppData.pSipEndPoint, &_pAccount->AutoReReg.ReRegTimer);
+        }
+        _pAccount->AutoReReg.Active = PJ_TRUE;
+
+        _pAccount->AutoReReg.ReRegTimer.cb = &SipReRegTimerCallBack;
+        _pAccount->AutoReReg.ReRegTimer.user_data = _pAccount;
+
+        pj_time_val Delay;
+        Delay.sec = _pAccount->nRegRetryInterval;
+        Delay.msec = 0;
+        pj_time_val_normalize(&Delay);
+        PJ_LOG(4, (THIS_FILE, "Schedule re-registration retry for acc %d in %u seconds", _pAccount->nIndex, Delay.sec));
+
+        _pAccount->AutoReReg.ReRegTimer.id = PJ_TRUE;
+        if (pjsip_endpt_schedule_timer(SipAppData.pSipEndPoint, &_pAccount->AutoReReg.ReRegTimer, &Delay) != PJ_SUCCESS)
+                _pAccount->AutoReReg.ReRegTimer.id = PJ_FALSE;
+}
+
+static void SipReRegTimerCallBack(pj_timer_heap_t *_pTimerHeap, pj_timer_entry *_pTimerEntry)
+{
+        SipAccount *pAccount;
+        pj_status_t Status;
+        pAccount = (SipAccount *)_pTimerEntry->user_data;
+        pj_assert(pAccount);
+        pj_mutex_lock(SipAppData.pMutex);
+
+        if (!pAccount->bValid || !pAccount->AutoReReg.Active || pAccount->nRegRetryInterval == 0) {
+                pj_mutex_unlock(SipAppData.pMutex);
+                return;
+        }
+        if (SipRegAccount(pAccount->nIndex, 1) != SIP_SUCCESS)
+                SipScheduleReRegistration(pAccount);
+        pj_mutex_unlock(SipAppData.pMutex);
 }
 static void UpdateKeepAlive(INOUT SipAccount *_pAccount, IN const pj_bool_t _Start, IN const struct pjsip_regc_cbparam *_pCbData)
 {
@@ -725,6 +774,7 @@ static void KeepAliveTimerCallBack(IN pj_timer_heap_t *_pTimerHeap, IN pj_timer_
 /* On registration transaction callback */
 static void onSipRegcTsx(IN struct pjsip_regc_tsx_cb_param *_pCbData)
 {
+        pj_mutex_lock(SipAppData.pMutex);
         if (_pCbData->cbparam.code >= 400 && _pCbData->cbparam.rdata) {
                 SipAccount *pAccount = (SipAccount *)_pCbData->cbparam.token;
                 if (SipUpdateContactIfNat(pAccount, &_pCbData->cbparam)) {
@@ -732,6 +782,7 @@ static void onSipRegcTsx(IN struct pjsip_regc_tsx_cb_param *_pCbData)
                         _pCbData->contact[0] = pAccount->Contact;
                 }
         }
+        pj_mutex_unlock(SipAppData.pMutex);
 }
 
 static pj_bool_t isPrivateIp(const pj_str_t *pAddr)
@@ -823,7 +874,7 @@ SIP_ERROR_CODE SipMakeNewCall(IN const int _nFromAccountId, IN const char *_pDes
                 pj_mutex_unlock(SipAppData.pMutex);
                 return SIP_TOO_MANY_CALLS_FOR_INSTANCE;
         }
-        if ((SipAppData.Accounts[_nFromAccountId].nOngoingCall + 1) >= SipAppData.Accounts[_nFromAccountId].nMaxOngoingCall) {
+        if (SipAppData.Accounts[_nFromAccountId].nOngoingCall >= SipAppData.Accounts[_nFromAccountId].nMaxOngoingCall) {
                 PJ_LOG(1, (THIS_FILE, "Too many call for this account"));
                 pj_mutex_unlock(SipAppData.pMutex);
                 return SIP_TOO_MANY_CALLS_FOR_ACCOUNT;
@@ -1045,7 +1096,7 @@ static pj_bool_t onRxRequest(IN pjsip_rx_data *_pRxData )
                 return PJ_TRUE;
         }
 
-        if ((SipAppData.Accounts[nToAccountId].nOngoingCall + 1) >= SipAppData.Accounts[nToAccountId].nMaxOngoingCall) {
+        if (SipAppData.Accounts[nToAccountId].nOngoingCall >= SipAppData.Accounts[nToAccountId].nMaxOngoingCall) {
                 PJ_LOG(1, (THIS_FILE, "Too many call for this account"));
                 pjsip_endpt_respond_stateless(SipAppData.pSipEndPoint, _pRxData, PJSIP_SC_BUSY_HERE,
                                               NULL, NULL, NULL);

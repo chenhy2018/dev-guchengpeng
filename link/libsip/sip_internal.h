@@ -43,6 +43,10 @@ typedef struct SipAccount {
         int nLastRegCode;
         int nOngoingCall;
 
+        struct {
+                pj_bool_t Active;
+                pj_timer_entry ReRegTimer;
+        } AutoReReg;
         unsigned nCredCnt;
         pjsip_cred_info  Cred[SIP_MAX_CRED];
         pjsip_host_port ViaAddr;
