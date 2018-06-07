@@ -555,7 +555,7 @@ static int createSdp(IN OUT PeerConnection * _pPeerConnection, IN pj_pool_t * _p
         return PJ_SUCCESS;
 }
 
-int createOffer(IN OUT PeerConnection * _pPeerConnection, OUT pjmedia_sdp_session **_pOffer)
+int createOffer(IN OUT PeerConnection * _pPeerConnection, OUT void **_pOffer)
 {
         pj_status_t  status;
 
@@ -567,7 +567,7 @@ int createOffer(IN OUT PeerConnection * _pPeerConnection, OUT pjmedia_sdp_sessio
                 _pPeerConnection->pSdpPool = pPool;
         }
         
-        status = createSdp(_pPeerConnection, pPool, _pOffer);
+        status = createSdp(_pPeerConnection, pPool, (pjmedia_sdp_session **)_pOffer);
         STATUS_CHECK(createSdp, status);
         
         char sdpStr[2048];
@@ -595,7 +595,7 @@ int createOffer(IN OUT PeerConnection * _pPeerConnection, OUT pjmedia_sdp_sessio
         return PJ_SUCCESS;
 }
 
-int createAnswer(IN OUT PeerConnection * _pPeerConnection, IN pjmedia_sdp_session *_pOffer, OUT pjmedia_sdp_session **_pAnswer)
+int createAnswer(IN OUT PeerConnection * _pPeerConnection, IN void *_pOffer, OUT void **_pAnswer)
 {
         pj_status_t  status;
 
@@ -607,7 +607,7 @@ int createAnswer(IN OUT PeerConnection * _pPeerConnection, IN pjmedia_sdp_sessio
                 _pPeerConnection->pSdpPool = pPool;
         }
         
-        status = createSdp(_pPeerConnection, pPool, _pAnswer);
+        status = createSdp(_pPeerConnection, pPool, (pjmedia_sdp_session **)_pAnswer);
         STATUS_CHECK(createSdp, status);
         
         int nMaxTracks = sizeof(_pPeerConnection->nAvIndex) / sizeof(int);
@@ -905,18 +905,18 @@ static int checkAndNeg(IN OUT PeerConnection * _pPeerConnection)
         return PJ_SUCCESS;
 }
 
-int setLocalDescription(IN OUT PeerConnection * _pPeerConnection, IN pjmedia_sdp_session * _pSdp)
+int setLocalDescription(IN OUT PeerConnection * _pPeerConnection, IN void * _pSdp)
 {
-        _pPeerConnection->pOfferSdp = _pSdp;
+        _pPeerConnection->pOfferSdp = (pjmedia_sdp_session *)_pSdp;
         if (_pPeerConnection->pAnswerSdp) {
                 return checkAndNeg(_pPeerConnection);
         }
         return PJ_SUCCESS;
 }
 
-int setRemoteDescription(IN OUT PeerConnection * _pPeerConnection, IN pjmedia_sdp_session * _pSdp)
+int setRemoteDescription(IN OUT PeerConnection * _pPeerConnection, IN void * _pSdp)
 {
-        _pPeerConnection->pAnswerSdp = _pSdp;
+        _pPeerConnection->pAnswerSdp = (pjmedia_sdp_session *)_pSdp;
         if(_pPeerConnection->pOfferSdp){
                 return checkAndNeg(_pPeerConnection);
         }
