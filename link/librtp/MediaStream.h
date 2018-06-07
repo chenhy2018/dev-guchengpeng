@@ -52,6 +52,7 @@ typedef struct _JitterBuffer {
         pj_pool_t *pJbufPool;
         pjmedia_jbuf *pJbuf;
         int nLastRecvRtpSeq;
+        int nPutGetDiff;
         char getBuf[1500];
 }JitterBuffer;
 

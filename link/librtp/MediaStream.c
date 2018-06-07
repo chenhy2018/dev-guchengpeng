@@ -240,6 +240,16 @@ pj_status_t h264_unpacketize(IN OUT MediaPacketier *_pKtz,
         pj_status_t status = PJ_SUCCESS;
         H264Packetizer *pPktz = (H264Packetizer *)_pKtz;
 
+        unsigned nUnpackLen = 0;
+        if (_pPayload == NULL) {
+                 status = pjmedia_h264_unpacketize(pPktz->pH264Packetizer, NULL, 0,
+                                                  pPktz->pUnpackBuf, pPktz->nUnpackBufCap, &nUnpackLen);
+                if (nUnpackLen > 0) {
+                        MY_PJ_LOG(3, "NULL:%d", nUnpackLen);
+                }
+                return status;
+        }
+
         int nType = _pPayload[0] & 0x1F;
         if (nType != 28 && pPktz->nUnpackBufLen != 0) {
                 *_pBitstreamPos = pPktz->nUnpackBufLen;
@@ -265,7 +275,7 @@ pj_status_t h264_unpacketize(IN OUT MediaPacketier *_pKtz,
                 pPktz->nUnpackBufCap *= 2;
         }
 
-        unsigned nUnpackLen = pPktz->nUnpackBufLen;
+        nUnpackLen = pPktz->nUnpackBufLen;
         status = pjmedia_h264_unpacketize(pPktz->pH264Packetizer, _pPayload, _nPlyloadLen,
                                           pPktz->pUnpackBuf, pPktz->nUnpackBufCap, &nUnpackLen);
         pPktz->nUnpackBufLen = nUnpackLen;
@@ -425,7 +435,7 @@ pj_status_t createJitterBuffer(IN MediaStreamTrack *_pMediaTrack, IN pj_pool_fac
                 return status;
         }
 
-        status = pjmedia_jbuf_set_adaptive(_pMediaTrack->jbuf.pJbuf, 20, 25, 40);
+        status = pjmedia_jbuf_set_adaptive(_pMediaTrack->jbuf.pJbuf, 10, 20, 30);
         if (status != PJ_SUCCESS) {
                 pj_pool_release(pPool);
                 pjmedia_jbuf_destroy(_pMediaTrack->jbuf.pJbuf);

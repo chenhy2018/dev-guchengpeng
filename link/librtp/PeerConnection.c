@@ -678,19 +678,50 @@ static void on_rx_rtp(void *pUserData, void *pPkt, pj_ssize_t size)
         pjmedia_jbuf_put_frame3(pMediaTrack->jbuf.pJbuf, pPayload, nPayloadLen,
                                 0, //pj_uint32_t bit_info
                                 pj_ntohs(pRtpHeader->seq),
-                                pj_ntohs(pRtpHeader->ts),
+                                pj_ntohl(pRtpHeader->ts),
                                 NULL);
+        if (pMediaTrack->jbuf.nPutGetDiff <= 0) {
+                pMediaTrack->jbuf.nPutGetDiff = 1;
+        } else {
+                pMediaTrack->jbuf.nPutGetDiff++;
+        }
 
-        pj_bool_t bGetFrame = PJ_FALSE;
-        do {
+        pj_bool_t bGetFrame = PJ_TRUE;
+        int nTestCnt = 0;
+        while(bGetFrame) {
                 char cFrameType;
                 int nSeq = 0;
-                pj_uint32_t nTs;
-                pj_size_t nFrameSize = sizeof(pMediaTrack->jbuf.getBuf);
+                pj_uint32_t nTs = 0;
+                pj_size_t nFrameSize = 0;
+                int nLastRecvRtpSeq = pMediaTrack->jbuf.nLastRecvRtpSeq;
+                if (nLastRecvRtpSeq != -1 && pMediaTrack->jbuf.nPutGetDiff < 20) {
+                        const void *pTmp = NULL;
+                        pjmedia_jbuf_peek_frame(pMediaTrack->jbuf.pJbuf, 0, &pTmp,
+                                                &nFrameSize, &cFrameType, NULL, &nTs, &nSeq);
+                        if (pTmp == NULL) {
+                                break;
+                        }
+                        if (nSeq != nLastRecvRtpSeq+1) {
+                                if (!pjmedia_jbuf_is_full(pMediaTrack->jbuf.pJbuf)) {
+                                        bGetFrame = PJ_FALSE;
+                                        continue;
+                                }
+                        }
+                        nTs = 0;
+                        nSeq = 0;
+                        nFrameSize = 0;
+                }
+                nFrameSize = sizeof(pMediaTrack->jbuf.getBuf);
                 pjmedia_jbuf_get_frame3(pMediaTrack->jbuf.pJbuf, pMediaTrack->jbuf.getBuf,
                                         &nFrameSize, &cFrameType, NULL, &nTs, &nSeq);
+                pMediaTrack->jbuf.nPutGetDiff--;
+
                 switch (cFrameType) {
                         case PJMEDIA_JB_MISSING_FRAME:
+                                pPayload = NULL;
+                                nPayloadLen = 0;
+                                bGetFrame = PJ_TRUE;
+                                break;
                         case PJMEDIA_JB_ZERO_PREFETCH_FRAME:
                         case PJMEDIA_JB_ZERO_EMPTY_FRAME:
                                 bGetFrame = PJ_FALSE;
@@ -704,12 +735,11 @@ static void on_rx_rtp(void *pUserData, void *pPkt, pj_ssize_t size)
                 if (!bGetFrame) {
                         break;
                 }
-                int nLastRecvRtpSeq = pMediaTrack->jbuf.nLastRecvRtpSeq;
-                if (nLastRecvRtpSeq == -1) {
-                        pMediaTrack->jbuf.nLastRecvRtpSeq = nSeq;
-                        nLastRecvRtpSeq = nSeq;
-                }
-                MY_PJ_LOG(3, "-->get_frame:%d  rtp seq:%d", nPayloadLen, nSeq);
+
+                pMediaTrack->jbuf.nLastRecvRtpSeq = nSeq;
+
+
+                MY_PJ_LOG(3, "%d-->get_frame:%d  rtp seq:%d", ++nTestCnt, nPayloadLen, nSeq);
 
                 //deal with payload
                 pj_bool_t bTryAgain = PJ_FALSE;
@@ -739,7 +769,7 @@ static void on_rx_rtp(void *pUserData, void *pPkt, pj_ssize_t size)
                                                                     CALLBACK_RTP,
                                                                     &rtpPacket);
                 }while(bTryAgain);
-        }while(bGetFrame);
+        };
         
         return;
 }
