@@ -218,6 +218,8 @@ SIP_ERROR_CODE SipCreateInstance(IN const SipInstanceConfig *_pConfig)
         SipAppData.OnIncomingCall = _pConfig->Cb.OnIncomingCall;
         SipAppData.nMaxAccount = _pConfig->nMaxAccount;
         SipAppData.nMaxCall = _pConfig->nMaxCall;
+        SipAppData.nAccountCount = 0;
+        SipAppData.nCallCount = 0;
         /* Init Accounts */
         int i;
 
