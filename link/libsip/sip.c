@@ -372,6 +372,9 @@ void SipDeleteAccount(IN const int _nAccountId)
         SipAccount *pAccount;
 
         PJ_LOG(4,(THIS_FILE, "Deleting account %d..", _nAccountId));
+        /* Hangup all calls */
+        SipHangUpByAccountId(_nAccountId);
+
         pj_mutex_lock(SipAppData.pMutex);
         pAccount = &SipAppData.Accounts[_nAccountId];
         /* Cancel keep alive timer */
@@ -383,7 +386,11 @@ void SipDeleteAccount(IN const int _nAccountId)
                 pjsip_transport_dec_ref(pAccount->KaTransport);
                 pAccount->KaTransport = NULL;
         }
-
+        /* Cancel auto-reregistration timer */
+        if (pAccount->AutoReReg.Active) {
+                pAccount->AutoReReg.ReRegTimer.id = PJ_FALSE;
+                pjsip_endpt_cancel_timer(SipAppData.pSipEndPoint, &pAccount->AutoReReg.ReRegTimer);
+        }
         /* Offline account */
         if (pAccount->pRegc) {
                 SipRegAccount(_nAccountId, 0);
