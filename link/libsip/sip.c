@@ -351,6 +351,8 @@ SIP_ERROR_CODE SipAddNewAccount(IN const SipAccountConfig *_pConfig, OUT int *_p
 
         SipAppData.nAccountCount++;
         SipAppData.Accounts[id].bValid = PJ_TRUE;
+        SipAppData.Accounts[id].nMaxOngoingCall = _pConfig->nMaxOngoingCall;
+        SipAppData.Accounts[id].nOngoingCall = 0;
 
         pj_mutex_unlock(SipAppData.pMutex);
 
@@ -823,7 +825,7 @@ SIP_ERROR_CODE SipMakeNewCall(IN const int _nFromAccountId, IN const char *_pDes
                 pj_mutex_unlock(SipAppData.pMutex);
                 return SIP_TOO_MANY_CALLS_FOR_INSTANCE;
         }
-        if ((SipAppData.Accounts[_nFromAccountId].nOngoingCall + 1) >= SipAppData.Accounts[_nFromAccountId].nMaxOngoingCall) {
+        if (SipAppData.Accounts[_nFromAccountId].nOngoingCall >= SipAppData.Accounts[_nFromAccountId].nMaxOngoingCall) {
                 PJ_LOG(1, (THIS_FILE, "Too many call for this account"));
                 pj_mutex_unlock(SipAppData.pMutex);
                 return SIP_TOO_MANY_CALLS_FOR_ACCOUNT;
