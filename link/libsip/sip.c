@@ -253,9 +253,6 @@ void SipDestroyInstance()
                 PJ_LOG(4, (THIS_FILE, "Destroy libSip instance ..."));
         }
 
-        /* Hangup all calls */
-        SipHangUpAll();
-
         /* offline all account */
         int i;
         for (i = 0; i < SipAppData.nMaxAccount; ++i) {
@@ -387,7 +384,7 @@ void SipDeleteAccount(IN const int _nAccountId)
                 pAccount->KaTransport = NULL;
         }
         /* Cancel auto-reregistration timer */
-        if (pAccount->AutoReReg.Active) {
+        if (pAccount->AutoReReg.ReRegTimer.id) {
                 pAccount->AutoReReg.ReRegTimer.id = PJ_FALSE;
                 pjsip_endpt_cancel_timer(SipAppData.pSipEndPoint, &pAccount->AutoReReg.ReRegTimer);
         }
