@@ -1049,7 +1049,7 @@ static pj_bool_t onRxRequest(IN pjsip_rx_data *_pRxData )
                 return PJ_TRUE;
         }
 
-        if ((SipAppData.Accounts[nToAccountId].nOngoingCall + 1) >= SipAppData.Accounts[nToAccountId].nMaxOngoingCall) {
+        if (SipAppData.Accounts[nToAccountId].nOngoingCall >= SipAppData.Accounts[nToAccountId].nMaxOngoingCall) {
                 PJ_LOG(1, (THIS_FILE, "Too many call for this account"));
                 pjsip_endpt_respond_stateless(SipAppData.pSipEndPoint, _pRxData, PJSIP_SC_BUSY_HERE,
                                               NULL, NULL, NULL);
