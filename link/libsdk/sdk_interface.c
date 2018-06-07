@@ -38,7 +38,7 @@ static CodecType ConversionFormat(Codec _nCodec)
 
 ErrorID InitSDK( Media* _pMediaConfigs, int _nSize)
 {
-       SipCallBack cb;
+       SipInstanceConfig config;
        pUAManager->videoConfigs.nCount = 0;
        pUAManager->audioConfigs.nCount = 0;
        for (int count = 0; count < _nSize; ++count) {
@@ -57,10 +57,15 @@ ErrorID InitSDK( Media* _pMediaConfigs, int _nSize)
                        ++pUAManager->audioConfigs.nCount;
                }
         }
-        cb.OnIncomingCall  = &cbOnIncomingCall;
-        cb.OnCallStateChange = &cbOnCallStateChange;
-        cb.OnRegStatusChange = &cbOnRegStatusChange;
-        SipCreateInstance(&cb);
+        config.Cb.OnIncomingCall  = &cbOnIncomingCall;
+        config.Cb.OnCallStateChange = &cbOnCallStateChange;
+        config.Cb.OnRegStatusChange = &cbOnRegStatusChange;
+        config.nMaxCall = 10;
+        config.nMaxAccount = 10;
+        // debug code.
+        SipSetLogLevel(4);
+        SipCreateInstance(&config);
+        INIT_LIST_HEAD(&pUAManager->UAList.list);
         pUAManager->bInitSdk = true;
         return RET_OK;
 }
@@ -85,13 +90,16 @@ ErrorID UninitSDK()
         return RET_OK;
 }
 
-static UA* FindUA(UAManager* _pUAManager, AccountID _nAccountId, struct list_head *pos)
+static UA* FindUA(UAManager* _pUAManager, AccountID _nAccountId, struct list_head **po)
 {
         UA* pUA;
-        struct list_head *q;
+        struct list_head *q, *pos;
+        DBG_LOG("FindUA in %p %p %p\n", &_pUAManager->UAList.list, pos, q);
         list_for_each_safe(pos, q, &_pUAManager->UAList.list) {
+                DBG_LOG("FindUA pos %p\n", pos);
                 pUA = list_entry(pos, UA, list);
                 if (pUA->id == _nAccountId) {
+                        *po = pos;
                         return pUA;
                 }
         }
@@ -117,10 +125,10 @@ AccountID Register(const char* _id, const char* _password, const char* _pSigHost
     return pUA->id;
 }
 
-ErrorID UnRegister( AccountID _nAccountId )
+ErrorID UnRegister(AccountID _nAccountId)
 {
     struct list_head *pos;
-    UA *pUA = FindUA(pUAManager, _nAccountId, pos);
+    UA *pUA = FindUA(pUAManager, _nAccountId, &pos);
     if (pUA != NULL) {
             list_del(pos);
             UAUnRegister(pUA);
@@ -136,7 +144,7 @@ ErrorID MakeCall(AccountID _nAccountId, const char* id, const char* _pDestUri, O
     if ( !_pDestUri || !_pCallId )
         return RET_PARAM_ERROR;
 
-    UA *pUA = FindUA(pUAManager, _nAccountId, pos);
+    UA *pUA = FindUA(pUAManager, _nAccountId, &pos);
     if (pUA != NULL) {
             return UAMakeCall(pUA, id, _pDestUri, _pCallId);
     }
@@ -155,7 +163,7 @@ ErrorID PollEvent(AccountID _nAccountID, EventType* _pType, Event* _pEvent, int 
     }
 
 
-    pUA = FindUA(pUAManager, _nAccountID, pos);
+    pUA = FindUA(pUAManager, _nAccountID, &pos);
     if (pUA == NULL) {
             return RET_ACCOUNT_NOT_EXIST;
     }
@@ -199,7 +207,7 @@ ErrorID AnswerCall(AccountID id, int _nCallId)
 {
     struct list_head *pos;
     
-    UA *pUA = FindUA(pUAManager, id, pos);
+    UA *pUA = FindUA(pUAManager, id, &pos);
     if (pUA != NULL) {
             return UAAnswerCall(pUA, _nCallId);
     }
@@ -211,7 +219,7 @@ ErrorID RejectCall( AccountID id, int _nCallId )
 {
     struct list_head *pos;
 
-    UA *pUA = FindUA(pUAManager, id, pos);
+    UA *pUA = FindUA(pUAManager, id, &pos);
     if (pUA != NULL) {
             return UAAnswerCall(pUA, _nCallId);
     }
@@ -223,7 +231,7 @@ ErrorID HangupCall( AccountID id, int _nCallId )
 {
     struct list_head *pos;
 
-    UA *pUA = FindUA(pUAManager, id, pos);
+    UA *pUA = FindUA(pUAManager, id, &pos);
     if (pUA != NULL) {
             return UAHangupCall(pUA, _nCallId);
     }
@@ -235,7 +243,7 @@ ErrorID SendPacket(AccountID id, int _nCallId, Stream streamID, const uint8_t* b
 {
     struct list_head *pos;
 
-    UA *pUA = FindUA(pUAManager, id, pos);
+    UA *pUA = FindUA(pUAManager, id, &pos);
     if (pUA != NULL) {
             return UASendPacket(pUA, _nCallId, streamID, buffer, size, nTimestamp);
     }
@@ -247,7 +255,7 @@ ErrorID Report(AccountID id, const char* message, int length)
 {
     struct list_head *pos;
 
-    UA *pUA = FindUA(pUAManager, id, pos);
+    UA *pUA = FindUA(pUAManager, id, &pos);
     if (pUA != NULL) {
             return UAReport(pUA, message, length);
     }
@@ -264,8 +272,8 @@ SipAnswerCode cbOnIncomingCall(const const int _nAccountId, const int _nCallId,
     const UA *_pUA = _pUser;
     struct list_head *pos;
     
-    UA *pUA = FindUA(pUAManager, _nAccountId, pos);
-    if (pUA == NULL && _pUA == pUA) {
+    UA *pUA = FindUA(pUAManager, _nAccountId, &pos);
+    if (pUA == NULL) {
             return DOES_NOT_EXIST_ANYWHERE;
     }
     
@@ -308,9 +316,10 @@ void cbOnRegStatusChange(const int _nAccountId, const SipAnswerCode _regStatusCo
     UA *_pUA = ( UA *)_pUser;
     struct list_head *pos;
 
-    UA *pUA = FindUA(pUAManager, _nAccountId, pos);
-    if (pUA == NULL && _pUA == pUA) {
-            DBG_ERROR("pUser is NULL\n");
+    UA *pUA = FindUA(pUAManager, _nAccountId, &pos);
+    if (pUA == NULL) {
+            DBG_ERROR("pUser is NULL %p\n", _pUA);
+            return;
     }
 
     memset( pMessage, 0, sizeof(Message) );
@@ -325,6 +334,7 @@ void cbOnRegStatusChange(const int _nAccountId, const SipAnswerCode _regStatusCo
         SendMessage( pUA->pQueue, pMessage );
     else {
         DBG_ERROR("pUA is NULL\n");
+        return NULL;
     }
 
     DBG_LOG("reg status = %d\n", _regStatusCode);
@@ -354,7 +364,7 @@ void cbOnCallStateChange(const int _nCallId, const int _nAccountId, const SipInv
             return;
     }
 
-    UA *pUA = FindUA(pUAManager, _nAccountId, pos);
+    UA *pUA = FindUA(pUAManager, _nAccountId, &pos);
     if (pUA == NULL && _pUA == pUA) {
             DBG_ERROR("pUser is NULL\n");
             return;

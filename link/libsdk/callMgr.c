@@ -1,6 +1,6 @@
 #include <string.h>
 #include "callMgr.h"
-
+#include "dbg.h"
 
 // Todo send to message queue.
 static void onRxRtp(void *_pUserData, CallbackType _type, void *_pCbData)
@@ -83,8 +83,9 @@ Call* CALLMakeCall(AccountID _nAccountId, const char* id, const char* _pDestUri,
                    OUT int* _pCallId, MediaConfig* _pVideo, MediaConfig* _pAudio,
                    const char* _pId, const char* _pPassword, const char* _pHost) 
 {
+        DBG_LOG("CALLMakeCall start \n");
         Call* pCall = (Call*)malloc(sizeof(Call));
-        if (pCall) {
+        if (pCall == NULL) {
                 return NULL;
         }
         memset(pCall, 0, sizeof(Call));
@@ -105,6 +106,7 @@ Call* CALLMakeCall(AccountID _nAccountId, const char* id, const char* _pDestUri,
         pCall->id = *_pCallId;
         pCall->callStatus = CALL_STATUS_REGISTERED;
         CheckCallStatus(pCall, CALL_STATUS_RING);
+        DBG_LOG("CALLMakeCall end %p \n", pCall);
         return pCall;
 }
 

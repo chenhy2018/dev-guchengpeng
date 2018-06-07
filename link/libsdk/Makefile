@@ -16,6 +16,8 @@ CURRENT_DIR:=$(shell pwd)
 PROJECT_PATH=../../third_party
 PJSIP_PATH=$(PROJECT_PATH)/pjproject-2.7.2
 LDFLAGS=
+CFLAGS  = -g
+
 INSTALL_DIR=$(CURRENT_DIR)/output/pjsip
 PJ_CONFIG=--disable-sdl --disable-ffmpeg --disable-v4l2 \
 		  --disable-openh264 --disable-libwebrtc --disable-sound \
@@ -81,7 +83,7 @@ sdk $(TARGET_LIBRARY) : $(LIBPJ) $(LIBSIP) $(LIBSDK) $(LIBMQTT) $(LIBRTP)
 
 $(LIBSDK) : %.o : %.c
 	mkdir -p $(SDK_OBJS_PATH) 
-	$(CC) $(INCLUDE_PATH) -c $< -o $(SDK_OBJS_PATH)/$@
+	$(CC) $(CFLAGS) $(INCLUDE_PATH) -c $< -o $(SDK_OBJS_PATH)/$@
 libsdk : $(LIBSDK)
 
 clean:

@@ -11,6 +11,7 @@
 #include "sdk_interface.h"
 #include "dbg.h"
 #include "unit_test.h"
+#include <unistd.h> 
 
 #define ARRSZ(arr) (sizeof(arr)/sizeof(arr[0]))
 
@@ -37,11 +38,11 @@ typedef struct {
 RegisterTestCase gRegisterTestCases[] =
 {
     {
-        { "normal", RET_OK },
+        { "normal", 0 },
         { "1006", "1006", HOST, HOST, HOST, 100, 1 }
     },
     {
-        { "invalid_account", RET_ACCOUNT_NOT_EXIST },
+        { "invalid_account", 0 },
         { "1006", "1007", HOST, HOST, HOST, 100, 0 }
     }
 };
@@ -95,6 +96,7 @@ int RegisterTestSuitCallback( TestSuit *this )
     pData = &pTestCases[this->index].data;
 
     if ( pData->init ) {
+        DBG_LOG("InitSDK");
         sts = InitSDK( &media, 1 );
         if ( RET_OK != sts ) {
             DBG_ERROR("sdk init error\n");
@@ -105,8 +107,31 @@ int RegisterTestSuitCallback( TestSuit *this )
     DBG_STR( pData->id );
     DBG_STR( pData->password );
     DBG_STR( pData->sigHost );
+    DBG_LOG("Register in\n");
     sts = Register( pData->id, pData->password, pData->sigHost, pData->mediaHost, pData->imHost, pData->timeOut );
-    return TEST_EQUAL( sts, pTestCases->father.expact );
+    DBG_LOG("Register out %x %x\n", sts, pTestCases->father.expact);
+    TEST_GT( sts, pTestCases->father.expact );
+    int nCallId1 = -1;
+    ErrorID id;
+    int count = 0;
+    while (count != 10) {
+            DBG_LOG("MakeCall in\n");
+            id = MakeCall(sts, pData->id, "<sip:1003@192.168.56.102>", &nCallId1);
+            if (RET_OK != id) {
+                    fprintf(stderr, "call error %d \n", id);
+                    sleep(1);
+                    ++ count;
+                    continue;
+            }
+            sleep(1);
+            DBG_LOG("HangupCall in\n");
+            int ret = HangupCall(sts, nCallId1);
+            TEST_EQUAL(ret, RET_OK);
+            DBG_LOG("HangupCall out\n");
+            sleep(1);
+            ++ count;
+    }
+    UnRegister(sts);
 }
 
 int InitAllTestSuit()

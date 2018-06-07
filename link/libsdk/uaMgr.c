@@ -13,22 +13,26 @@
 
 void OnMessage(IN const void* _pInstance, IN const char* _pTopic, IN const char* _pMessage, IN size_t nLength)
 {
-        fprintf(stderr, "%p topic %s message %s \n", _pInstance, _pTopic, _pMessage);
+        DBG_LOG("%p topic %s message %s \n", _pInstance, _pTopic, _pMessage);
 }
 
 void OnEvent(IN const void* _pInstance, IN int _nId,  IN const char* _pReason)
 {
-        fprintf(stderr, "%p id %d, reason  %s \n",_pInstance, _nId, _pReason);
+        DBG_LOG("%p id %d, reason  %s \n",_pInstance, _nId, _pReason);
         // TODO call back to user.
 }
 
-static Call* FindCall(UA* _pUa, int _nCallId, struct list_head *pos)
+static Call* FindCall(UA* _pUa, int _nCallId, struct list_head **pos)
 {
         Call* pCall;
         struct list_head *q;
-        list_for_each_safe(pos, q, &_pUa->callList.list) {
-                pCall = list_entry(pos, Call, list);
+        struct list_head *po;
+        DBG_LOG("Findcall in %p %p %p\n", &_pUa->callList.list, *pos, q);
+        list_for_each_safe(po, q, &_pUa->callList.list) {
+                pCall = list_entry(po, Call, list);
                 if (pCall->id == _nCallId) {
+                        *pos = po;
+                        DBG_LOG("Findcall out %p %p %\n", pCall, *pos);
                         return pCall;
                 }
         }
@@ -79,23 +83,22 @@ UA* UARegister(const char* _pId, const char* _pPassword, const char* _pSigHost,
                 return NULL;
         }
         memset( pUA, 0, sizeof(UA) );
-
+        INIT_LIST_HEAD(&pUA->callList.list);
         pUA->pQueue = CreateMessageQueue(MESSAGE_QUEUE_MAX);
         if (!pUA->pQueue) {
                 DBG_ERROR("queue malloc fail\n");
                 free(pUA);
                 return NULL;
         }
-        list_add(&(pUA->list), &(pUAManager->UAList.list));
         SipAccountConfig sipConfig;
         sipConfig.pUserName = _pId;
         sipConfig.pPassWord = _pPassword;
         sipConfig.pDomain = _pSigHost;
         sipConfig.pUserData = (void *)pUA;
         int nAccountId = 0;
+        DBG_LOG("UARegister %s %s %s %p \n", sipConfig.pUserName, sipConfig.pPassWord, sipConfig.pDomain, sipConfig.pUserData);
         SipAddNewAccount(&sipConfig, &nAccountId);
-        
-        SipRegAccount(nAccountId, 0);
+        SipRegAccount(nAccountId, 1);
         pUA->regStatus == TRYING;
         //mqtt create instance.
         struct MqttOptions option;
@@ -112,7 +115,7 @@ UA* UARegister(const char* _pId, const char* _pPassword, const char* _pSigHost,
 
 ErrorID UAUnRegister(UA* _pUa)
 {
-        SipRegAccount(_pUa->id, 1 );
+        SipRegAccount(_pUa->id, 0);
         MqttDestroy(_pUa->pMqttInstance);
         _pUa->pMqttInstance = NULL;
         free(_pUa);
@@ -124,6 +127,9 @@ ErrorID UAMakeCall(UA* _pUa, const char* id, const char* host, OUT int* callID)
         if (_pUa->regStatus == OK) {
                 Call* call = CALLMakeCall(_pUa->id, id, host, callID, _pUa->pVideoConfigs, _pUa->pAudioConfigs,
                                           _pUa->turnHost, _pUa->turnUsername, _pUa->turnPassword);
+                if (call == NULL) {
+                        return RET_MEM_ERROR;
+                }
                 list_add(&(call->list), &(_pUa->callList.list));
                 return RET_OK;
         }
@@ -143,8 +149,8 @@ ErrorID UAMakeCall(UA* _pUa, const char* id, const char* host, OUT int* callID)
 
 ErrorID UAAnswerCall(UA* _pUa, int nCallId)
 {
-        struct list_head *pos;
-        Call* call = FindCall(_pUa, nCallId, pos);
+        struct list_head *pos = NULL;
+        Call* call = FindCall(_pUa, nCallId, &pos);
         if (call) {
                 return CALLAnswerCall(call);
         }
@@ -155,8 +161,8 @@ ErrorID UAAnswerCall(UA* _pUa, int nCallId)
 
 ErrorID UARejectCall(UA* _pUa, int nCallId)
 {
-        struct list_head *pos;
-        Call* call = FindCall(_pUa, nCallId, pos);
+        struct list_head *pos = NULL;
+        Call* call = FindCall(_pUa, nCallId, &pos);
         if (call) {
                 ErrorID id = CALLRejectCall(call);
                 list_del(pos);
@@ -170,8 +176,8 @@ ErrorID UARejectCall(UA* _pUa, int nCallId)
 // hangup a call
 ErrorID UAHangupCall(UA* _pUa, int nCallId)
 {
-        struct list_head *pos;
-        Call* call = FindCall(_pUa, nCallId, pos);
+        struct list_head *pos = NULL;
+        Call* call = FindCall(_pUa, nCallId, &pos);
         if (call) {
                 ErrorID id =  CALLHangupCall(call);
                 list_del(pos);
@@ -186,7 +192,7 @@ ErrorID UAHangupCall(UA* _pUa, int nCallId)
 ErrorID UASendPacket(UA* _pUa, int nCallId, Stream streamID, const char* buffer, int size, int64_t nTimestamp)
 {
         struct list_head *pos;
-        Call* call = FindCall(_pUa, nCallId, pos);
+        Call* call = FindCall(_pUa, nCallId, &pos);
         if (call) {
                 return CALLSendPacket(call, streamID, buffer, size, nTimestamp);
         }
@@ -212,12 +218,12 @@ ErrorID UAPollEvent(UA* _pUa, EventType* _pType, Event* _pEvent, int _pTimeOut)
                 //To do error event and another event.
         }
         struct list_head *pos;
-        Call* call = FindCall(_pUa, nCallId, pos);
+        Call* call = FindCall(_pUa, nCallId, &pos);
         if (call) {
                 return CALLPollEvent(call, _pType, _pEvent, _pTimeOut);
         }
         else {
-                fprintf(stderr, "Call is not exist\n");
+                DBG_LOG("Call is not exist\n");
                 return RET_CALL_NOT_EXIST;
         }
 }
@@ -251,8 +257,8 @@ void UAOnRegStatusChange(UA* _pUa, const SipAnswerCode _nRegStatusCode)
 
 void UAOnCallStateChange(UA* _pUa, const int nCallId, const SipInviteState State, const SipAnswerCode StatusCode, const void *pMedia)
 {
-        struct list_head *pos;
-        Call* call = FindCall(_pUa, nCallId, pos);
+        struct list_head *pos = NULL;
+        Call* call = FindCall(_pUa, nCallId, &pos);
         if (call) {
                 CALLOnCallStateChange(call, State, StatusCode, pMedia);
                 if (StatusCode >= 400 || State == INV_STATE_DISCONNECTED) {

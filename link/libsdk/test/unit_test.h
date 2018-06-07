@@ -13,6 +13,8 @@
 #define TEST_FAIL 1
 #define TEST_PASS 0
 #define TEST_EQUAL( actual, expect ) ( actual == expect ? TEST_PASS : TEST_FAIL )
+#define TEST_GT( actual, expect ) ( actual >= expect ? TEST_PASS : TEST_FAIL )
+
 #define TEST_SUIT_MAX 256
 #define LOG(args...) printf(args)
 
