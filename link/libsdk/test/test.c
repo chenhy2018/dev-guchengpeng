@@ -11,12 +11,14 @@
 #include "sdk_interface.h"
 #include "dbg.h"
 #include "unit_test.h"
+#include "test.h"
 #include <unistd.h> 
 
 #define ARRSZ(arr) (sizeof(arr)/sizeof(arr[0]))
+#define HOST "123.59.204.198"
 
 int RegisterTestSuitCallback( TestSuit *this );
-int RegisterTestSuitInit( TestSuit *this );
+int RegisterTestSuitInit( TestSuit *this, TestSuitManager *_pManager );
 int RegisterTestSuitGetTestCase( TestSuit *this, TestCase **testCase );
 
 typedef struct {
@@ -34,7 +36,6 @@ typedef struct {
     RegisterData data;
 } RegisterTestCase;
 
-#define HOST "123.59.204.198"
 RegisterTestCase gRegisterTestCases[] =
 {
     {
@@ -56,11 +57,11 @@ TestSuit gRegisterTestSuit =
     (void*)&gRegisterTestCases,
 };
 
-
-int RegisterTestSuitInit( TestSuit *this )
+int RegisterTestSuitInit( TestSuit *this, TestSuitManager *_pManager )
 {
     this->total = ARRSZ(gRegisterTestCases);
     this->index = 0;
+    this->pManager = _pManager;
 
     return 0;
 }
@@ -134,6 +135,61 @@ int RegisterTestSuitCallback( TestSuit *this )
     UnRegister(sts);
 }
 
+void *EventLoopThread( void *arg )
+{
+    TestSuitManager *pManager = (TestSuitManager *)arg;
+    ErrorID ret = 0;
+    EventType type = 0;
+    AccountID id = 0;
+    Event event;
+    CallEvent *pCallEvent;
+    EventManger *pEventManager = &pManager->eventManager;
+
+    DBG_LOG("EventLoopThread enter ...\n");
+    if ( !pManager ) {
+        DBG_ERROR("check param error\n");
+        return NULL;
+    }
+
+    if ( pEventManager->WaitForEvent ) {
+        int ret = pEventManager->WaitForEvent( WAIT_FOR_ACCOUNTID, 5 );
+        if ( STS_OK != ret ) {
+            DBG_ERROR("wait for event WAIT_FOR_ACCOUNTID error, ret = %d\n", ret );
+            return NULL;
+        } else {
+            DBG_LOG("get WAIT_FOR_ACCOUNTID event ok\n");
+        }
+    } else {
+        DBG_ERROR("WaitForEvent error\n");
+        return NULL;
+    }
+
+    if ( !pManager->data ) {
+        DBG_ERROR("check data error\n");
+        return NULL;
+    }
+
+    id = *(AccountID *)pManager->data;
+    DBG_VAL( id );
+
+
+    for (;;) {
+        DBG_LOG("call PollEvent\n");
+        ret = PollEvent( id, &type, &event, 0 );
+        DBG_VAL( type );
+        if ( type == EVENT_CALL ) {
+            DBG_LINE();
+            pCallEvent = &event.body.callEvent;
+            if ( pManager->NotifyAllEvent ) {
+                DBG_LINE();
+                pManager->NotifyAllEvent( pCallEvent->status );
+            }
+        }
+    }
+
+    return NULL;
+}
+
 int InitAllTestSuit()
 {
     AddTestSuit( &gRegisterTestSuit );
@@ -145,6 +201,7 @@ int main()
 {
     DBG_LOG("+++++ enter main...\n");
     TestSuitManagerInit();
+    ThreadRegister( EventLoopThread );
     InitAllTestSuit();
     RunAllTestSuits();
 
