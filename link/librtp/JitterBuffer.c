@@ -66,7 +66,7 @@ void JitterBufferPush(IN JitterBuffer *_pJbuf, IN const void *_pFrame, IN int _n
         heap_entry * pEntry = heap_insert(&_pJbuf->heap, (void *)_nFrameSeq, NULL);
         _pJbuf->nCurrentSize++;
         pFrame = (JitterBufferFrame*)(pEntry->immutable);
-        pFrame->nSeq = _nFrameSeq;
+        pFrame->nSeq = _nFrameSeq & 0x0000FFFF;
         pFrame->nTs = _nTs;
         pFrame->nFrameSize = _nFrameSize;
         pFrame->pData = (uint8_t *)pEntry->immutable + sizeof(JitterBufferFrame);
@@ -97,6 +97,9 @@ void JitterBufferPop(IN JitterBuffer *_pJbuf, OUT void *_pFrame, IN OUT int *_pF
         uint32_t nMinSeq = (uint32_t)(pEntry->key);
 
         JitterBufferFrame *pFrame = (JitterBufferFrame*)pEntry->immutable;
+        if (nMinSeq == 65536) {
+                nMinSeq = 0;
+        }
         pj_assert(nMinSeq == pFrame->nSeq);
         if (_pJbuf->nFirstFlag) {
                 _pJbuf->nLastRecvRtpSeq = nMinSeq;
@@ -132,6 +135,12 @@ void JitterBufferPop(IN JitterBuffer *_pJbuf, OUT void *_pFrame, IN OUT int *_pF
                 if (_pJbuf->nCurrentSize == 0) {
                         _pJbuf->state = JB_STATE_CACHING;
                 }
+                if (*_pFrameSeq < _pJbuf->nLastRecvRtpSeq || *_pFrameSeq == 0) {
+                        _pJbuf->nLastRecvRtpSeq = *_pFrameSeq;
+                        //TOTO rebuild heap
+                        heap_rebuild(&_pJbuf->heap);
+                }
+
                 return;
         }
 }

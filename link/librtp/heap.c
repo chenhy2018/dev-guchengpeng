@@ -391,3 +391,21 @@ void heap_foreach(heap* h, void (*func)(void*,void*)) {
 }
 
 
+
+void heap_rebuild(heap *h) {
+    heap_entry* entry;
+    int entries = h->active_entries;
+    heap_entry* table = h->table;
+
+    for (int i = 0; i < entries; i++) {
+        entry = GET_ENTRY(i,table);
+        uint32_t nkey = (uint32_t)entry->key;
+        nkey &= 0x0000FFFF;
+        entry->key = (void *)nkey;
+    }
+    h->active_entries = 0;
+    for (int i = 0; i < entries; i++) {
+        entry = GET_ENTRY(i,table);
+        heap_insert(h, entry->key, entry->value);
+    }
+}

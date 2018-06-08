@@ -78,6 +78,7 @@ int heap_delmin(heap* h, heap_entry **pEntry);
  */
 void heap_foreach(heap* h, void (*func)(void*,void*));
 
+void heap_rebuild(heap* h);
 /**
  * Destroys and cleans up a heap.
  * @param h The heap to destroy.
