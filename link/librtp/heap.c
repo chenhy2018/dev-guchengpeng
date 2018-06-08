@@ -88,8 +88,8 @@ static void map_out_pages(void* addr, int page_count) {
 // This is a comparison function that treats keys as signed ints
 int compare_int_keys(register void* key1, register void* key2) {
     // Cast them as int and read them in
-    register int key1_v = (int)key1;
-    register int key2_v = (int)key2;
+    register uint32_t key1_v = (uint32_t)key1;
+    register uint32_t key2_v = (uint32_t)key2;
 
     // Perform the comparison
     if (key1_v < key2_v)

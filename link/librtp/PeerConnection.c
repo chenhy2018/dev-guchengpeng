@@ -686,7 +686,7 @@ static void on_rx_rtp(void *pUserData, void *pPkt, pj_ssize_t size)
         int nTestCnt = 0;
         while(bGetFrame) {
                 JBFrameStatus popFrameType;
-                int nSeq = 0;
+                uint32_t nSeq = 0;
                 pj_uint32_t nTs = 0;
                 int nFrameSize = 0;
                 

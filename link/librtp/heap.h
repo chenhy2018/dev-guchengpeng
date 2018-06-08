@@ -6,6 +6,7 @@
 
 #ifndef HEAP_H
 #define HEAP_H
+#include <stdint.h>
 
 // Structure for a single heap entry
 typedef struct heap_entry {

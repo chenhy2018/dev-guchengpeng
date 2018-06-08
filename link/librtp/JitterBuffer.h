@@ -27,9 +27,10 @@ typedef struct _JitterBuffer {
         int nMaxFrameSize;
 
         JBStatus state;
+        uint32_t nHighSeq;
 
         int nCurrentSize;
-        int nLastRecvRtpSeq;
+        uint32_t nLastRecvRtpSeq;
         char getBuf[1500];
         pj_pool_t *pJitterPool;
 }JitterBuffer;
@@ -37,10 +38,10 @@ typedef struct _JitterBuffer {
 pj_status_t JitterBufferInit(OUT JitterBuffer *pJbuf, IN int nMaxBufferCount, IN int nInitCacheCount,
                       IN pj_pool_t *pJitterPool, IN int nMaxFrameSize);
 void JitterBufferPush(IN JitterBuffer *pJbuf, IN const void *pFrame, IN int nFrameSize,
-                        IN int nFrameSeq, IN uint32_t nTs, OUT int *pDiscarded);
+                        IN uint32_t nFrameSeq, IN uint32_t nTs, OUT int *pDiscarded);
 void JitterBufferPop(IN JitterBuffer *pJbuf, OUT void *pFrame, IN OUT int *pFrameSize,
-                     OUT int *pFrameSeq, OUT uint32_t *pTs, OUT JBFrameStatus *pFrameStatus);
+                     OUT uint32_t *pFrameSeq, OUT uint32_t *pTs, OUT JBFrameStatus *pFrameStatus);
 void JitterBufferPeek(IN JitterBuffer *pJbuf, OUT const void **pFrame, OUT int *pFrameSize,
-                     OUT int *pFrameSeq, OUT uint32_t *pTs, OUT JBFrameStatus *pFrameStatus);
+                     OUT uint32_t *pFrameSeq, OUT uint32_t *pTs, OUT JBFrameStatus *pFrameStatus);
 
 #endif

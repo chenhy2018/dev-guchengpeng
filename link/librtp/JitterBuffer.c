@@ -1,7 +1,7 @@
 #include "JitterBuffer.h"
 
 typedef struct _JitterBufferFrame {
-        int nSeq;
+        uint32_t nSeq;
         uint32_t nTs;
         int nFrameSize;
         void * pData;
@@ -36,7 +36,7 @@ pj_status_t JitterBufferInit(OUT JitterBuffer *_pJbuf, IN int _nMaxBufferCount, 
 }
 
 void JitterBufferPush(IN JitterBuffer *_pJbuf, IN const void *_pFrame, IN int _nFrameSize,
-                      IN int _nFrameSeq, IN uint32_t _nTs, OUT int *_pDiscarded)
+                      IN uint32_t _nFrameSeq, IN uint32_t _nTs, OUT int *_pDiscarded)
 {
         pj_assert(_pJbuf && _pFrame);
 
@@ -75,7 +75,7 @@ void JitterBufferPush(IN JitterBuffer *_pJbuf, IN const void *_pFrame, IN int _n
 }
 
 void JitterBufferPop(IN JitterBuffer *_pJbuf, OUT void *_pFrame, IN OUT int *_pFrameSize,
-                     OUT int *_pFrameSeq, OUT uint32_t *_pTs, OUT JBFrameStatus *_pFrameStatus)
+                     OUT uint32_t *_pFrameSeq, OUT uint32_t *_pTs, OUT JBFrameStatus *_pFrameStatus)
 {
         if (_pJbuf->state == JB_STATE_CACHING){
                 *_pFrameStatus = JBFRAME_STATE_CACHING;
@@ -90,7 +90,7 @@ void JitterBufferPop(IN JitterBuffer *_pJbuf, OUT void *_pFrame, IN OUT int *_pF
         heap_entry *pEntry = NULL;
         heap_min(&_pJbuf->heap, &pEntry);
 
-        int nMinSeq = (int)(pEntry->key);
+        uint32_t nMinSeq = (uint32_t)(pEntry->key);
 
         JitterBufferFrame *pFrame = (JitterBufferFrame*)pEntry->immutable;
         pj_assert(nMinSeq == pFrame->nSeq);
@@ -133,7 +133,7 @@ void JitterBufferPop(IN JitterBuffer *_pJbuf, OUT void *_pFrame, IN OUT int *_pF
 }
 
 void JitterBufferPeek(IN JitterBuffer *_pJbuf, OUT const void **_pFrame, OUT int *_pFrameSize,
-                      OUT int *_pFrameSeq, OUT uint32_t *_pTs, OUT JBFrameStatus *_pFrameStatus)
+                      OUT uint32_t *_pFrameSeq, OUT uint32_t *_pTs, OUT JBFrameStatus *_pFrameStatus)
 {
         
 }
