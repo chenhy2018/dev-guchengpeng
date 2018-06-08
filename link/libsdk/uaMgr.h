@@ -6,7 +6,7 @@
 // register a account
 // @return UA struct point. If return NULL, error.
 UA* UARegister(const char* id, const char* password, const char* sigHost,
-               const char* mediaHost, const char* imHost, int timeOut,
+               const char* mediaHost, const char* imHost,
                MediaConfig* pVideo, MediaConfig* pAudio);
 
 ErrorID UAUnRegister(UA* _pUa);

@@ -120,7 +120,7 @@ ErrorID UninitSDK();
 // register a account
 // @return if return value > 0, it is the account id, if < 0, it is the ErrorID
 AccountID Register(const char* id, const char* password, const char* sigHost,
-                   const char* mediaHost, const char* imHost, int timeOut );
+                   const char* mediaHost, const char* imHost);
 ErrorID UnRegister( AccountID id );
 // make a call, user need to save call id
 ErrorID MakeCall(AccountID accountID, const char* id, const char* host, OUT int* callID);
@@ -133,7 +133,7 @@ ErrorID SendPacket(AccountID id, int callID, Stream streamID, const uint8_t* buf
 // poll a event
 // if the EventData have video or audio data
 // the user shuould copy the the packet data as soon as possible
-ErrorID PollEvent(AccountID id, EventType* type, Event* event, int timeOut );
+ErrorID PollEvent(AccountID id, EventType* type, Event* event, int timeOut);
 
 // mqtt report
 ErrorID Report(AccountID id, const char* message, int length);

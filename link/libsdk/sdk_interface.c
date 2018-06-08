@@ -36,6 +36,7 @@ static CodecType ConversionFormat(Codec _nCodec)
         return MEDIA_FORMAT_H264;
 }
 
+
 ErrorID InitSDK( Media* _pMediaConfigs, int _nSize)
 {
        SipInstanceConfig config;
@@ -43,14 +44,14 @@ ErrorID InitSDK( Media* _pMediaConfigs, int _nSize)
        pUAManager->audioConfigs.nCount = 0;
        for (int count = 0; count < _nSize; ++count) {
                if (_pMediaConfigs[count].streamType == STREAM_VIDEO) {
-                       pUAManager->videoConfigs.configs[pUAManager->videoConfigs.nCount].streamType = STREAM_VIDEO;
+                       pUAManager->videoConfigs.configs[pUAManager->videoConfigs.nCount].streamType = RTP_STREAM_VIDEO;
                        pUAManager->videoConfigs.configs[pUAManager->videoConfigs.nCount].codecType = ConversionFormat(_pMediaConfigs[count].codecType);
                        pUAManager->videoConfigs.configs[pUAManager->videoConfigs.nCount].nSampleOrClockRate = _pMediaConfigs[count].sampleRate;
                        pUAManager->videoConfigs.configs[pUAManager->videoConfigs.nCount].nChannel = _pMediaConfigs[count].channels;
                        ++pUAManager->videoConfigs.nCount;
                }
                else if (_pMediaConfigs[count].streamType == STREAM_AUDIO) {
-                       pUAManager->audioConfigs.configs[pUAManager->audioConfigs.nCount].streamType = STREAM_AUDIO;
+                       pUAManager->audioConfigs.configs[pUAManager->audioConfigs.nCount].streamType = RTP_STREAM_AUDIO;
                        pUAManager->audioConfigs.configs[pUAManager->audioConfigs.nCount].codecType = ConversionFormat(_pMediaConfigs[count].codecType);
                        pUAManager->audioConfigs.configs[pUAManager->audioConfigs.nCount].nSampleOrClockRate = _pMediaConfigs[count].sampleRate;
                        pUAManager->audioConfigs.configs[pUAManager->audioConfigs.nCount].nChannel = _pMediaConfigs[count].channels;
@@ -107,10 +108,10 @@ static UA* FindUA(UAManager* _pUAManager, AccountID _nAccountId, struct list_hea
 }
 
 AccountID Register(const char* _id, const char* _password, const char* _pSigHost,
-                   const char* _pMediaHost, const char* _pImHost, int _nTimeOut)
+                   const char* _pMediaHost, const char* _pImHost)
 {
     int nAccountId = 0;
-    UA *pUA = UARegister(_id, _password, _pSigHost, _pMediaHost, _pImHost, _nTimeOut, &pUAManager->videoConfigs, &pUAManager->audioConfigs);
+    UA *pUA = UARegister(_id, _password, _pSigHost, _pMediaHost, _pImHost, &pUAManager->videoConfigs, &pUAManager->audioConfigs);
     int nReason = 0;
 
     if (!pUAManager->bInitSdk) {
@@ -178,7 +179,6 @@ ErrorID PollEvent(AccountID _nAccountID, EventType* _pType, Event* _pEvent, int 
         free( pEvent );
         pEvent = NULL;
     }
-
     if (_nTimeOut) {
         pMessage = ReceiveMessageTimeout( pUA->pQueue, _nTimeOut );
     } else {
@@ -336,7 +336,7 @@ void cbOnRegStatusChange(const int _nAccountId, const SipAnswerCode _regStatusCo
         SendMessage( pUA->pQueue, pMessage );
     else {
         DBG_ERROR("pUA is NULL\n");
-        return NULL;
+        return;
     }
 
     DBG_LOG("reg status = %d\n", _regStatusCode);
