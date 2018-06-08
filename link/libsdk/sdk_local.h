@@ -16,6 +16,7 @@
 #include "sdk_interface.h"
 #include "queue.h"
 #include "sip.h"
+#include "sdp.h"
 #include "qrtc.h"
 
 #define MESSAGE_QUEUE_MAX (256)
@@ -30,7 +31,6 @@ typedef struct {
         pjmedia_sdp_session* pOffer;
         pjmedia_sdp_session* pAnswer;
         IceConfig iceConfig;
-        void* pMedia;
 }Call;
 
 typedef struct {
@@ -44,16 +44,16 @@ typedef struct {
         char turnHost[MAX_TURN_HOST_SIZE];
         char turnUsername[MAX_TURN_USR_SIZE];
         char turnPassword[MAX_TURN_PWD_SIZE];
-        MediaConfig* pVideoConfigs;
-        MediaConfig* pAudioConfigs;
+        MediaConfigSet* pVideoConfigs;
+        MediaConfigSet* pAudioConfigs;
         Call callList;
 }UA;
 
 typedef struct {
         UA UAList;
         bool bInitSdk;
-        MediaConfig videoConfigs;
-        MediaConfig audioConfigs;
+        MediaConfigSet videoConfigs;
+        MediaConfigSet audioConfigs;
 }UAManager;
 
 extern UAManager *pUAManager;;

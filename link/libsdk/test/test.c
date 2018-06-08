@@ -114,17 +114,18 @@ int RegisterTestSuitCallback( TestSuit *this )
     TEST_GT( sts, pTestCases->father.expact );
     int nCallId1 = -1;
     ErrorID id;
+    //sleep(10);
     int count = 0;
     while (count != 10) {
             DBG_LOG("MakeCall in\n");
-            id = MakeCall(sts, pData->id, "<sip:1003@192.168.56.102>", &nCallId1);
+            id = MakeCall(sts, pData->id, "<sip:1009@123.59.204.198>", &nCallId1);
             if (RET_OK != id) {
                     fprintf(stderr, "call error %d \n", id);
                     sleep(1);
                     ++ count;
                     continue;
             }
-            sleep(1);
+            sleep(15);
             DBG_LOG("HangupCall in\n");
             int ret = HangupCall(sts, nCallId1);
             TEST_EQUAL(ret, RET_OK);

@@ -36,7 +36,8 @@ rm -rvf ${OUTPUT}/ori/$1/libpjsua2-x86_64-unknown-linux-gnu.a
 
 cp -rvf ${OUTPUT}/libsip/*.o ${OUTPUT}/objs
 cp -rvf ${OUTPUT}/libsdk/*.o ${OUTPUT}/objs
-
+cp -rvf ../libmqtt/*.a ${OUTPUT}/ori/$1
+cp -rvf ../librtp/*.a ${OUTPUT}/ori/$1
 cd ${OUTPUT}/ori/$1
 for f in ./*
 do

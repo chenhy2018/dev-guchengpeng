@@ -78,17 +78,9 @@ ErrorID CheckCallStatus(Call* _pCall, CallStatus expectedState)
        return RET_FAIL;
 }
 
-// make a call, user need to save call id . add parameter for ice info and media info.
-Call* CALLMakeCall(AccountID _nAccountId, const char* id, const char* _pDestUri,
-                   OUT int* _pCallId, MediaConfig* _pVideo, MediaConfig* _pAudio,
-                   const char* _pId, const char* _pPassword, const char* _pHost) 
+ErrorID InitRtp(Call* pCall, const char* _pId, const char* _pPassword, const char* _pHost,
+                MediaConfigSet* _pVideo, MediaConfigSet* _pAudio)
 {
-        DBG_LOG("CALLMakeCall start \n");
-        Call* pCall = (Call*)malloc(sizeof(Call));
-        if (pCall == NULL) {
-                return NULL;
-        }
-        memset(pCall, 0, sizeof(Call));
         // rtp to do. ice config.media info. and check error)
         InitIceConfig(&pCall->iceConfig);
         strcpy(&pCall->iceConfig.turnHost[0], _pHost);
@@ -102,6 +94,20 @@ Call* CALLMakeCall(AccountID _nAccountId, const char* id, const char* _pDestUri,
         createOffer(pCall->pPeerConnection, &pCall->pOffer);
         setLocalDescription(pCall->pPeerConnection, pCall->pOffer);
         pCall->pAnswer = NULL;
+        return RET_OK;
+}
+                
+// make a call, user need to save call id . add parameter for ice info and media info.
+Call* CALLMakeCall(AccountID _nAccountId, const char* id, const char* _pDestUri,
+                   OUT int* _pCallId, MediaConfigSet* _pVideo, MediaConfigSet* _pAudio,
+                   const char* _pId, const char* _pPassword, const char* _pHost) 
+{
+        DBG_LOG("CALLMakeCall start \n");
+        Call* pCall = (Call*)malloc(sizeof(Call));
+        if (pCall == NULL) {
+                return NULL;
+        }
+        memset(pCall, 0, sizeof(Call));
         SipMakeNewCall(_nAccountId, _pDestUri, pCall->pOffer, _pCallId);
         pCall->id = *_pCallId;
         pCall->callStatus = CALL_STATUS_REGISTERED;
@@ -172,12 +178,12 @@ ErrorID CALLSendPacket(Call* _pCall, Stream streamID, const uint8_t* buffer, int
               return id;
         }
         RtpPacket packet = {buffer, size, nTimestamp, streamID};
-        return SendPacket_1(_pCall->pPeerConnection, &packet);
+        return SendRtpPacket(_pCall->pPeerConnection, &packet);
         //return RET_OK;
 }
 
 SipAnswerCode CALLOnIncomingCall(Call** _pCall, const int _nCallId, const char *pFrom,
-                                 const void *pMedia, MediaConfig* _pVideo, MediaConfig* _pAudio,
+                                 const void *pMedia, MediaConfigSet* _pVideo, MediaConfigSet* _pAudio,
                                  const char* _pId, const char* _pPassword, const char* _pHost)
 {
         Call* pCall = (Call*)malloc(sizeof(Call));
@@ -196,13 +202,15 @@ SipAnswerCode CALLOnIncomingCall(Call** _pCall, const int _nCallId, const char *
         setLocalDescription(pCall->pPeerConnection, pCall->pAnswer);
 }
 
-void CALLOnCallStateChange(Call* _pCall, const SipInviteState State, const SipAnswerCode StatusCode, const void *pMedia)
+void CALLOnCallStateChange(Call** _pCall, const SipInviteState State, const SipAnswerCode StatusCode, const void *pMedia)
 {
-        _pCall->callStatus = State;
+        (*_pCall)->callStatus = State;
         //todo free disconnected call.
-        if (StatusCode >= 400 || _pCall->callStatus == INV_STATE_DISCONNECTED) {
-                ReleasePeerConnectoin(_pCall->pPeerConnection);
-                free(_pCall);
+        DBG_LOG("stats %d state %d call %p\n", State, StatusCode, *_pCall);
+        if (StatusCode >= 400 || (*_pCall)->callStatus == INV_STATE_DISCONNECTED) {
+                CALLHangupCall(*_pCall);
+                //free(*_pCall);
+                DBG_LOG("stats %d state %d call %p\n", State, StatusCode, *_pCall);
         }
 }
 

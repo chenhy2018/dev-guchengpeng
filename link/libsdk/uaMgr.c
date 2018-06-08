@@ -10,7 +10,6 @@
 #include "callMgr.h"
 #include "qrtc.h"
 
-
 void OnMessage(IN const void* _pInstance, IN const char* _pTopic, IN const char* _pMessage, IN size_t nLength)
 {
         DBG_LOG("%p topic %s message %s \n", _pInstance, _pTopic, _pMessage);
@@ -32,40 +31,40 @@ static Call* FindCall(UA* _pUa, int _nCallId, struct list_head **pos)
                 pCall = list_entry(po, Call, list);
                 if (pCall->id == _nCallId) {
                         *pos = po;
-                        DBG_LOG("Findcall out %p %p %\n", pCall, *pos);
+                        DBG_LOG("Findcall out %p %p\n", pCall, *pos);
                         return pCall;
                 }
         }
         return NULL;
 }
 
-void InitMqtt(struct MqttOptions options, const char* _pId, const char* _pPassword, const char* _pImHost)
+void InitMqtt(struct MqttOptions* options, const char* _pId, const char* _pPassword, const char* _pImHost)
 {
 //Init option.
-        options.pId = _pId;
-        options.bCleanSession = false;
-        options.primaryUserInfo.nAuthenicatinMode = MQTT_AUTHENTICATION_USER;
-        options.primaryUserInfo.pHostname = _pImHost;
+        options->pId = (char*)(_pId);
+        options->bCleanSession = false;
+        options->primaryUserInfo.nAuthenicatinMode = MQTT_AUTHENTICATION_USER;
+        options->primaryUserInfo.pHostname = (char*)(_pImHost);
         //strcpy(options.bindaddress, "172.17.0.2");
-        options.secondaryUserInfo.pHostname = NULL;
+        options->secondaryUserInfo.pHostname = NULL;
         //strcpy(options.secondBindaddress, "172.17.0.2`");
-        options.primaryUserInfo.pUsername = _pId;
-        options.primaryUserInfo.pPassword = _pPassword;
-        options.secondaryUserInfo.pUsername = NULL;
-        options.secondaryUserInfo.pPassword = NULL;
-        options.secondaryUserInfo.nPort = 0;
-        options.primaryUserInfo.nPort = 1883;
-        options.primaryUserInfo.pCafile = NULL;
-        options.primaryUserInfo.pCertfile = NULL;
-        options.primaryUserInfo.pKeyfile = NULL;
-        options.secondaryUserInfo.pCafile = NULL;
-        options.secondaryUserInfo.pCertfile = NULL;
-        options.secondaryUserInfo.pKeyfile = NULL;
-        options.nKeepalive = 10;
-        options.nQos = 0;
-        options.bRetain = false;
-        options.callbacks.OnMessage = &OnMessage;
-        options.callbacks.OnEvent = &OnEvent;
+        options->primaryUserInfo.pUsername = (char*)(_pId);
+        options->primaryUserInfo.pPassword = (char*)(_pPassword);
+        options->secondaryUserInfo.pUsername = NULL;
+        options->secondaryUserInfo.pPassword = NULL;
+        options->secondaryUserInfo.nPort = 0;
+        options->primaryUserInfo.nPort = 1883;
+        options->primaryUserInfo.pCafile = NULL;
+        options->primaryUserInfo.pCertfile = NULL;
+        options->primaryUserInfo.pKeyfile = NULL;
+        options->secondaryUserInfo.pCafile = NULL;
+        options->secondaryUserInfo.pCertfile = NULL;
+        options->secondaryUserInfo.pKeyfile = NULL;
+        options->nKeepalive = 10;
+        options->nQos = 0;
+        options->bRetain = false;
+        options->callbacks.OnMessage = &OnMessage;
+        options->callbacks.OnEvent = &OnEvent;
 
 }
 
@@ -75,6 +74,7 @@ UA* UARegister(const char* _pId, const char* _pPassword, const char* _pSigHost,
                const char* _pMediaHost, const char* _pImHost, int _nTimeOut,
                MediaConfig* _pVideo, MediaConfig* _pAudio)
 {
+
         UA *pUA = (UA *) malloc (sizeof(UA));
         int nReason = 0;
 
@@ -95,14 +95,16 @@ UA* UARegister(const char* _pId, const char* _pPassword, const char* _pSigHost,
         sipConfig.pPassWord = _pPassword;
         sipConfig.pDomain = _pSigHost;
         sipConfig.pUserData = (void *)pUA;
+        sipConfig.nMaxOngoingCall = 10;
         int nAccountId = 0;
-        DBG_LOG("UARegister %s %s %s %p \n", sipConfig.pUserName, sipConfig.pPassWord, sipConfig.pDomain, sipConfig.pUserData);
+        DBG_LOG("UARegister %s %s %s %p ongoing call %d\n", sipConfig.pUserName, sipConfig.pPassWord, sipConfig.pDomain, sipConfig.pUserData, sipConfig.nMaxOngoingCall);
         SipAddNewAccount(&sipConfig, &nAccountId);
         SipRegAccount(nAccountId, 1);
         pUA->regStatus == TRYING;
         //mqtt create instance.
         struct MqttOptions option;
-        InitMqtt(option, _pId, _pPassword, _pImHost);
+        InitMqtt(&option, _pId, _pPassword, _pImHost);
+        DBG_LOG("NOT MQTT");
         pUA->pMqttInstance = MqttCreateInstance(&option);
         pUA->id = nAccountId;
         pUA->pVideoConfigs = _pVideo;
@@ -258,11 +260,16 @@ void UAOnRegStatusChange(UA* _pUa, const SipAnswerCode _nRegStatusCode)
 void UAOnCallStateChange(UA* _pUa, const int nCallId, const SipInviteState State, const SipAnswerCode StatusCode, const void *pMedia)
 {
         struct list_head *pos = NULL;
+        DBG_LOG("UA call statue change");
         Call* call = FindCall(_pUa, nCallId, &pos);
         if (call) {
-                CALLOnCallStateChange(call, State, StatusCode, pMedia);
-                if (StatusCode >= 400 || State == INV_STATE_DISCONNECTED) {
+                DBG_LOG("call %p", call);
+                CALLOnCallStateChange(&call, State, StatusCode, pMedia);
+                DBG_LOG("call change end \n");
+                if (StatusCode >= 400 && State == INV_STATE_DISCONNECTED) {
+                                DBG_LOG("Findcall out %p \n", pos);
                                 list_del(pos);
+                                DBG_LOG("Findcall out %p \n", pos);
                 }
         }
 }
