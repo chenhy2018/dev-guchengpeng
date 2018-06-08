@@ -30,24 +30,29 @@ TODO 已解决
 6. 发送数据的接受到数据和rtcp的回调函数, 已完成
     pcmu能正常接收数据了
 
-TODO 未解决
-7. 发送h264的时候rtp marker字段设置，packetizer并不会设置这个字段 
+7. 发送h264的时候rtp marker字段设置，packetizer并不会设置这个字段 :已解决
      ffmpeg推流，wireshark抓包分析，发现marker位不能单独判断帧的起始， 并且奇怪的时候stap有时候设置marker有时候不设置
 	 如果是stap-a类型，就是完整的一帧， 如果是fu-a类型，就要结合fu header和marker位来判断了
-     所以在发送的时候也这样设置
+     所以在发送的时候也这样设置.
+     最后方法是没有使用marker bit，通过fu-a类型判断的
+
 8. 接收数据的回调函数分别处理音频和视频
      1) 音视频分别处理
      2) 根据samplerate或者clockrate还原时间戳
      目前pcmu传输和接收没有问题, 时间戳未还原
-     初步的想法， 维护一个 解包的结构，包含时间戳等信息
-  h264_packetizer是可以同时pack和unpack的，但是h264来看，packetizer不会维护完整一帧的数据
+  h264_packetizer是可以同时pack和unpack的，但是h264来看，packetizer不会维护完整一帧的数据, 封装了下packitizer，来维护h264的数据
 
 9. rtp丢包了怎么办。可能是通过rtp的序列号来判断是否丢包
-   pjmedia h264 packetizer接口说明，貌似丢包了以null去调用，会更新内部状态， 每丢一个包调用一次吗？
+   pjmedia h264 packetizer接口说明，貌似丢包了以null去调用，会更新内部状态， 每丢一个包调用一次吗？,目前做法，丢包会null调用一次
+   自己写了jitterbuffer. pjsip的pjmedia_jbuf，测试了下，无论adpative参数怎么调整，push的比第一个frame seq大的frame都会被discard，所以没有
 
-
-10. 音频的rtp marker位是否需要设置?
+TODO 未解决
+10. rtp 序列号restart
 11.  时间戳维护, rtp时间戳溢出问题？
+
+
+
+12. 音频的rtp marker位是否需要设置?
 
 
 
