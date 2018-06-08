@@ -1,4 +1,4 @@
-// Last Update:2018-06-08 19:35:30
+// Last Update:2018-06-08 20:13:25
 /**
  * @file test.c
  * @brief 
@@ -16,6 +16,7 @@
 
 #define ARRSZ(arr) (sizeof(arr)/sizeof(arr[0]))
 #define HOST "123.59.204.198"
+#define INVALID_SERVER "192,.168.1.239"
 
 int RegisterTestSuitCallback( TestSuit *this );
 int RegisterTestSuitInit( TestSuit *this, TestSuitManager *_pManager );
@@ -24,6 +25,8 @@ int RegisterTestSuitCallback2( TestSuit *this );
 void *UA1_EventLoopThread( void *arg );
 void *UA2_EventLoopThread( void *arg );
 void *UA3_EventLoopThread( void *arg );
+void *UA4_EventLoopThread( void *arg );
+void *UA5_EventLoopThread( void *arg );
 
 typedef struct {
     char *id;
@@ -51,8 +54,16 @@ RegisterTestCase gRegisterTestCases[] =
         { "1003", "1003", HOST, HOST, HOST, 10, 0 }
     },
     {
-        { "invalid_account", CALL_STATUS_REGISTER_FAIL, UA3_EventLoopThread },
+        { "invalid_account1", CALL_STATUS_REGISTER_FAIL, UA3_EventLoopThread },
         { "1003", "1004", HOST, HOST, HOST, 10, 0 }
+    },
+    {
+        { "invalid_account2", CALL_STATUS_REGISTER_FAIL, UA4_EventLoopThread },
+        { "0000", "0000", HOST, HOST, HOST, 10, 0 }
+    },
+    {
+        { "invalid_sip_register_server", CALL_STATUS_REGISTER_FAIL, UA5_EventLoopThread },
+        { "1003", "1003", INVALID_SERVER, INVALID_SERVER, INVALID_SERVER, 10, 0 }
     }
 };
 
@@ -347,7 +358,89 @@ void *UA3_EventLoopThread( void *arg )
     return NULL;
 }
 
+void *UA4_EventLoopThread( void *arg )
+{
+    TestSuitManager *pManager = (TestSuitManager *)arg;
+    ErrorID ret = 0;
+    EventType type = 0;
+    AccountID id = 0;
+    Event event, *pEvent;
+    CallEvent *pCallEvent;
+    EventManger *pEventManager = &pManager->eventManager;
 
+    UT_LOG("EventLoopThread enter ...\n");
+    if ( !pManager ) {
+        UT_ERROR("check param error\n");
+        return NULL;
+    }
+
+    if ( !pManager->data ) {
+        UT_ERROR("check data error\n");
+        return NULL;
+    }
+
+    id = *(AccountID *)pManager->data;
+    UT_VAL( id );
+
+
+    for (;;) {
+        UT_LOG("call PollEvent\n");
+        ret = PollEvent( id, &type, &pEvent, 0 );
+        UT_VAL( type );
+        if ( type == EVENT_CALL ) {
+            UT_LINE();
+            pCallEvent = &pEvent->body.callEvent;
+            if ( pManager->NotifyAllEvent ) {
+                UT_VAL( pCallEvent->status );
+                pManager->NotifyAllEvent( pCallEvent->status );
+            }
+        }
+    }
+
+    return NULL;
+}
+
+void *UA5_EventLoopThread( void *arg )
+{
+    TestSuitManager *pManager = (TestSuitManager *)arg;
+    ErrorID ret = 0;
+    EventType type = 0;
+    AccountID id = 0;
+    Event event, *pEvent;
+    CallEvent *pCallEvent;
+    EventManger *pEventManager = &pManager->eventManager;
+
+    UT_LOG("EventLoopThread enter ...\n");
+    if ( !pManager ) {
+        UT_ERROR("check param error\n");
+        return NULL;
+    }
+
+    if ( !pManager->data ) {
+        UT_ERROR("check data error\n");
+        return NULL;
+    }
+
+    id = *(AccountID *)pManager->data;
+    UT_VAL( id );
+
+
+    for (;;) {
+        UT_LOG("call PollEvent\n");
+        ret = PollEvent( id, &type, &pEvent, 0 );
+        UT_VAL( type );
+        if ( type == EVENT_CALL ) {
+            UT_LINE();
+            pCallEvent = &pEvent->body.callEvent;
+            if ( pManager->NotifyAllEvent ) {
+                UT_VAL( pCallEvent->status );
+                pManager->NotifyAllEvent( pCallEvent->status );
+            }
+        }
+    }
+
+    return NULL;
+}
 
 int InitAllTestSuit()
 {
