@@ -775,7 +775,7 @@ void test_jitter_buffer()
                         char getBuf[257] = {0};
                         int nFrameSize = sizeof(getBuf) - 1;
                         uint32_t nTs;
-                        int nFrameSeq = 0;
+                        uint32_t nFrameSeq = 0;
                         JBFrameStatus popFrameType;
                         JitterBufferPop(&jb, getBuf, &nFrameSize, &nFrameSeq, &nTs, &popFrameType);
                         
