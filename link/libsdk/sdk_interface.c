@@ -21,6 +21,86 @@
 UAManager gUAManager;
 UAManager *pUAManager = &gUAManager;
 
+static UA* FindUA(UAManager* _pUAManager, AccountID _nAccountId, struct list_head **po)
+{
+        UA* pUA;
+        struct list_head *q, *pos;
+        DBG_LOG("FindUA in %p %p %p\n", &_pUAManager->UAList.list, pos, q);
+        list_for_each_safe(pos, q, &_pUAManager->UAList.list) {
+                DBG_LOG("FindUA pos %p\n", pos);
+                pUA = list_entry(pos, UA, list);
+                if (pUA->id == _nAccountId) {
+                        *po = pos;
+                        return pUA;
+                }
+        }
+        return NULL;
+}
+
+void OnMessage(IN const void* _pInstance, IN int _nAccountId, IN const char* _pTopic, IN const char* _pMessage, IN size_t nLength)
+{
+        DBG_LOG("%p topic %s message %s nAccountId %d \n", _pInstance, _pTopic, _pMessage, _nAccountId);
+}
+
+void OnEvent(IN const void* _pInstance, IN int _nAccountId, IN int _nId,  IN const char* _pReason)
+{       
+        DBG_LOG("%p id %d, account id %d, reason  %s \n",_pInstance, _nAccountId, _nId, _pReason);
+        // TODO call back to user.
+        Message *pMessage = (Message *) malloc ( sizeof(Message) );
+        Event *pEvent = (Event *) malloc( sizeof(Event) );
+        MessageEvent *pMessageEvent = NULL;
+        
+        if ( !pMessage || !pEvent ) {
+                DBG_ERROR("malloc error\n");
+                return;
+        }
+        struct list_head *pos;
+
+        UA *pUA = FindUA(pUAManager, _nAccountId, &pos);
+        if (pUA == NULL) {
+                DBG_ERROR("PUA is NULL\n");
+                return;
+        }
+        memset( pMessage, 0, sizeof(Message) );
+        memset( pEvent, 0, sizeof(Event) );
+        pMessage->nMessageID = EVENT_MESSAGE;
+        pMessageEvent = &pEvent->body.messageEvent;
+        pMessageEvent->status = _nId;
+        pMessageEvent->message = _pReason;
+        pMessage->pMessage  = (void *)pEvent;
+        SendMessage(pUA->pQueue, pMessage);
+}
+
+void InitMqtt(struct MqttOptions* options, const char* _pId, const char* _pPassword, const char* _pImHost)
+{
+//Init option.
+        options->pId = (char*)(_pId);
+        options->bCleanSession = false;
+        options->primaryUserInfo.nAuthenicatinMode = MQTT_AUTHENTICATION_USER;
+        options->primaryUserInfo.pHostname = (char*)(_pImHost);
+        //strcpy(options.bindaddress, "172.17.0.2");
+        options->secondaryUserInfo.pHostname = NULL;
+        //strcpy(options.secondBindaddress, "172.17.0.2`");
+        options->primaryUserInfo.pUsername = "root";//(char*)(_pId);
+        options->primaryUserInfo.pPassword = "root";//(char*)(_pPassword);
+        options->secondaryUserInfo.pUsername = NULL;
+        options->secondaryUserInfo.pPassword = NULL;
+        options->secondaryUserInfo.nPort = 0;
+        options->primaryUserInfo.nPort = 1883;
+        options->primaryUserInfo.pCafile = NULL;
+        options->primaryUserInfo.pCertfile = NULL;
+        options->primaryUserInfo.pKeyfile = NULL;
+        options->secondaryUserInfo.pCafile = NULL;
+        options->secondaryUserInfo.pCertfile = NULL;
+        options->secondaryUserInfo.pKeyfile = NULL;
+        options->nKeepalive = 10;
+        options->nQos = 0;
+        options->bRetain = false;
+        options->callbacks.OnMessage = &OnMessage;
+        options->callbacks.OnEvent = &OnEvent;
+
+}
+
 static CodecType ConversionFormat(Codec _nCodec)
 {
         switch (_nCodec) {
@@ -91,27 +171,13 @@ ErrorID UninitSDK()
         return RET_OK;
 }
 
-static UA* FindUA(UAManager* _pUAManager, AccountID _nAccountId, struct list_head **po)
-{
-        UA* pUA;
-        struct list_head *q, *pos;
-        DBG_LOG("FindUA in %p %p %p\n", &_pUAManager->UAList.list, pos, q);
-        list_for_each_safe(pos, q, &_pUAManager->UAList.list) {
-                DBG_LOG("FindUA pos %p\n", pos);
-                pUA = list_entry(pos, UA, list);
-                if (pUA->id == _nAccountId) {
-                        *po = pos;
-                        return pUA;
-                }
-        }
-        return NULL;
-}
-
 AccountID Register(const char* _id, const char* _password, const char* _pSigHost,
                    const char* _pMediaHost, const char* _pImHost)
 {
     int nAccountId = 0;
-    UA *pUA = UARegister(_id, _password, _pSigHost, _pMediaHost, _pImHost, &pUAManager->videoConfigs, &pUAManager->audioConfigs);
+    struct MqttOptions options;
+    InitMqtt(&options, _id, _password, _pImHost);
+    UA *pUA = UARegister(_id, _password, _pSigHost, _pMediaHost, &options, &pUAManager->videoConfigs, &pUAManager->audioConfigs);
     int nReason = 0;
 
     if (!pUAManager->bInitSdk) {
@@ -367,7 +433,7 @@ void cbOnCallStateChange(const int _nCallId, const int _nAccountId, const SipInv
     }
 
     UA *pUA = FindUA(pUAManager, _nAccountId, &pos);
-    if (pUA == NULL && _pUA == pUA) {
+    if (pUA == NULL) {
             DBG_ERROR("pUser is NULL\n");
             return;
     }
@@ -377,12 +443,14 @@ void cbOnCallStateChange(const int _nCallId, const int _nAccountId, const SipInv
     pMessage->nMessageID = EVENT_CALL;
     pCallEvent = &pEvent->body.callEvent;
     pCallEvent->callID = _nCallId;
+    DBG_ERROR("pUser is NULL\n");
     if ( _State == INV_STATE_CONFIRMED ) {
             pCallEvent->status = CALL_STATUS_ESTABLISHED;
     } else if ( _State == INV_STATE_DISCONNECTED ) {
             pCallEvent->status = CALL_STATUS_HANGUP;
     } else {
     }
+    DBG_ERROR("pUser is NULL\n");
     pMessage->pMessage  = (void *)pEvent;
     SendMessage(pUA->pQueue, pMessage);
     UAOnCallStateChange(pUA, _nCallId, _State, _StatusCode, pMedia);

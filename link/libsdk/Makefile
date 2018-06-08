@@ -59,9 +59,9 @@ pjsip $(LIBPJ) : #pjclean depclean
 	@echo "compile pjsip"
 	mkdir -p $(INSTALL_DIR)
 	cd $(PJSIP_PATH); \
-	#make distclean && \
-	#make clean && \
-	#make realclean && \
+	make distclean && \
+	make clean && \
+	make realclean && \
 	cd $(PJSIP_PATH); \
 	if [ "$(HOST)" = "" ]; then \
 		./configure $(PJ_CONFIG); \
@@ -81,7 +81,7 @@ $(LIBSIP):$(SIP_PATH)/sip.c
 
 # set .o file search path
 vpath %.o $(SDK_OBJS_PATH)
-sdk $(TARGET_LIBRARY) :  $(LIBSIP) $(LIBSDK) $(LIBMQTT) $(LIBRTP)
+sdk $(TARGET_LIBRARY) : $(LIBPJ)  $(LIBSIP) $(LIBSDK) $(LIBMQTT) $(LIBRTP)
 	./merge-lib.sh $(ARCH)
 	make -C test
 

@@ -40,7 +40,7 @@ RegisterTestCase gRegisterTestCases[] =
 {
     {
         { "normal", 0 },
-        { "1011", "1011", HOST, HOST, HOST, 100, 1 }
+        { "1006", "1006", HOST, HOST, HOST, 100, 1 }
     },
     {
         { "invalid_account", 0 },
@@ -88,9 +88,11 @@ int RegisterTestSuitCallback( TestSuit *this )
     media[0].streamType = STREAM_VIDEO;
     media[0].codecType = CODEC_H264;
     media[0].sampleRate = 90000;
+    media[0].channels = 0;
     media[1].streamType = STREAM_AUDIO;
     media[1].codecType = CODEC_G711A;
     media[1].sampleRate = 8000;
+    media[1].channels = 1;
     int i = 0;
     ErrorID sts = 0;
 
@@ -124,7 +126,7 @@ int RegisterTestSuitCallback( TestSuit *this )
     int count = 0;
     while (count != 10) {
             DBG_LOG("MakeCall in\n");
-            id = MakeCall(sts, pData->id, "<sip:1004@123.59.204.198>", &nCallId1);
+            id = MakeCall(sts, pData->id, "<sip:1010@123.59.204.198>", &nCallId1);
             if (RET_OK != id) {
                     fprintf(stderr, "call error %d \n", id);
                     sleep(1);

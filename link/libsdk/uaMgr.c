@@ -10,51 +10,6 @@
 #include "callMgr.h"
 #include "qrtc.h"
 
-void OnMessage(IN const void* _pInstance, IN const char* _pTopic, IN const char* _pMessage, IN size_t nLength)
-{
-        DBG_LOG("%p topic %s message %s \n", _pInstance, _pTopic, _pMessage);
-}
-
-void OnEvent(IN const void* _pInstance, IN int _nId,  IN const char* _pReason)
-{
-#if 0
-        DBG_LOG("%p id %d, reason  %s \n",_pInstance, _nId, _pReason);
-        // TODO call back to user.
-        Message *pMessage = (Message *) malloc ( sizeof(Message) );
-        Event *pEvent = (Event *) malloc( sizeof(Event) );
-        CallEvent *pCallEvent = NULL;
-        const UA *_pUA = pUser;
-        struct list_head *pos;
-
-        DBG_LOG("state = %d, status code = %d\n", _State, _StatusCode);
-
-        if ( !pMessage || !pEvent ) {
-                DBG_ERROR("malloc error\n");
-                return;
-        }
-
-        UA *pUA = FindUA(pUAManager, _nAccountId, &pos);
-        if (pUA == NULL && _pUA == pUA) {
-                DBG_ERROR("pUser is NULL\n");
-                return;
-        }
-
-        memset( pMessage, 0, sizeof(Message) );
-        memset( pEvent, 0, sizeof(Event) );
-        pMessage->nMessageID = EVENT_CALL;
-        pCallEvent = &pEvent->body.callEvent;
-        pCallEvent->callID = _nCallId;
-        if ( _State == INV_STATE_CONFIRMED ) {
-                pCallEvent->status = CALL_STATUS_ESTABLISHED;
-        } else if ( _State == INV_STATE_DISCONNECTED ) {
-                pCallEvent->status = CALL_STATUS_HANGUP;
-        } else {
-        }
-        pMessage->pMessage  = (void *)pEvent;
-        SendMessage(pUA->pQueue, pMessage);
-#endif
-}
-
 static Call* FindCall(UA* _pUa, int _nCallId, struct list_head **pos)
 {
         Call* pCall;
@@ -72,40 +27,10 @@ static Call* FindCall(UA* _pUa, int _nCallId, struct list_head **pos)
         return NULL;
 }
 
-void InitMqtt(struct MqttOptions* options, const char* _pId, const char* _pPassword, const char* _pImHost)
-{
-//Init option.
-        options->pId = (char*)(_pId);
-        options->bCleanSession = false;
-        options->primaryUserInfo.nAuthenicatinMode = MQTT_AUTHENTICATION_USER;
-        options->primaryUserInfo.pHostname = (char*)(_pImHost);
-        //strcpy(options.bindaddress, "172.17.0.2");
-        options->secondaryUserInfo.pHostname = NULL;
-        //strcpy(options.secondBindaddress, "172.17.0.2`");
-        options->primaryUserInfo.pUsername = (char*)(_pId);
-        options->primaryUserInfo.pPassword = (char*)(_pPassword);
-        options->secondaryUserInfo.pUsername = NULL;
-        options->secondaryUserInfo.pPassword = NULL;
-        options->secondaryUserInfo.nPort = 0;
-        options->primaryUserInfo.nPort = 1883;
-        options->primaryUserInfo.pCafile = NULL;
-        options->primaryUserInfo.pCertfile = NULL;
-        options->primaryUserInfo.pKeyfile = NULL;
-        options->secondaryUserInfo.pCafile = NULL;
-        options->secondaryUserInfo.pCertfile = NULL;
-        options->secondaryUserInfo.pKeyfile = NULL;
-        options->nKeepalive = 10;
-        options->nQos = 0;
-        options->bRetain = false;
-        options->callbacks.OnMessage = &OnMessage;
-        options->callbacks.OnEvent = &OnEvent;
-
-}
-
 // register a account
 // @return UA struct point. If return NULL, error.
 UA* UARegister(const char* _pId, const char* _pPassword, const char* _pSigHost,
-               const char* _pMediaHost, const char* _pImHost,
+               const char* _pMediaHost, MqttOptions* _pOptions,
                MediaConfig* _pVideo, MediaConfig* _pAudio)
 {
 
@@ -136,10 +61,8 @@ UA* UARegister(const char* _pId, const char* _pPassword, const char* _pSigHost,
         SipRegAccount(nAccountId, 1);
         pUA->regStatus == TRYING;
         //mqtt create instance.
-        struct MqttOptions option;
-        InitMqtt(&option, _pId, _pPassword, _pImHost);
-        DBG_LOG("NOT MQTT");
-        pUA->pMqttInstance = MqttCreateInstance(&option);
+        _pOptions->nAccountId = nAccountId;
+        pUA->pMqttInstance = MqttCreateInstance(_pOptions);
         pUA->id = nAccountId;
         pUA->pVideoConfigs = _pVideo;
         pUA->pAudioConfigs = _pAudio;

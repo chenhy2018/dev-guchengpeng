@@ -92,8 +92,7 @@ typedef struct {
 
 typedef struct {
     char *message;
-    char *topic;
-    int qos;
+    int status;
 } MessageEvent;
 
 typedef struct {

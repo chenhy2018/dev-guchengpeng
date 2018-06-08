@@ -114,7 +114,8 @@ Call* CALLMakeCall(AccountID _nAccountId, const char* id, const char* _pDestUri,
         }
         memset(pCall, 0, sizeof(Call));
         InitRtp(&pCall, _pId, _pPassword, _pHost, _pVideo, _pAudio);
-        createOffer(pCall->pPeerConnection, &pCall->pOffer);
+        //createOffer(pCall->pPeerConnection, &pCall->pOffer);
+        CreateTmpSDP(&pCall->pOffer);
         setLocalDescription(pCall->pPeerConnection, pCall->pOffer);
         SipMakeNewCall(_nAccountId, _pDestUri, pCall->pOffer, _pCallId);
         pCall->id = *_pCallId;
@@ -207,9 +208,10 @@ SipAnswerCode CALLOnIncomingCall(Call** _pCall, const int _nCallId, const char *
         InitRtp(&pCall, _pId, _pPassword, _pHost, _pVideo, _pAudio);
         setRemoteDescription(pCall->pPeerConnection, pCall->pOffer);
         DBG_LOG("call answer call\n");
-        createAnswer(pCall->pPeerConnection, pCall->pOffer, &pCall->pAnswer);
+        //createAnswer(pCall->pPeerConnection, pCall->pOffer, &pCall->pAnswer);
+        CreateTmpSDP(&pCall->pAnswer);
         DBG_LOG("call answer call end\n");
-        setLocalDescription(pCall->pPeerConnection, pCall->pAnswer);
+        //setLocalDescription(pCall->pPeerConnection, pCall->pAnswer);
         DBG_LOG("call answer call end 1\n");
 }
 
