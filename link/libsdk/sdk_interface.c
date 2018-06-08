@@ -1,4 +1,4 @@
-// Last Update:2018-06-04 14:18:25
+// Last Update:2018-06-08 18:41:37
 /**
  * @file sdk_interface.c
  * @brief 
@@ -144,7 +144,7 @@ ErrorID InitSDK( Media* _pMediaConfigs, int _nSize)
         config.nMaxCall = 10;
         config.nMaxAccount = 10;
         // debug code.
-        SipSetLogLevel(4);
+        SipSetLogLevel(1);
         SipCreateInstance(&config);
         INIT_LIST_HEAD(&pUAManager->UAList.list);
         pUAManager->bInitSdk = true;
@@ -219,7 +219,7 @@ ErrorID MakeCall(AccountID _nAccountId, const char* id, const char* _pDestUri, O
     return RET_ACCOUNT_NOT_EXIST;
 }
 
-ErrorID PollEvent(AccountID _nAccountID, EventType* _pType, Event* _pEvent, int _nTimeOut )
+ErrorID PollEvent(AccountID _nAccountID, EventType* _pType, Event** _pEvent, int _nTimeOut )
 {
     Message *pMessage = NULL;
     struct list_head *pos, *q;
@@ -232,6 +232,7 @@ ErrorID PollEvent(AccountID _nAccountID, EventType* _pType, Event* _pEvent, int 
 
     pUA = FindUA(pUAManager, _nAccountID, &pos);
     if (pUA == NULL) {
+            DBG_ERROR( "RET_ACCOUNT_NOT_EXIST\n");
             return RET_ACCOUNT_NOT_EXIST;
     }
 
@@ -245,12 +246,14 @@ ErrorID PollEvent(AccountID _nAccountID, EventType* _pType, Event* _pEvent, int 
         free( pEvent );
         pEvent = NULL;
     }
+    DBG_LOG("wait for event, pUA = 0x%x\n", pUA );
     if (_nTimeOut) {
         pMessage = ReceiveMessageTimeout( pUA->pQueue, _nTimeOut );
     } else {
         pMessage = ReceiveMessage( pUA->pQueue );
     }
 
+    DBG_LOG("[ LIBSDK ]get one event\n");
     if (!pMessage) {
         return RET_RETRY;
     }
@@ -262,6 +265,9 @@ ErrorID PollEvent(AccountID _nAccountID, EventType* _pType, Event* _pEvent, int 
         // we can free the last one
         pUA->pLastMessage = pMessage;
     }
+    
+    *_pEvent = (Event *)pMessage->pMessage;
+
 #if 0
     if (UAPollEvent(pUA, _pType, _pEvent, _nTimeOut) == RET_CALL_NOT_EXIST) {
         fprintf(stderr, "Call is not exist, poll next event\n");
@@ -390,17 +396,24 @@ void cbOnRegStatusChange(const int _nAccountId, const SipAnswerCode _regStatusCo
             return;
     }
 
+    DBG_VAL(_nAccountId);
+    DBG_LOG("pUA address is 0x%x, _regStatusCode = %d\n", pUA, _regStatusCode );
     memset( pMessage, 0, sizeof(Message) );
     memset( pEvent, 0, sizeof(Event) );
     pMessage->nMessageID = EVENT_CALL;
     pCallEvent = &pEvent->body.callEvent;
     pCallEvent->callID = 0;
-    pCallEvent->status = CALL_STATUS_REGISTERED;
+    if ( _regStatusCode == OK ) {
+        pCallEvent->status = CALL_STATUS_REGISTERED;
+    } else {
+        pCallEvent->status = CALL_STATUS_REGISTER_FAIL;
+    }
     pCallEvent->pFromAccount = NULL;
     pMessage->pMessage = pEvent;
-    if ( pUA )
+    if ( pUA ) {
+        DBG_LOG("[ LIBSDK ] SendMessage\n");
         SendMessage( pUA->pQueue, pMessage );
-    else {
+    } else {
         DBG_ERROR("pUA is NULL\n");
         return;
     }

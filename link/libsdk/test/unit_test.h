@@ -1,4 +1,4 @@
-// Last Update:2018-06-07 18:33:09
+// Last Update:2018-06-08 18:28:59
 /**
  * @file unit_test.h
  * @brief 
@@ -25,10 +25,17 @@
 #define ERROR_TIMEOUT (-2)
 #define ERROR_INVAL (-3)
 #define STS_OK (0)
+#define UT_LOG(args...) printf("[ UNIT TEST ] ");DBG_LOG(args)
+#define UT_ERROR(args...) printf("[ UNIT TEST] ");DBG_ERROR(args)
+#define UT_VAL(v) printf("[ UNIT TEST ] ");DBG_LOG(#v" = %d\n", v)
+#define UT_STR(s) printf("[ UNIT TEST ]");DBG_LOG(#s" = %s\n", s)
+#define UT_LINE() printf("[ UNIT TEST ]");DBG_LOG("======================\n")
 
+typedef void *(*ThreadFn)(void *);
 typedef struct {
     char *caseName;
     int expact;
+    ThreadFn threadEntry;
 } TestCase;
 
 
@@ -40,6 +47,7 @@ struct _TestSuit {
     int (*OnInit)( TestSuit *this, TestSuitManager *pManager );
     int (*GetTestCase) ( TestSuit *this, TestCase **testCase );
     void *testCases;
+    unsigned char enable;
     int total;
     int failNum;
     int index;
@@ -59,7 +67,6 @@ typedef struct {
     int (*WaitForEvent)( int event, int timeout );
 } EventManger;
 
-typedef void *(*ThreadFn)(void *);
 
 typedef struct {
     pthread_t threadId;
@@ -79,6 +86,7 @@ struct _TestSuitManager{
     ThreadManager threadManager;
     int (* NotifyAllEvent)( int _nEventId );
     int (*AddPrivateData)( void *data );
+    int (*ThreadRegister)( ThreadFn threadFn );
 };
 
 extern int AddTestSuit( TestSuit *pTestSuit );
@@ -88,5 +96,6 @@ extern int NotifyAllEvent( int event );
 extern int WaitForEvent( int _nEventId, int nTimeOut );
 extern int ThreadRegister( ThreadFn threadFn );
 extern int AddPrivateData( void *data );
+extern int ThreadRegister( ThreadFn threadFn );
 
 #endif  /*UNIT_TEST_H*/
