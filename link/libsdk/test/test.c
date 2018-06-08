@@ -194,7 +194,7 @@ int RegisterTestSuitCallback2( TestSuit *this )
     UT_STR( pData->password );
     UT_STR( pData->sigHost );
 
-    sts = Register( pData->id, pData->password, pData->sigHost, pData->mediaHost, pData->imHost, pData->timeOut );
+    sts = Register( pData->id, pData->password, pData->sigHost, pData->mediaHost, pData->imHost );
     if ( sts >= RET_MEM_ERROR ) {
         DBG_ERROR("sts = %d\n", sts );
         return TEST_FAIL;
