@@ -27,7 +27,6 @@ typedef struct _JitterBuffer {
         int nMaxFrameSize;
 
         JBStatus state;
-        uint32_t nHighSeq;
 
         int nCurrentSize;
         uint32_t nLastRecvRtpSeq;

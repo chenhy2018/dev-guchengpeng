@@ -41,7 +41,11 @@ void JitterBufferPush(IN JitterBuffer *_pJbuf, IN const void *_pFrame, IN int _n
         pj_assert(_pJbuf && _pFrame);
 
         *_pDiscarded = 0;
-        //TODO seq restart
+
+        //rtp sequence number restart
+        if (_nFrameSeq < _pJbuf->nMaxBufferCount+1 && _pJbuf->nLastRecvRtpSeq > 65000) {
+                _nFrameSeq += 65536;
+        }
 
         JitterBufferFrame * pFrame = NULL;
 
@@ -118,7 +122,7 @@ void JitterBufferPop(IN JitterBuffer *_pJbuf, OUT void *_pFrame, IN OUT int *_pF
 
                 pj_memcpy(_pFrame, pFrame->pData, pFrame->nFrameSize);
                 *_pFrameSize = pFrame->nFrameSize;
-                *_pFrameSeq = pFrame->nSeq;
+                *_pFrameSeq = pFrame->nSeq & 0x0000FFFF;
                 *_pTs = pFrame->nTs;
                 *_pFrameStatus = JBFRAME_STATE_NORMAL;
         

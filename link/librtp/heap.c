@@ -277,6 +277,7 @@ int heap_delmin(heap* h, heap_entry **pEntry) {
         // Move the last element to the root
         heap_entry* last = GET_ENTRY(entries,table);
 #ifdef MYMY
+	    *pEntry = last;
             SWAP_ENTRIES(current, last);
 #else
             current->key = last->key;
