@@ -48,7 +48,16 @@ TODO 已解决
 
 TODO 未解决
 10. rtp 序列号restart
-	接收使用int32_t类型序列号, 一直递增，heap里面排序也适用uint32_t. 能连续发送一个月以上了,目前先这样做
+	接收使用int32_t类型序列号, 使用了一个非常简单的办法
+	if (_nFrameSeq < _pJbuf->nMaxBufferCount+1 && _pJbuf->nLastRecvRtpSeq > 65000) {
+                _nFrameSeq += 65536;
+        }
+	上一次的nLastRecvRtpSeq大于65000了，然后又出现了现在的_nFrameSeq小于nMaxBufferCount+1，则认为出现了翻转，
+	现在的nFrameSeq则加上65536
+
+	pop时候发现nLastRecvRtpSeq 变小了，重新排序一下队列？
+        TODO heap_rebuild 条件，如果65535这个包丢了怎么办？
+
 11.  时间戳维护, rtp时间戳溢出问题？
 	uint32_t类型的时间错，在90000hz时钟频率情况下，大概13h15m就会溢出
 
