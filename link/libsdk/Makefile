@@ -27,8 +27,11 @@ INCLUDE_PATH=-I$(PJSIP_PATH)/pjlib/include \
 			 -I$(PJSIP_PATH)/pjlib-util/include \
 			 -I$(PJSIP_PATH)/pjsip/include \
 			 -I$(PJSIP_PATH)/pjmedia/include \
+                         -I$(PJSIP_PATH)/pjmedia/include/pjmedia \
 			 -I$(PJSIP_PATH)/pjnath/include \
-			 -I../libsip
+			 -I../libsip \
+                         -I ../libmqtt \
+                         -I ../librtp
 
 SIP_PATH=../libsip
 OUTPUT=output
@@ -36,7 +39,7 @@ SIP_OUT_PATH=$(OUTPUT)/libsip
 LIBSIP=$(SIP_OUT_PATH)/sip.o
 SDK_OBJS_PATH=$(OUTPUT)/libsdk
 LIBSDK=queue.o sdk_interface.o \
-       test.o dbg.o mock_api.o uaMgr.o callMgr.o mock_rtc.o
+       test.o dbg.o uaMgr.o callMgr.o
 TARGET_LIBRARY=$(OUTPUT)/lib/$(ARCH)/libua.a
 LIBPJ=$(OUTPUT)/ori/$(ARCH)
 LIBMQTT=
@@ -56,9 +59,9 @@ pjsip $(LIBPJ) : #pjclean depclean
 	@echo "compile pjsip"
 	mkdir -p $(INSTALL_DIR)
 	cd $(PJSIP_PATH); \
-	make distclean && \
-	make clean && \
-	make realclean && \
+	#make distclean && \
+	#make clean && \
+	#make realclean && \
 	cd $(PJSIP_PATH); \
 	if [ "$(HOST)" = "" ]; then \
 		./configure $(PJ_CONFIG); \
@@ -75,9 +78,10 @@ $(LIBSIP):$(SIP_PATH)/sip.c
 	mkdir -p $(SIP_OUT_PATH)
 	$(CC) $(INCLUDE_PATH) -c $< -o $@
 
+
 # set .o file search path
 vpath %.o $(SDK_OBJS_PATH)
-sdk $(TARGET_LIBRARY) : $(LIBPJ) $(LIBSIP) $(LIBSDK) $(LIBMQTT) $(LIBRTP)
+sdk $(TARGET_LIBRARY) :  $(LIBSIP) $(LIBSDK) $(LIBMQTT) $(LIBRTP)
 	./merge-lib.sh $(ARCH)
 	make -C test
 

@@ -6,7 +6,7 @@
  * @version 0.1.00
  * @date 2018-05-25
  */
-
+ 
 #include <string.h>
 #include "sip.h"
 #include "dbg.h"
@@ -196,10 +196,12 @@ ErrorID PollEvent(AccountID _nAccountID, EventType* _pType, Event* _pEvent, int 
         // we can free the last one
         pUA->pLastMessage = pMessage;
     }
+#if 0
     if (UAPollEvent(pUA, _pType, _pEvent, _nTimeOut) == RET_CALL_NOT_EXIST) {
         fprintf(stderr, "Call is not exist, poll next event\n");
         return PollEvent(_nAccountID, _pType,  _pEvent, _nTimeOut);
     }
+#endif
     return RET_OK;
 }
 
@@ -384,4 +386,5 @@ void cbOnCallStateChange(const int _nCallId, const int _nAccountId, const SipInv
     pMessage->pMessage  = (void *)pEvent;
     SendMessage(pUA->pQueue, pMessage);
     UAOnCallStateChange(pUA, _nCallId, _State, _StatusCode, pMedia);
+    DBG_LOG("cbOnCallStateChange end\n");
 }
