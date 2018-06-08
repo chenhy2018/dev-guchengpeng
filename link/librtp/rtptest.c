@@ -632,6 +632,74 @@ void test_sdp_neg()
 
 #define HAS_AUDIO 0x01
 #define HAS_VIDEO 0x02
+
+//jitter buffer
+#include "JitterBuffer.h"
+void test_jitter_buffer()
+{
+        pj_pool_t * pool = pj_pool_create(&app.cachingPool.factory, "jbuf", 256 * 50, 256 * 10, NULL);
+        JitterBuffer jb;
+        
+        JitterBufferInit(&jb, 50, 20, pool, 256);
+        
+        int seqs[] = {
+                7639,7641,7642,7640,7645,7646,7643,7644,7647,7648,
+                7649,7650,7651,7653,7652,7654,7655,7656,7657,7658,
+                7659,7660,7661,7662,7663,7664,7665,7666,7667,7668,
+                7669,7671,7670,7672,7673,7674,7675,7676,7677,7678,
+                7679,7680,7681,7682,7683,7685,7684,7686,7687,7688,
+                7689,7690,7692,7691,7693,7694,7695,7696,7697,7699,
+                7698,7700,7701,7702,7703,7704,7705,7706,7707,7709,
+                7710,7711,7712,7713,7714,7716,7718,7720,7715,7717,
+                7722,7719,7721,7723,7725,7724,7726,7728,7727,7729,
+                7730,7731,7732,7733,7735,7734,7736,7737,7738,7739
+        };
+        
+        int nTotalSeqCount = sizeof(seqs) / sizeof(int);
+        for (int i = 0; i < nTotalSeqCount; i++) {
+                char buf[20] = {0};
+                sprintf(buf, "%d %d", seqs[i], seqs[i]);
+                int nIsDiscard;
+                JitterBufferPush(&jb, buf, 9, seqs[i], seqs[i]+10000, &nIsDiscard);
+                if (nIsDiscard) {
+                        MY_PJ_LOG(3, "seq:%d dicarded", seqs[i]);
+                }
+                printf("======>push frame:seq:%d  idx:%03d jblen:%d\n", seqs[i], i, jb.nCurrentSize);
+                
+                pj_bool_t bGetFrame = PJ_TRUE;
+                while(bGetFrame) {
+                        char getBuf[257] = {0};
+                        int nFrameSize = sizeof(getBuf) - 1;
+                        uint32_t nTs;
+                        int nFrameSeq = 0;
+                        JBFrameStatus popFrameType;
+                        JitterBufferPop(&jb, getBuf, &nFrameSize, &nFrameSeq, &nTs, &popFrameType);
+                        
+                        switch (popFrameType) {
+                                case JBFRAME_STATE_MISSING:
+                                        pj_thread_sleep(50);
+                                        printf("missing\n");
+                                        bGetFrame = PJ_FALSE;
+                                        break;
+                                case JBFRAME_STATE_CACHING:
+                                        printf("JBFRAME_STATE_CACHING\n");
+                                        bGetFrame = PJ_FALSE;
+                                        break;
+                                case JBFRAME_STATE_EMPTY:
+                                        printf("JBFRAME_STATE_EMPTY\n");
+                                        bGetFrame = PJ_FALSE;
+                                        break;
+                                case JBFRAME_STATE_NORMAL:
+                                        printf("-->get one frame:seq:%04d, size:%02d, ts:%05d, content:%s\n", nFrameSeq, nFrameSize, nTs, getBuf);
+                                        bGetFrame = PJ_TRUE;
+                                        break;
+                        }
+                }
+                pj_thread_sleep(50);
+        }
+}
+
+//end jitter buffer
 int main(int argc, char **argv)
 {
         if(argc == 1){
@@ -666,6 +734,9 @@ int main(int argc, char **argv)
         pj_caching_pool_init(&app.cachingPool, &pj_pool_factory_default_policy, 0);
 
         set_log_to_file(role);
+        
+        test_jitter_buffer();
+        return 0;
 
         test_sdp_neg();
         //---------------------start------------

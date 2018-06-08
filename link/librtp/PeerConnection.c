@@ -674,59 +674,37 @@ static void on_rx_rtp(void *pUserData, void *pPkt, pj_ssize_t size)
         /* Update RTP session */
         pjmedia_rtp_session_update(&pMediaTrack->rtpSession, pRtpHeader, NULL);
 
- 
-        pjmedia_jbuf_put_frame3(pMediaTrack->jbuf.pJbuf, pPayload, nPayloadLen,
-                                0, //pj_uint32_t bit_info
-                                pj_ntohs(pRtpHeader->seq),
-                                pj_ntohl(pRtpHeader->ts),
-                                NULL);
-        if (pMediaTrack->jbuf.nPutGetDiff <= 0) {
-                pMediaTrack->jbuf.nPutGetDiff = 1;
-        } else {
-                pMediaTrack->jbuf.nPutGetDiff++;
+        int nIsDiscard;
+        JitterBufferPush(&pMediaTrack->jbuf, pPayload, nPayloadLen, pj_ntohs(pRtpHeader->seq),
+                         pj_ntohl(pRtpHeader->ts), &nIsDiscard);
+        if (nIsDiscard) {
+                MY_PJ_LOG(3, "rtp packet disacrded by jitter buffer");
+                return;
         }
 
         pj_bool_t bGetFrame = PJ_TRUE;
         int nTestCnt = 0;
         while(bGetFrame) {
-                char cFrameType;
+                JBFrameStatus popFrameType;
                 int nSeq = 0;
                 pj_uint32_t nTs = 0;
-                pj_size_t nFrameSize = 0;
-                int nLastRecvRtpSeq = pMediaTrack->jbuf.nLastRecvRtpSeq;
-                if (nLastRecvRtpSeq != -1 && pMediaTrack->jbuf.nPutGetDiff < 20) {
-                        const void *pTmp = NULL;
-                        pjmedia_jbuf_peek_frame(pMediaTrack->jbuf.pJbuf, 0, &pTmp,
-                                                &nFrameSize, &cFrameType, NULL, &nTs, &nSeq);
-                        if (pTmp == NULL) {
-                                break;
-                        }
-                        if (nSeq != nLastRecvRtpSeq+1) {
-                                if (!pjmedia_jbuf_is_full(pMediaTrack->jbuf.pJbuf)) {
-                                        bGetFrame = PJ_FALSE;
-                                        continue;
-                                }
-                        }
-                        nTs = 0;
-                        nSeq = 0;
-                        nFrameSize = 0;
-                }
+                int nFrameSize = 0;
+                
                 nFrameSize = sizeof(pMediaTrack->jbuf.getBuf);
-                pjmedia_jbuf_get_frame3(pMediaTrack->jbuf.pJbuf, pMediaTrack->jbuf.getBuf,
-                                        &nFrameSize, &cFrameType, NULL, &nTs, &nSeq);
-                pMediaTrack->jbuf.nPutGetDiff--;
+                JitterBufferPop(&pMediaTrack->jbuf, pMediaTrack->jbuf.getBuf,
+                                &nFrameSize, &nSeq, &nTs, &popFrameType);
 
-                switch (cFrameType) {
-                        case PJMEDIA_JB_MISSING_FRAME:
+                switch (popFrameType) {
+                        case JBFRAME_STATE_MISSING:
                                 pPayload = NULL;
                                 nPayloadLen = 0;
-                                bGetFrame = PJ_TRUE;
+                                bGetFrame = PJ_FALSE;
                                 break;
-                        case PJMEDIA_JB_ZERO_PREFETCH_FRAME:
-                        case PJMEDIA_JB_ZERO_EMPTY_FRAME:
+                        case JBFRAME_STATE_CACHING:
+                        case JBFRAME_STATE_EMPTY:
                                 bGetFrame = PJ_FALSE;
                                 return;
-                        case PJMEDIA_JB_NORMAL_FRAME:
+                        case JBFRAME_STATE_NORMAL:
                                 pPayload = pMediaTrack->jbuf.getBuf;
                                 nPayloadLen = nFrameSize;
                                 bGetFrame = PJ_TRUE;
@@ -735,9 +713,6 @@ static void on_rx_rtp(void *pUserData, void *pPkt, pj_ssize_t size)
                 if (!bGetFrame) {
                         break;
                 }
-
-                pMediaTrack->jbuf.nLastRecvRtpSeq = nSeq;
-
 
                 MY_PJ_LOG(3, "%d-->get_frame:%d  rtp seq:%d", ++nTestCnt, nPayloadLen, nSeq);
 

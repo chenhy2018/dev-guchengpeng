@@ -3,11 +3,15 @@ SET(GCC_INCLUDE_PATH "-I../../third_party/pjproject-2.7.2/pjlib/include -I../../
 SET(CMAKE_C_FLAGS "${GCC_INCLUDE_PATH} ${GCC_COVERAGE_COMPILE_FLAGS}")
 
 set(LIB_SRC
+	heap.c
+	JitterBuffer.c
 	MediaStream.c
 	PeerConnection.c)
 set(LIB_HEADER
 	MediaStream.h
+	JitterBuffer.h
 	qrtc.h
+	heap.h
 	PeerConnection.h)
 set(TEST_SRC
 	rtptest.c)
