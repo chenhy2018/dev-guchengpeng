@@ -17,7 +17,7 @@ void OnMessage(IN const void* _pInstance, IN const char* _pTopic, IN const char*
 
 void OnEvent(IN const void* _pInstance, IN int _nId,  IN const char* _pReason)
 {
-        DBG_LOG("%p id %d, reason  %s \n",_pInstance, _nId, _pReason);
+        DBG_LOG("[ MQTT ]%p id %d, reason  %s \n",_pInstance, _nId, _pReason);
         // TODO call back to user.
 }
 

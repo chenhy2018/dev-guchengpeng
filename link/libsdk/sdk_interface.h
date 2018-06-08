@@ -1,4 +1,4 @@
-// Last Update:2018-06-04 14:11:11
+// Last Update:2018-06-08 17:36:15
 /**
  * @file sdk_interface.h
  * @brief 
@@ -15,6 +15,7 @@
 typedef enum {
     CALL_STATUS_IDLE,
     CALL_STATUS_REGISTERED,
+    CALL_STATUS_REGISTER_FAIL,
     CALL_STATUS_INCOMING,
     CALL_STATUS_TIMEOUT,
     CALL_STATUS_ESTABLISHED,
@@ -133,7 +134,7 @@ ErrorID SendPacket(AccountID id, int callID, Stream streamID, const uint8_t* buf
 // poll a event
 // if the EventData have video or audio data
 // the user shuould copy the the packet data as soon as possible
-ErrorID PollEvent(AccountID id, EventType* type, Event* event, int timeOut );
+ErrorID PollEvent(AccountID id, EventType* type, Event** event, int timeOut );
 
 // mqtt report
 ErrorID Report(AccountID id, const char* message, int length);

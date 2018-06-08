@@ -16,7 +16,7 @@
 #include "sdk_interface.h"
 #include "queue.h"
 #include "sip.h"
-#include "sdp.h"
+#include "../../third_party/pjproject-2.7.2/pjmedia/include/pjmedia/sdp.h"
 #include "qrtc.h"
 
 #define MESSAGE_QUEUE_MAX (256)

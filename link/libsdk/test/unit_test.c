@@ -1,4 +1,4 @@
-// Last Update:2018-06-07 19:28:50
+// Last Update:2018-06-08 18:14:52
 /**
  * @file unit_test.c
  * @brief 
@@ -41,7 +41,8 @@ int RunAllTestSuits()
     TestCase *pTestCase = NULL;
     ThreadManager *pThreadManager = &pTestSuitManager->threadManager;
 
-    DBG_VAL( pThreadManager->num );
+    UT_VAL( pThreadManager->num );
+#if 0
     for ( i=0; i<pThreadManager->num; i++ ) {
         int ret = pthread_create( &pThreadManager->threadList[i].threadId, NULL,
                         pThreadManager->threadList[i].threadFn, (void *)pTestSuitManager );
@@ -49,12 +50,16 @@ int RunAllTestSuits()
             DBG_ERROR("create thread error, ret = %d\n", ret );
             return -1;
         }
-        DBG_VAL( ret );
+        UT_VAL( ret );
     }
+#endif
 
-    DBG_VAL( pTestSuitManager->num );
+    UT_VAL( pTestSuitManager->num );
     for ( i=0; i<pTestSuitManager->num; i++ ) {
         pTestSuit = &pTestSuitManager->testSuits[i];
+        if ( !pTestSuit->enable ) {
+            continue;
+        }
         LOG("run the test suit : %s\n", pTestSuit->suitName );
         if ( pTestSuit->OnInit ) {
             pTestSuit->OnInit( pTestSuit, pTestSuitManager );
@@ -84,6 +89,7 @@ int TestSuitManagerInit()
     pTestSuitManager->eventManager.WaitForEvent = WaitForEvent;
     pTestSuitManager->NotifyAllEvent = NotifyAllEvent;
     pTestSuitManager->AddPrivateData = AddPrivateData;
+    pTestSuitManager->ThreadRegister = ThreadRegister;
 	pthread_mutex_init( &pTestSuitManager->eventManager.mutex, NULL );
 
 
@@ -119,16 +125,21 @@ int NotifyAllEvent( int _nEventId )
     int j = 0;
     EventManger *pEventManager = &pTestSuitManager->eventManager;
 
-    DBG_VAL( pEventManager->eventNum );
+    UT_VAL( pEventManager->eventNum );
+
+    pthread_mutex_lock( &pEventManager->mutex );
     for ( i=0; i<pEventManager->eventNum; i++ ) {
         EventWait *pEventWait = &pEventManager->eventWait[i];
+        UT_VAL(_nEventId);
+        UT_VAL(pEventWait->eventId);
         if ( _nEventId == pEventWait->eventId ) {
-            DBG_VAL( pEventWait->condNum );
+            UT_VAL( pEventWait->condNum );
             for ( j=0; j<pEventWait->condNum; j++ ) {
                 pthread_cond_signal( &pEventWait->condList[j] );
             }
         }
     }
+    pthread_mutex_unlock( &pEventManager->mutex );
 
     return 0;
 }
@@ -139,10 +150,10 @@ int AddEventWait( EventManger *pEventManager, EventWait *pEventWait, int nTimeOu
     struct timespec after;
 
     pthread_cond_init( &pEventWait->condList[pEventWait->condNum], NULL );
-    pthread_mutex_lock( &pEventManager->mutex );
     gettimeofday(&now, NULL);
     after.tv_sec = now.tv_sec + nTimeOut;
     after.tv_nsec = now.tv_usec * 1000 + 10 * 1000 * 1000;
+    UT_LOG("pthread_cond_timedwait, pEventWait->condNum = %d\n", pEventWait->condNum);
     int nReason = pthread_cond_timedwait( &pEventWait->condList[pEventWait->condNum++],
                                           &pEventManager->mutex, &after );
     if (nReason == ETIMEDOUT) {
@@ -151,7 +162,7 @@ int AddEventWait( EventManger *pEventManager, EventWait *pEventWait, int nTimeOu
     if ( nReason == EINVAL ) {
         return ERROR_INVAL;
     }
-    pthread_mutex_unlock( &pEventManager->mutex );
+    UT_VAL( nReason );
 
     return STS_OK;
 }
@@ -165,36 +176,50 @@ int WaitForEvent( int _nEventId, int nTimeOut )
     EventManger *pEventManager = &pTestSuitManager->eventManager;
     EventWait *pEventWait = NULL;
 
-    DBG_VAL( pEventManager->eventNum );
+    UT_VAL(_nEventId);
+    UT_VAL( pEventManager->eventNum );
+    pthread_mutex_lock( &pEventManager->mutex );
     for ( i=0; i<pEventManager->eventNum; i++ ) {
         pEventWait= &pEventManager->eventWait[i];
         if ( _nEventId == pEventWait->eventId ) {
             ret = AddEventWait( pEventManager, pEventWait, nTimeOut);
+            UT_VAL( ret );
             found = 1;
         }
     }
 
     if ( !found ) {
-        DBG_LINE();
+        UT_LINE();
         pEventWait = &pEventManager->eventWait[pEventManager->eventNum];
         pEventWait->eventId = _nEventId;
         pEventManager->eventNum++;
         ret = AddEventWait( pEventManager, pEventWait, nTimeOut);
+        UT_VAL( ret );
     }
+    pthread_mutex_unlock( &pEventManager->mutex );
 
     return ret;
 } 
 
 int ThreadRegister( ThreadFn threadFn )
 {
+    int ret = 0;
     ThreadManager *pThreadManager = &pTestSuitManager->threadManager;
 
     if ( !threadFn ) {
         return -1;
     }
 
-    pThreadManager->threadList[pThreadManager->num++].threadFn = threadFn;
+    pThreadManager->threadList[pThreadManager->num].threadFn = threadFn;
 
+    ret = pthread_create( &pThreadManager->threadList[pThreadManager->num].threadId, NULL,
+                              threadFn, (void *)pTestSuitManager );
+    if ( 0 != ret ) {
+        DBG_ERROR("create thread error, ret = %d\n", ret );
+        return -1;
+    }
+    pThreadManager->num++;
+    UT_VAL( ret );
     return 0;
 }
 
