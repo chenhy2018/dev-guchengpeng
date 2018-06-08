@@ -21,7 +21,7 @@ CFLAGS  = -g
 INSTALL_DIR=$(CURRENT_DIR)/output/pjsip
 PJ_CONFIG=--disable-sdl --disable-ffmpeg --disable-v4l2 \
 		  --disable-openh264 --disable-libwebrtc --disable-sound \
-		  --disable-libyuv \
+		  --disable-libyuv CFLAGS='-g' \
 		  --prefix=$(INSTALL_DIR)
 INCLUDE_PATH=-I$(PJSIP_PATH)/pjlib/include \
 			 -I$(PJSIP_PATH)/pjlib-util/include \
@@ -91,6 +91,7 @@ $(LIBSDK) : %.o : %.c
 libsdk : $(LIBSDK)
 
 clean:
+	make -C test clean
 	rm -rvf output
 
 
