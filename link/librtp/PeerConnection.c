@@ -876,7 +876,9 @@ static int checkAndNeg(IN OUT PeerConnection * _pPeerConnection)
                         STATUS_CHECK(createPacketizer, status);
                 }
         }
-        
+#ifdef AUTO_NEGOTIATION
+        StartNegotiation(_pPeerConnection);
+#endif
         return PJ_SUCCESS;
 }
 
