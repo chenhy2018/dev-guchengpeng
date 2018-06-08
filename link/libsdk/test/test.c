@@ -103,7 +103,13 @@ int RegisterTestSuitCallback( TestSuit *this )
 {
     RegisterTestCase *pTestCases = NULL;
     RegisterData *pData = NULL;
-    Media media;
+    Media media[2];
+    media[0].streamType = STREAM_VIDEO;
+    media[0].codecType = CODEC_H264;
+    media[0].sampleRate = 90000;
+    media[1].streamType = STREAM_AUDIO;
+    media[1].codecType = CODEC_G711A;
+    media[1].sampleRate = 8000;
     int i = 0;
     ErrorID sts = 0;
 
@@ -117,7 +123,7 @@ int RegisterTestSuitCallback( TestSuit *this )
 
     if ( pData->init ) {
         UT_LOG("InitSDK");
-        sts = InitSDK( &media, 1 );
+        sts = InitSDK( &media[0], 2 );
         if ( RET_OK != sts ) {
             UT_ERROR("sdk init error\n");
             return TEST_FAIL;
@@ -128,7 +134,7 @@ int RegisterTestSuitCallback( TestSuit *this )
     UT_STR( pData->password );
     UT_STR( pData->sigHost );
     UT_LOG("Register in\n");
-    sts = Register( pData->id, pData->password, pData->sigHost, pData->mediaHost, pData->imHost, pData->timeOut );
+    sts = Register( pData->id, pData->password, pData->sigHost, pData->mediaHost, pData->imHost);
     UT_LOG("Register out %x %x\n", sts, pTestCases->father.expact);
     TEST_GT( sts, pTestCases->father.expact );
     int nCallId1 = -1;
@@ -137,14 +143,14 @@ int RegisterTestSuitCallback( TestSuit *this )
     int count = 0;
     while (count != 10) {
             UT_LOG("MakeCall in\n");
-            id = MakeCall(sts, pData->id, "<sip:1009@123.59.204.198>", &nCallId1);
+            id = MakeCall(sts, pData->id, "<sip:1004@123.59.204.198>", &nCallId1);
             if (RET_OK != id) {
                     fprintf(stderr, "call error %d \n", id);
                     sleep(1);
                     ++ count;
                     continue;
             }
-            sleep(15);
+            sleep(150000);
             UT_LOG("HangupCall in\n");
             int ret = HangupCall(sts, nCallId1);
             TEST_EQUAL(ret, RET_OK);

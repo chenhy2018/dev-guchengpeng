@@ -121,7 +121,7 @@ ErrorID UninitSDK();
 // register a account
 // @return if return value > 0, it is the account id, if < 0, it is the ErrorID
 AccountID Register(const char* id, const char* password, const char* sigHost,
-                   const char* mediaHost, const char* imHost, int timeOut );
+                   const char* mediaHost, const char* imHost);
 ErrorID UnRegister( AccountID id );
 // make a call, user need to save call id
 ErrorID MakeCall(AccountID accountID, const char* id, const char* host, OUT int* callID);
