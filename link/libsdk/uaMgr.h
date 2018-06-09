@@ -7,7 +7,7 @@
 // @return UA struct point. If return NULL, error.
 UA* UARegister(const char* id, const char* password, const char* sigHost,
                const char* mediaHost, MqttOptions* options,
-               MediaConfigSet* pVideo, MediaConfigSet* pAudio);
+               UAConfig* config);
 
 ErrorID UAUnRegister(UA* _pUa);
 // make a call, user need to save call id

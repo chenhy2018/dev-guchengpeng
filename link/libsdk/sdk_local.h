@@ -23,6 +23,11 @@
 #define CODECS_MAX (128)
 #define MEDIA_CONFIG_MAX (64)
 
+typedef struct RtpCallback
+{
+        void (*OnRxRtp)(void *_pUserData, CallbackType _type, void *_pCbData);
+}RtpCallback;
+
 typedef struct {
         int id;
         struct list_head list;
@@ -34,6 +39,21 @@ typedef struct {
 }Call;
 
 typedef struct {
+        MediaConfigSet videoConfigs;
+        MediaConfigSet audioConfigs;
+        RtpCallback callback;
+} UAConfig;
+
+typedef struct {
+        MediaConfigSet *pVideoConfigs;
+        MediaConfigSet *pAudioConfigs;
+        RtpCallback *pCallback;
+        char turnHost[MAX_TURN_HOST_SIZE];
+        char turnUsername[MAX_TURN_USR_SIZE];
+        char turnPassword[MAX_TURN_PWD_SIZE];
+} CallConfig;
+
+typedef struct {
         AccountID id;
         struct list_head list;
         MessageQueue *pQueue;
@@ -41,19 +61,14 @@ typedef struct {
         void *pMqttInstance;
         pthread_cond_t registerCond;
         SipAnswerCode regStatus;
-        char turnHost[MAX_TURN_HOST_SIZE];
-        char turnUsername[MAX_TURN_USR_SIZE];
-        char turnPassword[MAX_TURN_PWD_SIZE];
-        MediaConfigSet* pVideoConfigs;
-        MediaConfigSet* pAudioConfigs;
+        CallConfig config;
         Call callList;
 }UA;
 
 typedef struct {
         UA UAList;
         bool bInitSdk;
-        MediaConfigSet videoConfigs;
-        MediaConfigSet audioConfigs;
+        UAConfig config;
 }UAManager;
 
 extern UAManager *pUAManager;;

@@ -31,7 +31,7 @@ static Call* FindCall(UA* _pUa, int _nCallId, struct list_head **pos)
 // @return UA struct point. If return NULL, error.
 UA* UARegister(const char* _pId, const char* _pPassword, const char* _pSigHost,
                const char* _pMediaHost, MqttOptions* _pOptions,
-               MediaConfig* _pVideo, MediaConfig* _pAudio)
+               UAConfig* _pConfig)
 {
 
         UA *pUA = (UA *) malloc (sizeof(UA));
@@ -64,11 +64,12 @@ UA* UARegister(const char* _pId, const char* _pPassword, const char* _pSigHost,
         _pOptions->nAccountId = nAccountId;
         pUA->pMqttInstance = MqttCreateInstance(_pOptions);
         pUA->id = nAccountId;
-        pUA->pVideoConfigs = _pVideo;
-        pUA->pAudioConfigs = _pAudio;
-        strncpy(pUA->turnHost, _pMediaHost, MAX_TURN_HOST_SIZE - 1);
-        strncpy(pUA->turnUsername, _pId, MAX_TURN_USR_SIZE -1);
-        strncpy(pUA->turnPassword, _pPassword, MAX_TURN_PWD_SIZE -1);
+        pUA->config.pVideoConfigs = &_pConfig->videoConfigs;
+        pUA->config.pAudioConfigs = &_pConfig->audioConfigs;
+        pUA->config.pCallback = &_pConfig->callback;
+        strncpy(pUA->config.turnHost, _pMediaHost, MAX_TURN_HOST_SIZE - 1);
+        strncpy(pUA->config.turnUsername, _pId, MAX_TURN_USR_SIZE -1);
+        strncpy(pUA->config.turnPassword, _pPassword, MAX_TURN_PWD_SIZE -1);
         return pUA;
 }
 
@@ -84,8 +85,7 @@ ErrorID UAUnRegister(UA* _pUa)
 ErrorID UAMakeCall(UA* _pUa, const char* id, const char* host, OUT int* callID)
 {
         if (_pUa->regStatus == OK) {
-                Call* call = CALLMakeCall(_pUa->id, id, host, callID, _pUa->pVideoConfigs, _pUa->pAudioConfigs,
-                                          _pUa->turnUsername, _pUa->turnPassword, _pUa->turnHost);
+                Call* call = CALLMakeCall(_pUa->id, id, host, callID, &_pUa->config);
                 if (call == NULL) {
                         return RET_MEM_ERROR;
                 }
@@ -199,8 +199,7 @@ SipAnswerCode UAOnIncomingCall(UA* _pUa, const int _nCallId, const char *pFrom, 
         struct list_head *pos;
         Call** call;
         DBG_LOG("UAOnIncomingCall \n");
-        SipAnswerCode code = CALLOnIncomingCall(call, _nCallId, pFrom, pMedia, _pUa->pVideoConfigs, _pUa->pAudioConfigs,
-                                                 _pUa->turnUsername, _pUa->turnPassword, _pUa->turnHost);
+        SipAnswerCode code = CALLOnIncomingCall(call, _nCallId, pFrom, pMedia, &_pUa->config);
         list_add(&((*call)->list), &(_pUa->callList.list));
 }
 

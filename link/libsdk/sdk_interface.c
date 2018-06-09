@@ -37,6 +37,35 @@ static UA* FindUA(UAManager* _pUAManager, AccountID _nAccountId, struct list_hea
         return NULL;
 }
 
+// Todo send to message queue.
+static void OnRxRtp(void *_pUserData, CallbackType _type, void *_pCbData)
+{
+        switch (_type){
+                case CALLBACK_ICE:{
+                        IceNegInfo *pInfo = (IceNegInfo *)_pCbData;
+                        DBG_LOG("==========>callback_ice: state:%d", pInfo->state);
+                        for ( int i = 0; i < pInfo->nCount; i++) {
+                                DBG_LOG(" codec type:%d", pInfo->configs[i]->codecType);
+                        }
+                }
+                        break;
+                case CALLBACK_RTP:{
+                        DBG_LOG("==========>callback_rtp\n");
+                        RtpPacket *pPkt = (RtpPacket *)_pCbData;
+                        pj_ssize_t nLen = pPkt->nDataLen;
+                        if (pPkt->type == STREAM_AUDIO && nLen == 160) {
+                                //pj_file_write(gPcmuFd, pPkt->pData, &nLen);
+                        } else if (pPkt->type == STREAM_VIDEO) {
+                                //pj_file_write(gH264Fd, pPkt->pData, &nLen);
+                        }
+                }
+                        break;
+                case CALLBACK_RTCP:
+                        DBG_LOG("==========>callback_rtcp\n");
+                        break;
+        }
+}
+
 void OnMessage(IN const void* _pInstance, IN int _nAccountId, IN const char* _pTopic, IN const char* _pMessage, IN size_t nLength)
 {
         DBG_LOG("%p topic %s message %s nAccountId %d \n", _pInstance, _pTopic, _pMessage, _nAccountId);
@@ -66,9 +95,10 @@ void OnEvent(IN const void* _pInstance, IN int _nAccountId, IN int _nId,  IN con
         pMessage->nMessageID = EVENT_MESSAGE;
         pMessageEvent = &pEvent->body.messageEvent;
         pMessageEvent->status = _nId;
-        char *message = (char *) malloc (sizeof(_pReason));
-        strcpy(message, _pReason);
+        char *message = (char *) malloc (strlen(_pReason));
+        strncpy(message, _pReason, strlen(_pReason) - 1);
         pMessageEvent->message = message;//_pReason;
+        DBG_ERROR("message %p  %s\n", pMessageEvent->message, pMessageEvent->message);
         pMessage->pMessage  = (void *)pEvent;
         SendMessage(pUA->pQueue, pMessage);
 }
@@ -122,22 +152,30 @@ static CodecType ConversionFormat(Codec _nCodec)
 ErrorID InitSDK( Media* _pMediaConfigs, int _nSize)
 {
        SipInstanceConfig config;
-       pUAManager->videoConfigs.nCount = 0;
-       pUAManager->audioConfigs.nCount = 0;
+       pUAManager->config.videoConfigs.nCount = 0;
+       pUAManager->config.audioConfigs.nCount = 0;
        for (int count = 0; count < _nSize; ++count) {
                if (_pMediaConfigs[count].streamType == STREAM_VIDEO) {
-                       pUAManager->videoConfigs.configs[pUAManager->videoConfigs.nCount].streamType = RTP_STREAM_VIDEO;
-                       pUAManager->videoConfigs.configs[pUAManager->videoConfigs.nCount].codecType = ConversionFormat(_pMediaConfigs[count].codecType);
-                       pUAManager->videoConfigs.configs[pUAManager->videoConfigs.nCount].nSampleOrClockRate = _pMediaConfigs[count].sampleRate;
-                       pUAManager->videoConfigs.configs[pUAManager->videoConfigs.nCount].nChannel = _pMediaConfigs[count].channels;
-                       ++pUAManager->videoConfigs.nCount;
+                       pUAManager->config.videoConfigs.configs[pUAManager->config.videoConfigs.nCount].streamType
+                         = RTP_STREAM_VIDEO;
+                       pUAManager->config.videoConfigs.configs[pUAManager->config.videoConfigs.nCount].codecType
+                         = ConversionFormat(_pMediaConfigs[count].codecType);
+                       pUAManager->config.videoConfigs.configs[pUAManager->config.videoConfigs.nCount].nSampleOrClockRate
+                         = _pMediaConfigs[count].sampleRate;
+                       pUAManager->config.videoConfigs.configs[pUAManager->config.videoConfigs.nCount].nChannel
+                         = _pMediaConfigs[count].channels;
+                       ++pUAManager->config.videoConfigs.nCount;
                }
                else if (_pMediaConfigs[count].streamType == STREAM_AUDIO) {
-                       pUAManager->audioConfigs.configs[pUAManager->audioConfigs.nCount].streamType = RTP_STREAM_AUDIO;
-                       pUAManager->audioConfigs.configs[pUAManager->audioConfigs.nCount].codecType = ConversionFormat(_pMediaConfigs[count].codecType);
-                       pUAManager->audioConfigs.configs[pUAManager->audioConfigs.nCount].nSampleOrClockRate = _pMediaConfigs[count].sampleRate;
-                       pUAManager->audioConfigs.configs[pUAManager->audioConfigs.nCount].nChannel = _pMediaConfigs[count].channels;
-                       ++pUAManager->audioConfigs.nCount;
+                       pUAManager->config.audioConfigs.configs[pUAManager->config.audioConfigs.nCount].streamType
+                         = RTP_STREAM_AUDIO;
+                       pUAManager->config.audioConfigs.configs[pUAManager->config.audioConfigs.nCount].codecType
+                         = ConversionFormat(_pMediaConfigs[count].codecType);
+                       pUAManager->config.audioConfigs.configs[pUAManager->config.audioConfigs.nCount].nSampleOrClockRate
+                          = _pMediaConfigs[count].sampleRate;
+                       pUAManager->config.audioConfigs.configs[pUAManager->config.audioConfigs.nCount].nChannel
+                         = _pMediaConfigs[count].channels;
+                       ++pUAManager->config.audioConfigs.nCount;
                }
         }
         config.Cb.OnIncomingCall  = &cbOnIncomingCall;
@@ -145,6 +183,7 @@ ErrorID InitSDK( Media* _pMediaConfigs, int _nSize)
         config.Cb.OnRegStatusChange = &cbOnRegStatusChange;
         config.nMaxCall = 10;
         config.nMaxAccount = 10;
+        pUAManager->config.callback.OnRxRtp = &OnRxRtp;
         // debug code.
         SipSetLogLevel(1);
         SipCreateInstance(&config);
@@ -167,8 +206,8 @@ ErrorID UninitSDK()
                 UAUnRegister(pUA);
         }
         pUAManager->bInitSdk = false;
-        memset(&pUAManager->videoConfigs, 0, sizeof(MediaConfig));
-        memset(&pUAManager->audioConfigs, 0, sizeof(MediaConfig));
+        memset(&pUAManager->config.videoConfigs, 0, sizeof(MediaConfigSet));
+        memset(&pUAManager->config.audioConfigs, 0, sizeof(MediaConfigSet));
 
         return RET_OK;
 }
@@ -179,7 +218,7 @@ AccountID Register(const char* _id, const char* _password, const char* _pSigHost
     int nAccountId = 0;
     struct MqttOptions options;
     InitMqtt(&options, _id, _password, _pImHost);
-    UA *pUA = UARegister(_id, _password, _pSigHost, _pMediaHost, &options, &pUAManager->videoConfigs, &pUAManager->audioConfigs);
+    UA *pUA = UARegister(_id, _password, _pSigHost, _pMediaHost, &options, &pUAManager->config);
     int nReason = 0;
 
     if (!pUAManager->bInitSdk) {
@@ -237,16 +276,19 @@ ErrorID PollEvent(AccountID _nAccountID, EventType* _pType, Event** _pEvent, int
             DBG_ERROR( "RET_ACCOUNT_NOT_EXIST\n");
             return RET_ACCOUNT_NOT_EXIST;
     }
+#if 1
     // pLastMessage use to free last message
     if ( pUA->pLastMessage ) {
         Event *pEvent = (Event *) pUA->pLastMessage->pMessage;
         if (pUA->pLastMessage->nMessageID == EVENT_DATA) {
+                DBG_ERROR("EVENT DATA \n");
                 if (pEvent->body.dataEvent.data) {
                         free( pEvent->body.dataEvent.data );
                         pEvent->body.dataEvent.data = NULL;
                 }
         }
         if (pUA->pLastMessage->nMessageID == EVENT_MESSAGE) {
+                DBG_ERROR("EVENT MESSAGE %p %s\n", pEvent->body.messageEvent.message, pEvent->body.messageEvent.message);
                 if (pEvent->body.messageEvent.message) {
                         free(pEvent->body.messageEvent.message);
                         pEvent->body.messageEvent.message = NULL;
@@ -254,8 +296,10 @@ ErrorID PollEvent(AccountID _nAccountID, EventType* _pType, Event** _pEvent, int
         }
         free( pEvent );
         pEvent = NULL;
+        pUA->pLastMessage = NULL;
     }
-    DBG_LOG("wait for event, pUA = 0x%x\n", pUA );
+#endif
+    DBG_LOG("wait for event, pUA = %p\n", pUA );
     if (_nTimeOut) {
         pMessage = ReceiveMessageTimeout( pUA->pQueue, _nTimeOut );
     } else {
@@ -264,6 +308,7 @@ ErrorID PollEvent(AccountID _nAccountID, EventType* _pType, Event** _pEvent, int
 
     DBG_LOG("[ LIBSDK ]get one event\n");
     if (!pMessage) {
+        DBG_LOG("[ LIBSDK ]get one event 111\n");
         return RET_RETRY;
     }
 
@@ -406,7 +451,7 @@ void cbOnRegStatusChange(const int _nAccountId, const SipAnswerCode _regStatusCo
     }
 
     DBG_VAL(_nAccountId);
-    DBG_LOG("pUA address is 0x%x, _regStatusCode = %d\n", pUA, _regStatusCode );
+    DBG_LOG("pUA address is %p, _regStatusCode = %d\n", pUA, _regStatusCode );
     memset( pMessage, 0, sizeof(Message) );
     memset( pEvent, 0, sizeof(Event) );
     pMessage->nMessageID = EVENT_CALL;

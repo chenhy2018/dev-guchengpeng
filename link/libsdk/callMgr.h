@@ -5,9 +5,10 @@
 
 // make a call, user need to save call id
 Call* CALLMakeCall(AccountID _nAccountId, const char* id, const char* host, OUT int* callID,
-                   MediaConfigSet* _pVideo, MediaConfigSet* _pAudio,
-                   const char* _pId, const char* _pPassword, const char* _pHost);
+                   CallConfig* _pConfig);
+
 ErrorID CALLAnswerCall(Call* _pCall);
+
 ErrorID CALLRejectCall(Call* _pCall);
 // hangup a call
 ErrorID CALLHangupCall(Call* _pCall);
@@ -20,8 +21,7 @@ ErrorID CALLPollEvent(Call* _pCall, EventType* type, Event* event, int timeOut);
 
 //Callback, asyn
 SipAnswerCode CALLOnIncomingCall(Call** _pCall, const int _nCallId, const char *pFrom,
-                                 const void *pMedia, MediaConfigSet* _pVideo, MediaConfigSet* _pAudio,
-                                 const char* _pId, const char* _pPassword, const char* _pHost);
+                                 const void *pMedia, CallConfig* _pConfig);
 
 void CALLOnCallStateChange(Call** _pCall, const SipInviteState State, const SipAnswerCode StatusCode, const void *pMedia);
 
