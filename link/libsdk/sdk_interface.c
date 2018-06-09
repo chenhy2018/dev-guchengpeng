@@ -66,7 +66,9 @@ void OnEvent(IN const void* _pInstance, IN int _nAccountId, IN int _nId,  IN con
         pMessage->nMessageID = EVENT_MESSAGE;
         pMessageEvent = &pEvent->body.messageEvent;
         pMessageEvent->status = _nId;
-        pMessageEvent->message = _pReason;
+        char *message = (char *) malloc (sizeof(_pReason));
+        strcpy(message, _pReason);
+        pMessageEvent->message = message;//_pReason;
         pMessage->pMessage  = (void *)pEvent;
         SendMessage(pUA->pQueue, pMessage);
 }
@@ -235,13 +237,20 @@ ErrorID PollEvent(AccountID _nAccountID, EventType* _pType, Event** _pEvent, int
             DBG_ERROR( "RET_ACCOUNT_NOT_EXIST\n");
             return RET_ACCOUNT_NOT_EXIST;
     }
-
     // pLastMessage use to free last message
     if ( pUA->pLastMessage ) {
         Event *pEvent = (Event *) pUA->pLastMessage->pMessage;
-        if ( pEvent->body.dataEvent.data ) {
-            free( pEvent->body.dataEvent.data );
-            pEvent->body.dataEvent.data = NULL;
+        if (pUA->pLastMessage->nMessageID == EVENT_DATA) {
+                if (pEvent->body.dataEvent.data) {
+                        free( pEvent->body.dataEvent.data );
+                        pEvent->body.dataEvent.data = NULL;
+                }
+        }
+        if (pUA->pLastMessage->nMessageID == EVENT_MESSAGE) {
+                if (pEvent->body.messageEvent.message) {
+                        free(pEvent->body.messageEvent.message);
+                        pEvent->body.messageEvent.message = NULL;
+                }
         }
         free( pEvent );
         pEvent = NULL;
