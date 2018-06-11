@@ -87,8 +87,8 @@ Call* CALLMakeCall(AccountID _nAccountId, const char* id, const char* _pDestUri,
         }
         memset(pCall, 0, sizeof(Call));
         InitRtp(&pCall, _pConfig);
-        //createOffer(pCall->pPeerConnection, &pCall->pOffer);
-        CreateTmpSDP(&pCall->pOffer);
+        createOffer(pCall->pPeerConnection, &pCall->pOffer);
+        //CreateTmpSDP(&pCall->pOffer);
         setLocalDescription(pCall->pPeerConnection, pCall->pOffer);
         SipMakeNewCall(_nAccountId, _pDestUri, pCall->pOffer, _pCallId);
         pCall->id = *_pCallId;
@@ -114,6 +114,7 @@ ErrorID CALLAnswerCall(Call* _pCall)
         createAnswer(_pCall->pPeerConnection, _pCall->pOffer, &_pCall->pAnswer);
         setLocalDescription(pCall->pPeerConnection, pCall->pAnswer);
 #endif
+        DBG_LOG("CALLAnswerCall  %p id %d \n", _pCall, _pCall->id);
         return SipAnswerCall(_pCall->id, OK, "answser call", _pCall->pAnswer);
 }
 
@@ -173,6 +174,7 @@ SipAnswerCode CALLOnIncomingCall(Call** _pCall, const int _nCallId, const char *
         memset(pCall, 0, sizeof(Call));
         *_pCall = pCall;
         pCall->id = _nCallId;
+        pCall->callStatus =  INV_STATE_CALLING;
         // rtp to do. improved
         pCall->pOffer = pMedia;
         // rtp to do. ice config.media info. and check error)
@@ -180,10 +182,11 @@ SipAnswerCode CALLOnIncomingCall(Call** _pCall, const int _nCallId, const char *
         InitRtp(&pCall, _pConfig);
         setRemoteDescription(pCall->pPeerConnection, pCall->pOffer);
         DBG_LOG("call answer call\n");
-        //createAnswer(pCall->pPeerConnection, pCall->pOffer, &pCall->pAnswer);
-        CreateTmpSDP(&pCall->pAnswer);
+        createAnswer(pCall->pPeerConnection, pCall->pOffer, &pCall->pAnswer);
+        //CreateTmpSDP(&pCall->pAnswer);
         DBG_LOG("call answer call end\n");
-        //setLocalDescription(pCall->pPeerConnection, pCall->pAnswer);
+        setLocalDescription(pCall->pPeerConnection, pCall->pAnswer);
+        //StartNegotiation(pCall->pPeerConnection);
         DBG_LOG("call answer call end 1\n");
 }
 
@@ -191,6 +194,13 @@ void CALLOnCallStateChange(Call** _pCall, const SipInviteState State, const SipA
 {
         (*_pCall)->callStatus = State;
         //todo free disconnected call.
+        if ((*_pCall)->callStatus == INV_STATE_CONNECTING) {
+                DBG_LOG("====================stats %d state %d call %p\n", State, StatusCode, *_pCall);
+                if (pMedia != NULL) {
+                        setRemoteDescription((*_pCall)->pPeerConnection, pMedia);
+                }
+                StartNegotiation((*_pCall)->pPeerConnection);
+        }
         DBG_LOG("stats %d state %d call %p\n", State, StatusCode, *_pCall);
         if (StatusCode >= 400 && (*_pCall)->callStatus == INV_STATE_DISCONNECTED) {
                 //CALLHangupCall(*_pCall);

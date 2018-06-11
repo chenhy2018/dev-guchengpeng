@@ -110,6 +110,7 @@ ErrorID UAMakeCall(UA* _pUa, const char* id, const char* host, OUT int* callID)
 ErrorID UAAnswerCall(UA* _pUa, int nCallId)
 {
         struct list_head *pos = NULL;
+        DBG_LOG("UAAnswerCall in call id %d ua %p\n",nCallId, _pUa);
         Call* call = FindCall(_pUa, nCallId, &pos);
         if (call) {
                 return CALLAnswerCall(call);
@@ -197,10 +198,10 @@ ErrorID UAReport(UA* _pUa, const char* topic, const char* message, int length)
 SipAnswerCode UAOnIncomingCall(UA* _pUa, const int _nCallId, const char *pFrom, const void *pMedia)
 {
         struct list_head *pos;
-        Call** call;
+        Call* call;
         DBG_LOG("UAOnIncomingCall \n");
-        SipAnswerCode code = CALLOnIncomingCall(call, _nCallId, pFrom, pMedia, &_pUa->config);
-        list_add(&((*call)->list), &(_pUa->callList.list));
+        SipAnswerCode code = CALLOnIncomingCall(&call, _nCallId, pFrom, pMedia, &_pUa->config);
+        list_add(&(call->list), &(_pUa->callList.list));
 }
 
 void UAOnRegStatusChange(UA* _pUa, const SipAnswerCode _nRegStatusCode)

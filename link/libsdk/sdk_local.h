@@ -36,7 +36,7 @@ typedef struct {
         pjmedia_sdp_session* pOffer;
         pjmedia_sdp_session* pAnswer;
         IceConfig iceConfig;
-}Call;
+} Call;
 
 typedef struct {
         MediaConfigSet videoConfigs;

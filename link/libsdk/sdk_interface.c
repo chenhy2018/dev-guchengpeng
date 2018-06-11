@@ -25,10 +25,10 @@ static UA* FindUA(UAManager* _pUAManager, AccountID _nAccountId, struct list_hea
 {
         UA* pUA;
         struct list_head *q, *pos;
-        DBG_LOG("FindUA in %p %p %p\n", &_pUAManager->UAList.list, pos, q);
+        DBG_LOG("FindUA in %p %p %p AccountID %d \n", &_pUAManager->UAList.list, pos, q, _nAccountId);
         list_for_each_safe(pos, q, &_pUAManager->UAList.list) {
-                DBG_LOG("FindUA pos %p\n", pos);
                 pUA = list_entry(pos, UA, list);
+                DBG_LOG("FindUA pos %p id %d\n", pos, pUA->id);
                 if (pUA->id == _nAccountId) {
                         *po = pos;
                         return pUA;
@@ -43,9 +43,9 @@ static void OnRxRtp(void *_pUserData, CallbackType _type, void *_pCbData)
         switch (_type){
                 case CALLBACK_ICE:{
                         IceNegInfo *pInfo = (IceNegInfo *)_pCbData;
-                        DBG_LOG("==========>callback_ice: state:%d", pInfo->state);
+                        DBG_LOG("==========>callback_ice: state: %d\n", pInfo->state);
                         for ( int i = 0; i < pInfo->nCount; i++) {
-                                DBG_LOG(" codec type:%d", pInfo->configs[i]->codecType);
+                                DBG_LOG(" codec type: %d\n", pInfo->configs[i]->codecType);
                         }
                 }
                         break;
@@ -185,7 +185,7 @@ ErrorID InitSDK( Media* _pMediaConfigs, int _nSize)
         config.nMaxAccount = 10;
         pUAManager->config.callback.OnRxRtp = &OnRxRtp;
         // debug code.
-        SipSetLogLevel(1);
+        SipSetLogLevel(6);
         SipCreateInstance(&config);
         INIT_LIST_HEAD(&pUAManager->UAList.list);
         pUAManager->bInitSdk = true;
@@ -508,6 +508,7 @@ void cbOnCallStateChange(const int _nCallId, const int _nAccountId, const SipInv
     } else if ( _State == INV_STATE_DISCONNECTED ) {
             pCallEvent->status = CALL_STATUS_HANGUP;
     } else {
+            pCallEvent->status = CALL_STATUS_REGISTERED;
     }
     pMessage->pMessage  = (void *)pEvent;
     SendMessage(pUA->pQueue, pMessage);
