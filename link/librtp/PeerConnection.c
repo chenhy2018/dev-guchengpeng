@@ -555,6 +555,20 @@ static int createSdp(IN OUT PeerConnection * _pPeerConnection, IN pj_pool_t * _p
         return PJ_SUCCESS;
 }
 
+static void createSdpPool(IN OUT PeerConnection * _pPeerConnection)
+{
+        pj_pool_t *pPool = _pPeerConnection->pSdpPool;
+        if(pPool == NULL) {
+                pPool = pj_pool_create(&_pPeerConnection->cachingPool.factory,
+                                       NULL, 2048, 512, NULL);
+                MY_PJ_LOG(1, "pj_pool_create fail. may out of memory");
+                pj_assert(pPool != NULL);
+                _pPeerConnection->pSdpPool = pPool;
+        }
+        
+        return;
+}
+
 int createOffer(IN OUT PeerConnection * _pPeerConnection, OUT void **_pOffer)
 {
         pj_status_t  status;
@@ -591,6 +605,7 @@ int createOffer(IN OUT PeerConnection * _pPeerConnection, OUT void **_pOffer)
         MY_PJ_LOG(5, "----------------\n%s", sdpStr);
         
         _pPeerConnection->role = ICE_ROLE_OFFERER;
+        _pPeerConnection->pOfferSdp = *_pOffer;
         
         return PJ_SUCCESS;
 }
@@ -622,6 +637,7 @@ int createAnswer(IN OUT PeerConnection * _pPeerConnection, IN void *_pOffer, OUT
         }
         
         _pPeerConnection->role = ICE_ROLE_ANSWERER;
+        _pPeerConnection->pAnswerSdp = *_pAnswer;
         
         return PJ_SUCCESS;
 }
@@ -763,7 +779,7 @@ int StartNegotiation(IN PeerConnection * _pPeerConnection)
                         ASSERT_RETURN_CHECK(pIceNegPool, pj_pool_create);
                         pTransportIce->pNegotiationPool = pIceNegPool;
                         status = pjmedia_transport_media_start(pTransportIce->pTransport, pIceNegPool,
-                                                               _pPeerConnection->pOfferSdp, _pPeerConnection->pAnswerSdp, i);
+                                                               _pPeerConnection->pLocalSdp, _pPeerConnection->pRemoteSdp, i);
                         STATUS_CHECK(pjmedia_transport_media_start, status);
                         
                         if (waitState(&_pPeerConnection->transportIce[i], ICE_STATE_GATHERING_OK)){
@@ -824,15 +840,15 @@ static int checkAndNeg(IN OUT PeerConnection * _pPeerConnection)
                 if (_pPeerConnection->pIceNeg == NULL) {
                         
                         status = pjmedia_sdp_neg_create_w_local_offer (_pPeerConnection->pNegPool,
-                                                                       _pPeerConnection->pOfferSdp, &_pPeerConnection->pIceNeg);
+                                                                       _pPeerConnection->pLocalSdp, &_pPeerConnection->pIceNeg);
                         STATUS_CHECK(pjmedia_sdp_neg_create_w_local_offer, status);
                         status = pjmedia_sdp_neg_set_remote_answer (_pPeerConnection->pNegPool,
-                                                                    _pPeerConnection->pIceNeg, _pPeerConnection->pAnswerSdp);
+                                                                    _pPeerConnection->pIceNeg, _pPeerConnection->pRemoteSdp);
                         STATUS_CHECK(pjmedia_sdp_neg_set_remote_answer, status);
                 }
         } else if (_pPeerConnection->role == ICE_ROLE_ANSWERER) {
                 status = pjmedia_sdp_neg_create_w_remote_offer(_pPeerConnection->pNegPool,
-                                                               _pPeerConnection->pAnswerSdp, _pPeerConnection->pOfferSdp,
+                                                               _pPeerConnection->pRemoteSdp, _pPeerConnection->pLocalSdp,
                                                                &_pPeerConnection->pIceNeg);
                 STATUS_CHECK(pjmedia_sdp_neg_create_w_remote_offer, status);
         }
@@ -884,8 +900,20 @@ static int checkAndNeg(IN OUT PeerConnection * _pPeerConnection)
 
 int setLocalDescription(IN OUT PeerConnection * _pPeerConnection, IN void * _pSdp)
 {
-        _pPeerConnection->pOfferSdp = (pjmedia_sdp_session *)_pSdp;
-        if (_pPeerConnection->pAnswerSdp) {
+        pj_assert(_pSdp != NULL);
+        createSdpPool(_pPeerConnection);
+        pjmedia_sdp_session *  pSdp = (pjmedia_sdp_session *) _pSdp;
+        if (pSdp != _pPeerConnection->pOfferSdp && pSdp != _pPeerConnection->pAnswerSdp) {
+                _pPeerConnection->pLocalSdp = pjmedia_sdp_session_clone(_pPeerConnection->pSdpPool, _pSdp);
+                if (_pPeerConnection->pLocalSdp == NULL) {
+                        MY_PJ_LOG(1, "PJ_NO_MEMORY_EXCEPTION, clone sdp fail");
+                        pj_assert(_pPeerConnection->pLocalSdp != NULL);
+                }
+        } else {
+                _pPeerConnection->pLocalSdp = pSdp;
+        }
+
+        if (_pPeerConnection->pRemoteSdp) {
                 return checkAndNeg(_pPeerConnection);
         }
         return PJ_SUCCESS;
@@ -893,8 +921,20 @@ int setLocalDescription(IN OUT PeerConnection * _pPeerConnection, IN void * _pSd
 
 int setRemoteDescription(IN OUT PeerConnection * _pPeerConnection, IN void * _pSdp)
 {
-        _pPeerConnection->pAnswerSdp = (pjmedia_sdp_session *)_pSdp;
-        if(_pPeerConnection->pOfferSdp){
+        pj_assert(_pSdp != NULL);
+        createSdpPool(_pPeerConnection);
+        pjmedia_sdp_session *  pSdp = (pjmedia_sdp_session *) _pSdp;
+        if (pSdp != _pPeerConnection->pOfferSdp && pSdp != _pPeerConnection->pAnswerSdp) {
+                _pPeerConnection->pRemoteSdp = pjmedia_sdp_session_clone(_pPeerConnection->pSdpPool, _pSdp);
+                if (_pPeerConnection->pRemoteSdp == NULL) {
+                        MY_PJ_LOG(1, "PJ_NO_MEMORY_EXCEPTION, clone sdp fail");
+                        pj_assert(_pPeerConnection->pLocalSdp != NULL);
+                }
+        } else {
+                _pPeerConnection->pRemoteSdp = pSdp;
+        }
+
+        if(_pPeerConnection->pLocalSdp){
                 return checkAndNeg(_pPeerConnection);
         }
         return PJ_SUCCESS;
