@@ -308,7 +308,6 @@ ErrorID PollEvent(AccountID _nAccountID, EventType* _pType, Event** _pEvent, int
 
     DBG_LOG("[ LIBSDK ]get one event\n");
     if (!pMessage) {
-        DBG_LOG("[ LIBSDK ]get one event 111\n");
         return RET_RETRY;
     }
 
@@ -322,12 +321,6 @@ ErrorID PollEvent(AccountID _nAccountID, EventType* _pType, Event** _pEvent, int
     
     *_pEvent = (Event *)pMessage->pMessage;
 
-#if 0
-    if (UAPollEvent(pUA, _pType, _pEvent, _nTimeOut) == RET_CALL_NOT_EXIST) {
-        fprintf(stderr, "Call is not exist, poll next event\n");
-        return PollEvent(_nAccountID, _pType,  _pEvent, _nTimeOut);
-    }
-#endif
     return RET_OK;
 }
 
@@ -510,16 +503,13 @@ void cbOnCallStateChange(const int _nCallId, const int _nAccountId, const SipInv
     pMessage->nMessageID = EVENT_CALL;
     pCallEvent = &pEvent->body.callEvent;
     pCallEvent->callID = _nCallId;
-    DBG_ERROR("pUser is NULL\n");
     if ( _State == INV_STATE_CONFIRMED ) {
             pCallEvent->status = CALL_STATUS_ESTABLISHED;
     } else if ( _State == INV_STATE_DISCONNECTED ) {
             pCallEvent->status = CALL_STATUS_HANGUP;
     } else {
     }
-    DBG_ERROR("pUser is NULL\n");
     pMessage->pMessage  = (void *)pEvent;
     SendMessage(pUA->pQueue, pMessage);
     UAOnCallStateChange(pUA, _nCallId, _State, _StatusCode, pMedia);
-    DBG_LOG("cbOnCallStateChange end\n");
 }

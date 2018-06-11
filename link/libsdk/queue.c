@@ -138,7 +138,7 @@ Message* ReceiveMessageTimeout(MessageQueue* _pQueue, int _nMilliSec)
                         pthread_mutex_unlock(&_pQueue->mutex);
                         return NULL;
 		}
-	`}
+	}
 
 	if (_pQueue->nSize != 0) {
 		// pop one event
