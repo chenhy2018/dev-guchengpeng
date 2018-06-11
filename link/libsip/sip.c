@@ -958,6 +958,7 @@ SIP_ERROR_CODE SipMakeNewCall(IN const int _nFromAccountId, IN const char *_pDes
 SIP_ERROR_CODE SipAnswerCall(IN const int _nCallId, IN const SipAnswerCode _StatusCode, IN const char *_pReason, IN const void *_pMedia)
 {
         /* Check that callId is valid */
+        PJ_LOG(4, (THIS_FILE, "callId = %d answer code = %d, reason = %s \n", _nCallId, _StatusCode, _pReason));
         PJ_ASSERT_RETURN(_nCallId >=0 || _nCallId < SipAppData.nMaxCall, SIP_INVALID_ARG);
 
         if (SipAppData.Calls[_nCallId].pInviteSession == NULL)
