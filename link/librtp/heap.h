@@ -10,19 +10,19 @@
 
 // Structure for a single heap entry
 typedef struct heap_entry {
-    void* key;   // Key for this entry
-    void* value; // Value for this entry
-    void* immutable;
+        void* key;   // Key for this entry
+        void* value; // Value for this entry
+        void* immutable;
 } heap_entry;
 
 
 // Main struct for representing the heap
 typedef struct heap {
-    int (*compare_func)(void*, void*); // The key comparison function to use
-    int active_entries;  // The number of entries in the heap
-    int minimum_pages;   // The minimum number of pages to maintain, based on the initial cap.
-    int allocated_pages; // The number of pages in memory that are allocated
-    heap_entry* table; // Pointer to the table, which maps to the pages
+        int (*compare_func)(void*, void*); // The key comparison function to use
+        int active_entries;  // The number of entries in the heap
+        int minimum_pages;   // The minimum number of pages to maintain, based on the initial cap.
+        int allocated_pages; // The number of pages in memory that are allocated
+        heap_entry* table; // Pointer to the table, which maps to the pages
 } heap;
 
 // Functions
