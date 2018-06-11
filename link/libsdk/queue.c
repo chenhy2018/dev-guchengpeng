@@ -135,9 +135,10 @@ Message* ReceiveMessageTimeout(MessageQueue* _pQueue, int _nMilliSec)
 		after.tv_nsec = now.tv_usec * 1000 + _nMilliSec * 1000 * 1000;
 		int nReason = pthread_cond_timedwait(&_pQueue->consumerCond, &_pQueue->mutex, &after);
 		if (nReason == ETIMEDOUT) {
-			return NULL;
+                        pthread_mutex_unlock(&_pQueue->mutex);
+                        return NULL;
 		}
-	}
+	`}
 
 	if (_pQueue->nSize != 0) {
 		// pop one event
