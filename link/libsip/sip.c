@@ -169,6 +169,7 @@ SIP_ERROR_CODE SipCreateInstance(IN const SipInstanceConfig *_pConfig)
         PJ_ASSERT_RETURN(Status == PJ_SUCCESS, SIP_CREATE_ENDPOINT_FALIED);
 
         /* start udp socket on sip port */
+        /*
         pj_sockaddr Address;
         pjsip_transport *tp;
         pj_sockaddr_init(pj_AF_INET(), &Address, NULL, 0);
@@ -179,7 +180,13 @@ SIP_ERROR_CODE SipCreateInstance(IN const SipInstanceConfig *_pConfig)
         PJ_LOG(4,(THIS_FILE, "SIP UDP listening on %.*s:%d",
                   (int)tp->local_name.host.slen, tp->local_name.host.ptr,
                   tp->local_name.port));
-
+        */
+        /* start tcp socket on sip port */
+        pjsip_tpfactory *TcpFactory;
+        pjsip_tcp_transport_cfg TcpConfig;
+        pjsip_tcp_transport_cfg_default(&TcpConfig, pj_AF_INET());
+        Status = pjsip_tcp_transport_start3(SipAppData.pSipEndPoint, &TcpConfig, &TcpFactory);
+        PJ_ASSERT_RETURN(Status == PJ_SUCCESS, SIP_START_TP_FAILED);
         /* Init transaction layer */
         Status = pjsip_tsx_layer_init_module(SipAppData.pSipEndPoint);
         PJ_ASSERT_RETURN(Status == PJ_SUCCESS, SIP_INIT_TRANS_FAILED);
@@ -331,7 +338,7 @@ SIP_ERROR_CODE SipAddNewAccount(IN const SipAccountConfig *_pConfig, OUT int *_p
         /* Copy account info */
         char ID[80], Registrar[80];
         sprintf(ID, "sip:%s@%s", _pConfig->pUserName, _pConfig->pDomain);
-        sprintf(Registrar, "sip:%s", _pConfig->pDomain);
+        sprintf(Registrar, "sip:%s;transport=tcp", _pConfig->pDomain);
         pj_str_t PJID = pj_str(ID);
         pj_str_t PJReg = pj_str(Registrar);
         pj_str_t PJUserName = pj_str((char *)_pConfig->pUserName);
@@ -652,6 +659,7 @@ static void SipReRegTimerCallBack(pj_timer_heap_t *_pTimerHeap, pj_timer_entry *
 }
 static void UpdateKeepAlive(INOUT SipAccount *_pAccount, IN const pj_bool_t _Start, IN const struct pjsip_regc_cbparam *_pCbData)
 {
+
         if (_pAccount->KaTimer.id) {
                 pjsip_endpt_cancel_timer(SipAppData.pSipEndPoint, &_pAccount->KaTimer);
                 _pAccount->KaTimer.id = PJ_FALSE;
@@ -666,7 +674,8 @@ static void UpdateKeepAlive(INOUT SipAccount *_pAccount, IN const pj_bool_t _Sta
                 pj_status_t Status;
 
                 /* return if ka is disable */
-                if (_pAccount->nKaInterval == 0)
+                if (_pAccount->nKaInterval == 0 || (_pCbData->rdata->tp_info.transport->key.type &
+                                                    ~PJSIP_TRANSPORT_IPV6)!= PJSIP_TRANSPORT_UDP)
                         return;
                 _pAccount->KaTransport = _pCbData->rdata->tp_info.transport;
                 pjsip_transport_add_ref(_pAccount->KaTransport);
@@ -1319,7 +1328,7 @@ int CreateTmpSDP(OUT void **_pSdp)
         pSdp->origin.version = pSdp->origin.id = TimeVal.sec + 2208988800UL;
         pSdp->origin.net_type = pj_str("IN");
         pSdp->origin.addr_type = pj_str("IP4");
-        pSdp->origin.addr = *pj_gethostname();
+        pSdp->origin.addr = pj_str("127.0.0.1");
         pSdp->name = pj_str("pjsip");
 
         /* Since we only support one media stream at present, put the
@@ -1328,7 +1337,7 @@ int CreateTmpSDP(OUT void **_pSdp)
         pSdp->conn = pj_pool_zalloc (_pPool, sizeof(pjmedia_sdp_conn));
         pSdp->conn->net_type = pj_str("IN");
         pSdp->conn->addr_type = pj_str("IP4");
-        pSdp->conn->addr = SipAppData.LocalIp;
+        pSdp->conn->addr = pj_str("172.20.4.69");
 
 
         /* SDP time and attributes. */
