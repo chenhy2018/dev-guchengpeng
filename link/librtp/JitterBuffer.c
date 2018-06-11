@@ -47,11 +47,13 @@ void JitterBufferPush(IN JitterBuffer *_pJbuf, IN const void *_pFrame, IN int _n
         if (_nFrameSeq < _pJbuf->nMaxBufferCount+1 && _pJbuf->nLastRecvRtpSeq > 65000) {
                 _nFrameSeq += 65536;
         }
-        //if (_nFrameSeq < _pJbuf->nLastRecvRtpSeq || (_pJbuf->nLastRecvRtpSeq > _nFrameSeq &&
-        //                                             (_pJbuf->nLastRecvRtpSeq - _nFrameSeq) > 10000 )) {
-        //        *_pDiscarded = 1;
-        //        return;
-        //}
+
+        //drop frame that is arrive too late
+        if (_nFrameSeq < _pJbuf->nLastRecvRtpSeq || (_pJbuf->nLastRecvRtpSeq > _nFrameSeq &&
+                                                     (_pJbuf->nLastRecvRtpSeq - _nFrameSeq) > 10000 )) {
+                *_pDiscarded = 1;
+                return;
+        }
 
         JitterBufferFrame * pFrame = NULL;
 
