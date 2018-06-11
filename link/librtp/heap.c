@@ -65,7 +65,7 @@ static void* map_in_pages(int page_count) {
                 // Clear the memory
                 bzero(addr,page_count*PAGE_SIZE);
                 
-                // Return the address 
+                // Return the address
                 return addr;
         }
 }
@@ -88,8 +88,8 @@ static void map_out_pages(void* addr, int page_count) {
 // This is a comparison function that treats keys as signed ints
 int compare_int_keys(register void* key1, register void* key2) {
         // Cast them as int and read them in
-        register uint32_t key1_v = (uint32_t)key1;
-        register uint32_t key2_v = (uint32_t)key2;
+        register int key1_v = (int)key1;
+        register int key2_v = (int)key2;
         
         // Perform the comparison
         if (key1_v < key2_v)
@@ -167,7 +167,7 @@ int heap_min(heap* h, heap_entry **pEntry) {
         // Get the 0th element
         heap_entry* root = GET_ENTRY(0, h->table);
         
-        *pEntry = root; 
+        *pEntry = root;
         
         // Success
         return 1;
@@ -221,7 +221,7 @@ heap_entry* heap_insert(heap *h, void* key, void* value) {
                 // Get the parent entry
                 parent = GET_ENTRY(parent_index, table);
                 
-                // Compare the keys, and swap if we need to 
+                // Compare the keys, and swap if we need to
                 if (cmp_func(key, parent->key) < 0) {
                         // Move the parent down
 #ifdef MYMY
@@ -242,7 +242,7 @@ heap_entry* heap_insert(heap *h, void* key, void* value) {
         
         // Insert at the current index
         current->key = key;
-        current->value = value; 
+        current->value = value;
         
         // Increase the number of active entries
         h->active_entries++;
@@ -343,7 +343,7 @@ int heap_delmin(heap* h, heap_entry **pEntry) {
                                 break;
                         
                 }
-        } 
+        }
         
         // Check if we should release a page of memory
         int used_pages = entries / ENTRIES_PER_PAGE + ((entries % ENTRIES_PER_PAGE > 0) ? 1 : 0);
@@ -399,7 +399,7 @@ void heap_rebuild(heap *h) {
         
         for (int i = 0; i < entries; i++) {
                 entry = GET_ENTRY(i,table);
-                uint32_t nkey = (uint32_t)entry->key;
+                int nkey = (int)entry->key;
                 nkey &= 0x0000FFFF;
                 entry->key = (void *)nkey;
         }

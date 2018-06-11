@@ -18,6 +18,7 @@ pj_status_t JitterBufferInit(OUT JitterBuffer *_pJbuf, IN int _nMaxBufferCount, 
         _pJbuf->nMaxFrameSize = _nMaxFrameSize;
         _pJbuf->state = JB_STATE_CACHING;
         _pJbuf->nFirstFlag = 1;
+        _pJbuf->nLastRecvRtpSeq = -1;
 
         int nMaxJBFrameSize = _nMaxFrameSize + sizeof(JitterBufferFrame);
 
@@ -36,7 +37,7 @@ pj_status_t JitterBufferInit(OUT JitterBuffer *_pJbuf, IN int _nMaxBufferCount, 
 }
 
 void JitterBufferPush(IN JitterBuffer *_pJbuf, IN const void *_pFrame, IN int _nFrameSize,
-                      IN uint32_t _nFrameSeq, IN uint32_t _nTs, OUT int *_pDiscarded)
+                      IN int _nFrameSeq, IN uint32_t _nTs, OUT int *_pDiscarded)
 {
         pj_assert(_pJbuf && _pFrame);
 
@@ -46,6 +47,11 @@ void JitterBufferPush(IN JitterBuffer *_pJbuf, IN const void *_pFrame, IN int _n
         if (_nFrameSeq < _pJbuf->nMaxBufferCount+1 && _pJbuf->nLastRecvRtpSeq > 65000) {
                 _nFrameSeq += 65536;
         }
+        //if (_nFrameSeq < _pJbuf->nLastRecvRtpSeq || (_pJbuf->nLastRecvRtpSeq > _nFrameSeq &&
+        //                                             (_pJbuf->nLastRecvRtpSeq - _nFrameSeq) > 10000 )) {
+        //        *_pDiscarded = 1;
+        //        return;
+        //}
 
         JitterBufferFrame * pFrame = NULL;
 
@@ -79,7 +85,7 @@ void JitterBufferPush(IN JitterBuffer *_pJbuf, IN const void *_pFrame, IN int _n
 }
 
 void JitterBufferPop(IN JitterBuffer *_pJbuf, OUT void *_pFrame, IN OUT int *_pFrameSize,
-                     OUT uint32_t *_pFrameSeq, OUT uint32_t *_pTs, OUT JBFrameStatus *_pFrameStatus)
+                     OUT int *_pFrameSeq, OUT uint32_t *_pTs, OUT JBFrameStatus *_pFrameStatus)
 {
         if (_pJbuf->state == JB_STATE_CACHING){
                 *_pFrameStatus = JBFRAME_STATE_CACHING;
@@ -147,7 +153,7 @@ void JitterBufferPop(IN JitterBuffer *_pJbuf, OUT void *_pFrame, IN OUT int *_pF
 }
 
 void JitterBufferPeek(IN JitterBuffer *_pJbuf, OUT const void **_pFrame, OUT int *_pFrameSize,
-                      OUT uint32_t *_pFrameSeq, OUT uint32_t *_pTs, OUT JBFrameStatus *_pFrameStatus)
+                      OUT int *_pFrameSeq, OUT uint32_t *_pTs, OUT JBFrameStatus *_pFrameStatus)
 {
         
 }

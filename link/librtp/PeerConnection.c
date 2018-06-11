@@ -682,27 +682,32 @@ static void on_rx_rtp(void *pUserData, void *pPkt, pj_ssize_t size)
         }
         MY_PJ_LOG(3, "-->receiveSize:%d  rtp seq:%d", size, pj_ntohs(pRtpHeader->seq));
         
+        uint32_t nRtpTs = pj_ntohl(pRtpHeader->ts);
         //MY_PJ_LOG(4, "Rx seq=%d", pj_ntohs(hdr->seq));
         /* Update the RTCP session. */
         pjmedia_rtcp_rx_rtp(&pMediaTrack->rtcpSession, pj_ntohs(pRtpHeader->seq),
-                            pj_ntohl(pRtpHeader->ts), nPayloadLen);
+                            nRtpTs, nPayloadLen);
         
         /* Update RTP session */
         pjmedia_rtp_session_update(&pMediaTrack->rtpSession, pRtpHeader, NULL);
 
         int nIsDiscard;
         JitterBufferPush(&pMediaTrack->jbuf, pPayload, nPayloadLen, pj_ntohs(pRtpHeader->seq),
-                         pj_ntohl(pRtpHeader->ts), &nIsDiscard);
+                         nRtpTs, &nIsDiscard);
         if (nIsDiscard) {
                 MY_PJ_LOG(3, "rtp packet disacrded by jitter buffer");
                 return;
         }
 
+        //if (nRtpTs < pMediaTrack->nLastRecvPktTimestamp && pMediaTrack->nLastRecvPktTimestamp - nRtpTs > 1000000000) {
+                //pMediaTrack->nMostLastRecvTimeAcc +=
+        //}
+
         pj_bool_t bGetFrame = PJ_TRUE;
         int nTestCnt = 0;
         while(bGetFrame) {
                 JBFrameStatus popFrameType;
-                uint32_t nSeq = 0;
+                int nSeq = 0;
                 pj_uint32_t nTs = 0;
                 int nFrameSize = 0;
                 
