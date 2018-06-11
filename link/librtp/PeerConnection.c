@@ -978,18 +978,18 @@ static pj_status_t checkAndSendRtcp(MediaStreamTrack *_pMediaTrack, TransportIce
 
 static inline uint64_t getTimestampGapFromLastPacket(IN MediaStreamTrack *_pMediaTrack, uint64_t _timestamp)
 {
-        if (_pMediaTrack->nLastPktTimestamp == 0) {
-                _pMediaTrack->nLastPktTimestamp = _timestamp;
+        if (_pMediaTrack->nLastSendPktTimestamp == 0) {
+                _pMediaTrack->nLastSendPktTimestamp = _timestamp;
                 return 0;
         }
-        uint64_t diff = _timestamp - _pMediaTrack->nLastPktTimestamp;
-        _pMediaTrack->nLastPktTimestamp = _timestamp;
+        uint64_t diff = _timestamp - _pMediaTrack->nLastSendPktTimestamp;
+        _pMediaTrack->nLastSendPktTimestamp = _timestamp;
         return diff;
 }
 
 static inline uint64_t getMediaTrackElapseTime(IN MediaStreamTrack *_pMediaTrack, uint64_t _timestamp)
 {
-        return _timestamp - _pMediaTrack->nFirstPktTimestamp;
+        return _timestamp - _pMediaTrack->nFirstSendPktTimestamp;
 }
 
 // _nPktTimestampGap millisecond?
@@ -1092,7 +1092,7 @@ static int SendAudioPacket(IN PeerConnection *_pPeerConnection, IN RtpPacket * _
         
         if (pMediaTrack->nSysTimeBase.u64 == 0) {
                 pMediaTrack->nSysTimeBase = now;
-                pMediaTrack->nFirstPktTimestamp = _pPacket->nTimestamp;
+                pMediaTrack->nFirstSendPktTimestamp = _pPacket->nTimestamp;
         }
 
         checkAndSendRtcp(pMediaTrack, pTransportIce, now);
@@ -1127,7 +1127,7 @@ static int SendVideoPacket(IN PeerConnection *_pPeerConnection, IN OUT RtpPacket
 
         if (pMediaTrack->nSysTimeBase.u64 == 0) {
                 pMediaTrack->nSysTimeBase = now;
-                pMediaTrack->nFirstPktTimestamp = _pPacket->nTimestamp;
+                pMediaTrack->nFirstSendPktTimestamp = _pPacket->nTimestamp;
         }
 
         checkAndSendRtcp(pMediaTrack, pTransportIce, now);
