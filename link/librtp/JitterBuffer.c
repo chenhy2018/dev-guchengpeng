@@ -97,9 +97,9 @@ void JitterBufferPop(IN JitterBuffer *_pJbuf, OUT void *_pFrame, IN OUT int *_pF
         uint32_t nMinSeq = (uint32_t)(pEntry->key);
 
         JitterBufferFrame *pFrame = (JitterBufferFrame*)pEntry->immutable;
-        //TODO what should i do if 65535 is lost?
-        if (nMinSeq == 65536) {
-                nMinSeq = 0;
+        //what should I do if 65535 is lost. set nMinSeq = nMinSeq & 0x0000FFF
+        if (nMinSeq >= 65536) {
+                nMinSeq = nMinSeq & 0x0000FFFF;
         }
         pj_assert(nMinSeq == pFrame->nSeq);
         if (_pJbuf->nFirstFlag) {

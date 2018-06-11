@@ -56,7 +56,7 @@ TODO 未解决
 	现在的nFrameSeq则加上65536
 
 	pop时候发现nLastRecvRtpSeq 变小了，重新排序一下队列？
-        TODO heap_rebuild 条件，如果65535这个包丢了怎么办？
+        TODO heap_rebuild 条件，如果65535这个包丢了怎么办？ 大于65535的序列号都&0x0000FFFF，这样就可以第一个翻转的包就能探测到
 
 11.  时间戳维护, rtp时间戳溢出问题？
 	uint32_t类型的时间错，在90000hz时钟频率情况下，大概13h15m就会溢出
@@ -70,3 +70,4 @@ TODO 未解决
 已明确，待选择做法:
 1. 回调函数，目前是sleep等待超时ice的状态. 对于用户没有回调，即同步的. 确定是否这样做？
 2. StartNegotiation移动到checkAndNeg最后面去，即offer和answer都获取到就自动协商了. 可能最后做，这样做了不好通过文件sdp手动测试了
+
