@@ -1,8 +1,6 @@
 #ifndef __QRTC_H__
 #define __QRTC_H__
-#ifndef __APPLE__
-#include <inttypes.h>
-#endif
+#include <stdint.h>
 
 #define _s_l_(x) #x
 #define _str_line_(x) _s_l_(x)
@@ -125,11 +123,11 @@ int InitPeerConnectoin(OUT PeerConnection ** pPeerConnectoin,
 
 int AddAudioTrack(IN OUT PeerConnection * pPeerConnection, IN MediaConfigSet *pAudioConfig);
 int AddVideoTrack(IN OUT PeerConnection * pPeerConnection, IN MediaConfigSet *pVideoConfig);
-int createOffer(IN OUT PeerConnection * pPeerConnection,  OUT pjmedia_sdp_session **pOffer);
-int createAnswer(IN OUT PeerConnection * pPeerConnection, IN pjmedia_sdp_session *pOffer,
-                 OUT pjmedia_sdp_session **pAnswer);
-int setLocalDescription(IN OUT PeerConnection * pPeerConnection, IN pjmedia_sdp_session * pSdp);
-int setRemoteDescription(IN OUT PeerConnection * pPeerConnection, IN pjmedia_sdp_session * pSdp);
+int createOffer(IN OUT PeerConnection * pPeerConnection,  OUT void **pOffer);
+int createAnswer(IN OUT PeerConnection * pPeerConnection, IN void *pOffer,
+                 OUT void **pAnswer);
+int setLocalDescription(IN OUT PeerConnection * pPeerConnection, IN void * pSdp);
+int setRemoteDescription(IN OUT PeerConnection * pPeerConnection, IN void * pSdp);
 int StartNegotiation(IN PeerConnection * pPeerConnection);
 
 int SendRtpPacket(IN PeerConnection *pPeerConnection, IN OUT RtpPacket * pPacket);

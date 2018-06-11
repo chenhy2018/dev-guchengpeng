@@ -7,7 +7,7 @@
 #include <pjlib-util.h>
 #include <pjlib.h>
 #include <pjmedia-codec/h264_packetizer.h>
-#include "qrtc.h"
+#include "JitterBuffer.h"
 
 
 typedef struct _MediaPacketier MediaPacketier;
@@ -46,14 +46,6 @@ typedef struct _H264Packetizer {
         unsigned nUnpackBufLen;
         pj_bool_t bFuAStartbit;
 }H264Packetizer;
-
-//TODO JitterBuffer add to MediaStreamTrack
-typedef struct _JitterBuffer {
-        pj_pool_t *pJbufPool;
-        pjmedia_jbuf *pJbuf;
-        int nLastRecvRtpSeq;
-        char getBuf[1500];
-}JitterBuffer;
 
 typedef struct _MediaStreamTrack
 {

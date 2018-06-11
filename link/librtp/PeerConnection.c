@@ -555,7 +555,7 @@ static int createSdp(IN OUT PeerConnection * _pPeerConnection, IN pj_pool_t * _p
         return PJ_SUCCESS;
 }
 
-int createOffer(IN OUT PeerConnection * _pPeerConnection, OUT pjmedia_sdp_session **_pOffer)
+int createOffer(IN OUT PeerConnection * _pPeerConnection, OUT void **_pOffer)
 {
         pj_status_t  status;
 
@@ -567,7 +567,7 @@ int createOffer(IN OUT PeerConnection * _pPeerConnection, OUT pjmedia_sdp_sessio
                 _pPeerConnection->pSdpPool = pPool;
         }
         
-        status = createSdp(_pPeerConnection, pPool, _pOffer);
+        status = createSdp(_pPeerConnection, pPool, (pjmedia_sdp_session **)_pOffer);
         STATUS_CHECK(createSdp, status);
         
         char sdpStr[2048];
@@ -595,7 +595,7 @@ int createOffer(IN OUT PeerConnection * _pPeerConnection, OUT pjmedia_sdp_sessio
         return PJ_SUCCESS;
 }
 
-int createAnswer(IN OUT PeerConnection * _pPeerConnection, IN pjmedia_sdp_session *_pOffer, OUT pjmedia_sdp_session **_pAnswer)
+int createAnswer(IN OUT PeerConnection * _pPeerConnection, IN void *_pOffer, OUT void **_pAnswer)
 {
         pj_status_t  status;
 
@@ -607,7 +607,7 @@ int createAnswer(IN OUT PeerConnection * _pPeerConnection, IN pjmedia_sdp_sessio
                 _pPeerConnection->pSdpPool = pPool;
         }
         
-        status = createSdp(_pPeerConnection, pPool, _pAnswer);
+        status = createSdp(_pPeerConnection, pPool, (pjmedia_sdp_session **)_pAnswer);
         STATUS_CHECK(createSdp, status);
         
         int nMaxTracks = sizeof(_pPeerConnection->nAvIndex) / sizeof(int);
@@ -674,28 +674,37 @@ static void on_rx_rtp(void *pUserData, void *pPkt, pj_ssize_t size)
         /* Update RTP session */
         pjmedia_rtp_session_update(&pMediaTrack->rtpSession, pRtpHeader, NULL);
 
- 
-        pjmedia_jbuf_put_frame3(pMediaTrack->jbuf.pJbuf, pPayload, nPayloadLen,
-                                0, //pj_uint32_t bit_info
-                                pj_ntohs(pRtpHeader->seq),
-                                pj_ntohs(pRtpHeader->ts),
-                                NULL);
+        int nIsDiscard;
+        JitterBufferPush(&pMediaTrack->jbuf, pPayload, nPayloadLen, pj_ntohs(pRtpHeader->seq),
+                         pj_ntohl(pRtpHeader->ts), &nIsDiscard);
+        if (nIsDiscard) {
+                MY_PJ_LOG(3, "rtp packet disacrded by jitter buffer");
+                return;
+        }
 
-        pj_bool_t bGetFrame = PJ_FALSE;
-        do {
-                char cFrameType;
-                int nSeq = 0;
-                pj_uint32_t nTs;
-                pj_size_t nFrameSize = sizeof(pMediaTrack->jbuf.getBuf);
-                pjmedia_jbuf_get_frame3(pMediaTrack->jbuf.pJbuf, pMediaTrack->jbuf.getBuf,
-                                        &nFrameSize, &cFrameType, NULL, &nTs, &nSeq);
-                switch (cFrameType) {
-                        case PJMEDIA_JB_MISSING_FRAME:
-                        case PJMEDIA_JB_ZERO_PREFETCH_FRAME:
-                        case PJMEDIA_JB_ZERO_EMPTY_FRAME:
+        pj_bool_t bGetFrame = PJ_TRUE;
+        int nTestCnt = 0;
+        while(bGetFrame) {
+                JBFrameStatus popFrameType;
+                uint32_t nSeq = 0;
+                pj_uint32_t nTs = 0;
+                int nFrameSize = 0;
+                
+                nFrameSize = sizeof(pMediaTrack->jbuf.getBuf);
+                JitterBufferPop(&pMediaTrack->jbuf, pMediaTrack->jbuf.getBuf,
+                                &nFrameSize, &nSeq, &nTs, &popFrameType);
+
+                switch (popFrameType) {
+                        case JBFRAME_STATE_MISSING:
+                                pPayload = NULL;
+                                nPayloadLen = 0;
+                                bGetFrame = PJ_FALSE;
+                                break;
+                        case JBFRAME_STATE_CACHING:
+                        case JBFRAME_STATE_EMPTY:
                                 bGetFrame = PJ_FALSE;
                                 return;
-                        case PJMEDIA_JB_NORMAL_FRAME:
+                        case JBFRAME_STATE_NORMAL:
                                 pPayload = pMediaTrack->jbuf.getBuf;
                                 nPayloadLen = nFrameSize;
                                 bGetFrame = PJ_TRUE;
@@ -704,12 +713,8 @@ static void on_rx_rtp(void *pUserData, void *pPkt, pj_ssize_t size)
                 if (!bGetFrame) {
                         break;
                 }
-                int nLastRecvRtpSeq = pMediaTrack->jbuf.nLastRecvRtpSeq;
-                if (nLastRecvRtpSeq == -1) {
-                        pMediaTrack->jbuf.nLastRecvRtpSeq = nSeq;
-                        nLastRecvRtpSeq = nSeq;
-                }
-                MY_PJ_LOG(3, "-->get_frame:%d  rtp seq:%d", nPayloadLen, nSeq);
+
+                MY_PJ_LOG(3, "%d-->get_frame:%d  rtp seq:%d", ++nTestCnt, nPayloadLen, nSeq);
 
                 //deal with payload
                 pj_bool_t bTryAgain = PJ_FALSE;
@@ -739,7 +744,7 @@ static void on_rx_rtp(void *pUserData, void *pPkt, pj_ssize_t size)
                                                                     CALLBACK_RTP,
                                                                     &rtpPacket);
                 }while(bTryAgain);
-        }while(bGetFrame);
+        };
         
         return;
 }
@@ -871,22 +876,24 @@ static int checkAndNeg(IN OUT PeerConnection * _pPeerConnection)
                         STATUS_CHECK(createPacketizer, status);
                 }
         }
-        
+#ifdef AUTO_NEGOTIATION
+        StartNegotiation(_pPeerConnection);
+#endif
         return PJ_SUCCESS;
 }
 
-int setLocalDescription(IN OUT PeerConnection * _pPeerConnection, IN pjmedia_sdp_session * _pSdp)
+int setLocalDescription(IN OUT PeerConnection * _pPeerConnection, IN void * _pSdp)
 {
-        _pPeerConnection->pOfferSdp = _pSdp;
+        _pPeerConnection->pOfferSdp = (pjmedia_sdp_session *)_pSdp;
         if (_pPeerConnection->pAnswerSdp) {
                 return checkAndNeg(_pPeerConnection);
         }
         return PJ_SUCCESS;
 }
 
-int setRemoteDescription(IN OUT PeerConnection * _pPeerConnection, IN pjmedia_sdp_session * _pSdp)
+int setRemoteDescription(IN OUT PeerConnection * _pPeerConnection, IN void * _pSdp)
 {
-        _pPeerConnection->pAnswerSdp = _pSdp;
+        _pPeerConnection->pAnswerSdp = (pjmedia_sdp_session *)_pSdp;
         if(_pPeerConnection->pOfferSdp){
                 return checkAndNeg(_pPeerConnection);
         }
