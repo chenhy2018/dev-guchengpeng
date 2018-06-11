@@ -160,6 +160,12 @@ int RegisterTestSuitCallback( TestSuit *this )
                            DBG_LOG("Message %s status id %d account id %d\n", pMessage->message, pMessage->status, sts);
                            break;
                      }
+                     case EVENT_MEDIA:
+                     {
+                           MediaEvent *pMedia = &(event->body.mediaEvent);
+                           DBG_LOG("Callid %d ncount %d type 1 %d type 2\n", pMedia->callID, pMedia->nCount, pMedia->media[0].codecType, pMedia->media[1].codecType);
+                           break;
+                     }
             }
             usleep(100000);
     }

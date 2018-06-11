@@ -29,6 +29,7 @@ typedef enum {
     EVENT_CALL,
     EVENT_DATA,
     EVENT_MESSAGE,
+    EVENT_MEDIA
 } EventType;
 
 typedef enum {
@@ -97,6 +98,19 @@ typedef struct {
 } MessageEvent;
 
 typedef struct {
+    Stream streamType;
+    Codec codecType;
+    int sampleRate;
+    int channels;
+} Media;
+
+typedef struct {
+    int callID;
+    Media media[2];
+    int nCount;
+} MediaEvent;
+
+typedef struct {
     int eventID;
     int time;
     EventType type;
@@ -104,18 +118,12 @@ typedef struct {
         CallEvent callEvent;
         DataEvent dataEvent;
         MessageEvent messageEvent;
+        MediaEvent mediaEvent;
     } body;
 } Event;
 
-typedef struct {
-    Stream streamType;
-    Codec codecType;
-    int sampleRate;
-    int channels;
-} Media;
-
 // library initial, application only need to call one time
-ErrorID InitSDK(  Media* mediaConfigs, int size);
+ErrorID InitSDK( Media* mediaConfigs, int size);
 ErrorID UninitSDK();
 // register a account
 // @return if return value > 0, it is the account id, if < 0, it is the ErrorID

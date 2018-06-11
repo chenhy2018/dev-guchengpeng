@@ -125,7 +125,7 @@ ErrorID UARejectCall(UA* _pUa, int nCallId)
         struct list_head *pos = NULL;
         Call* call = FindCall(_pUa, nCallId, &pos);
         if (call) {
-                list_del(pos);
+                //list_del(pos);
                 ErrorID id = CALLRejectCall(call);
                 return id;
         }
@@ -140,7 +140,7 @@ ErrorID UAHangupCall(UA* _pUa, int nCallId)
         struct list_head *pos = NULL;
         Call* call = FindCall(_pUa, nCallId, &pos);
         if (call) {
-                list_del(pos);
+                //list_del(pos);
                 ErrorID id =  CALLHangupCall(call);
                 return id;
         }
@@ -200,7 +200,7 @@ SipAnswerCode UAOnIncomingCall(UA* _pUa, const int _nCallId, const char *pFrom, 
         struct list_head *pos;
         Call* call;
         DBG_LOG("UAOnIncomingCall \n");
-        SipAnswerCode code = CALLOnIncomingCall(&call, _nCallId, pFrom, pMedia, &_pUa->config);
+        SipAnswerCode code = CALLOnIncomingCall(&call, _pUa->id, _nCallId, pFrom, pMedia, &_pUa->config);
         list_add(&(call->list), &(_pUa->callList.list));
 }
 

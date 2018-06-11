@@ -60,6 +60,7 @@ ErrorID InitRtp(Call** _pCall, CallConfig* _pConfig)
         strcpy(&pCall->iceConfig.turnUsername[0], "root");// _pId);
         strcpy(&pCall->iceConfig.turnPassword[0], "root"); //_pPassword);
         pCall->iceConfig.userCallback = _pConfig->pCallback->OnRxRtp;
+        pCall->iceConfig.pCbUserData = *_pCall;
         //todo check status
         DBG_LOG("CALLMakeCall %s %s %s %p\n",
                 &pCall->iceConfig.turnHost[0], &pCall->iceConfig.turnUsername[0], &pCall->iceConfig.turnPassword[0], pCall->iceConfig.userCallback);
@@ -92,6 +93,7 @@ Call* CALLMakeCall(AccountID _nAccountId, const char* id, const char* _pDestUri,
         setLocalDescription(pCall->pPeerConnection, pCall->pOffer);
         SipMakeNewCall(_nAccountId, _pDestUri, pCall->pOffer, _pCallId);
         pCall->id = *_pCallId;
+        pCall->nAccountId = _nAccountId;
         pCall->callStatus = CALL_STATUS_REGISTERED;
         CheckCallStatus(pCall, CALL_STATUS_RING);
         DBG_LOG("CALLMakeCall end %p \n", pCall);
@@ -135,8 +137,8 @@ ErrorID CALLRejectCall(Call* _pCall)
         setLocalDescription(pCall->pPeerConnection, pCall->pAnswer);
 #endif
         id = SipAnswerCall(_pCall->id, BUSY_HERE, "reject call", _pCall->pAnswer);
-        ReleasePeerConnectoin(_pCall->pPeerConnection);
-        free(_pCall);
+        //ReleasePeerConnectoin(_pCall->pPeerConnection);
+        //free(_pCall);
 }
 
 // hangup a call
@@ -148,8 +150,8 @@ ErrorID CALLHangupCall(Call* _pCall)
         }
         // check return.  
         SipHangUp(_pCall->id);
-        ReleasePeerConnectoin(_pCall->pPeerConnection);
-        free(_pCall);
+        //ReleasePeerConnectoin(_pCall->pPeerConnection);
+        //free(_pCall);
         return id;
 }
 
@@ -160,11 +162,13 @@ ErrorID CALLSendPacket(Call* _pCall, Stream streamID, const uint8_t* buffer, int
         if (id != RET_OK) {
               return id;
         }
+        DBG_LOG("call %p\n", _pCall);
         RtpPacket packet = {buffer, size, nTimestamp, streamID};
+        DBG_LOG("call %p sendpack\n", _pCall);
         return SendRtpPacket(_pCall->pPeerConnection, &packet);
 }
 
-SipAnswerCode CALLOnIncomingCall(Call** _pCall, const int _nCallId, const char *pFrom,
+SipAnswerCode CALLOnIncomingCall(Call** _pCall, const int _nAccountId, const int _nCallId, const char *pFrom,
                                  const void *pMedia, CallConfig* _pConfig)
 {
         Call* pCall = (Call*)malloc(sizeof(Call));
@@ -174,6 +178,7 @@ SipAnswerCode CALLOnIncomingCall(Call** _pCall, const int _nCallId, const char *
         memset(pCall, 0, sizeof(Call));
         *_pCall = pCall;
         pCall->id = _nCallId;
+        pCall->nAccountId = _nAccountId;
         pCall->callStatus =  INV_STATE_CALLING;
         // rtp to do. improved
         pCall->pOffer = pMedia;

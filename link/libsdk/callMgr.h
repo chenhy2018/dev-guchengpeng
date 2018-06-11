@@ -20,7 +20,7 @@ ErrorID CALLSendPacket(Call* _pCall, Stream streamID, const uint8_t* buffer, int
 ErrorID CALLPollEvent(Call* _pCall, EventType* type, Event* event, int timeOut);
 
 //Callback, asyn
-SipAnswerCode CALLOnIncomingCall(Call** _pCall, const int _nCallId, const char *pFrom,
+SipAnswerCode CALLOnIncomingCall(Call** _pCall, const int _nAccountId, const int _nCallId, const char *pFrom,
                                  const void *pMedia, CallConfig* _pConfig);
 
 void CALLOnCallStateChange(Call** _pCall, const SipInviteState State, const SipAnswerCode StatusCode, const void *pMedia);

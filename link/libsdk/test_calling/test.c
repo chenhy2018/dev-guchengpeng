@@ -163,7 +163,52 @@ int RegisterTestSuitCallback( TestSuit *this )
                     ++ count;
                     continue;
             }
-            sleep(1500000);
+            EventType type;
+            Event* event = (Event*) malloc(sizeof(Event));
+            int sendflag = 0;
+            int callId = 0;
+            while (1) {
+              DBG_LOG("PullEvent start \n");
+              id = PollEvent(sts, &type, &event, 1);
+              DBG_LOG("PullEvent end id %d \n", id);
+              if (id != RET_OK) {
+                    usleep(1000000);
+                    continue;
+              }
+              switch (type) {
+                     case EVENT_CALL:
+                     {
+                             CallEvent *pCallEvent = &(event->body.callEvent);
+                             DBG_LOG("Call status %d call id %d call account id %d\n", pCallEvent->status, pCallEvent->callID, sts);
+                             break;
+                     }
+                     case EVENT_DATA:
+                     {
+                            DataEvent *pDataEvent = &(event->body.dataEvent);
+                            DBG_LOG("Data size %d call id %d call account id %d\n", pDataEvent->size, pDataEvent->callID, sts);
+                            break;
+                     }
+                     case EVENT_MESSAGE:
+                     {
+                           MessageEvent *pMessage = &(event->body.messageEvent);
+                           DBG_LOG("Message %s status id %d account id %d\n", pMessage->message, pMessage->status, sts);
+                           break;
+                     }
+                     case EVENT_MEDIA:
+                     {
+                           MediaEvent *pMedia = &(event->body.mediaEvent);
+                           DBG_LOG("Callid %d ncount %d type 1 %d type 2\n", pMedia->callID, pMedia->nCount, pMedia->media[0].codecType, pMedia->media[1].codecType);
+                           sendflag = 1;
+                           break;
+                     }
+              }
+              if (sendflag) {
+                     DBG_LOG("send packet\n");
+                     sleep(10);
+                     SendPacket(sts, callId, STREAM_VIDEO, "123456788901234567890123456", 15, 123);
+              }
+              usleep(100000);
+            }
             UT_LOG("HangupCall in\n");
             int ret = HangupCall(sts, nCallId1);
             TEST_EQUAL(ret, RET_OK);

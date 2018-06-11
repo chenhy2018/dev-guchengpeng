@@ -30,6 +30,7 @@ typedef struct RtpCallback
 
 typedef struct {
         int id;
+        int nAccountId;
         struct list_head list;
         SipInviteState callStatus;
         PeerConnection* pPeerConnection;

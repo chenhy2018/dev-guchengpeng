@@ -37,33 +37,84 @@ static UA* FindUA(UAManager* _pUAManager, AccountID _nAccountId, struct list_hea
         return NULL;
 }
 
+static Codec ConversionFormatToUser(CodecType _nCodec)
+{
+        switch (_nCodec) {
+                case MEDIA_FORMAT_H264:
+                        return CODEC_H264;
+                case MEDIA_FORMAT_PCMA:
+                        return CODEC_G711A;
+                case MEDIA_FORMAT_PCMU:
+                        return CODEC_G711U;
+                default:
+                        return MEDIA_FORMAT_H264;
+        }
+        return MEDIA_FORMAT_H264;
+}
+
 // Todo send to message queue.
 static void OnRxRtp(void *_pUserData, CallbackType _type, void *_pCbData)
 {
+        Message *pMessage = (Message *) malloc (sizeof(Message));
+        Event *pEvent = (Event *) malloc(sizeof(Event));
+        if ( !pMessage || !pEvent ) {
+                DBG_ERROR("OnRxRtp malloc error***************\n");
+                return;
+        }
+        struct list_head *pos;
+        Call* pCall = (Call*)(_pUserData);
+        UA *pUA = FindUA(pUAManager, pCall->nAccountId, &pos);
+        if (pUA == NULL) {
+                DBG_ERROR("OnRxRtp PUA is NULL *****************\n");
+                return;
+        }
         switch (_type){
                 case CALLBACK_ICE:{
                         IceNegInfo *pInfo = (IceNegInfo *)_pCbData;
+                        MediaEvent* event = &pEvent->body.mediaEvent;
+                        pMessage->nMessageID = EVENT_MEDIA;
                         DBG_LOG("==========>callback_ice: state: %d\n", pInfo->state);
                         for ( int i = 0; i < pInfo->nCount; i++) {
                                 DBG_LOG(" codec type: %d\n", pInfo->configs[i]->codecType);
+                                event->media[i].codecType = ConversionFormatToUser(pInfo->configs[i]->codecType);
+                                if (pInfo->configs[i]->streamType == RTP_STREAM_VIDEO) {
+                                        event->media[i].streamType = STREAM_VIDEO;
+                                } else {
+                                        event->media[i].streamType = STREAM_AUDIO;
+                                }
+                                event->media[i].sampleRate = pInfo->configs[i]->nSampleOrClockRate;
+                                event->media[i].channels = pInfo->configs[i]->nChannel;
                         }
+                        event->callID =  pCall->id;
+                        event->nCount = pInfo->nCount;
                 }
                         break;
                 case CALLBACK_RTP:{
                         DBG_LOG("==========>callback_rtp\n");
+                        pMessage->nMessageID = EVENT_DATA;
                         RtpPacket *pPkt = (RtpPacket *)_pCbData;
                         pj_ssize_t nLen = pPkt->nDataLen;
-                        if (pPkt->type == STREAM_AUDIO && nLen == 160) {
+                        DataEvent* event = &pEvent->body.dataEvent;
+                        if (pPkt->type == RTP_STREAM_AUDIO && nLen == 160) {
                                 //pj_file_write(gPcmuFd, pPkt->pData, &nLen);
-                        } else if (pPkt->type == STREAM_VIDEO) {
+                                event->stream = STREAM_AUDIO;
+                        } else if (pPkt->type == RTP_STREAM_VIDEO) {
                                 //pj_file_write(gH264Fd, pPkt->pData, &nLen);
+                                event->stream = STREAM_VIDEO;
                         }
+                        event->callID = pCall->id;
+                        event->size = nLen;
+                        event->codec = ConversionFormatToUser(pPkt->format);
+                        event->data = (uint8_t*)malloc(nLen);
+                        memcpy(event->data, pPkt->pData, nLen);
                 }
                         break;
                 case CALLBACK_RTCP:
                         DBG_LOG("==========>callback_rtcp\n");
                         break;
         }
+        pMessage->pMessage  = (void *)pEvent;
+        SendMessage(pUA->pQueue, pMessage);
 }
 
 void OnMessage(IN const void* _pInstance, IN int _nAccountId, IN const char* _pTopic, IN const char* _pMessage, IN size_t nLength)
