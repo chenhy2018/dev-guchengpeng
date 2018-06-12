@@ -1197,7 +1197,26 @@ static pj_bool_t onRxRequest(IN pjsip_rx_data *_pRxData )
         pSdpInfo = pjsip_rdata_get_sdp_info(_pRxData);
         if (pSdpInfo)
                 pRemoteSdp = pSdpInfo->sdp;
-        SipAppData.OnIncomingCall(nToAccountId, nCallId,  From, SipAppData.Accounts[pCall->nAccountId].pUserData, (void *)pRemoteSdp);
+        int Code =  SipAppData.OnIncomingCall(nToAccountId, nCallId,  From, SipAppData.Accounts[pCall->nAccountId].pUserData, (void *)pRemoteSdp);
+        /* Faild in callback function */
+        if (Code != OK) {
+                pj_str_t Reason = pj_str("Faild in callback function");
+                Status = pjsip_inv_answer(pCall->pInviteSession,
+                                          Code, &Reason,
+                                          NULL,
+                                          &pTxData);
+                if (Status != PJ_SUCCESS) {
+                        PrintErrorMsg(Status, "Create user response error");
+                        goto onError;
+
+                }
+
+                Status = pjsip_inv_send_msg(pCall->pInviteSession, pTxData);
+                if (Status != PJ_SUCCESS) {
+                        PrintErrorMsg(Status, "Send user response error");
+                        goto onError;
+                }
+        }
 
         SipAppData.nCallCount++;
         SipAppData.Accounts[nToAccountId].nOngoingCall++;
@@ -1205,9 +1224,6 @@ static pj_bool_t onRxRequest(IN pjsip_rx_data *_pRxData )
         return PJ_TRUE;
 
  onError:
-        /* TODO release media resource */
-        pjsip_inv_terminate(pCall->pInviteSession, 500, PJ_FALSE);
-
         /* Release the session */
         pjsip_inv_terminate(pCall->pInviteSession, 500, PJ_FALSE);
 
