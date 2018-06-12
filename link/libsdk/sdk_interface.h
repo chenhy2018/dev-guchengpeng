@@ -1,4 +1,4 @@
-// Last Update:2018-06-08 17:36:15
+// Last Update:2018-06-12 19:14:06
 /**
  * @file sdk_interface.h
  * @brief 
@@ -48,7 +48,8 @@ typedef enum {
     RET_USER_UNAUTHORIZED,
     RET_CALL_INVAILD_CONNECTION,
     RET_CALL_INVAILD_SDP,
-    RET_CALL_INVAILD_OPERATING
+    RET_CALL_INVAILD_OPERATING,
+    RET_SDK_ALREADY_INITED,
 } ErrorID;
 
 typedef enum {

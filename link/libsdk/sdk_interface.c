@@ -1,4 +1,4 @@
-// Last Update:2018-06-11 14:23:52
+// Last Update:2018-06-12 19:14:20
 /**
  * @file sdk_interface.c
  * @brief 
@@ -221,6 +221,11 @@ static CodecType ConversionFormat(Codec _nCodec)
 ErrorID InitSDK( Media* _pMediaConfigs, int _nSize)
 {
        SipInstanceConfig config;
+
+       if ( pUAManager->bInitSdk ) {
+           return RET_SDK_ALREADY_INITED;
+       }
+
        pUAManager->config.videoConfigs.nCount = 0;
        pUAManager->config.audioConfigs.nCount = 0;
        for (int count = 0; count < _nSize; ++count) {
