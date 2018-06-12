@@ -127,7 +127,7 @@ int RegisterTestSuitCallback( TestSuit *this )
     int count = 0;
     EventType type;
     Event* event = (Event*) malloc(sizeof(Event));
-    
+    int64_t timecount = 0;
     while (1) {
             DBG_LOG("PullEvent start \n");
             id = PollEvent(sts, &type, &event, 0);
@@ -151,7 +151,16 @@ int RegisterTestSuitCallback( TestSuit *this )
                      case EVENT_DATA:
                      {
                             DataEvent *pDataEvent = &(event->body.dataEvent);
-                            DBG_LOG("Data size %d call id %d call account id %d\n", pDataEvent->size, pDataEvent->callID, sts);
+                            DBG_LOG("Data size %d call id %d call account id %d timestamp %ld \n", pDataEvent->size, pDataEvent->callID, sts, pDataEvent->pts);
+                            if (timecount == 0) {
+                                    timecount = pDataEvent->pts;
+                            }
+                            else {
+                                    if (pDataEvent->pts != timecount + 1) {
+                                            DBG_ERROR("*****************error timestamp %ld last timestamp %ld", pDataEvent->pts, timecount);
+                                    }
+                                    timecount = pDataEvent->pts;
+                            }
                             break;
                      }
                      case EVENT_MESSAGE:
@@ -163,7 +172,7 @@ int RegisterTestSuitCallback( TestSuit *this )
                      case EVENT_MEDIA:
                      {
                            MediaEvent *pMedia = &(event->body.mediaEvent);
-                           DBG_LOG("Callid %d ncount %d type 1 %d type 2\n", pMedia->callID, pMedia->nCount, pMedia->media[0].codecType, pMedia->media[1].codecType);
+                           DBG_LOG("Callid %d ncount %d type 1 %d type 2 %d\n", pMedia->callID, pMedia->nCount, pMedia->media[0].codecType, pMedia->media[1].codecType);
                            break;
                      }
             }

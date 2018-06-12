@@ -35,6 +35,7 @@ typedef enum {
 typedef enum {
     RET_OK,
     RET_FAIL,
+    RET_INTERAL_FAIL,
     RET_REGISTERING,
     RET_RETRY,
     RET_MEM_ERROR = 1001,
@@ -81,7 +82,7 @@ typedef struct {
     int callID;
     void *data;
     int size;
-    int pts;
+    int64_t pts;
     Codec codec;
     Stream stream;
 } DataEvent;

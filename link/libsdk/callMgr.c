@@ -5,12 +5,6 @@
 //to do change the CallStatus to INV_STATE
 ErrorID CheckCallStatus(Call* _pCall, CallStatus expectedState)
 {
-       if (_pCall->pPeerConnection == NULL) {
-               return RET_CALL_INVAILD_CONNECTION;
-       }
-       if (_pCall->pOffer == NULL) {
-               return RET_CALL_INVAILD_CONNECTION;
-       }
        if (expectedState == CALL_STATUS_INCOMING || expectedState == CALL_STATUS_RING) {
                switch (_pCall->callStatus) {
                        case INV_STATE_NULL:
@@ -50,12 +44,11 @@ ErrorID CheckCallStatus(Call* _pCall, CallStatus expectedState)
 
 ErrorID InitRtp(Call** _pCall, CallConfig* _pConfig)
 {
+        int res = 0;
         Call* pCall = *_pCall;
         // rtp to do. ice config.media info. and check error)
-        DBG_LOG("InitRtp aaa \n");
         InitIceConfig(&pCall->iceConfig);
-        DBG_LOG("InitRtp bb \n");
-        if (_pConfig->turnHost) DBG_LOG("InitRtp _pHost NULL \n");
+        if (!_pConfig->turnHost) DBG_LOG("InitRtp _pHost NULL \n");
         strcpy(&pCall->iceConfig.turnHost[0], _pConfig->turnHost);
         strcpy(&pCall->iceConfig.turnUsername[0], "root");// _pId);
         strcpy(&pCall->iceConfig.turnPassword[0], "root"); //_pPassword);
@@ -64,15 +57,27 @@ ErrorID InitRtp(Call** _pCall, CallConfig* _pConfig)
         //todo check status
         DBG_LOG("CALLMakeCall %s %s %s %p\n",
                 &pCall->iceConfig.turnHost[0], &pCall->iceConfig.turnUsername[0], &pCall->iceConfig.turnPassword[0], pCall->iceConfig.userCallback);
-        InitPeerConnectoin(&pCall->pPeerConnection, &pCall->iceConfig);
+        res = InitPeerConnectoin(&pCall->pPeerConnection, &pCall->iceConfig);
+        if (res != 0) {
+                DBG_ERROR("InitPeerConnectoin failed %d \n", res);
+                return RET_INTERAL_FAIL;
+        }
         MediaConfigSet *_pVideo = _pConfig->pVideoConfigs;
-        DBG_LOG("media config video count %d, streamType %d, codecType %d, nSampleOrClockRate %d \n",
+        DBG_LOG("media config video count %d, streamType %x, codecType %x, nSampleOrClockRate %d \n",
                 _pVideo->nCount, _pVideo->configs[0].streamType, _pVideo->configs[0].codecType, _pVideo->configs[0].nSampleOrClockRate);
-        AddVideoTrack(pCall->pPeerConnection, _pVideo);
+        res = AddVideoTrack(pCall->pPeerConnection, _pVideo);
+        if (res != 0) {
+                DBG_ERROR("InitPeerConnectoin failed %d \n", res);
+                return RET_INTERAL_FAIL;
+        }
         MediaConfigSet *_pAudio = _pConfig->pAudioConfigs;
         DBG_LOG("media config audio count %d streamType %d, codecType %d, nSampleOrClockRate %d, nChannel %d \n",
-                _pAudio->nCount, _pAudio->configs[0].streamType, _pAudio->configs[0].codecType, _pAudio->configs[0].nSampleOrClockRate);
-        AddAudioTrack(pCall->pPeerConnection, _pAudio);
+                _pAudio->nCount, _pAudio->configs[0].streamType, _pAudio->configs[0].codecType, _pAudio->configs[0].nSampleOrClockRate, _pAudio->configs[0].nChannel);
+        res = AddAudioTrack(pCall->pPeerConnection, _pAudio);
+        if (res != 0) {
+                DBG_ERROR("InitPeerConnectoin failed %d \n", res);
+                return RET_INTERAL_FAIL;
+        }
         pCall->pAnswer = NULL;
         return RET_OK;
 }
@@ -87,11 +92,31 @@ Call* CALLMakeCall(AccountID _nAccountId, const char* id, const char* _pDestUri,
                 return NULL;
         }
         memset(pCall, 0, sizeof(Call));
-        InitRtp(&pCall, _pConfig);
-        createOffer(pCall->pPeerConnection, &pCall->pOffer);
-        //CreateTmpSDP(&pCall->pOffer);
-        setLocalDescription(pCall->pPeerConnection, pCall->pOffer);
-        SipMakeNewCall(_nAccountId, _pDestUri, pCall->pOffer, _pCallId);
+        ErrorID nId = InitRtp(&pCall, _pConfig);
+        if (nId != RET_OK) {
+                DBG_ERROR("InitRtp failed %d \n", nId);
+                free(pCall);
+                return NULL;
+        }
+        int res = 0;
+        res = createOffer(pCall->pPeerConnection, &pCall->pOffer);
+        if (res != 0) {
+                DBG_ERROR("createOffer failed %d \n", res);
+                free(pCall);
+                return NULL;
+        }
+        res = setLocalDescription(pCall->pPeerConnection, pCall->pOffer);
+        if (res != 0) {
+                DBG_ERROR("setLocalDescription failed %d \n", res);
+                free(pCall);
+                return NULL;
+        }
+        SIP_ERROR_CODE error = SipMakeNewCall(_nAccountId, _pDestUri, pCall->pOffer, _pCallId);
+        if (error != SIP_SUCCESS) {
+                DBG_ERROR("SipMakeNewCall failed %d \n", res);
+                free(pCall);
+                return NULL;
+        }
         pCall->id = *_pCallId;
         pCall->nAccountId = _nAccountId;
         pCall->callStatus = CALL_STATUS_REGISTERED;
@@ -137,8 +162,7 @@ ErrorID CALLRejectCall(Call* _pCall)
         setLocalDescription(pCall->pPeerConnection, pCall->pAnswer);
 #endif
         id = SipAnswerCall(_pCall->id, BUSY_HERE, "reject call", _pCall->pAnswer);
-        //ReleasePeerConnectoin(_pCall->pPeerConnection);
-        //free(_pCall);
+        return id;
 }
 
 // hangup a call
@@ -148,10 +172,7 @@ ErrorID CALLHangupCall(Call* _pCall)
         if (id != RET_OK) {
               return id;
         }
-        // check return.  
         SipHangUp(_pCall->id);
-        //ReleasePeerConnectoin(_pCall->pPeerConnection);
-        //free(_pCall);
         return id;
 }
 
@@ -163,7 +184,14 @@ ErrorID CALLSendPacket(Call* _pCall, Stream streamID, const uint8_t* buffer, int
               return id;
         }
         DBG_LOG("call %p\n", _pCall);
-        RtpPacket packet = {buffer, size, nTimestamp, streamID};
+        RtpStreamType type;
+        if (streamID == STREAM_AUDIO) {
+                type = RTP_STREAM_AUDIO;
+        }
+        else {
+                type = RTP_STREAM_VIDEO;
+        }
+        RtpPacket packet = {(uint8_t*)(buffer), size, nTimestamp, type};
         DBG_LOG("call %p sendpack\n", _pCall);
         return SendRtpPacket(_pCall->pPeerConnection, &packet);
 }
@@ -173,45 +201,70 @@ SipAnswerCode CALLOnIncomingCall(Call** _pCall, const int _nAccountId, const int
 {
         Call* pCall = (Call*)malloc(sizeof(Call));
         if (pCall == NULL) {
-                return 1;
+                *_pCall = NULL;
+                return NOT_ACCEPTABLE;
         }
         memset(pCall, 0, sizeof(Call));
         *_pCall = pCall;
         pCall->id = _nCallId;
         pCall->nAccountId = _nAccountId;
         pCall->callStatus =  INV_STATE_CALLING;
-        // rtp to do. improved
-        pCall->pOffer = pMedia;
-        // rtp to do. ice config.media info. and check error)
+        pCall->pOffer = (pjmedia_sdp_session*)pMedia;
         DBG_LOG("call %p\n", pCall);
-        InitRtp(&pCall, _pConfig);
-        setRemoteDescription(pCall->pPeerConnection, pCall->pOffer);
+        int res = 0;
+        ErrorID id = InitRtp(&pCall, _pConfig);
+        if (id != RET_OK) {
+              DBG_ERROR("InitRtp failed %d\n", id);
+              return INTERNAL_SERVER_ERROR;
+        }
+        res = setRemoteDescription(pCall->pPeerConnection, pCall->pOffer);
+        if (res != 0) {
+                DBG_ERROR("setRemoteDescription failed %d \n", res);
+                return INTERNAL_SERVER_ERROR;
+        }
         DBG_LOG("call answer call\n");
-        createAnswer(pCall->pPeerConnection, pCall->pOffer, &pCall->pAnswer);
-        //CreateTmpSDP(&pCall->pAnswer);
+        res = createAnswer(pCall->pPeerConnection, pCall->pOffer, &pCall->pAnswer);
+        if (res != 0) {
+                DBG_ERROR("createAnswer failed %d \n", res);
+                return INTERNAL_SERVER_ERROR;
+        }
+
         DBG_LOG("call answer call end\n");
-        setLocalDescription(pCall->pPeerConnection, pCall->pAnswer);
-        //StartNegotiation(pCall->pPeerConnection);
+        res = setLocalDescription(pCall->pPeerConnection, pCall->pAnswer);
+        if (res != 0) {
+                DBG_ERROR("createAnswer failed %d \n", res);
+                return INTERNAL_SERVER_ERROR;
+        }
         DBG_LOG("call answer call end 1\n");
+        return OK;
 }
 
 void CALLOnCallStateChange(Call** _pCall, const SipInviteState State, const SipAnswerCode StatusCode, const void *pMedia)
 {
+        int res = 0;
         (*_pCall)->callStatus = State;
-        //todo free disconnected call.
         if ((*_pCall)->callStatus == INV_STATE_CONNECTING) {
                 DBG_LOG("====================stats %d state %d call %p\n", State, StatusCode, *_pCall);
                 if (pMedia != NULL) {
-                        setRemoteDescription((*_pCall)->pPeerConnection, pMedia);
+                        res = setRemoteDescription((*_pCall)->pPeerConnection, (pjmedia_sdp_session*)(pMedia));
                 }
-                StartNegotiation((*_pCall)->pPeerConnection);
+                if (res == 0) {
+                        res = StartNegotiation((*_pCall)->pPeerConnection);
+                }
+                if (res != 0) {
+                        DBG_ERROR("StartNegotiation failed %d todo\n", res);
+                        SipAnswerCall((*_pCall)->id, INTERNAL_SERVER_ERROR, "StartNegotiation failed", (*_pCall)->pAnswer);
+                }
         }
         DBG_LOG("stats %d state %d call %p\n", State, StatusCode, *_pCall);
-        if (StatusCode >= 400 && (*_pCall)->callStatus == INV_STATE_DISCONNECTED) {
+        if ((*_pCall)->callStatus == INV_STATE_DISCONNECTED) {
                 //CALLHangupCall(*_pCall);
-                ReleasePeerConnectoin((*_pCall)->pPeerConnection);
+                if ((*_pCall)->pPeerConnection) {
+                         ReleasePeerConnectoin((*_pCall)->pPeerConnection);
+                }
                 free(*_pCall);
                 DBG_LOG("Free call\n");
+                *_pCall = NULL;
         }
 }
 

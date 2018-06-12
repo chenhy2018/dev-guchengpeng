@@ -56,7 +56,8 @@ UA* UARegister(const char* _pId, const char* _pPassword, const char* _pSigHost,
         sipConfig.pUserData = (void *)pUA;
         sipConfig.nMaxOngoingCall = 10;
         int nAccountId = 0;
-        DBG_LOG("UARegister %s %s %s %p ongoing call %d\n", sipConfig.pUserName, sipConfig.pPassWord, sipConfig.pDomain, sipConfig.pUserData, sipConfig.nMaxOngoingCall);
+        DBG_LOG("UARegister %s %s %s %p ongoing call %d\n",
+                sipConfig.pUserName, sipConfig.pPassWord, sipConfig.pDomain, sipConfig.pUserData, sipConfig.nMaxOngoingCall);
         SipAddNewAccount(&sipConfig, &nAccountId);
         SipRegAccount(nAccountId, 1);
         pUA->regStatus == TRYING;
@@ -192,7 +193,7 @@ ErrorID UAPollEvent(UA* _pUa, EventType* _pType, Event* _pEvent, int _pTimeOut)
 // mqtt report
 ErrorID UAReport(UA* _pUa, const char* topic, const char* message, int length)
 {
-        return MqttPublish(_pUa->pMqttInstance, topic, length, message);
+        return MqttPublish(_pUa->pMqttInstance, (char*)(topic), length, message);
 }
 
 SipAnswerCode UAOnIncomingCall(UA* _pUa, const int _nCallId, const char *pFrom, const void *pMedia)
