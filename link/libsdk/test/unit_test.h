@@ -1,4 +1,4 @@
-// Last Update:2018-06-08 18:28:59
+// Last Update:2018-06-12 12:22:07
 /**
  * @file unit_test.h
  * @brief 
@@ -11,6 +11,7 @@
 #define UNIT_TEST_H
 
 #include <pthread.h>
+#include <stdio.h>
 
 #define TEST_FAIL 1
 #define TEST_PASS 0
@@ -30,14 +31,16 @@
 #define UT_VAL(v) printf("[ UNIT TEST ] ");DBG_LOG(#v" = %d\n", v)
 #define UT_STR(s) printf("[ UNIT TEST ]");DBG_LOG(#s" = %s\n", s)
 #define UT_LINE() printf("[ UNIT TEST ]");DBG_LOG("======================\n")
+#define ARRSZ(arr) (sizeof(arr)/sizeof(arr[0]))
+#define TEST_CASE_RESULT_MAX 512
 
 typedef void *(*ThreadFn)(void *);
 typedef struct {
     char *caseName;
     int expact;
     ThreadFn threadEntry;
+    pthread_t tid;
 } TestCase;
-
 
 typedef struct _TestSuit TestSuit;
 typedef struct _TestSuitManager TestSuitManager; 
@@ -48,10 +51,12 @@ struct _TestSuit {
     int (*GetTestCase) ( TestSuit *this, TestCase **testCase );
     void *testCases;
     unsigned char enable;
+    ThreadFn threadEntry;
     int total;
     int failNum;
     int index;
     TestSuitManager *pManager;
+    pthread_t tid;
 };
 
 typedef struct {
@@ -67,26 +72,28 @@ typedef struct {
     int (*WaitForEvent)( int event, int timeout );
 } EventManger;
 
+typedef struct {
+    char *pTestCaseName;
+    int res;
+} TestCaseResult;
 
 typedef struct {
-    pthread_t threadId;
-    ThreadFn threadFn;
-} ThreadInfo;
-
-typedef struct {
-    ThreadInfo threadList[THREAD_MAX];
+    TestCaseResult results[TEST_CASE_RESULT_MAX];
+    char *pTestSuitName;
     int num;
-} ThreadManager;
+}  TestSuitResult;
 
 struct _TestSuitManager{
     void *data;
     int num;
     TestSuit testSuits[TEST_SUIT_MAX];
+    TestSuitResult testSuitResults[TEST_SUIT_MAX];
     EventManger eventManager;
-    ThreadManager threadManager;
     int (* NotifyAllEvent)( int _nEventId );
     int (*AddPrivateData)( void *data );
-    int (*ThreadRegister)( ThreadFn threadFn );
+    int (*startThread)( TestSuit *_pTestSuit,  ThreadFn threadFn );
+    int (*CancelThread)( TestSuit *pTestSuit );
+    int (*Report)();
 };
 
 extern int AddTestSuit( TestSuit *pTestSuit );
@@ -94,8 +101,9 @@ extern int RunAllTestSuits();
 extern int TestSuitManagerInit();
 extern int NotifyAllEvent( int event );
 extern int WaitForEvent( int _nEventId, int nTimeOut );
-extern int ThreadRegister( ThreadFn threadFn );
 extern int AddPrivateData( void *data );
-extern int ThreadRegister( ThreadFn threadFn );
+extern int startThread( TestSuit *_pTestSuit, ThreadFn threadFn );
+extern int CancelThread( TestSuit *_pTestSuit );
+extern int ResultReport();
 
 #endif  /*UNIT_TEST_H*/

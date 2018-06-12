@@ -1,4 +1,4 @@
-// Last Update:2018-06-08 18:41:37
+// Last Update:2018-06-11 14:23:52
 /**
  * @file sdk_interface.c
  * @brief 
@@ -300,9 +300,10 @@ ErrorID UnRegister(AccountID _nAccountId)
 ErrorID MakeCall(AccountID _nAccountId, const char* id, const char* _pDestUri, OUT int* _pCallId)
 {
     struct list_head *pos;
+
     if ( !_pDestUri || !_pCallId )
         return RET_PARAM_ERROR;
-
+    
     UA *pUA = FindUA(pUAManager, _nAccountId, &pos);
     if (pUA != NULL) {
             return UAMakeCall(pUA, id, _pDestUri, _pCallId);

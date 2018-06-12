@@ -1,4 +1,4 @@
-// Last Update:2018-06-08 18:14:52
+// Last Update:2018-06-12 12:27:05
 /**
  * @file unit_test.c
  * @brief 
@@ -39,20 +39,8 @@ int RunAllTestSuits()
     TestSuit *pTestSuit = NULL;
     int res = 0;
     TestCase *pTestCase = NULL;
-    ThreadManager *pThreadManager = &pTestSuitManager->threadManager;
-
-    UT_VAL( pThreadManager->num );
-#if 0
-    for ( i=0; i<pThreadManager->num; i++ ) {
-        int ret = pthread_create( &pThreadManager->threadList[i].threadId, NULL,
-                        pThreadManager->threadList[i].threadFn, (void *)pTestSuitManager );
-        if ( 0 != ret ) {
-            DBG_ERROR("create thread error, ret = %d\n", ret );
-            return -1;
-        }
-        UT_VAL( ret );
-    }
-#endif
+    TestSuitResult *pSuitResult = NULL;
+    TestCaseResult *pCaseResult = NULL;
 
     UT_VAL( pTestSuitManager->num );
     for ( i=0; i<pTestSuitManager->num; i++ ) {
@@ -60,22 +48,30 @@ int RunAllTestSuits()
         if ( !pTestSuit->enable ) {
             continue;
         }
+        pSuitResult = &pTestSuitManager->testSuitResults[i];
+        pSuitResult->pTestSuitName = pTestSuit->suitName;
         LOG("run the test suit : %s\n", pTestSuit->suitName );
         if ( pTestSuit->OnInit ) {
             pTestSuit->OnInit( pTestSuit, pTestSuitManager );
         }
         if ( pTestSuit->TestCaseCb ) {
             for ( j=0; j<pTestSuit->total; j++ ) {
+                pCaseResult = &pSuitResult->results[j];
                 pTestSuit->index = j;
                 res = pTestSuit->TestCaseCb( pTestSuit );
                 if ( pTestSuit->GetTestCase ) {
                     pTestSuit->GetTestCase( pTestSuit, &pTestCase );
                     LOG("----- test case [ %s ] result ( %s ) \n", pTestCase->caseName, 
                         res == TEST_PASS ? "pass" : "fail" );
+                    pCaseResult->pTestCaseName = pTestCase->caseName;
+                    pCaseResult->res = res;
+                    pSuitResult->num++;
                 }
+                pTestSuitManager->CancelThread( pTestSuit );
             }
         }
     }
+    pTestSuitManager->Report();
 
 
     return 0;
@@ -89,7 +85,9 @@ int TestSuitManagerInit()
     pTestSuitManager->eventManager.WaitForEvent = WaitForEvent;
     pTestSuitManager->NotifyAllEvent = NotifyAllEvent;
     pTestSuitManager->AddPrivateData = AddPrivateData;
-    pTestSuitManager->ThreadRegister = ThreadRegister;
+    pTestSuitManager->startThread = startThread;
+    pTestSuitManager->CancelThread = CancelThread;
+    pTestSuitManager->Report = ResultReport;
 	pthread_mutex_init( &pTestSuitManager->eventManager.mutex, NULL );
 
 
@@ -157,12 +155,13 @@ int AddEventWait( EventManger *pEventManager, EventWait *pEventWait, int nTimeOu
     int nReason = pthread_cond_timedwait( &pEventWait->condList[pEventWait->condNum++],
                                           &pEventManager->mutex, &after );
     if (nReason == ETIMEDOUT) {
+        UT_ERROR("pthread_cond_timedwait time out\n");
         return ERROR_TIMEOUT;
     }
     if ( nReason == EINVAL ) {
+        UT_ERROR("pthread_cond_timedwait TINVAL param error\n");
         return ERROR_INVAL;
     }
-    UT_VAL( nReason );
 
     return STS_OK;
 }
@@ -201,25 +200,26 @@ int WaitForEvent( int _nEventId, int nTimeOut )
     return ret;
 } 
 
-int ThreadRegister( ThreadFn threadFn )
+int startThread( TestSuit *_pTestSuit, ThreadFn threadFn )
 {
     int ret = 0;
-    ThreadManager *pThreadManager = &pTestSuitManager->threadManager;
+    TestCase *pTestCase = NULL;
 
-    if ( !threadFn ) {
+    if ( !threadFn || !_pTestSuit ) {
         return -1;
     }
 
-    pThreadManager->threadList[pThreadManager->num].threadFn = threadFn;
+    _pTestSuit->GetTestCase( _pTestSuit, &pTestCase );
+    if ( pTestCase ) {
+        ret = pthread_create( &pTestCase->tid, NULL,
+                              threadFn, (void *)_pTestSuit );
+        if ( 0 != ret ) {
+            UT_ERROR("create thread error, ret = %d\n", ret );
+            return -1;
+        }
 
-    ret = pthread_create( &pThreadManager->threadList[pThreadManager->num].threadId, NULL,
-                              threadFn, (void *)pTestSuitManager );
-    if ( 0 != ret ) {
-        DBG_ERROR("create thread error, ret = %d\n", ret );
-        return -1;
+        UT_VAL( ret );
     }
-    pThreadManager->num++;
-    UT_VAL( ret );
     return 0;
 }
 
@@ -227,4 +227,38 @@ int AddPrivateData( void *data )
 {
     pTestSuitManager->data = data;
 }
+
+
+int CancelThread( TestSuit *_pTestSuit )
+{
+    int ret = 0;
+    TestCase *pTestCase = NULL;
+
+    DBG_LOG("cancel thread %d\n", (int)_pTestSuit->tid );
+    _pTestSuit->GetTestCase( _pTestSuit, &pTestCase );
+    if ( pTestCase )
+        ret = pthread_cancel( pTestCase->tid );
+
+    return ret;
+}
+
+int ResultReport()
+{
+    int i = 0, j=0;
+    TestSuitResult *pSuitResult = NULL;
+
+    LOG("total %d test suits\n", pTestSuitManager->num );
+    for ( i=0; i<pTestSuitManager->num; i++ ) {
+        pSuitResult = &pTestSuitManager->testSuitResults[i];
+        if ( !pSuitResult->num )
+            continue;
+        LOG("------------ test suit name : %s\n", pSuitResult->pTestSuitName );
+        for ( j=0; j<pSuitResult->num; j++ ) {
+            LOG("*** test case ( %s ) result [ %s ] \n", pSuitResult->results[j].pTestCaseName,
+                pSuitResult->results[j].res == TEST_PASS ? "PASS" : "FAIL" );
+        }
+    }
+    return 0;
+}
+
 

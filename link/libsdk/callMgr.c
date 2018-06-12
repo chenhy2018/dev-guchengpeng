@@ -82,20 +82,37 @@ Call* CALLMakeCall(AccountID _nAccountId, const char* id, const char* _pDestUri,
                    OUT int* _pCallId, CallConfig* _pConfig) 
 {
         DBG_LOG("CALLMakeCall start \n");
+        char *pUri = NULL;
+        int nSize = 0;
         Call* pCall = (Call*)malloc(sizeof(Call));
         if (pCall == NULL) {
                 return NULL;
         }
+
+        nSize = strlen(id) + strlen(_pDestUri) + 8;// <sip:id@_pDestUri>
+        pUri = (char *) malloc( nSize );
+        if ( !pUri ) {
+            DBG_ERROR("[ LIBSDK ] malloc error, malloc size %d\n", nSize );
+            return NULL;
+        }
+        memset( pUri, 0, nSize );
         memset(pCall, 0, sizeof(Call));
+        strcat( pUri, "<sip:" );
+        strcat( pUri, id );
+        strcat( pUri, "@" );
+        strcat( pUri, _pDestUri );
+        strcat( pUri, ">" );
         InitRtp(&pCall, _pConfig);
         createOffer(pCall->pPeerConnection, &pCall->pOffer);
         //CreateTmpSDP(&pCall->pOffer);
         setLocalDescription(pCall->pPeerConnection, pCall->pOffer);
-        SipMakeNewCall(_nAccountId, _pDestUri, pCall->pOffer, _pCallId);
+        DBG_STR( pUri );
+        SipMakeNewCall(_nAccountId, pUri, pCall->pOffer, _pCallId);
         pCall->id = *_pCallId;
         pCall->nAccountId = _nAccountId;
         pCall->callStatus = CALL_STATUS_REGISTERED;
         CheckCallStatus(pCall, CALL_STATUS_RING);
+        free( pUri );
         DBG_LOG("CALLMakeCall end %p \n", pCall);
         return pCall;
 }
