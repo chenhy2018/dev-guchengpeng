@@ -104,7 +104,7 @@ static void ClearNode(Node* PHead)
 void OnEventCallback(struct MqttInstance* _pInstance, int rc, const char* _pStr)
 {
         if (_pInstance->options.callbacks.OnEvent != NULL) {
-                _pInstance->options.callbacks.OnEvent(_pInstance, rc, _pStr);
+                _pInstance->options.callbacks.OnEvent(_pInstance, _pInstance->options.nAccountId, rc, _pStr);
         }
 }
 
@@ -118,7 +118,7 @@ void OnMessageCallback(struct mosquitto* _pMosq, void* _pObj, const struct mosqu
         int rc = MOSQ_ERR_SUCCESS;
         struct MqttInstance* pInstance = (struct MqttInstance*)(_pObj);
         if (pInstance->options.callbacks.OnMessage) {
-                pInstance->options.callbacks.OnMessage(_pObj, _pMessage->topic, _pMessage->payload, _pMessage->payloadlen);
+                pInstance->options.callbacks.OnMessage(_pObj, pInstance->options.nAccountId,  _pMessage->topic, _pMessage->payload, _pMessage->payloadlen);
         }
 }
 

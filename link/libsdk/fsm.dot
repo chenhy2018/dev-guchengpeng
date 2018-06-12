@@ -1,0 +1,11 @@
+digraph fsm {                                                               
+       "NULL" -> "ACCOUNT_REGISTERED" [label= "Register()"]
+       "ACCOUNT_REGISTERED" -> "CALLING" [label= "MakeCall()"]
+       "ACCOUNT_REGISTERED" -> "CALLING" [label= "  OnIncomingCall()"]
+       "ESTABLISHED" -> "HANGING" [label="HangupCall()"]
+       "HANGING" -> "DISCONNECTED" [label="onCallStateChange( status = STATE_DISCONNECTED)"]
+       "CALLING" -> "CALLING" [label="AnswerCall()"]
+       "CALLING" -> "ESTABLISHED" [label="onCallStateChange( status = STATE_CONFIRMED )"]
+       "CALLING" -> "CALLING" [label="     RejectCall()"]
+       "CALLING" -> "DISCONNECTED" [label="onCallStateChange( status = STATE_DISCONNECTED )"]
+}

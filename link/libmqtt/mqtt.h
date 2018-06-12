@@ -40,8 +40,8 @@ typedef struct MqttOptions MqttOptions;
 
 struct MqttCallback
 {
-        void (*OnMessage)(IN const void* _pInstance, IN const char* _pTopic, IN const char* _pMessage, IN size_t nLength);
-        void (*OnEvent)(IN const void* _pInstance, IN int nCode, const char* _pReason);
+        void (*OnMessage)(IN const void* _pInstance, IN int _nAccountId, IN const char* _pTopic, IN const char* _pMessage, IN size_t nLength);
+        void (*OnEvent)(IN const void* _pInstance, IN int _nAccountId, IN int _nCode, const char* _pReason);
 };
 
 struct MqttUserInfo
@@ -60,6 +60,7 @@ struct MqttUserInfo
 struct MqttOptions
 {
         char* pId;
+        int nAccountId;
         bool bCleanSession;
         struct MqttUserInfo primaryUserInfo;
         struct MqttUserInfo secondaryUserInfo;
