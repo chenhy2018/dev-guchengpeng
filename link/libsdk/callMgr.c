@@ -87,11 +87,26 @@ Call* CALLMakeCall(AccountID _nAccountId, const char* id, const char* _pDestUri,
                    OUT int* _pCallId, CallConfig* _pConfig) 
 {
         DBG_LOG("CALLMakeCall start \n");
+        char *pUri = NULL;
+        int nSize = 0;
         Call* pCall = (Call*)malloc(sizeof(Call));
         if (pCall == NULL) {
                 return NULL;
         }
+
+        nSize = strlen(id) + strlen(_pDestUri) + 22;// <sip:id@_pDestUri>
+        pUri = (char *) malloc( nSize );
+        if ( !pUri ) {
+            DBG_ERROR("[ LIBSDK ] malloc error, malloc size %d\n", nSize );
+            return NULL;
+        }
+        memset( pUri, 0, nSize );
         memset(pCall, 0, sizeof(Call));
+        strcat( pUri, "<sip:" );
+        strcat( pUri, id );
+        strcat( pUri, "@" );
+        strcat( pUri, _pDestUri );
+        strcat( pUri, ";transport=tcp>" );
         ErrorID nId = InitRtp(&pCall, _pConfig);
         if (nId != RET_OK) {
                 DBG_ERROR("InitRtp failed %d \n", nId);
@@ -111,16 +126,24 @@ Call* CALLMakeCall(AccountID _nAccountId, const char* id, const char* _pDestUri,
                 free(pCall);
                 return NULL;
         }
-        SIP_ERROR_CODE error = SipMakeNewCall(_nAccountId, _pDestUri, pCall->pOffer, _pCallId);
+        DBG_LOG("CALLMakeCall start url %s\n", pUri);
+        SIP_ERROR_CODE error = SipMakeNewCall(_nAccountId, pUri, pCall->pOffer, _pCallId);
         if (error != SIP_SUCCESS) {
                 DBG_ERROR("SipMakeNewCall failed %d \n", res);
                 free(pCall);
                 return NULL;
         }
+        InitRtp(&pCall, _pConfig);
+        createOffer(pCall->pPeerConnection, &pCall->pOffer);
+        //CreateTmpSDP(&pCall->pOffer);
+        setLocalDescription(pCall->pPeerConnection, pCall->pOffer);
+        DBG_STR( pUri );
+        SipMakeNewCall(_nAccountId, pUri, pCall->pOffer, _pCallId);
         pCall->id = *_pCallId;
         pCall->nAccountId = _nAccountId;
         pCall->callStatus = CALL_STATUS_REGISTERED;
         CheckCallStatus(pCall, CALL_STATUS_RING);
+        free( pUri );
         DBG_LOG("CALLMakeCall end %p \n", pCall);
         return pCall;
 }

@@ -157,7 +157,7 @@ int RegisterTestSuitCallback( TestSuit *this )
     int count = 0;
     while (count != 10) {
             UT_LOG("MakeCall in\n");
-            id = MakeCall(sts, pData->id, "<sip:1010@123.59.204.198;transport=tcp>", &nCallId1);
+            id = MakeCall(sts, "1010", "123.59.204.198", &nCallId1);
             if (RET_OK != id) {
                     fprintf(stderr, "call error %d \n", id);
                     sleep(1);
@@ -206,6 +206,7 @@ int RegisterTestSuitCallback( TestSuit *this )
                      {
                            MediaEvent *pMedia = &(event->body.mediaEvent);
                            DBG_LOG("Callid %d ncount %d type 1 %d type 2 %d\n", pMedia->callID, pMedia->nCount, pMedia->media[0].codecType, pMedia->media[1].codecType);
+                           callId = pMedia->callID;
                            sendflag = 1;
                            break;
                      }

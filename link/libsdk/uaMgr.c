@@ -141,7 +141,6 @@ ErrorID UAHangupCall(UA* _pUa, int nCallId)
         struct list_head *pos = NULL;
         Call* call = FindCall(_pUa, nCallId, &pos);
         if (call) {
-                //list_del(pos);
                 ErrorID id =  CALLHangupCall(call);
                 return id;
         }
@@ -226,9 +225,8 @@ void UAOnCallStateChange(UA* _pUa, const int nCallId, const SipInviteState State
                 DBG_LOG("call %p\n", call);
                 //CALLOnCallStateChange(&call, State, StatusCode, pMedia);
                 if (StatusCode >= 400 && State == INV_STATE_DISCONNECTED) {
-                                DBG_LOG("Findcall out %p \n", pos);
+                                DBG_LOG("*******UAOnCallStateChange del %p \n", pos);
                                 list_del(pos);
-                                DBG_LOG("Findcall out %p \n", pos);
                 }
                 CALLOnCallStateChange(&call, State, StatusCode, pMedia);
                 DBG_LOG("call change end \n");
