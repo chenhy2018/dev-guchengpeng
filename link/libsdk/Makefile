@@ -91,6 +91,8 @@ sdk $(TARGET_LIBRARY) : $(LIBPJ) $(LIBSIP) $(LIBSDK) $(LIBMQTT) $(LIBRTP)
 	./merge-lib.sh $(ARCH)
 	make -C test clean
 	make -C test
+	make -C test/callee clean
+	make -C test/callee
 
 $(LIBSDK) : %.o : %.c
 	mkdir -p $(SDK_OBJS_PATH) 
