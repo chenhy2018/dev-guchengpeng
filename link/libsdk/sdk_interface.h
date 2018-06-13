@@ -79,6 +79,17 @@ typedef int AccountID;
 #define AUDIO_CODEC_MAX 16
 #define VIDEO_CODEC_MAX 16
 
+// Define logging levels
+#define LOG_FATAL    0    // A fatal error has occured: program will exit immediately
+#define LOG_ERROR    1    // An error has occured: program may not exit
+#define LOG_INFO     2     // Nessessary information regarding program operation
+#define LOG_WARN     3     // Any circumstance that may not affect normal operation
+#define LOG_DEBUG    4     // Standard debug messages
+#define LOG_VERBOSE  5     // All debug messages
+typedef void LogFunc(const char *data);
+void SetLogLevel(int level);
+void SetLogFunc(LogFunc *func);
+
 typedef struct {
     int callID;
     void *data;

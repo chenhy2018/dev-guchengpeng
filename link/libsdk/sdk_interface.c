@@ -259,7 +259,7 @@ ErrorID InitSDK( Media* _pMediaConfigs, int _nSize)
         config.nMaxAccount = 10;
         pUAManager->config.callback.OnRxRtp = &OnRxRtp;
         // debug code.
-        SipSetLogLevel(6);
+        SetLogLevel(6);
         SipCreateInstance(&config);
         INIT_LIST_HEAD(&pUAManager->UAList.list);
         pUAManager->bInitSdk = true;
