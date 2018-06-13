@@ -46,7 +46,6 @@ TODO 已解决
    pjmedia h264 packetizer接口说明，貌似丢包了以null去调用，会更新内部状态， 每丢一个包调用一次吗？,目前做法，丢包会null调用一次
    自己写了jitterbuffer. pjsip的pjmedia_jbuf，测试了下，无论adpative参数怎么调整，push的比第一个frame seq大的frame都会被discard，所以没有
 
-TODO 未解决
 10. rtp 序列号restart
 	接收使用int32_t类型序列号, 使用了一个非常简单的办法
 	if (_nFrameSeq < _pJbuf->nMaxBufferCount+1 && _pJbuf->nLastRecvRtpSeq > 65000) {
@@ -56,7 +55,15 @@ TODO 未解决
 	现在的nFrameSeq则加上65536
 
 	pop时候发现nLastRecvRtpSeq 变小了，重新排序一下队列？
-        TODO heap_rebuild 条件，如果65535这个包丢了怎么办？ 大于65535的序列号都&0x0000FFFF，这样就可以第一个翻转的包就能探测到
+        heap_rebuild 条件，如果65535这个包丢了怎么办？ 大于65535的序列号都&0x0000FFFF，这样就可以第一个翻转的包就能探测到
+TODO 未解决
+	如果之前判定为丢弃的包又接收到了，怎么判断?
+ else if (_pJbuf->nLastRecvRtpSeq != 0 &&
+                   (_nFrameSeq < _pJbuf->nLastRecvRtpSeq || (_nFrameSeq - _pJbuf->nLastRecvRtpSeq) > 65000)) {
+                *_pDiscarded = 1;
+                return;
+        }
+
 
 11.  时间戳维护, rtp时间戳溢出问题？
 	uint32_t类型的时间错，在90000hz时钟频率情况下，大概13h15m就会溢出
