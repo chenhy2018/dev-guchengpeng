@@ -5,6 +5,8 @@
 #include <assert.h>
 #include <pthread.h>
 
+int nid = -1;
+
 SipAnswerCode cbOnIncomingCall(int _nAccountId, int _nCallId, const char *_pFrom, const void *_pUser, const void *_pMedia)
 {
         printf("----->incoming call From %s to %d--------------userdata = %d\n", _pFrom, _nAccountId, *(int*)_pUser);
@@ -27,7 +29,6 @@ void *print_message_function( void *ptr )
         printf("--------------------------------------\n");
         int *user = (int *)malloc(sizeof(int));
         *user = 12345;
-        int nid = -1;
         SipAccountConfig AccountConfig;
         AccountConfig.pUserName = "1039";
         AccountConfig.pPassWord = "1039";
@@ -38,6 +39,10 @@ void *print_message_function( void *ptr )
         int ret = SipAddNewAccount(&AccountConfig, &nid);
         if (ret != SIP_SUCCESS)
                 printf("Add sip account failed ret = %d\n", ret);
+        return NULL;
+}
+void* unregister(void *ptr){
+        SipRegAccount(nid, 0);
         return NULL;
 }
 int main()
@@ -57,8 +62,13 @@ int main()
         pthread_create( &thread1, NULL, print_message_function, NULL);
         pthread_join( thread1, NULL);
 
-        while(1) {
-                sleep(10);
-        }
-        return 0;
+        sleep(4);
+        SipRegAccount(nid, 1);
+        sleep(4);
+
+        pthread_t thread2;
+        pthread_create( &thread2, NULL, unregister, NULL);
+        pthread_join( thread2, NULL);
+
+        SipDestroyInstance();
 }
