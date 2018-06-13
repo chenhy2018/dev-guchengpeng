@@ -11,6 +11,10 @@
 
 #define THIS_FILE "sip.c"
 
+#define MUTEX_LOCK(mutex) { PJ_LOG(5, (THIS_FILE, "get lock in %s on line %d", __FUNCTION__, __LINE__));pj_mutex_lock(mutex);}
+
+#define MUTEX_FREE(mutex) { PJ_LOG(5, (THIS_FILE, "free lock in %s on line %d", __FUNCTION__, __LINE__)); pj_mutex_unlock(mutex);}
+
 void PrintErrorMsg(IN const pj_status_t _Status, IN const char *_pMsg)
 {
         char errmsg[PJ_ERR_MSG_SIZE];
@@ -169,6 +173,7 @@ SIP_ERROR_CODE SipCreateInstance(IN const SipInstanceConfig *_pConfig)
         PJ_ASSERT_RETURN(Status == PJ_SUCCESS, SIP_CREATE_ENDPOINT_FALIED);
 
         /* start udp socket on sip port */
+        /*
         pj_sockaddr Address;
         pjsip_transport *tp;
         pj_sockaddr_init(pj_AF_INET(), &Address, NULL, 0);
@@ -179,7 +184,13 @@ SIP_ERROR_CODE SipCreateInstance(IN const SipInstanceConfig *_pConfig)
         PJ_LOG(4,(THIS_FILE, "SIP UDP listening on %.*s:%d",
                   (int)tp->local_name.host.slen, tp->local_name.host.ptr,
                   tp->local_name.port));
-
+        */
+        /* start tcp socket on sip port */
+        pjsip_tpfactory *TcpFactory;
+        pjsip_tcp_transport_cfg TcpConfig;
+        pjsip_tcp_transport_cfg_default(&TcpConfig, pj_AF_INET());
+        Status = pjsip_tcp_transport_start3(SipAppData.pSipEndPoint, &TcpConfig, &TcpFactory);
+        PJ_ASSERT_RETURN(Status == PJ_SUCCESS, SIP_START_TP_FAILED);
         /* Init transaction layer */
         Status = pjsip_tsx_layer_init_module(SipAppData.pSipEndPoint);
         PJ_ASSERT_RETURN(Status == PJ_SUCCESS, SIP_INIT_TRANS_FAILED);
@@ -301,7 +312,7 @@ SIP_ERROR_CODE SipAddNewAccount(IN const SipAccountConfig *_pConfig, OUT int *_p
         /* Account amount check */
         PJ_ASSERT_RETURN(SipAppData.nAccountCount < SipAppData.nMaxAccount, SIP_TOO_MANY_ACCOUNT);
 
-        pj_mutex_lock(SipAppData.pMutex);
+        MUTEX_LOCK(SipAppData.pMutex);
         /* Find empty account id. */
         int id;
         for (id=0; id < SipAppData.nMaxAccount; ++id) {
@@ -310,7 +321,7 @@ SIP_ERROR_CODE SipAddNewAccount(IN const SipAccountConfig *_pConfig, OUT int *_p
         }
         /* Expect to find a slot */
         PJ_ASSERT_ON_FAIL(id < SipAppData.nMaxAccount,
-                          {pj_mutex_unlock(SipAppData.pMutex); return SIP_TOO_MANY_ACCOUNT;});
+                          {MUTEX_FREE(SipAppData.pMutex); return SIP_TOO_MANY_ACCOUNT;});
 
         SipAccount *pAccount = &SipAppData.Accounts[id];
 
@@ -331,7 +342,7 @@ SIP_ERROR_CODE SipAddNewAccount(IN const SipAccountConfig *_pConfig, OUT int *_p
         /* Copy account info */
         char ID[80], Registrar[80];
         sprintf(ID, "sip:%s@%s", _pConfig->pUserName, _pConfig->pDomain);
-        sprintf(Registrar, "sip:%s", _pConfig->pDomain);
+        sprintf(Registrar, "sip:%s;transport=tcp", _pConfig->pDomain);
         pj_str_t PJID = pj_str(ID);
         pj_str_t PJReg = pj_str(Registrar);
         pj_str_t PJUserName = pj_str((char *)_pConfig->pUserName);
@@ -358,7 +369,7 @@ SIP_ERROR_CODE SipAddNewAccount(IN const SipAccountConfig *_pConfig, OUT int *_p
         SipAppData.Accounts[id].nMaxOngoingCall = _pConfig->nMaxOngoingCall;
         SipAppData.Accounts[id].nOngoingCall = 0;
 
-        pj_mutex_unlock(SipAppData.pMutex);
+        MUTEX_FREE(SipAppData.pMutex);
 
         *_pAccountId = id;
         return SIP_SUCCESS;
@@ -372,7 +383,7 @@ void SipDeleteAccount(IN const int _nAccountId)
         /* Hangup all calls */
         SipHangUpByAccountId(_nAccountId);
 
-        pj_mutex_lock(SipAppData.pMutex);
+        MUTEX_LOCK(SipAppData.pMutex);
         pAccount = &SipAppData.Accounts[_nAccountId];
         /* Cancel keep alive timer */
         if (pAccount->KaTimer.id) {
@@ -402,7 +413,7 @@ void SipDeleteAccount(IN const int _nAccountId)
         pAccount->bValid = PJ_FALSE;
         pAccount->Contact.slen = 0;
         SipAppData.nAccountCount--;
-        pj_mutex_unlock(SipAppData.pMutex);
+        MUTEX_FREE(SipAppData.pMutex);
 }
 
 SIP_ERROR_CODE SipRegAccount(IN const int _nAccountId, IN const int _bDeReg)
@@ -417,7 +428,7 @@ SIP_ERROR_CODE SipRegAccount(IN const int _nAccountId, IN const int _bDeReg)
 
         PJ_LOG(4,(THIS_FILE, "Acc %d: setting %sregistration..",
                   _nAccountId, (_bDeReg? "" : "un")));
-        pj_mutex_lock(SipAppData.pMutex);
+        MUTEX_LOCK(SipAppData.pMutex);
 
         pAccount = &SipAppData.Accounts[_nAccountId];
 
@@ -432,12 +443,12 @@ SIP_ERROR_CODE SipRegAccount(IN const int _nAccountId, IN const int _bDeReg)
                         Status = SipRegcInit(_nAccountId);
                         if (Status != PJ_SUCCESS) {
                                 PrintErrorMsg(Status, "Unable to create registration, Status");
-                                pj_mutex_unlock(SipAppData.pMutex);
+                                MUTEX_FREE(SipAppData.pMutex);
                                 return SIP_CREATE_REG_FAILED;
                         }
                 }
                 if (!pAccount->pRegc) {
-                        pj_mutex_unlock(SipAppData.pMutex);
+                        MUTEX_FREE(SipAppData.pMutex);
                         return SIP_CREATE_REG_FAILED;
                 }
 
@@ -446,7 +457,7 @@ SIP_ERROR_CODE SipRegAccount(IN const int _nAccountId, IN const int _bDeReg)
         } else {
                 if (pAccount->pRegc == NULL) {
                         PJ_LOG(4, (THIS_FILE, "Currently not registered"));
-                        pj_mutex_unlock(SipAppData.pMutex);
+                        MUTEX_FREE(SipAppData.pMutex);
                         return SIP_USR_NOT_REGISTERED;
                 }
                 Status = pjsip_regc_unregister(pAccount->pRegc, &pTransData);
@@ -457,14 +468,14 @@ SIP_ERROR_CODE SipRegAccount(IN const int _nAccountId, IN const int _bDeReg)
 
         if (Status != PJ_SUCCESS) {
                 PrintErrorMsg(Status, "Unable to create/send register");
-                pj_mutex_unlock(SipAppData.pMutex);
+                MUTEX_FREE(SipAppData.pMutex);
                 return SIP_SEND_REG_FAILED;
         }
         PJ_LOG(4,(THIS_FILE, "Acc %d: %s sent", _nAccountId,
                   (_bDeReg ? "Registration" : "Unregistration")));
 
         /* Invoke callback function */
-        pj_mutex_unlock(SipAppData.pMutex);
+        MUTEX_FREE(SipAppData.pMutex);
         return SIP_SUCCESS;
 }
 
@@ -548,7 +559,7 @@ static pj_status_t SipRegcInit(IN const int _nAccountId)
 static void onSipRegc(IN struct pjsip_regc_cbparam *_pCbData)
 {
         SipAccount *pAccount = (SipAccount *)_pCbData->token;
-        pj_mutex_lock(SipAppData.pMutex);
+        MUTEX_LOCK(SipAppData.pMutex);
 
         /* Print registration Status */
         if (_pCbData->status != PJ_SUCCESS) {
@@ -605,7 +616,7 @@ static void onSipRegc(IN struct pjsip_regc_cbparam *_pCbData)
                 // SipHangUpByAccountId(pAccount->nIndex); this will trigger by session timer
                 SipScheduleReRegistration(pAccount);
         }
-        pj_mutex_unlock(SipAppData.pMutex);
+        MUTEX_FREE(SipAppData.pMutex);
 }
 static void SipScheduleReRegistration(SipAccount *_pAccount)
 {
@@ -640,18 +651,19 @@ static void SipReRegTimerCallBack(pj_timer_heap_t *_pTimerHeap, pj_timer_entry *
         pj_status_t Status;
         pAccount = (SipAccount *)_pTimerEntry->user_data;
         pj_assert(pAccount);
-        pj_mutex_lock(SipAppData.pMutex);
+        MUTEX_LOCK(SipAppData.pMutex);
 
         if (!pAccount->bValid || !pAccount->AutoReReg.Active || pAccount->nRegRetryInterval == 0) {
-                pj_mutex_unlock(SipAppData.pMutex);
+                MUTEX_FREE(SipAppData.pMutex);
                 return;
         }
         if (SipRegAccount(pAccount->nIndex, 1) != SIP_SUCCESS)
                 SipScheduleReRegistration(pAccount);
-        pj_mutex_unlock(SipAppData.pMutex);
+        MUTEX_FREE(SipAppData.pMutex);
 }
 static void UpdateKeepAlive(INOUT SipAccount *_pAccount, IN const pj_bool_t _Start, IN const struct pjsip_regc_cbparam *_pCbData)
 {
+
         if (_pAccount->KaTimer.id) {
                 pjsip_endpt_cancel_timer(SipAppData.pSipEndPoint, &_pAccount->KaTimer);
                 _pAccount->KaTimer.id = PJ_FALSE;
@@ -666,7 +678,8 @@ static void UpdateKeepAlive(INOUT SipAccount *_pAccount, IN const pj_bool_t _Sta
                 pj_status_t Status;
 
                 /* return if ka is disable */
-                if (_pAccount->nKaInterval == 0)
+                if (_pAccount->nKaInterval == 0 || (_pCbData->rdata->tp_info.transport->key.type &
+                                                    ~PJSIP_TRANSPORT_IPV6)!= PJSIP_TRANSPORT_UDP)
                         return;
                 _pAccount->KaTransport = _pCbData->rdata->tp_info.transport;
                 pjsip_transport_add_ref(_pAccount->KaTransport);
@@ -719,12 +732,12 @@ static void KeepAliveTimerCallBack(IN pj_timer_heap_t *_pTimerHeap, IN pj_timer_
         char AddrText[PJ_INET6_ADDRSTRLEN];
         pj_status_t Status;
 
-        pj_mutex_lock(SipAppData.pMutex);
+        MUTEX_LOCK(SipAppData.pMutex);
         _pTimerEntry->id = PJ_FALSE;
         pAccount = (SipAccount *)_pTimerEntry->user_data;
 
         if (pAccount->KaTransport == NULL) {
-                pj_mutex_unlock(SipAppData.pMutex);
+                MUTEX_FREE(SipAppData.pMutex);
         }
 
         /* Selet the transport to send the keep alive packet */
@@ -745,7 +758,7 @@ static void KeepAliveTimerCallBack(IN pj_timer_heap_t *_pTimerHeap, IN pj_timer_
                                       NULL, NULL);
 
         if (Status != PJ_SUCCESS && Status != PJ_EPENDING) {
-                pj_mutex_unlock(SipAppData.pMutex);
+                MUTEX_FREE(SipAppData.pMutex);
                 PrintErrorMsg(Status, "Error on sending keep-alive packet");
                 return;
         }
@@ -755,7 +768,7 @@ static void KeepAliveTimerCallBack(IN pj_timer_heap_t *_pTimerHeap, IN pj_timer_
          * cancelled.
          */
         if (pAccount->nKaInterval == 0) {
-                pj_mutex_unlock(SipAppData.pMutex);
+                MUTEX_FREE(SipAppData.pMutex);
                 return;
         }
 
@@ -768,13 +781,13 @@ static void KeepAliveTimerCallBack(IN pj_timer_heap_t *_pTimerHeap, IN pj_timer_
         } else {
                 PJ_LOG(4, (THIS_FILE, "Error sending keep-alive packet, Status = %d", Status));
         }
-        pj_mutex_unlock(SipAppData.pMutex);
+        MUTEX_FREE(SipAppData.pMutex);
 }
 
 /* On registration transaction callback */
 static void onSipRegcTsx(IN struct pjsip_regc_tsx_cb_param *_pCbData)
 {
-        pj_mutex_lock(SipAppData.pMutex);
+        MUTEX_LOCK(SipAppData.pMutex);
         if (_pCbData->cbparam.code >= 400 && _pCbData->cbparam.rdata) {
                 SipAccount *pAccount = (SipAccount *)_pCbData->cbparam.token;
                 if (SipUpdateContactIfNat(pAccount, &_pCbData->cbparam)) {
@@ -782,7 +795,7 @@ static void onSipRegcTsx(IN struct pjsip_regc_tsx_cb_param *_pCbData)
                         _pCbData->contact[0] = pAccount->Contact;
                 }
         }
-        pj_mutex_unlock(SipAppData.pMutex);
+        MUTEX_FREE(SipAppData.pMutex);
 }
 
 static pj_bool_t isPrivateIp(const pj_str_t *pAddr)
@@ -866,17 +879,17 @@ SIP_ERROR_CODE SipMakeNewCall(IN const int _nFromAccountId, IN const char *_pDes
         PJ_ASSERT_RETURN(_pDestUri, SIP_INVALID_ARG);
         PJ_LOG(4, (THIS_FILE, "Making call with acc %d to %s", _nFromAccountId, _pDestUri));
 
-        pj_mutex_lock(SipAppData.pMutex);
+        MUTEX_LOCK(SipAppData.pMutex);
         /* Find free call id */
         nCallId = SipGetFreeCallId();
         if (nCallId == -1) {
                 PJ_LOG(1, (THIS_FILE, "Too many calls"));
-                pj_mutex_unlock(SipAppData.pMutex);
+                MUTEX_FREE(SipAppData.pMutex);
                 return SIP_TOO_MANY_CALLS_FOR_INSTANCE;
         }
         if (SipAppData.Accounts[_nFromAccountId].nOngoingCall >= SipAppData.Accounts[_nFromAccountId].nMaxOngoingCall) {
                 PJ_LOG(1, (THIS_FILE, "Too many call for this account"));
-                pj_mutex_unlock(SipAppData.pMutex);
+                MUTEX_FREE(SipAppData.pMutex);
                 return SIP_TOO_MANY_CALLS_FOR_ACCOUNT;
         }
         pCall = &SipAppData.Calls[nCallId];
@@ -890,7 +903,7 @@ SIP_ERROR_CODE SipMakeNewCall(IN const int _nFromAccountId, IN const char *_pDes
         Status = pjsip_dlg_create_uac(pjsip_ua_instance(), &Local, &SipAppData.Accounts[_nFromAccountId].Contact, &Dest,  &Dest, &pDialog);
         if (Status != PJ_SUCCESS) {
                 PrintErrorMsg(Status, "Create uac dialg failed");
-                pj_mutex_unlock(SipAppData.pMutex);
+                MUTEX_FREE(SipAppData.pMutex);
                 return SIP_CREATE_DLG_FAILED;
         }
         /* TODO get Local SDP */
@@ -905,7 +918,7 @@ SIP_ERROR_CODE SipMakeNewCall(IN const int _nFromAccountId, IN const char *_pDes
                 PrintErrorMsg(Status, "Create uac invite session");
                 pjsip_dlg_terminate(pDialog);
                 /* TODO destory media resouce */
-                pj_mutex_unlock(SipAppData.pMutex);
+                MUTEX_FREE(SipAppData.pMutex);
                 return SIP_CREATE_INV_SESS_FAILED;
         }
         Status = pjsip_timer_init_session(pCall->pInviteSession, &SipAppData.Accounts[_nFromAccountId].TimerSetting);
@@ -913,7 +926,7 @@ SIP_ERROR_CODE SipMakeNewCall(IN const int _nFromAccountId, IN const char *_pDes
                 PrintErrorMsg(Status, "Session Timer init failed");
                 pjsip_dlg_terminate(pDialog);
                 /* TODO destory media resouce */
-                pj_mutex_unlock(SipAppData.pMutex);
+                MUTEX_FREE(SipAppData.pMutex);
                 return SIP_SESS_TIMER_INIT_FALIED;
         }
         pCall->pInviteSession->mod_data[SipMod.id] = pCall;
@@ -926,7 +939,7 @@ SIP_ERROR_CODE SipMakeNewCall(IN const int _nFromAccountId, IN const char *_pDes
                 PrintErrorMsg(Status, "Create invite request failed");
                 pjsip_dlg_terminate(pDialog);
                 /* TODO destory media resouce */
-                pj_mutex_unlock(SipAppData.pMutex);
+                MUTEX_FREE(SipAppData.pMutex);
                 return SIP_CREATE_INV_REQ_FAILED;
         }
         Status = pjsip_inv_send_msg(pCall->pInviteSession, pTransData);
@@ -934,14 +947,14 @@ SIP_ERROR_CODE SipMakeNewCall(IN const int _nFromAccountId, IN const char *_pDes
                 PrintErrorMsg(Status, "Send invite request failed");
                 pjsip_dlg_terminate(pDialog);
                 /* TODO destory media resouce */
-                pj_mutex_unlock(SipAppData.pMutex);
+                MUTEX_FREE(SipAppData.pMutex);
                 SIP_SNED_INV_REQ_FAILED;
         }
 
         SipAppData.nCallCount++;
         SipAppData.Accounts[_nFromAccountId].nOngoingCall++;
         SipAppData.Calls[nCallId].bValid = PJ_TRUE;
-        pj_mutex_unlock(SipAppData.pMutex);
+        MUTEX_FREE(SipAppData.pMutex);
         *_pCallId = nCallId;
         return SIP_SUCCESS;
 }
@@ -949,6 +962,7 @@ SIP_ERROR_CODE SipMakeNewCall(IN const int _nFromAccountId, IN const char *_pDes
 SIP_ERROR_CODE SipAnswerCall(IN const int _nCallId, IN const SipAnswerCode _StatusCode, IN const char *_pReason, IN const void *_pMedia)
 {
         /* Check that callId is valid */
+        PJ_LOG(4, (THIS_FILE, "callId = %d answer code = %d, reason = %s \n", _nCallId, _StatusCode, _pReason));
         PJ_ASSERT_RETURN(_nCallId >=0 || _nCallId < SipAppData.nMaxCall, SIP_INVALID_ARG);
 
         if (SipAppData.Calls[_nCallId].pInviteSession == NULL)
@@ -970,7 +984,7 @@ SIP_ERROR_CODE SipAnswerCall(IN const int _nCallId, IN const SipAnswerCode _Stat
                 pSdp = (pjmedia_sdp_session*)_pMedia;
         else
                 pSdp = NULL;
-        pj_mutex_lock(SipAppData.pMutex);
+        MUTEX_LOCK(SipAppData.pMutex);
         Status = pjsip_inv_answer(pCall->pInviteSession,
                                   _StatusCode, pReason,
                                   pSdp,
@@ -989,13 +1003,13 @@ SIP_ERROR_CODE SipAnswerCall(IN const int _nCallId, IN const SipAnswerCode _Stat
                 goto onError;
 
         }
-        pj_mutex_unlock(SipAppData.pMutex);
+        MUTEX_FREE(SipAppData.pMutex);
         return SIP_SUCCESS;
 
  onError:
         /* Release the session */
         pjsip_inv_terminate(pCall->pInviteSession, 500, PJ_FALSE);
-        pj_mutex_unlock(SipAppData.pMutex);
+        MUTEX_FREE(SipAppData.pMutex);
         return Status;
 }
 void SipHangUp(IN const int _nCallId)
@@ -1007,12 +1021,12 @@ void SipHangUp(IN const int _nCallId)
                 return;
 
         /* TODO release media resource */
-        pj_mutex_lock(SipAppData.pMutex);
+        MUTEX_LOCK(SipAppData.pMutex);
         SipAppData.Calls[_nCallId].bValid = PJ_FALSE;
         Status = pjsip_inv_end_session(SipAppData.Calls[_nCallId].pInviteSession, 0, NULL, &pTxData);
         if (Status == PJ_SUCCESS && pTxData != NULL)
                 pjsip_inv_send_msg(SipAppData.Calls[_nCallId].pInviteSession, pTxData);
-        pj_mutex_unlock(SipAppData.pMutex);
+        MUTEX_FREE(SipAppData.pMutex);
 }
 
 void SipHangUpAll()
@@ -1056,14 +1070,14 @@ static pj_bool_t onRxRequest(IN pjsip_rx_data *_pRxData )
         }
         PJ_LOG(4,(THIS_FILE, "Incoming %s", _pRxData->msg_info.info));
 
-        pj_mutex_lock(SipAppData.pMutex);
+        MUTEX_LOCK(SipAppData.pMutex);
         /* Find free call id */
         nCallId = SipGetFreeCallId();
         if (nCallId == -1) {
                 PJ_LOG(1, (THIS_FILE, "Too many calls"));
                 pjsip_endpt_respond_stateless(SipAppData.pSipEndPoint, _pRxData, PJSIP_SC_BUSY_HERE,
                                               NULL, NULL, NULL);
-                pj_mutex_unlock(SipAppData.pMutex);
+                MUTEX_FREE(SipAppData.pMutex);
                 return PJ_TRUE;
         }
 
@@ -1081,7 +1095,7 @@ static pj_bool_t onRxRequest(IN pjsip_rx_data *_pRxData )
                 pj_str_t Reason = pj_str("Sorry we can't handle this request");
                 pjsip_endpt_respond_stateless(SipAppData.pSipEndPoint, _pRxData, PJSIP_SC_INTERNAL_SERVER_ERROR,
                                               &Reason, NULL, NULL);
-                pj_mutex_unlock(SipAppData.pMutex);
+                MUTEX_FREE(SipAppData.pMutex);
                 return PJ_TRUE;
         }
 
@@ -1092,7 +1106,7 @@ static pj_bool_t onRxRequest(IN pjsip_rx_data *_pRxData )
                 pj_str_t Reason = pj_str("Sorry we can't find right account Id");
                 pjsip_endpt_respond_stateless(SipAppData.pSipEndPoint, _pRxData, PJSIP_SC_INTERNAL_SERVER_ERROR,
                                               &Reason, NULL, NULL);
-                pj_mutex_unlock(SipAppData.pMutex);
+                MUTEX_FREE(SipAppData.pMutex);
                 return PJ_TRUE;
         }
 
@@ -1100,7 +1114,7 @@ static pj_bool_t onRxRequest(IN pjsip_rx_data *_pRxData )
                 PJ_LOG(1, (THIS_FILE, "Too many call for this account"));
                 pjsip_endpt_respond_stateless(SipAppData.pSipEndPoint, _pRxData, PJSIP_SC_BUSY_HERE,
                                               NULL, NULL, NULL);
-                pj_mutex_unlock(SipAppData.pMutex);
+                MUTEX_FREE(SipAppData.pMutex);
                 return PJ_TRUE;
         }
         /* Create UAS dialog */
@@ -1112,7 +1126,7 @@ static pj_bool_t onRxRequest(IN pjsip_rx_data *_pRxData )
                 pj_str_t Reason = pj_str("Sorry we can't create dialog");
                 pjsip_endpt_respond_stateless(SipAppData.pSipEndPoint, _pRxData, PJSIP_SC_INTERNAL_SERVER_ERROR,
                                               &Reason, NULL, NULL);
-                pj_mutex_unlock(SipAppData.pMutex);
+                MUTEX_FREE(SipAppData.pMutex);
                 return PJ_TRUE;
         }
 
@@ -1128,7 +1142,7 @@ static pj_bool_t onRxRequest(IN pjsip_rx_data *_pRxData )
                 pjsip_dlg_create_response(pDialog, _pRxData, PJSIP_SC_INTERNAL_SERVER_ERROR, &Reason, &pTxData);
                 pjsip_dlg_send_response(pDialog, pjsip_rdata_get_tsx(_pRxData), pTxData);
                 pjsip_dlg_dec_lock(pDialog);
-                pj_mutex_unlock(SipAppData.pMutex);
+                MUTEX_FREE(SipAppData.pMutex);
                 return PJ_TRUE;
         }
 
@@ -1139,7 +1153,7 @@ static pj_bool_t onRxRequest(IN pjsip_rx_data *_pRxData )
                 pjsip_dlg_create_response(pDialog, _pRxData, PJSIP_SC_INTERNAL_SERVER_ERROR, &Reason, &pTxData);
                 pjsip_dlg_send_response(pDialog, pjsip_rdata_get_tsx(_pRxData), pTxData);
                 pjsip_dlg_dec_lock(pDialog);
-                pj_mutex_unlock(SipAppData.pMutex);
+                MUTEX_FREE(SipAppData.pMutex);
                 return PJ_TRUE;
         }
         pCall->pInviteSession->mod_data[SipMod.id] = pCall;
@@ -1183,37 +1197,37 @@ static pj_bool_t onRxRequest(IN pjsip_rx_data *_pRxData )
         pSdpInfo = pjsip_rdata_get_sdp_info(_pRxData);
         if (pSdpInfo)
                 pRemoteSdp = pSdpInfo->sdp;
-        SipAppData.OnIncomingCall(nToAccountId, nCallId,  From, SipAppData.Accounts[pCall->nAccountId].pUserData, (void *)pRemoteSdp);
-        /*
-        int nAnswerCode = (int)SipAppData.OnIncomingCall(nToAccountId, nCallId,  From, SipAppData.Accounts[pCall->nAccountId].pUserData);
-        Status = pjsip_inv_answer(pCall->pInviteSession,
-                                   nAnswerCode, NULL,
-                                   NULL,
-                                   &pTxData);
-        if (Status != PJ_SUCCESS) {
-                PrintErrorMsg(Status, "Create user response error");
-                goto onError;
+        int Code =  SipAppData.OnIncomingCall(nToAccountId, nCallId,  From, SipAppData.Accounts[pCall->nAccountId].pUserData, (void *)pRemoteSdp);
+        /* Faild in callback function */
+        if (Code != OK) {
+                pj_str_t Reason = pj_str("Faild in callback function");
+                Status = pjsip_inv_answer(pCall->pInviteSession,
+                                          Code, &Reason,
+                                          NULL,
+                                          &pTxData);
+                if (Status != PJ_SUCCESS) {
+                        PrintErrorMsg(Status, "Create user response error");
+                        goto onError;
+
+                }
+
+                Status = pjsip_inv_send_msg(pCall->pInviteSession, pTxData);
+                if (Status != PJ_SUCCESS) {
+                        PrintErrorMsg(Status, "Send user response error");
+                        goto onError;
+                }
         }
 
-        Status = pjsip_inv_send_msg(pCall->pInviteSession, pTxData);
-        if (Status != PJ_SUCCESS) {
-                PrintErrorMsg(Status, "Send user response error");
-                goto onError;
-        }
-        */
         SipAppData.nCallCount++;
         SipAppData.Accounts[nToAccountId].nOngoingCall++;
-        pj_mutex_unlock(SipAppData.pMutex);
+        MUTEX_FREE(SipAppData.pMutex);
         return PJ_TRUE;
 
  onError:
-        /* TODO release media resource */
-        pjsip_inv_terminate(pCall->pInviteSession, 500, PJ_FALSE);
-
         /* Release the session */
         pjsip_inv_terminate(pCall->pInviteSession, 500, PJ_FALSE);
 
-        pj_mutex_unlock(SipAppData.pMutex);
+        MUTEX_FREE(SipAppData.pMutex);
         if (pDialog)
                 pjsip_dlg_dec_lock(pDialog);
         return PJ_TRUE;
@@ -1226,8 +1240,6 @@ static int SipGetAccountIdFromRxData(IN const pjsip_rx_data *_pRxData)
         unsigned nAccountId;
 
         pUri = _pRxData->msg_info.to->uri;
-        pj_mutex_lock(SipAppData.pMutex);
-
         pSipUri = (pjsip_sip_uri*)pjsip_uri_get_uri(pUri);
         int i;
         for (i = 0; i < SipAppData.nAccountCount; ++i) {
@@ -1235,11 +1247,9 @@ static int SipGetAccountIdFromRxData(IN const pjsip_rx_data *_pRxData)
                 SipAccount *pAccount = &SipAppData.Accounts[nAccountId];
                 if (pAccount->bValid && pj_stricmp(&pAccount->UserName, &pSipUri->user) == 0
                     && pj_stricmp(&pAccount->SipDomain, &pSipUri->host) == 0 ) {
-                        pj_mutex_lock(SipAppData.pMutex);
                         return nAccountId;
                 }
         }
-        pj_mutex_lock(SipAppData.pMutex);
         return -1;
 }
 
@@ -1319,7 +1329,7 @@ int CreateTmpSDP(OUT void **_pSdp)
         pSdp->origin.version = pSdp->origin.id = TimeVal.sec + 2208988800UL;
         pSdp->origin.net_type = pj_str("IN");
         pSdp->origin.addr_type = pj_str("IP4");
-        pSdp->origin.addr = *pj_gethostname();
+        pSdp->origin.addr = pj_str("127.0.0.1");
         pSdp->name = pj_str("pjsip");
 
         /* Since we only support one media stream at present, put the
@@ -1328,7 +1338,7 @@ int CreateTmpSDP(OUT void **_pSdp)
         pSdp->conn = pj_pool_zalloc (_pPool, sizeof(pjmedia_sdp_conn));
         pSdp->conn->net_type = pj_str("IN");
         pSdp->conn->addr_type = pj_str("IP4");
-        pSdp->conn->addr = SipAppData.LocalIp;
+        pSdp->conn->addr = pj_str("172.20.4.69");
 
 
         /* SDP time and attributes. */
