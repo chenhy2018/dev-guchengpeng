@@ -41,8 +41,10 @@ typedef struct _PeerConnection
         pj_pool_factory   *pPoolFactory;
         pjmedia_endpt     *pMediaEndpt;
         MediaStream       mediaStream;
-        pjmedia_sdp_session *pOfferSdp;
-        pjmedia_sdp_session *pAnswerSdp;
+        pjmedia_sdp_session *pLocalSdp;
+        pjmedia_sdp_session *pRemoteSdp;
+        pjmedia_sdp_session *pOfferSdp; //if invoke createOffer same as pLocalSdp
+        pjmedia_sdp_session *pAnswerSdp; //if invoke createAnswer same as pRemoteSdp
         pjmedia_sdp_neg *pIceNeg;
         pj_pool_t *pNegPool;
         IceNegInfo iceNegInfo;

@@ -409,16 +409,11 @@ pj_status_t createJitterBuffer(IN MediaStreamTrack *_pMediaTrack, IN pj_pool_fac
 
         pj_status_t status;
 
-        char typeName[6] = {0};
-        sprintf(typeName, "jb%d", _pMediaTrack->mediaConfig.configs[nIdx].codecType);
-        pj_str_t name = {typeName, strlen(typeName)};
         status = JitterBufferInit(&_pMediaTrack->jbuf,  50, 20, pPool, nPerFrameMaxSize);
         if (status != PJ_SUCCESS) {
                 pj_pool_release(pPool);
                 return status;
         }
 
-        _pMediaTrack->jbuf.pJitterPool = pPool;
-        _pMediaTrack->jbuf.nLastRecvRtpSeq = -1;
         return PJ_SUCCESS;
 }
