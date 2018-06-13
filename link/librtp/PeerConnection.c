@@ -3,6 +3,20 @@
 
 enum { RTCP_INTERVAL = 5000, RTCP_RAND = 2000 };
 
+static void print_sdp(pjmedia_sdp_session * _pSdp, const char * _pLogPrefix)
+{
+        if (5 <= pj_log_get_level()) {
+                char sdpStr[2048];
+                memset(sdpStr, 0, 2048);
+                pjmedia_sdp_print(_pSdp, sdpStr, sizeof(sdpStr));
+                if (_pLogPrefix != NULL) {
+                        MY_PJ_LOG(5, "%s:%s", _pLogPrefix, sdpStr);
+                } else {
+                        MY_PJ_LOG(5, "%s", sdpStr);
+                }
+        }
+}
+
 static int waitState(IN TransportIce *_pTransportIce, IN IceState currentState)
 {
         int nCnt = 0;
@@ -584,10 +598,7 @@ int createOffer(IN OUT PeerConnection * _pPeerConnection, OUT void **_pOffer)
         status = createSdp(_pPeerConnection, pPool, (pjmedia_sdp_session **)_pOffer);
         STATUS_CHECK(createSdp, status);
         
-        char sdpStr[2048];
-        memset(sdpStr, 0, 2048);
-        pjmedia_sdp_print(*_pOffer, sdpStr, sizeof(sdpStr));
-        MY_PJ_LOG(5, "%s", sdpStr);
+        print_sdp(*_pOffer, "createOffer1");
         
         int nMaxTracks = sizeof(_pPeerConnection->nAvIndex) / sizeof(int);
         for ( int i = 0; i < nMaxTracks; i++) {
@@ -600,9 +611,7 @@ int createOffer(IN OUT PeerConnection * _pPeerConnection, OUT void **_pOffer)
                 }
         }
         
-        memset(sdpStr, 0, 2048);
-        pjmedia_sdp_print(*_pOffer, sdpStr, sizeof(sdpStr));
-        MY_PJ_LOG(5, "----------------\n%s", sdpStr);
+        print_sdp(*_pOffer, "createOffer2");
         
         _pPeerConnection->role = ICE_ROLE_OFFERER;
         _pPeerConnection->pOfferSdp = *_pOffer;
@@ -624,6 +633,8 @@ int createAnswer(IN OUT PeerConnection * _pPeerConnection, IN void *_pOffer, OUT
         
         status = createSdp(_pPeerConnection, pPool, (pjmedia_sdp_session **)_pAnswer);
         STATUS_CHECK(createSdp, status);
+
+        print_sdp(*_pAnswer, "createAnswer1");
         
         int nMaxTracks = sizeof(_pPeerConnection->nAvIndex) / sizeof(int);
         for ( int i = 0; i < nMaxTracks; i++) {
@@ -635,6 +646,8 @@ int createAnswer(IN OUT PeerConnection * _pPeerConnection, IN void *_pOffer, OUT
                         STATUS_CHECK(pjmedia_transport_encode_sdp, status);
                 }
         }
+
+        print_sdp(*_pAnswer, "createAnswer2");
         
         _pPeerConnection->role = ICE_ROLE_ANSWERER;
         _pPeerConnection->pAnswerSdp = *_pAnswer;
