@@ -699,9 +699,10 @@ static void on_rx_rtp(void *pUserData, void *pPkt, pj_ssize_t size)
                 return;
         }
 
-        //if (nRtpTs < pMediaTrack->nLastRecvPktTimestamp && pMediaTrack->nLastRecvPktTimestamp - nRtpTs > 1000000000) {
-                //pMediaTrack->nMostLastRecvTimeAcc +=
-        //}
+        if (pMediaTrack->nMostLastRecvTimeAcc !=0 &&
+            (nRtpTs < pMediaTrack->nLastRecvPktTimestamp && pMediaTrack->nLastRecvPktTimestamp - nRtpTs > 1000000000)) {
+                pMediaTrack->nMostLastRecvTimeAcc = pMediaTrack->nLastRecvPktTimestamp;
+        }
 
         pj_bool_t bGetFrame = PJ_TRUE;
         int nTestCnt = 0;
@@ -735,7 +736,7 @@ static void on_rx_rtp(void *pUserData, void *pPkt, pj_ssize_t size)
                         break;
                 }
 
-                MY_PJ_LOG(3, "%d-->get_frame:%d  rtp seq:%d", ++nTestCnt, nPayloadLen, nSeq);
+                MY_PJ_LOG(3, "%d-->get_frame:%d  rtp seq:%d, ts=%d", ++nTestCnt, nPayloadLen, nSeq, nTs);
 
                 //deal with payload
                 pj_bool_t bTryAgain = PJ_FALSE;
@@ -757,7 +758,8 @@ static void on_rx_rtp(void *pUserData, void *pPkt, pj_ssize_t size)
                         int nIdx = pMediaTrack->mediaConfig.nUseIndex;
                         MediaConfig * pAvParam = &pMediaTrack->mediaConfig.configs[nIdx];
                         rtpPacket.format = pAvParam->codecType;
-                        rtpPacket.nTimestamp = nTs * 1000 / pAvParam->nSampleOrClockRate;
+                        uint64_t nTs64 = nTs + pMediaTrack->nMostLastRecvTimeAcc;
+                        rtpPacket.nTimestamp = nTs64 * 1000 / pAvParam->nSampleOrClockRate;
 
                         //MY_PJ_LOG(5, "rtp data receive:%ld, payLen:%d", size, nPayloadLen);
                         PeerConnection * pPeerConnection = (PeerConnection *)pMediaTrack->pPeerConnection;
