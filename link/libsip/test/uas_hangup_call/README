@@ -1,0 +1,14 @@
+call 1(uac hangup the call)
+uac                  uas
+   ---------INVITE--->
+   <---------180------
+   <---------200------
+   ----------ACK------>
+              .
+              .
+              .
+   ----------BYE------>
+   <---------200-------
+
+firt run ./uas/uas
+then run ./uac/uac
