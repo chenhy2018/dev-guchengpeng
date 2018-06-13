@@ -1,4 +1,4 @@
-// Last Update:2018-06-05 17:53:14
+// Last Update:2018-06-13 14:42:48
 /**
  * @file dbg.h
  * @brief 
@@ -13,6 +13,8 @@
 #include "sdk_interface.h"
 #define SDK_DBG 1
 
+#define DBG_STRING( v ) { v, #v }
+#define ARRSZ( arr ) (sizeof(arr)/sizeof(arr[0]))
 #if SDK_DBG
 #define DBG_DEBUG(args...) 
 #define DBG_LOG(args...) writeLog(LOG_INFO, __FILE__, __FUNCTION__, __LINE__, args)
@@ -30,12 +32,19 @@ void writeLog (int loglvl, const char* file, const char* function, const int lin
 #define DBG_STR(str)
 #endif
 
+typedef struct {
+    int val;
+    char *str;
+} DbgStr;
+
 #if SDK_DBG
 void DumpUAList();
 void DbgBacktrace();
+char * DbgCallStatusGetStr(CallStatus status);
 #else
 #define DumpUAList()
 #define DbgBacktrace()
+#define DbgCallStatusGetStr( CallStatus status )
 #endif
 
 #endif  /*DBG_H*/

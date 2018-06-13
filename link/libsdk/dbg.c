@@ -1,4 +1,4 @@
-// Last Update:2018-05-31 15:50:49
+// Last Update:2018-06-13 14:46:25
 /**
  * @file dbg.c
  * @brief 
@@ -11,11 +11,27 @@
 #include "list.h"
 #include "sdk_local.h"
 #include "dbg.h"
+#include "dbg.h"
 #include <stdio.h>
 #include <stdarg.h>
 #include <string.h>
 #include "log.h"
 #if SDK_DBG
+
+DbgStr callStatusStr[] = 
+{
+    DBG_STRING( CALL_STATUS_IDLE ),
+    DBG_STRING( CALL_STATUS_REGISTERED ),
+    DBG_STRING( CALL_STATUS_REGISTER_FAIL ),
+    DBG_STRING( CALL_STATUS_INCOMING ),
+    DBG_STRING( CALL_STATUS_TIMEOUT ),
+    DBG_STRING( CALL_STATUS_ESTABLISHED ),
+    DBG_STRING( CALL_STATUS_RING ),
+    DBG_STRING( CALL_STATUS_REJECT ),
+    DBG_STRING( CALL_STATUS_HANGUP ),
+    DBG_STRING( CALL_STATUS_ERROR ),
+};
+
 #if 0
 void DumpUAList()
 {
@@ -47,7 +63,22 @@ void DbgBacktrace()
     free (strings);
 }
 #endif
+
+char * DbgCallStatusGetStr( CallStatus status )
+{
+    int i = 0;
+
+    for ( i=0; i<ARRSZ(callStatusStr); i++ ) {
+        if ( status == callStatusStr[i].val ) {
+            return callStatusStr[i].str;
+        }
+    }
+
+    return "NULL";
+}
+
 #endif
+
 static int  dbgLevel = LOG_DEBUG;    // Default Logging level
 
 static char* getDateString() {

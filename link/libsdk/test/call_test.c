@@ -1,4 +1,4 @@
-// Last Update:2018-06-11 18:53:12
+// Last Update:2018-06-13 14:43:50
 /**
  * @file call_test.c
  * @brief 
@@ -28,12 +28,13 @@ void *MakeCallEventLoopThread( void *arg );
 int MakeCallTestSuitCallback( TestSuit *this );
 int MakeCallTestSuitGetTestCase( TestSuit *this, TestCase **testCase );
 int MakeCallTestSuitInit( TestSuit *this, TestSuitManager *_pManager );
+void *CalleeThread( void *arg );
 
 MakeCallTestCase gMakeCallTestCases[] =
 {
     {
         { "valid_account1", CALL_STATUS_ESTABLISHED },
-        { "1015", "123.59.204.198", 0, 10 }
+        { "1015", "123.59.204.198", 1, 10 }
     },
 };
 
@@ -191,11 +192,68 @@ int MakeCallTestSuitCallback( TestSuit *this )
 
 int MakeCallTestSuitInit( TestSuit *this, TestSuitManager *_pManager )
 {
+    pthread_t tid = 0;
+
     this->total = ARRSZ(gMakeCallTestCases);
     this->index = 0;
     this->pManager = _pManager;
+    pthread_create( &tid,  NULL, CalleeThread, (void *)this );
 
     return 0;
 }
 
+void *CalleeThread( void *arg )
+{
+    ErrorID sts = 0;
+    EventType type = 0;
+    Event *pEvent = NULL;
+    CallEvent *pCallEvent = NULL;
+    Media media;
+
+    UT_LOG("CalleeThread() entry...\n");
+    sts = InitSDK( &media, 1 );
+    if ( RET_OK != sts &&
+        RET_SDK_ALREADY_INITED != sts ) {
+        UT_ERROR("InitSDK error\n");
+        return NULL;
+    }
+
+    sts = Register( "1015", "1015", "123.59.204.198", "123.59.204.198", "123.59.204.198" );
+    if ( sts >= RET_MEM_ERROR ) {
+        UT_ERROR("Register error, sts = %d\n", sts );
+        return NULL;
+    }
+
+    for (;;) {
+        sts = PollEvent( sts, &type, &pEvent, 5 );
+        if ( sts >= RET_MEM_ERROR ) {
+            UT_ERROR("PollEvent error, sts = %d\n", sts );
+            return NULL;
+        }
+        UT_VAL( type );
+        switch( type ) {
+        case EVENT_CALL:
+            UT_LOG("get event EVENT_CALL\n");
+            pCallEvent = &pEvent->body.callEvent;
+            char *callSts = DbgCallStatusGetStr( pCallEvent->status );
+            UT_LOG("status : %s\n", callSts );
+            UT_STR( pCallEvent->pFromAccount );
+            break;
+        case EVENT_DATA:
+            UT_LOG("get event EVENT_DATA\n");
+            break;
+        case EVENT_MESSAGE:
+            UT_LOG("get event EVENT_MESSAGE\n");
+            break;
+        case EVENT_MEDIA:
+            UT_LOG("get event EVENT_MEDIA\n");
+            break;
+        default:
+            UT_LOG("unknow event, type = %d\n", type );
+            break;
+        }
+    }
+
+    return NULL;
+}
 
