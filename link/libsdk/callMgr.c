@@ -133,12 +133,6 @@ Call* CALLMakeCall(AccountID _nAccountId, const char* id, const char* _pDestUri,
                 free(pCall);
                 return NULL;
         }
-        InitRtp(&pCall, _pConfig);
-        createOffer(pCall->pPeerConnection, &pCall->pOffer);
-        //CreateTmpSDP(&pCall->pOffer);
-        setLocalDescription(pCall->pPeerConnection, pCall->pOffer);
-        DBG_STR( pUri );
-        SipMakeNewCall(_nAccountId, pUri, pCall->pOffer, _pCallId);
         pCall->id = *_pCallId;
         pCall->nAccountId = _nAccountId;
         pCall->callStatus = CALL_STATUS_REGISTERED;
