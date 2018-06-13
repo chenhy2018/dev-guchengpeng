@@ -583,10 +583,10 @@ static int receive_data_callback(void *pData, int nDataLen, int nFlag, int64_t t
         RtpPacket rtpPacket;
         pj_bzero(&rtpPacket, sizeof(rtpPacket));
         if (nFlag == THIS_IS_AUDIO) {
-                printf("send %d bytes audio data to rtp with timestamp:%ld\n", nDataLen, timestamp);
+                //printf("send %d bytes audio data to rtp with timestamp:%ld\n", nDataLen, timestamp);
                 rtpPacket.type = RTP_STREAM_AUDIO;
         } else {
-                printf("send %d bytes vidoe data to rtp with timestamp:%ld\n", nDataLen, timestamp);
+                //printf("send %d bytes vidoe data to rtp with timestamp:%ld\n", nDataLen, timestamp);
                 rtpPacket.type = RTP_STREAM_VIDEO;
         }
         rtpPacket.pData = (uint8_t *)pData;
@@ -893,8 +893,10 @@ int main(int argc, char **argv)
                 InitMediaConfig(&app.audioConfig);
                 app.audioConfig.configs[0].nSampleOrClockRate = 8000;
                 app.audioConfig.configs[0].codecType = MEDIA_FORMAT_PCMU;
+                app.audioConfig.configs[0].nChannel = 1;
                 app.audioConfig.configs[1].nSampleOrClockRate = 8000;
                 app.audioConfig.configs[1].codecType = MEDIA_FORMAT_PCMA;
+                app.audioConfig.configs[1].nChannel = 1;
                 app.audioConfig.nCount = 2;
                 if ( role == ANSWER ){
                         app.audioConfig.configs[0] = app.audioConfig.configs[1];

@@ -1,14 +1,56 @@
 #include "MediaStream.h"
 #define THIS_FILE "MediaStream.c"
 
-void InitMediaConfig(IN MediaConfigSet * pMediaConfig)
+void InitMediaConfig(IN MediaConfigSet * _pMediaConfig)
 {
-        pj_bzero(pMediaConfig, sizeof(MediaConfigSet));
+        pj_assert(_pMediaConfig != NULL);
+        pj_bzero(_pMediaConfig, sizeof(MediaConfigSet));
 }
 
 void InitMediaStream(IN MediaStream *_pMediaStraem)
 {
+        pj_assert(_pMediaStraem != NULL);
         pj_bzero(_pMediaStraem, sizeof(MediaStream));
+}
+
+pj_status_t MediaConfigSetIsValid(MediaConfigSet *_pConfigSet)
+{
+        if (_pConfigSet == NULL) {
+                return PJ_EINVAL;
+        }
+        if (_pConfigSet->nCount <= 0 || _pConfigSet->nCount > sizeof(_pConfigSet->configs) / sizeof(MediaConfig)) {
+                return PJ_EINVAL;
+        }
+
+        for (int i = 0; i < _pConfigSet->nCount; i++) {
+                MediaConfig *pConfig = &_pConfigSet->configs[i];
+                if (pConfig->nSampleOrClockRate <=0) {
+                        return PJ_EINVAL;
+                }
+                if (pConfig->streamType == RTP_STREAM_DATA) {
+                        return PJ_ENOTSUP;
+                }
+                if (pConfig->streamType != RTP_STREAM_AUDIO && pConfig->streamType != RTP_STREAM_VIDEO) {
+                        return PJ_EINVAL;
+                }
+
+                switch (pConfig->codecType) {
+                        case MEDIA_FORMAT_PCMU:
+                        case MEDIA_FORMAT_PCMA:
+                        case MEDIA_FORMAT_G729:
+                                if (pConfig->nChannel <= 0) {
+                                        return PJ_EINVAL;
+                                }
+                                break;
+                        case MEDIA_FORMAT_H264:
+                        case MEDIA_FORMAT_H265:
+                                break;
+                        default:
+                               return PJ_ENOTSUP;
+                }
+        }
+
+        return PJ_SUCCESS;
 }
 
 static void setMediaConfig(IN OUT MediaConfigSet *_pMediaConfig)

@@ -370,8 +370,29 @@ static inline int GetTransportIndex(IN PeerConnection * _pPeerConnection, IN Tra
         return -1;
 }
 
+static pj_status_t IceConfigIsValid(IN IceConfig *_pIceConfig)
+{
+        if (_pIceConfig == NULL) {
+                return PJ_EINVAL;
+        }
+        if (_pIceConfig->userCallback == NULL) {
+                MY_PJ_LOG(1, "not set userCallback");
+                return PJ_EINVAL;
+        }
+        if (_pIceConfig->nComponents <= 0 || _pIceConfig->nComponents > 2) {
+                MY_PJ_LOG(1, "ice component:%d", _pIceConfig->nComponents);
+                return PJ_EINVAL;
+        }
+        if (_pIceConfig->turnHost[0] == '\0' && _pIceConfig->stunHost[0] == '\0') {
+                MY_PJ_LOG(1, "not set stun and turn server");
+                return PJ_EINVAL;
+        }
+        return PJ_SUCCESS;
+}
+
 void InitIceConfig(IN OUT IceConfig *_pIceConfig)
 {
+        pj_assert(_pIceConfig != NULL);
         pj_bzero(_pIceConfig, sizeof(IceConfig));
         
         _pIceConfig->nComponents = 2;
@@ -382,20 +403,20 @@ void InitIceConfig(IN OUT IceConfig *_pIceConfig)
 
 int InitPeerConnectoin(OUT PeerConnection ** _pPeerConnection, IN IceConfig *_pIceConfig)
 {
+        if (_pPeerConnection == NULL) {
+                return PJ_EINVAL;
+        }
+        pj_status_t status = IceConfigIsValid(_pIceConfig);
+        if (status != PJ_SUCCESS) {
+                MY_PJ_LOG(1, "invalid IceConfig");
+                return status;
+        }
+
         PeerConnection * pPeerConnection =  (PeerConnection *)malloc(sizeof(PeerConnection));
         ASSERT_RETURN_CHECK(pPeerConnection, malloc);
         
         pj_bzero(pPeerConnection, sizeof(PeerConnection));
         pj_caching_pool_init(&pPeerConnection->cachingPool, &pj_pool_factory_default_policy, 0);
-
-        IceConfig userConfig;
-        if ( _pIceConfig == NULL) {
-                InitIceConfig(&userConfig);
-                strcpy(userConfig.turnHost, "123.59.204.198");
-                strcpy(userConfig.turnUsername, "root");
-                strcpy(userConfig.turnPassword, "root");
-                _pIceConfig = &userConfig;
-        }
         
         pPeerConnection->userIceConfig = *_pIceConfig;
 
@@ -412,6 +433,7 @@ int InitPeerConnectoin(OUT PeerConnection ** _pPeerConnection, IN IceConfig *_pI
 
 void ReleasePeerConnectoin(IN OUT PeerConnection * _pPeerConnection)
 {
+        pj_assert(_pPeerConnection != NULL);
         _pPeerConnection->bQuit = 1;
         for ( int i = 0; i < sizeof(_pPeerConnection->nAvIndex) / sizeof(int); i++) {
                 if (_pPeerConnection->nAvIndex[i] != -1) {
@@ -459,6 +481,15 @@ void ReleasePeerConnectoin(IN OUT PeerConnection * _pPeerConnection)
 
 int AddAudioTrack(IN OUT PeerConnection * _pPeerConnection, IN MediaConfigSet * _pAudioConfig)
 {
+        if (_pPeerConnection == NULL || _pAudioConfig == NULL) {
+                return PJ_EINVAL;
+        }
+        pj_status_t status;
+        status = MediaConfigSetIsValid(_pAudioConfig);
+        if (status != PJ_SUCCESS) {
+                MY_PJ_LOG(1, "invalid MediaConfigSet");
+                return status;
+        }
         createMediaEndpt(_pPeerConnection);
         
         //TODO dupicated check
@@ -474,7 +505,6 @@ int AddAudioTrack(IN OUT PeerConnection * _pPeerConnection, IN MediaConfigSet * 
                 return -1;
         }
         
-        pj_status_t status;
         status = initTransportIce(_pPeerConnection, &_pPeerConnection->transportIce[nAudioIndex]);
         STATUS_CHECK(audio initTransportIce, status);
         
@@ -485,8 +515,18 @@ int AddAudioTrack(IN OUT PeerConnection * _pPeerConnection, IN MediaConfigSet * 
 
 int AddVideoTrack(IN OUT PeerConnection * _pPeerConnection, IN MediaConfigSet * _pVideoConfig)
 {
+        if (_pPeerConnection == NULL || _pVideoConfig == NULL) {
+                return PJ_EINVAL;
+        }
+        pj_status_t status;
+        status = MediaConfigSetIsValid(_pVideoConfig);
+        if (status != PJ_SUCCESS) {
+                MY_PJ_LOG(1, "invalid MediaConfigSet");
+                return status;
+        }
+
         createMediaEndpt(_pPeerConnection);
-        
+
         //TODO dupicated check
         int nVideoIndex = -1;
         int nMaxTracks = sizeof(_pPeerConnection->nAvIndex) / sizeof(int);
@@ -500,7 +540,6 @@ int AddVideoTrack(IN OUT PeerConnection * _pPeerConnection, IN MediaConfigSet * 
                 return -1;
         }
         
-        pj_status_t status;
         status = initTransportIce(_pPeerConnection, &_pPeerConnection->transportIce[nVideoIndex]);
         STATUS_CHECK(video initTransportIce, status);
         
@@ -586,6 +625,9 @@ static void createSdpPool(IN OUT PeerConnection * _pPeerConnection)
 int createOffer(IN OUT PeerConnection * _pPeerConnection, OUT void **_pOffer)
 {
         pj_status_t  status;
+        if (_pPeerConnection == NULL || _pOffer == NULL) {
+                return PJ_EINVAL;
+        }
 
         pj_pool_t *pPool = _pPeerConnection->pSdpPool;
         if(pPool == NULL) {
@@ -622,6 +664,9 @@ int createOffer(IN OUT PeerConnection * _pPeerConnection, OUT void **_pOffer)
 int createAnswer(IN OUT PeerConnection * _pPeerConnection, IN void *_pOffer, OUT void **_pAnswer)
 {
         pj_status_t  status;
+        if (_pPeerConnection == NULL || _pAnswer == NULL) {
+                return PJ_EINVAL;
+        }
 
         pj_pool_t *pPool = _pPeerConnection->pSdpPool;
         if(pPool == NULL) {
@@ -693,9 +738,10 @@ static void on_rx_rtp(void *pUserData, void *pPkt, pj_ssize_t size)
                 MY_PJ_LOG(3, "RTP decode error:%d", status);
                 return;
         }
-        MY_PJ_LOG(3, "-->receiveSize:%d  rtp seq:%d", size, pj_ntohs(pRtpHeader->seq));
         
         uint32_t nRtpTs = pj_ntohl(pRtpHeader->ts);
+        MY_PJ_LOG(5, "-->receiveSize:%d  rtp seq:%d ts=%d", size, pj_ntohs(pRtpHeader->seq), nRtpTs);
+
         //MY_PJ_LOG(4, "Rx seq=%d", pj_ntohs(hdr->seq));
         /* Update the RTCP session. */
         pjmedia_rtcp_rx_rtp(&pMediaTrack->rtcpSession, pj_ntohs(pRtpHeader->seq),
@@ -790,6 +836,10 @@ static void on_rx_rtp(void *pUserData, void *pPkt, pj_ssize_t size)
  */
 int StartNegotiation(IN PeerConnection * _pPeerConnection)
 {
+        if (_pPeerConnection == NULL) {
+                return PJ_EINVAL;
+        }
+
         pj_status_t status;
         int nMaxTracks = sizeof(_pPeerConnection->nAvIndex) / sizeof(int);
         for ( int i = 0; i < nMaxTracks; i++) {
@@ -920,7 +970,10 @@ static int checkAndNeg(IN OUT PeerConnection * _pPeerConnection)
 
 int setLocalDescription(IN OUT PeerConnection * _pPeerConnection, IN void * _pSdp)
 {
-        pj_assert(_pSdp != NULL);
+        if (_pPeerConnection == NULL || _pSdp == NULL) {
+                return PJ_EINVAL;
+        }
+
         createSdpPool(_pPeerConnection);
         pjmedia_sdp_session *  pSdp = (pjmedia_sdp_session *) _pSdp;
         if (pSdp != _pPeerConnection->pOfferSdp && pSdp != _pPeerConnection->pAnswerSdp) {
@@ -941,7 +994,10 @@ int setLocalDescription(IN OUT PeerConnection * _pPeerConnection, IN void * _pSd
 
 int setRemoteDescription(IN OUT PeerConnection * _pPeerConnection, IN void * _pSdp)
 {
-        pj_assert(_pSdp != NULL);
+        if (_pPeerConnection == NULL || _pSdp == NULL) {
+                return PJ_EINVAL;
+        }
+
         createSdpPool(_pPeerConnection);
         pjmedia_sdp_session *  pSdp = (pjmedia_sdp_session *) _pSdp;
         if (pSdp != _pPeerConnection->pOfferSdp && pSdp != _pPeerConnection->pAnswerSdp) {
@@ -1064,7 +1120,8 @@ static pj_status_t sendPacket(IN OUT MediaStreamTrack *_pMediaTrack, IN Transpor
         STATUS_CHECK(pjmedia_rtp_encode_rtp, status);
         
         pRtpHeader = (const pjmedia_rtp_hdr*) pVoidHeader;
-        MY_PJ_LOG(5, "send data(%d) len:%d with seq=%d", _nRtpType, _nDataLen, pj_ntohs(pRtpHeader->seq));
+        MY_PJ_LOG(5, "send data(%d) len:%d with seq=%d ts=%d", _nRtpType, _nDataLen,
+                  pj_ntohs(pRtpHeader->seq), pj_ntohl(pRtpHeader->ts));
         
         char packet[1500];
         /* Copy RTP header to packet */
@@ -1197,7 +1254,10 @@ static int SendVideoPacket(IN PeerConnection *_pPeerConnection, IN OUT RtpPacket
 
 int SendRtpPacket(IN PeerConnection *_pPeerConnection, IN OUT RtpPacket * _pPacket)
 {
-        pj_assert(_pPacket);
+        if (_pPeerConnection == NULL || _pPacket == NULL) {
+                return PJ_EINVAL;
+        }
+
         if (_pPacket->type == RTP_STREAM_AUDIO) {
                 return SendAudioPacket(_pPeerConnection, _pPacket);
         } else {
