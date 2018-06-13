@@ -8,7 +8,6 @@
  */
 #include "sdk_interface.h"
 #include "unit_test.h"
-#include "dbg.h"
 
 #define HOST "123.59.204.198"
 #define INVALID_SERVER "192.168.1.239"

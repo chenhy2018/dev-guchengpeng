@@ -11,8 +11,8 @@
 #include <pthread.h>
 #include <sys/time.h>
 #include <errno.h>
-#include "unit_test.h"
 #include "dbg.h"
+#include "unit_test.h"
 
 TestSuitManager gTestSuitManager, *pTestSuitManager = &gTestSuitManager;
 

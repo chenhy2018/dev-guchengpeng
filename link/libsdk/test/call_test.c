@@ -1,4 +1,4 @@
-// Last Update:2018-06-13 14:43:50
+// Last Update:2018-06-13 16:50:38
 /**
  * @file call_test.c
  * @brief 
@@ -7,8 +7,8 @@
  * @date 2018-06-11
  */
 
-#include "unit_test.h"
 #include "dbg.h"
+#include "unit_test.h"
 #include "sdk_interface.h"
 
 typedef struct {
@@ -16,6 +16,7 @@ typedef struct {
     char *host;
     unsigned char init;
     int timeOut;
+    unsigned char media;
 } CallData;
 
 typedef struct {
@@ -34,7 +35,7 @@ MakeCallTestCase gMakeCallTestCases[] =
 {
     {
         { "valid_account1", CALL_STATUS_ESTABLISHED },
-        { "1015", "123.59.204.198", 1, 10 }
+        { "1015", "123.59.204.198", 1, 10, 1 }
     },
 };
 
@@ -120,7 +121,6 @@ int MakeCallTestSuitCallback( TestSuit *this )
     MakeCallTestCase *pTestCases = NULL;
     CallData *pData = NULL;
     MakeCallTestCase *pTestCase = NULL;
-    Media media;
     int i = 0;
     int ret = 0, callId = 0;
     static ErrorID sts = 0;
@@ -135,14 +135,6 @@ int MakeCallTestSuitCallback( TestSuit *this )
     UT_LOG("this->index = %d\n", this->index );
     pTestCase = &pTestCases[this->index];
     pData = &pTestCase->data;
-
-    if ( pData->init ) {
-        sts = InitSDK( &media, 1 );
-        if ( RET_OK != sts ) {
-            UT_ERROR("sdk init error\n");
-            return TEST_FAIL;
-        }
-    }
 
     UT_STR( pData->id );
 
@@ -193,10 +185,27 @@ int MakeCallTestSuitCallback( TestSuit *this )
 int MakeCallTestSuitInit( TestSuit *this, TestSuitManager *_pManager )
 {
     pthread_t tid = 0;
+    ErrorID sts = 0;
+    Media media[2];
 
     this->total = ARRSZ(gMakeCallTestCases);
     this->index = 0;
     this->pManager = _pManager;
+
+    media[0].streamType = STREAM_VIDEO;
+    media[0].codecType = CODEC_H264;
+    media[0].sampleRate = 90000;
+    media[0].channels = 0;
+    media[1].streamType = STREAM_AUDIO;
+    media[1].codecType = CODEC_G711A;
+    media[1].sampleRate = 8000;
+    media[1].channels = 1;
+    sts = InitSDK( media, 2 );
+    if ( RET_OK != sts ) {
+        UT_ERROR("sdk init error\n");
+        return -1;
+    }
+
     pthread_create( &tid,  NULL, CalleeThread, (void *)this );
 
     return 0;
@@ -211,12 +220,6 @@ void *CalleeThread( void *arg )
     Media media;
 
     UT_LOG("CalleeThread() entry...\n");
-    sts = InitSDK( &media, 1 );
-    if ( RET_OK != sts &&
-        RET_SDK_ALREADY_INITED != sts ) {
-        UT_ERROR("InitSDK error\n");
-        return NULL;
-    }
 
     sts = Register( "1015", "1015", "123.59.204.198", "123.59.204.198", "123.59.204.198" );
     if ( sts >= RET_MEM_ERROR ) {

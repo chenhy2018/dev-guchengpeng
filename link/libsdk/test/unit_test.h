@@ -1,4 +1,4 @@
-// Last Update:2018-06-12 12:22:07
+// Last Update:2018-06-13 16:33:22
 /**
  * @file unit_test.h
  * @brief 
@@ -26,6 +26,12 @@
 #define ERROR_TIMEOUT (-2)
 #define ERROR_INVAL (-3)
 #define STS_OK (0)
+#undef DBG_LOG
+#undef DBG_BASIC
+#undef DBG_ERROR
+#define DBG_BASIC() printf("[ %s %s +%d ] ", __FILE__, __FUNCTION__, __LINE__)
+#define DBG_LOG(args...) DBG_BASIC();printf(args)
+#define DBG_ERROR DBG_LOG
 #define UT_LOG(args...) printf("[ UNIT TEST ] ");DBG_LOG(args)
 #define UT_ERROR(args...) printf("[ UNIT TEST] ");DBG_ERROR(args)
 #define UT_VAL(v) printf("[ UNIT TEST ] ");DBG_LOG(#v" = %d\n", v)
