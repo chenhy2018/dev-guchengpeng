@@ -2,6 +2,7 @@
 #include <unistd.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <assert.h>
 
 SipAnswerCode cbOnIncomingCall(int _nAccountId, int _nCallId, const char *_pFrom, const void *_pUser, const void *_pMedia)
 {
@@ -55,7 +56,7 @@ int main()
 
         ret = SipAddNewAccount(&AccountConfig, &nid);
         if (ret != SIP_SUCCESS)
-                printf("Add sip account failed");
+                printf("Add sip account failed ret = %d\n", ret);
 
         AccountConfig.pUserName = "1037";
         AccountConfig.pPassWord = "1037";
@@ -65,7 +66,7 @@ int main()
 
         ret =  SipAddNewAccount(&AccountConfig, &nid);
         if (ret != SIP_SUCCESS)
-                printf("Add sip account failed");
+                printf("Add sip account failed, ret = %d\n", ret);
 
         AccountConfig.pUserName = "1036";
         AccountConfig.pPassWord = "1036";
@@ -74,8 +75,9 @@ int main()
         AccountConfig.nMaxOngoingCall = 2;
 
         ret = SipAddNewAccount(&AccountConfig, &nid);
+        assert(ret == SIP_TOO_MANY_ACCOUNT);
         if (ret != SIP_SUCCESS)
-                printf("Add sip account failed");
+                printf("Add sip account failed, ret = %d\n", ret);
 
         return 0;
 }

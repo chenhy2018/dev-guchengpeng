@@ -17,7 +17,7 @@
 
 #define CHECK_RETURN(expr,retval)    \
         do {                                                     \
-                if (!(expr)) { pj_assert(expr); return retval; } \
+                if (!(expr)) {return retval; } \
         } while(0)
 
 void PrintErrorMsg(IN const pj_status_t _Status, IN const char *_pMsg)

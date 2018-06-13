@@ -8,6 +8,6 @@ link_directories(${CMAKE_CURRENT_SOURCE_DIR}/../../../../../third_party/pjprojec
 link_directories(${CMAKE_CURRENT_SOURCE_DIR}/../../../../../third_party/pjproject-2.7.2/pjlib/lib/)
 
 aux_source_directory(. uac)
-add_executable(sip_test ${uac})
+add_executable(uac ${uac})
 
 target_link_libraries(uac sip pjsip-ua-x86_64-unknown-linux-gnu.a pjsip-x86_64-unknown-linux-gnu pjmedia-x86_64-unknown-linux-gnu pjlib-util-x86_64-unknown-linux-gnu pj-x86_64-unknown-linux-gnu pthread m)

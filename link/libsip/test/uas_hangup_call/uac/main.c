@@ -59,9 +59,8 @@ int main()
         sleep(2);
         sleep(10);
         while(1) {
-                if (destory) {
-                        sleep(10);
-                        //SipDestroyInstance();
+                if (destroy) {
+                        SipDestroyInstance();
                         break;
                 }
         }
