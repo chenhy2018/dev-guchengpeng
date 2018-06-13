@@ -27,7 +27,7 @@ void cbOnCallStateChange(const int _nCallId, const int _nAccountId, const SipInv
         printf("----->state = %d, status code = %d------------>userdata = %d\n", _State, _StatusCode,  *(int*)_pUser);
         if (_State == INV_STATE_DISCONNECTED)
                 destroy = 1;
-        if (_State == INV_STATE_CONFIRTM)
+        if (_State == INV_STATE_CONFIRMED)
                 confirmed = 1;
 }
 int main()
@@ -70,8 +70,8 @@ int main()
                         incommingcall = 0;
                 }
 
-                if (confrimed) {
-                        SipHangUp(nCallId);
+                if (confirmed) {
+                        SipHangUp(nCallid);
                         confirmed = 0;
                 }
         }

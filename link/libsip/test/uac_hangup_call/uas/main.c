@@ -3,13 +3,16 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+int incommingcall = 0;
+int nCallid = 0;
+int destroy = 0;
+int confirmed = 0;
 SipAnswerCode cbOnIncomingCall(int _nAccountId, int _nCallId, const char *_pFrom, const void *_pUser, const void *_pMedia)
 {
         printf("----->incoming call From %s to %d--------------userdata = %d\n", _pFrom, _nAccountId, *(int*)_pUser);
         PrintSdp(_pMedia);
-        void *pLocalSdp;
-        CreateTmpSDP(&pLocalSdp);
-        SipAnswerCall(_nCallId, 200, NULL, pLocalSdp);
+        incommingcall = 1;
+        nCallid = _nCallId;
 	return OK ;
 }
 
@@ -22,6 +25,10 @@ void cbOnCallStateChange(const int _nCallId, const int _nAccountId, const SipInv
 {
         PrintSdp(_pMedia);
         printf("----->state = %d, status code = %d------------>userdata = %d\n", _State, _StatusCode,  *(int*)_pUser);
+        if (_State == INV_STATE_DISCONNECTED)
+                destroy = 1;
+        if (_State == INV_STATE_CONFIRMED)
+                confirmed = 1;
 }
 int main()
 {
@@ -37,53 +44,31 @@ int main()
         sleep(2);
         int *user = (int *)malloc(sizeof(int));
         *user = 12345;
-        int nid4 = -1;
+        int nid = -1;
         SipAccountConfig AccountConfig;
-        AccountConfig.pUserName = "1004";
-        AccountConfig.pPassWord = "1004";
+        AccountConfig.pUserName = "1040";
+        AccountConfig.pPassWord = "1040";
         AccountConfig.pDomain = "123.59.204.198";
         AccountConfig.pUserData = (void *)user;
         AccountConfig.nMaxOngoingCall = 2;
 
-        int ret = SipAddNewAccount(&AccountConfig, &nid4);
+        int ret = SipAddNewAccount(&AccountConfig, &nid);
         if (ret != SIP_SUCCESS)
                 printf("Add sip account failed");
+        int ret1 = SipRegAccount(nid, 1);
 
-
-        /*
-          int nid3 = SipAddNewAccount("1003", "1003", "192.168.56.102");
-
-        int nid5 = SipAddNewAccount("1005", "1005", "192.168.56.102");
-        int nid6 = SipAddNewAccount("1006", "1006", "192.168.56.102");
-        int nid7 = SipAddNewAccount("1007", "1007", "192.168.56.102");
-        int nid8 = SipAddNewAccount("1008", "1008", "192.168.56.102");
-        int nid9 = SipAddNewAccount("1009", "1009", "192.168.56.102");
-        int nid10 = SipAddNewAccount("1010", "1010", "192.168.56.102");
-
-        SipRegAccount(nid3, 1);
-        SipRegAccount(nid4, 1);
-        SipRegAccount(nid5, 1);
-        SipRegAccount(nid6, 1);
-        SipRegAccount(nid7, 1);
-        SipRegAccount(nid8, 1);
-        SipRegAccount(nid9, 1);
-        SipRegAccount(nid10, 1);
-        */
-        int ret1 = SipRegAccount(nid4, 1);
-
-        sleep(5);
-
-        void *pLocalSdp;
-        CreateTmpSDP(&pLocalSdp);
-        int nCallId1 = -1;
-        SipMakeNewCall(nid4, "<sip:1008@123.59.204.198;transport=tcp>", pLocalSdp, &nCallId1);
-        sleep(2);
-        SipHangUp(nCallId1);
-        //SipDestroyInstance();
         while(1) {
-                // SipMakeNewCall(nid4, "<sip:1003@192.168.56.102>", pLocalSdp, &nCallId1);
-                //sleep(5);
-                //sleep(5);
+                if (destroy) {
+                        sleep(10);
+                        SipDestroyInstance();
+                        break;
+                }
+                if (incommingcall) {
+                        void *pLocalSdp;
+                        CreateTmpSDP(&pLocalSdp);
+                        SipAnswerCall(nCallid, 200, NULL, pLocalSdp);
+                        incommingcall = 0;
+                }
         }
         return 0;
 }
