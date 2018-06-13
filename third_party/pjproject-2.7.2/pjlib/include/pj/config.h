@@ -161,7 +161,7 @@
 #   error "Please specify target os."
 #endif
 
-
+#define PJ_IS_LITTLE_ENDIAN	1
 /********************************************************************
  * Target machine specific configuration.
  */
@@ -1268,9 +1268,9 @@
 #  error "PJ_IS_LITTLE_ENDIAN is not defined!"
 #endif
 
-#if !defined(PJ_IS_BIG_ENDIAN)
-#  error "PJ_IS_BIG_ENDIAN is not defined!"
-#endif
+//#if !defined(PJ_IS_BIG_ENDIAN)
+//#  error "PJ_IS_BIG_ENDIAN is not defined!"
+//#endif
 
 #if !defined(PJ_EMULATE_RWMUTEX)
 #  error "PJ_EMULATE_RWMUTEX should be defined in compat/os_xx.h"
