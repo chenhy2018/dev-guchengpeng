@@ -1,4 +1,4 @@
-// Last Update:2018-06-08 17:36:15
+// Last Update:2018-06-12 19:14:06
 /**
  * @file sdk_interface.h
  * @brief 
@@ -35,6 +35,7 @@ typedef enum {
 typedef enum {
     RET_OK,
     RET_FAIL,
+    RET_INTERAL_FAIL,
     RET_REGISTERING,
     RET_RETRY,
     RET_MEM_ERROR = 1001,
@@ -47,7 +48,8 @@ typedef enum {
     RET_USER_UNAUTHORIZED,
     RET_CALL_INVAILD_CONNECTION,
     RET_CALL_INVAILD_SDP,
-    RET_CALL_INVAILD_OPERATING
+    RET_CALL_INVAILD_OPERATING,
+    RET_SDK_ALREADY_INITED,
 } ErrorID;
 
 typedef enum {
@@ -77,11 +79,22 @@ typedef int AccountID;
 #define AUDIO_CODEC_MAX 16
 #define VIDEO_CODEC_MAX 16
 
+// Define logging levels
+#define LOG_FATAL    0    // A fatal error has occured: program will exit immediately
+#define LOG_ERROR    1    // An error has occured: program may not exit
+#define LOG_INFO     2     // Nessessary information regarding program operation
+#define LOG_WARN     3     // Any circumstance that may not affect normal operation
+#define LOG_DEBUG    4     // Standard debug messages
+#define LOG_VERBOSE  5     // All debug messages
+typedef void LogFunc(const char *data);
+void SetLogLevel(int level);
+void SetLogFunc(LogFunc *func);
+
 typedef struct {
     int callID;
     void *data;
     int size;
-    int pts;
+    int64_t pts;
     Codec codec;
     Stream stream;
 } DataEvent;

@@ -13,6 +13,7 @@
 #include "unit_test.h"
 #include "test.h"
 #include <unistd.h> 
+#include <stdlib.h>
 
 #define ARRSZ(arr) (sizeof(arr)/sizeof(arr[0]))
 #define HOST "123.59.204.198"
@@ -156,7 +157,7 @@ int RegisterTestSuitCallback( TestSuit *this )
     int count = 0;
     while (count != 10) {
             UT_LOG("MakeCall in\n");
-            id = MakeCall(sts, pData->id, "<sip:1010@123.59.204.198;transport=tcp>", &nCallId1);
+            id = MakeCall(sts, "1010", "123.59.204.198", &nCallId1);
             if (RET_OK != id) {
                     fprintf(stderr, "call error %d \n", id);
                     sleep(1);
@@ -167,10 +168,17 @@ int RegisterTestSuitCallback( TestSuit *this )
             Event* event = (Event*) malloc(sizeof(Event));
             int sendflag = 0;
             int callId = 0;
+            int64_t timecount = 0;
             while (1) {
               DBG_LOG("PullEvent start \n");
               id = PollEvent(sts, &type, &event, 1);
               DBG_LOG("PullEvent end id %d \n", id);
+              if (sendflag) {
+                     DBG_LOG("send packet STREAM_AUDIO\n");
+                     sleep(1);
+                     SendPacket(sts, callId, STREAM_AUDIO, "123456788901234567890123456", 15, timecount);
+                     timecount += 20;
+              }
               if (id != RET_OK) {
                     usleep(1000000);
                     continue;
@@ -197,15 +205,11 @@ int RegisterTestSuitCallback( TestSuit *this )
                      case EVENT_MEDIA:
                      {
                            MediaEvent *pMedia = &(event->body.mediaEvent);
-                           DBG_LOG("Callid %d ncount %d type 1 %d type 2\n", pMedia->callID, pMedia->nCount, pMedia->media[0].codecType, pMedia->media[1].codecType);
+                           DBG_LOG("Callid %d ncount %d type 1 %d type 2 %d\n", pMedia->callID, pMedia->nCount, pMedia->media[0].codecType, pMedia->media[1].codecType);
+                           callId = pMedia->callID;
                            sendflag = 1;
                            break;
                      }
-              }
-              if (sendflag) {
-                     DBG_LOG("send packet\n");
-                     sleep(10);
-                     SendPacket(sts, callId, STREAM_VIDEO, "123456788901234567890123456", 15, 123);
               }
               usleep(100000);
             }

@@ -925,7 +925,7 @@ int main(int argc, char **argv)
 
         if (role == OFFER) {
                 pjmedia_sdp_session *pOffer = NULL;
-                status = createOffer(app.pPeerConnection, &pOffer);
+                status = createOffer(app.pPeerConnection, (void **)&pOffer);
                 TESTCHECK(status, app);
                 setLocalDescription(app.pPeerConnection, pOffer);
                 write_sdp(pOffer, OFFERFILE);
@@ -943,7 +943,7 @@ int main(int argc, char **argv)
                 setRemoteDescription(app.pPeerConnection, pOffer);
                 
                 pjmedia_sdp_session *pAnswer = NULL;
-                status = createAnswer(app.pPeerConnection, pOffer, &pAnswer);
+                status = createAnswer(app.pPeerConnection, pOffer, (void **)&pAnswer);
                 TESTCHECK(status, app);
                 setLocalDescription(app.pPeerConnection, pAnswer);
                 write_sdp(pAnswer, ANSWERFILE);

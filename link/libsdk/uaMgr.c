@@ -56,7 +56,8 @@ UA* UARegister(const char* _pId, const char* _pPassword, const char* _pSigHost,
         sipConfig.pUserData = (void *)pUA;
         sipConfig.nMaxOngoingCall = 10;
         int nAccountId = 0;
-        DBG_LOG("UARegister %s %s %s %p ongoing call %d\n", sipConfig.pUserName, sipConfig.pPassWord, sipConfig.pDomain, sipConfig.pUserData, sipConfig.nMaxOngoingCall);
+        DBG_LOG("UARegister %s %s %s %p ongoing call %d\n",
+                sipConfig.pUserName, sipConfig.pPassWord, sipConfig.pDomain, sipConfig.pUserData, sipConfig.nMaxOngoingCall);
         SipAddNewAccount(&sipConfig, &nAccountId);
         SipRegAccount(nAccountId, 1);
         pUA->regStatus == TRYING;
@@ -140,7 +141,6 @@ ErrorID UAHangupCall(UA* _pUa, int nCallId)
         struct list_head *pos = NULL;
         Call* call = FindCall(_pUa, nCallId, &pos);
         if (call) {
-                //list_del(pos);
                 ErrorID id =  CALLHangupCall(call);
                 return id;
         }
@@ -192,7 +192,7 @@ ErrorID UAPollEvent(UA* _pUa, EventType* _pType, Event* _pEvent, int _pTimeOut)
 // mqtt report
 ErrorID UAReport(UA* _pUa, const char* topic, const char* message, int length)
 {
-        return MqttPublish(_pUa->pMqttInstance, topic, length, message);
+        return MqttPublish(_pUa->pMqttInstance, (char*)(topic), length, message);
 }
 
 SipAnswerCode UAOnIncomingCall(UA* _pUa, const int _nCallId, const char *pFrom, const void *pMedia)
@@ -225,9 +225,8 @@ void UAOnCallStateChange(UA* _pUa, const int nCallId, const SipInviteState State
                 DBG_LOG("call %p\n", call);
                 //CALLOnCallStateChange(&call, State, StatusCode, pMedia);
                 if (StatusCode >= 400 && State == INV_STATE_DISCONNECTED) {
-                                DBG_LOG("Findcall out %p \n", pos);
+                                DBG_LOG("*******UAOnCallStateChange del %p \n", pos);
                                 list_del(pos);
-                                DBG_LOG("Findcall out %p \n", pos);
                 }
                 CALLOnCallStateChange(&call, State, StatusCode, pMedia);
                 DBG_LOG("call change end \n");

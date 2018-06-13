@@ -10,17 +10,19 @@
 #ifndef DBG_H
 #define DBG_H
 
+#include "sdk_interface.h"
 #define SDK_DBG 1
 
 #if SDK_DBG
-#define DBG_BASIC() printf("[ %s %s() +%d ] ", __FILE__, __FUNCTION__, __LINE__)
-#define DBG_LOG(args...) DBG_BASIC();printf(args)
+#define DBG_DEBUG(args...) 
+#define DBG_LOG(args...) writeLog(LOG_INFO, __FILE__, __FUNCTION__, __LINE__, args)
 #define DBG_LINE(args...) DBG_LOG("++++++++++\n")
-#define DBG_ERROR(args...) DBG_BASIC();printf("###error#### ");printf(args)
-#define DBG_VAL(val) DBG_LOG(#val" = %d\n", val )
+#define DBG_ERROR(args...) writeLog(LOG_ERROR, __FILE__, __FUNCTION__, __LINE__, args)
+#define DBG_VAL(val) DBG_LOG(#val" = %d\n", val)
 #define DBG_STR(str) DBG_LOG(#str" = %s\n", str)
+void writeLog (int loglvl, const char* file, const char* function, const int line, const char* str, ... );
+
 #else
-#define DBG_BASIC() 
 #define DBG_LOG(args...) 
 #define DBG_LINE(args...) 
 #define DBG_ERROR(args...) 

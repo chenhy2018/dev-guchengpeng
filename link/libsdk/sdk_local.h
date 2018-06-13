@@ -70,6 +70,7 @@ typedef struct {
         UA UAList;
         bool bInitSdk;
         UAConfig config;
+        pthread_mutex_t mutex;
 }UAManager;
 
 extern UAManager *pUAManager;;
