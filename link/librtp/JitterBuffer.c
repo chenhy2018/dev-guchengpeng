@@ -1,7 +1,7 @@
 #include "JitterBuffer.h"
 
 typedef struct _JitterBufferFrame {
-        uint32_t nSeq;
+        int nSeq;
         uint32_t nTs;
         int nFrameSize;
         void * pData;
