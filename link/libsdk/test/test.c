@@ -1,4 +1,4 @@
-// Last Update:2018-06-12 19:00:55
+// Last Update:2018-06-14 12:05:29
 /**
  * @file test.c
  * @brief 
@@ -15,11 +15,19 @@
 #include "test.h"
 #include "call_test.h"
 #include "register_test.h"
+#include "send_pkt_test.h"
+#include "hangup_call_test.h"
+#include "answercall_test.h"
+#include "rejectcall_test.h"
 
 int InitAllTestSuit()
 {
     AddTestSuit( &gRegisterTestSuit );
     AddTestSuit( &gMakeCallTestSuit );
+    AddTestSuit( &gSendPacketTestSuit );
+    AddTestSuit( &gHangupCallTestSuit );
+    AddTestSuit( &gAnswerCallTestSuit );
+    AddTestSuit( &gRejectCallTestSuit );
 
     return 0;
 }
