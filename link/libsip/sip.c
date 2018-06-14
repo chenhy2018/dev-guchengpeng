@@ -71,6 +71,7 @@ static void SipScheduleReRegistration(SipAccount *_pAccount);
 static void SipReRegTimerCallBack(pj_timer_heap_t *_pTimerHeap, pj_timer_entry *_pTimerEntry);
 
 
+static void register_thread();
 /* This is a PJSIP module to be registered by application to handle
  * incoming requests outside any dialogs/transactions. The main purpose
  * here is to handle incoming INVITE request message, where we will
@@ -154,7 +155,12 @@ static pjsip_module SipLogger =
 
 };
 
-
+static void register_thread() {
+        pj_thread_desc threaddesc;
+        pj_thread_t *thread = 0;
+        if( !pj_thread_is_registered())
+                pj_thread_register(NULL, threaddesc, &thread);
+}
 SIP_ERROR_CODE SipCreateInstance(IN const SipInstanceConfig *_pConfig)
 {
         pj_status_t Status;
@@ -265,6 +271,8 @@ SIP_ERROR_CODE SipCreateInstance(IN const SipInstanceConfig *_pConfig)
 
 void SipDestroyInstance()
 {
+
+        register_thread();
         if (SipAppData.pSipEndPoint) {
                 PJ_LOG(4, (THIS_FILE, "Destroy libSip instance ..."));
         }
@@ -311,6 +319,7 @@ void SipDestroyInstance()
 }
 SIP_ERROR_CODE SipAddNewAccount(IN const SipAccountConfig *_pConfig, OUT int *_pAccountId)
 {
+        register_thread();
         /* Input check */
         CHECK_RETURN(_pConfig->pUserName && _pConfig->pPassWord && _pConfig->pDomain, SIP_INVALID_ARG);
 
@@ -382,6 +391,8 @@ SIP_ERROR_CODE SipAddNewAccount(IN const SipAccountConfig *_pConfig, OUT int *_p
 
 void SipDeleteAccount(IN const int _nAccountId)
 {
+        register_thread();
+
         SipAccount *pAccount;
 
         PJ_LOG(4,(THIS_FILE, "Deleting account %d..", _nAccountId));
@@ -423,6 +434,8 @@ void SipDeleteAccount(IN const int _nAccountId)
 
 SIP_ERROR_CODE SipRegAccount(IN const int _nAccountId, IN const int _bDeReg)
 {
+        register_thread();
+
         SipAccount *pAccount;
         pj_status_t Status = 0;
         pjsip_tx_data *pTransData = 0;
@@ -869,6 +882,7 @@ static int SipGetFreeCallId(void)
 }
 SIP_ERROR_CODE SipMakeNewCall(IN const int _nFromAccountId, IN const char *_pDestUri, IN const void *_pMedia, OUT int *_pCallId)
 {
+        register_thread();
         int nCallId;
         SipCall *pCall;
         pjsip_dialog *pDialog;
@@ -966,6 +980,8 @@ SIP_ERROR_CODE SipMakeNewCall(IN const int _nFromAccountId, IN const char *_pDes
 
 SIP_ERROR_CODE SipAnswerCall(IN const int _nCallId, IN const SipAnswerCode _StatusCode, IN const char *_pReason, IN const void *_pMedia)
 {
+        register_thread();
+
         /* Check that callId is valid */
         PJ_LOG(4, (THIS_FILE, "callId = %d answer code = %d, reason = %s \n", _nCallId, _StatusCode, _pReason));
         CHECK_RETURN(_nCallId >=0 || _nCallId < SipAppData.nMaxCall, SIP_INVALID_ARG);
@@ -1019,6 +1035,8 @@ SIP_ERROR_CODE SipAnswerCall(IN const int _nCallId, IN const SipAnswerCode _Stat
 }
 void SipHangUp(IN const int _nCallId)
 {
+        register_thread();
+
         pjsip_tx_data *pTxData;
         pj_status_t Status;
 
@@ -1036,6 +1054,7 @@ void SipHangUp(IN const int _nCallId)
 
 void SipHangUpAll()
 {
+        register_thread();
         int i;
         for (i = 0; i < SipAppData.nMaxCall; ++i) {
                 SipHangUp(SipAppData.Calls[i].nIndex);
@@ -1044,6 +1063,7 @@ void SipHangUpAll()
 
 void SipHangUpByAccountId(int _nAccountId)
 {
+        register_thread();
         int i;
         for (i = 0; i < SipAppData.nMaxCall; ++i) {
                 if (SipAppData.Calls[i].bValid == PJ_TRUE && SipAppData.Calls[i].nAccountId == _nAccountId)
@@ -1317,6 +1337,8 @@ static void onSipCallOnForked(pjsip_inv_session *pInviteSession, pjsip_event *pE
 
 int CreateTmpSDP(OUT void **_pSdp)
 {
+        register_thread();
+
         pj_pool_t *_pPool = SipAppData.pPool;
         pj_time_val TimeVal;
         pjmedia_sdp_session *pSdp;
@@ -1408,10 +1430,12 @@ int CreateTmpSDP(OUT void **_pSdp)
 
 void SipSetLogLevel(IN const int _nLevel)
 {
+        register_thread();
         pj_log_set_level(_nLevel);
 }
 void PrintSdp(IN const void *_pSdp)
 {
+        register_thread();
         if (_pSdp){
                 char buf[500];
                 const pjmedia_sdp_session *pRemoteSdp = (pjmedia_sdp_session *)_pSdp;
