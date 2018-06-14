@@ -1,0 +1,4 @@
+### check max_account setting.
+1. set max_account = 3
+2. add 3 account
+3. add 4th account failed with SIP_TOO_MANY_ACCOUNT

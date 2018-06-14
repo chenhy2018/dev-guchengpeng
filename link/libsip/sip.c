@@ -156,7 +156,7 @@ static pjsip_module SipLogger =
 };
 
 static void register_thread() {
-        pj_thread_desc threaddesc;
+        static pj_thread_desc threaddesc;
         pj_thread_t *thread = 0;
         if( !pj_thread_is_registered())
                 pj_thread_register(NULL, threaddesc, &thread);
