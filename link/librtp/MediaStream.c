@@ -240,6 +240,16 @@ pj_status_t h264_unpacketize(IN OUT MediaPacketier *_pKtz,
         pj_status_t status = PJ_SUCCESS;
         H264Packetizer *pPktz = (H264Packetizer *)_pKtz;
 
+        unsigned nUnpackLen = 0;
+        if (_pPayload == NULL) {
+                 status = pjmedia_h264_unpacketize(pPktz->pH264Packetizer, NULL, 0,
+                                                  pPktz->pUnpackBuf, pPktz->nUnpackBufCap, &nUnpackLen);
+                if (nUnpackLen > 0) {
+                        MY_PJ_LOG(3, "NULL:%d", nUnpackLen);
+                }
+                return status;
+        }
+
         int nType = _pPayload[0] & 0x1F;
         if (nType != 28 && pPktz->nUnpackBufLen != 0) {
                 *_pBitstreamPos = pPktz->nUnpackBufLen;
@@ -247,6 +257,7 @@ pj_status_t h264_unpacketize(IN OUT MediaPacketier *_pKtz,
                 pPktz->nUnpackBufLen = 0;
                 pPktz->bFuAStartbit = PJ_FALSE;
                 *_pTryAgain = PJ_TRUE;
+                MY_PJ_LOG(3, "rtp packet lost\n");
                 return status;
         }
         *_pTryAgain = PJ_FALSE;
@@ -265,7 +276,7 @@ pj_status_t h264_unpacketize(IN OUT MediaPacketier *_pKtz,
                 pPktz->nUnpackBufCap *= 2;
         }
 
-        unsigned nUnpackLen = pPktz->nUnpackBufLen;
+        nUnpackLen = pPktz->nUnpackBufLen;
         status = pjmedia_h264_unpacketize(pPktz->pH264Packetizer, _pPayload, _nPlyloadLen,
                                           pPktz->pUnpackBuf, pPktz->nUnpackBufCap, &nUnpackLen);
         pPktz->nUnpackBufLen = nUnpackLen;
@@ -398,42 +409,11 @@ pj_status_t createJitterBuffer(IN MediaStreamTrack *_pMediaTrack, IN pj_pool_fac
 
         pj_status_t status;
 
-        char typeName[6] = {0};
-        sprintf(typeName, "jb%d", _pMediaTrack->mediaConfig.configs[nIdx].codecType);
-        pj_str_t name = {typeName, strlen(typeName)};
-        switch (_pMediaTrack->mediaConfig.configs[nIdx].codecType) {
-                case MEDIA_FORMAT_PCMU:
-                case MEDIA_FORMAT_PCMA:
-                case MEDIA_FORMAT_G729:
-                        status = pjmedia_jbuf_create (pPool, &name, nPerFrameMaxSize, 20, 60, &_pMediaTrack->jbuf.pJbuf);
-                        break;
-                case MEDIA_FORMAT_H264:
-                case MEDIA_FORMAT_H265:
-                        status = pjmedia_jbuf_create (pPool, &name, nPerFrameMaxSize, 40, 60, &_pMediaTrack->jbuf.pJbuf);
-                        break;
-        }
+        status = JitterBufferInit(&_pMediaTrack->jbuf,  50, 20, pPool, nPerFrameMaxSize);
         if (status != PJ_SUCCESS) {
                 pj_pool_release(pPool);
                 return status;
         }
 
-        status = pjmedia_jbuf_reset(_pMediaTrack->jbuf.pJbuf);
-        if (status != PJ_SUCCESS) {
-                pj_pool_release(pPool);
-                pjmedia_jbuf_destroy(_pMediaTrack->jbuf.pJbuf);
-                _pMediaTrack->jbuf.pJbuf = NULL;
-                return status;
-        }
-
-        status = pjmedia_jbuf_set_adaptive(_pMediaTrack->jbuf.pJbuf, 20, 25, 40);
-        if (status != PJ_SUCCESS) {
-                pj_pool_release(pPool);
-                pjmedia_jbuf_destroy(_pMediaTrack->jbuf.pJbuf);
-                _pMediaTrack->jbuf.pJbuf = NULL;
-                return status;
-        }
-
-        _pMediaTrack->jbuf.pJbufPool = pPool;
-        _pMediaTrack->jbuf.nLastRecvRtpSeq = -1;
         return PJ_SUCCESS;
 }

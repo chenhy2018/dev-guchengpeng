@@ -30,27 +30,51 @@ TODO 已解决
 6. 发送数据的接受到数据和rtcp的回调函数, 已完成
     pcmu能正常接收数据了
 
-TODO 未解决
-7. 发送h264的时候rtp marker字段设置，packetizer并不会设置这个字段 
+7. 发送h264的时候rtp marker字段设置，packetizer并不会设置这个字段 :已解决
      ffmpeg推流，wireshark抓包分析，发现marker位不能单独判断帧的起始， 并且奇怪的时候stap有时候设置marker有时候不设置
 	 如果是stap-a类型，就是完整的一帧， 如果是fu-a类型，就要结合fu header和marker位来判断了
-     所以在发送的时候也这样设置
+     所以在发送的时候也这样设置.
+     最后方法是没有使用marker bit，通过fu-a类型判断的
+
 8. 接收数据的回调函数分别处理音频和视频
      1) 音视频分别处理
      2) 根据samplerate或者clockrate还原时间戳
      目前pcmu传输和接收没有问题, 时间戳未还原
-     初步的想法， 维护一个 解包的结构，包含时间戳等信息
-  h264_packetizer是可以同时pack和unpack的，但是h264来看，packetizer不会维护完整一帧的数据
+  h264_packetizer是可以同时pack和unpack的，但是h264来看，packetizer不会维护完整一帧的数据, 封装了下packitizer，来维护h264的数据
 
 9. rtp丢包了怎么办。可能是通过rtp的序列号来判断是否丢包
-   pjmedia h264 packetizer接口说明，貌似丢包了以null去调用，会更新内部状态， 每丢一个包调用一次吗？
+   pjmedia h264 packetizer接口说明，貌似丢包了以null去调用，会更新内部状态， 每丢一个包调用一次吗？,目前做法，丢包会null调用一次
+   自己写了jitterbuffer. pjsip的pjmedia_jbuf，测试了下，无论adpative参数怎么调整，push的比第一个frame seq大的frame都会被discard，所以没有
+
+10. rtp 序列号restart
+	接收使用int32_t类型序列号, 使用了一个非常简单的办法
+	if (_nFrameSeq < _pJbuf->nMaxBufferCount+1 && _pJbuf->nLastRecvRtpSeq > 65000) {
+                _nFrameSeq += 65536;
+        }
+	上一次的nLastRecvRtpSeq大于65000了，然后又出现了现在的_nFrameSeq小于nMaxBufferCount+1，则认为出现了翻转，
+	现在的nFrameSeq则加上65536
+
+	pop时候发现nLastRecvRtpSeq 变小了，重新排序一下队列？
+        heap_rebuild 条件，如果65535这个包丢了怎么办？ 大于65535的序列号都&0x0000FFFF，这样就可以第一个翻转的包就能探测到
+TODO 未解决
+	如果之前判定为丢弃的包又接收到了，怎么判断?
+ else if (_pJbuf->nLastRecvRtpSeq != 0 &&
+                   (_nFrameSeq < _pJbuf->nLastRecvRtpSeq || (_nFrameSeq - _pJbuf->nLastRecvRtpSeq) > 65000)) {
+                *_pDiscarded = 1;
+                return;
+        }
 
 
-10. 音频的rtp marker位是否需要设置?
 11.  时间戳维护, rtp时间戳溢出问题？
+	uint32_t类型的时间错，在90000hz时钟频率情况下，大概13h15m就会溢出
+
+
+
+12. 音频的rtp marker位是否需要设置?
 
 
 
 已明确，待选择做法:
 1. 回调函数，目前是sleep等待超时ice的状态. 对于用户没有回调，即同步的. 确定是否这样做？
 2. StartNegotiation移动到checkAndNeg最后面去，即offer和answer都获取到就自动协商了. 可能最后做，这样做了不好通过文件sdp手动测试了
+
