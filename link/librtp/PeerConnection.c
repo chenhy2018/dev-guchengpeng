@@ -189,14 +189,20 @@ static int peerConnectInitIceConfig(IN OUT PeerConnection * _pPeerConnectoin)
                 }
                 
                 
-                if (pUserIceConfig->nMaxHosts > 0 || pUserIceConfig->stunHost[0] != '\0') {
+                if (pUserIceConfig->nForceStun || pUserIceConfig->stunHost[0] != '\0') {
                         pIceCfg->stun_tp_cnt = 1;
                         pj_ice_strans_stun_cfg_default(&pIceCfg->stun_tp[0]);
                         
                         pIceCfg->stun_tp[0].max_host_cands = pUserIceConfig->nMaxHosts;
+                        char *pServer = NULL;
                         if (pUserIceConfig->stunHost[0] != '\0') {
+                                pServer = pUserIceConfig->stunHost;
+                        } else if (pUserIceConfig->turnHost[0] != '\0') {
+                                pServer = pUserIceConfig->turnHost;
+                        }
+                        if (pServer != NULL) {
                                 pj_uint16_t nPort;
-                                pIceCfg->stun_tp[0].server = parseIpAndPort(pUserIceConfig->stunHost, &nPort);
+                                pIceCfg->stun_tp[0].server = parseIpAndPort(pServer, &nPort);
                                 pIceCfg->stun_tp[0].port = nPort;
                         }
                         if (pUserIceConfig->nKeepAlive > 0) {
@@ -396,7 +402,7 @@ void InitIceConfig(IN OUT IceConfig *_pIceConfig)
         pj_bzero(_pIceConfig, sizeof(IceConfig));
         
         _pIceConfig->nComponents = 2;
-        _pIceConfig->nMaxHosts = 0;
+        _pIceConfig->nMaxHosts = 5;
         _pIceConfig->bRegular = 1;
         _pIceConfig->nKeepAlive = 300;
 }

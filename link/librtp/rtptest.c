@@ -872,6 +872,7 @@ int main(int argc, char **argv)
         }
         
         InitIceConfig(&app.userConfig);
+        app.userConfig.nForceStun = 1;
         strcpy(app.userConfig.turnHost, "123.59.204.198");
         strcpy(app.userConfig.turnUsername, "root");
         strcpy(app.userConfig.turnPassword, "root");

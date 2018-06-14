@@ -87,6 +87,7 @@ typedef struct _IceConfig
         char         turnUsername[MAX_TURN_USR_SIZE];
         char         turnPassword[MAX_TURN_PWD_SIZE];
         
+        int          nForceStun;
         UserCallback userCallback;
         void *       pCbUserData;
         
