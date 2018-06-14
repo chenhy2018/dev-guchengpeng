@@ -1,4 +1,4 @@
-// Last Update:2018-06-13 16:50:38
+// Last Update:2018-06-14 09:49:05
 /**
  * @file call_test.c
  * @brief 
@@ -34,8 +34,20 @@ void *CalleeThread( void *arg );
 MakeCallTestCase gMakeCallTestCases[] =
 {
     {
-        { "valid_account1", CALL_STATUS_ESTABLISHED },
+        { "valid account1", CALL_STATUS_ESTABLISHED },
         { "1015", "123.59.204.198", 1, 10, 1 }
+    },
+    {
+        { "valid account2", CALL_STATUS_ESTABLISHED },
+        { "1002", "123.59.204.198", 1, 10, 1 }
+    },
+    {
+        { "invalid account1", CALL_STATUS_TIMEOUT },
+        { "0000", "123.59.204.198", 1, 10, 1 }
+    },
+    {
+        { "invalid sip server", CALL_STATUS_TIMEOUT },
+        { "0000", "123.59.204.198", 1, 10, 1 }
     },
 };
 
@@ -46,7 +58,7 @@ TestSuit gMakeCallTestSuit =
     MakeCallTestSuitInit,
     MakeCallTestSuitGetTestCase,
     (void*)&gMakeCallTestCases,
-    1,
+    0,
     MakeCallEventLoopThread
 };
 
@@ -206,7 +218,7 @@ int MakeCallTestSuitInit( TestSuit *this, TestSuitManager *_pManager )
         return -1;
     }
 
-    pthread_create( &tid,  NULL, CalleeThread, (void *)this );
+    /*pthread_create( &tid,  NULL, CalleeThread, (void *)this );*/
 
     return 0;
 }

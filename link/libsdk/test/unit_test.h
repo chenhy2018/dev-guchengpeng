@@ -1,4 +1,4 @@
-// Last Update:2018-06-13 16:33:22
+// Last Update:2018-06-14 14:51:15
 /**
  * @file unit_test.h
  * @brief 
@@ -40,15 +40,16 @@
 #define ARRSZ(arr) (sizeof(arr)/sizeof(arr[0]))
 #define TEST_CASE_RESULT_MAX 512
 
+typedef struct _TestSuit TestSuit;
 typedef void *(*ThreadFn)(void *);
 typedef struct {
     char *caseName;
     int expact;
     ThreadFn threadEntry;
+    int (*TestCaseCb)( TestSuit *this );
     pthread_t tid;
 } TestCase;
 
-typedef struct _TestSuit TestSuit;
 typedef struct _TestSuitManager TestSuitManager; 
 struct _TestSuit {
     char *suitName;

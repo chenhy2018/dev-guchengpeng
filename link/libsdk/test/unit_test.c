@@ -1,4 +1,4 @@
-// Last Update:2018-06-12 12:27:05
+// Last Update:2018-06-14 14:48:41
 /**
  * @file unit_test.c
  * @brief 
@@ -54,19 +54,27 @@ int RunAllTestSuits()
         if ( pTestSuit->OnInit ) {
             pTestSuit->OnInit( pTestSuit, pTestSuitManager );
         }
-        if ( pTestSuit->TestCaseCb ) {
+        
+        if ( pTestSuit->GetTestCase ) {
             for ( j=0; j<pTestSuit->total; j++ ) {
                 pCaseResult = &pSuitResult->results[j];
                 pTestSuit->index = j;
-                res = pTestSuit->TestCaseCb( pTestSuit );
-                if ( pTestSuit->GetTestCase ) {
-                    pTestSuit->GetTestCase( pTestSuit, &pTestCase );
-                    LOG("----- test case [ %s ] result ( %s ) \n", pTestCase->caseName, 
-                        res == TEST_PASS ? "pass" : "fail" );
-                    pCaseResult->pTestCaseName = pTestCase->caseName;
-                    pCaseResult->res = res;
-                    pSuitResult->num++;
+                pTestSuit->GetTestCase( pTestSuit, &pTestCase );
+                if ( !pTestCase ) {
+                    UT_ERROR("GetTestCase error\n");
+                    return -1;
                 }
+
+                if ( pTestSuit->TestCaseCb ) {
+                    res = pTestSuit->TestCaseCb( pTestSuit );
+                } else {
+                    res = pTestCase->TestCaseCb( pTestSuit );
+                }
+                LOG("----- test case [ %s ] result ( %s ) \n", pTestCase->caseName, 
+                    res == TEST_PASS ? "pass" : "fail" );
+                pCaseResult->pTestCaseName = pTestCase->caseName;
+                pCaseResult->res = res;
+                pSuitResult->num++;
                 pTestSuitManager->CancelThread( pTestSuit );
             }
         }
@@ -88,7 +96,7 @@ int TestSuitManagerInit()
     pTestSuitManager->startThread = startThread;
     pTestSuitManager->CancelThread = CancelThread;
     pTestSuitManager->Report = ResultReport;
-	pthread_mutex_init( &pTestSuitManager->eventManager.mutex, NULL );
+    pthread_mutex_init( &pTestSuitManager->eventManager.mutex, NULL );
 
 
     return 0;

@@ -1,4 +1,4 @@
-// Last Update:2018-06-12 19:05:18
+// Last Update:2018-06-13 16:35:05
 /**
  * @file register_test.c
  * @brief 
@@ -63,7 +63,7 @@ TestSuit gRegisterTestSuit =
     RegisterTestSuitInit,
     RegisterTestSuitGetTestCase,
     (void*)&gRegisterTestCases,
-    0,
+    1,
     RegisterEventLoopThread
 };
 

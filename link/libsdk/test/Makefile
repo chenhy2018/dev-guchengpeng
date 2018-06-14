@@ -3,7 +3,8 @@
 LIBUA=../output/lib/x86/libua.a
 LDFLAGS=-L../output/lib/x86 -lua -lpthread -lm /usr/lib/x86_64-linux-gnu/libcrypto.so /usr/lib/x86_64-linux-gnu/libssl.so
 CFLAGS=-g
-TARGET_OBJS=test.o unit_test.o call_test.o register_test.o
+TARGET_OBJS=test.o unit_test.o call_test.o register_test.o send_pkt_test.o hangup_call_test.o answercall_test.o \
+			rejectcall_test.o
 TESTCASE_OBJS_DIR=./objs
 INCLUDE_PATH=-I../
 TARGET=test
