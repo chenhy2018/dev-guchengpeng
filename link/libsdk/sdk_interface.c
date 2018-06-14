@@ -539,22 +539,22 @@ SipAnswerCode cbOnIncomingCall(const const int _nAccountId, const int _nCallId,
 
 void cbOnRegStatusChange(const int _nAccountId, const SipAnswerCode _regStatusCode, const void *_pUser )
 {
+    DBG_LOG("pUA address is, _regStatusCode = %d\n", _regStatusCode );
     Message *pMessage = (Message *) malloc( sizeof(Message) );
     Event *pEvent = (Event *) malloc( sizeof(Event) );
     CallEvent *pCallEvent = NULL;
     UA *_pUA = ( UA *)_pUser;
     struct list_head *pos;
-    pthread_mutex_lock(&pUAManager->mutex);
+    //pthread_mutex_lock(&pUAManager->mutex);
     UA *pUA = FindUA(pUAManager, _nAccountId, &pos);
 
     if (pUA == NULL) {
             DBG_ERROR("pUser is NULL %p\n", _pUA);
-            pthread_mutex_unlock(&pUAManager->mutex);
+            //pthread_mutex_unlock(&pUAManager->mutex);
             return;
     }
     
     DBG_VAL(_nAccountId);
-    DBG_LOG("pUA address is %p, _regStatusCode = %d\n", pUA, _regStatusCode );
     memset( pMessage, 0, sizeof(Message) );
     memset( pEvent, 0, sizeof(Event) );
     pMessage->nMessageID = EVENT_CALL;
@@ -572,7 +572,7 @@ void cbOnRegStatusChange(const int _nAccountId, const SipAnswerCode _regStatusCo
         SendMessage( pUA->pQueue, pMessage );
     } else {
         DBG_ERROR("pUA is NULL\n");
-        pthread_mutex_unlock(&pUAManager->mutex);
+        //pthread_mutex_unlock(&pUAManager->mutex);
         return;
     }
 
@@ -585,7 +585,7 @@ void cbOnRegStatusChange(const int _nAccountId, const SipAnswerCode _regStatusCo
             pUA->regStatus = _regStatusCode;
         }
     }
-    pthread_mutex_unlock(&pUAManager->mutex);
+    //pthread_mutex_unlock(&pUAManager->mutex);
 }
 
 //This function may call by sync. Disable lock firstly.

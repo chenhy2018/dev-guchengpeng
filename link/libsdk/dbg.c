@@ -148,7 +148,7 @@ void writeLog(int loglvl, const char* file, const char* function, const int line
         unsigned  long diff;
         gettimeofday(&end,NULL);
         diff = 1000000 * (end.tv_sec-start.tv_sec)+ end.tv_usec-start.tv_usec;
-        sprintf(output, "%s DIFF %ld %s %s [line +%d] %s %s", date, diff, file, function, line, debug, printf_buf);
+        sprintf(output, "%s DIFF %ld %s %s [line +%d] %s [pid %lld]  %s", date, diff, file, function, line, debug, pthread_self(), printf_buf);
         debugFunc(output);
         free(date);
         free(output);
