@@ -3,6 +3,16 @@
 
 enum { RTCP_INTERVAL = 5000, RTCP_RAND = 2000 };
 
+static pj_status_t librtp_register_thread()
+{
+        static pj_thread_desc desc;
+        if(!pj_thread_is_registered()){
+                pj_thread_t *pThread;
+                return pj_thread_register(NULL, desc, &pThread);
+        }
+        return PJ_SUCCESS;
+}
+
 static void print_sdp(pjmedia_sdp_session * _pSdp, const char * _pLogPrefix)
 {
         if (5 <= pj_log_get_level()) {
@@ -412,7 +422,9 @@ int InitPeerConnectoin(OUT PeerConnection ** _pPeerConnection, IN IceConfig *_pI
         if (_pPeerConnection == NULL) {
                 return PJ_EINVAL;
         }
-        pj_status_t status = IceConfigIsValid(_pIceConfig);
+        pj_status_t status = librtp_register_thread();
+        STATUS_CHECK(librtp_register_thread, status);
+        status = IceConfigIsValid(_pIceConfig);
         if (status != PJ_SUCCESS) {
                 MY_PJ_LOG(1, "invalid IceConfig");
                 return status;
@@ -438,9 +450,15 @@ int InitPeerConnectoin(OUT PeerConnection ** _pPeerConnection, IN IceConfig *_pI
         return 0;
 }
 
-void ReleasePeerConnectoin(IN OUT PeerConnection * _pPeerConnection)
+int ReleasePeerConnectoin(IN OUT PeerConnection * _pPeerConnection)
 {
-        pj_assert(_pPeerConnection != NULL);
+        if (_pPeerConnection == NULL)
+        {
+                return PJ_SUCCESS;
+        }
+        pj_status_t status = librtp_register_thread();
+        STATUS_CHECK(librtp_register_thread, status);
+
         _pPeerConnection->bQuit = 1;
         for ( int i = 0; i < sizeof(_pPeerConnection->nAvIndex) / sizeof(int); i++) {
                 if (_pPeerConnection->nAvIndex[i] != -1) {
@@ -484,6 +502,8 @@ void ReleasePeerConnectoin(IN OUT PeerConnection * _pPeerConnection)
         pj_caching_pool_destroy (&_pPeerConnection->cachingPool);
 
         free(_pPeerConnection);
+
+        return PJ_SUCCESS;
 }
 
 int AddAudioTrack(IN OUT PeerConnection * _pPeerConnection, IN MediaConfigSet * _pAudioConfig)
@@ -492,6 +512,8 @@ int AddAudioTrack(IN OUT PeerConnection * _pPeerConnection, IN MediaConfigSet * 
                 return PJ_EINVAL;
         }
         pj_status_t status;
+        status = librtp_register_thread();
+        STATUS_CHECK(librtp_register_thread, status);
         status = MediaConfigSetIsValid(_pAudioConfig);
         if (status != PJ_SUCCESS) {
                 MY_PJ_LOG(1, "invalid MediaConfigSet");
@@ -526,6 +548,8 @@ int AddVideoTrack(IN OUT PeerConnection * _pPeerConnection, IN MediaConfigSet * 
                 return PJ_EINVAL;
         }
         pj_status_t status;
+        status = librtp_register_thread();
+        STATUS_CHECK(librtp_register_thread, status);
         status = MediaConfigSetIsValid(_pVideoConfig);
         if (status != PJ_SUCCESS) {
                 MY_PJ_LOG(1, "invalid MediaConfigSet");
@@ -635,6 +659,8 @@ int createOffer(IN OUT PeerConnection * _pPeerConnection, OUT void **_pOffer)
         if (_pPeerConnection == NULL || _pOffer == NULL) {
                 return PJ_EINVAL;
         }
+        status = librtp_register_thread();
+        STATUS_CHECK(librtp_register_thread, status);
 
         pj_pool_t *pPool = _pPeerConnection->pSdpPool;
         if(pPool == NULL) {
@@ -674,6 +700,8 @@ int createAnswer(IN OUT PeerConnection * _pPeerConnection, IN void *_pOffer, OUT
         if (_pPeerConnection == NULL || _pAnswer == NULL) {
                 return PJ_EINVAL;
         }
+        status = librtp_register_thread();
+        STATUS_CHECK(librtp_register_thread, status);
 
         pj_pool_t *pPool = _pPeerConnection->pSdpPool;
         if(pPool == NULL) {
@@ -846,8 +874,9 @@ int StartNegotiation(IN PeerConnection * _pPeerConnection)
         if (_pPeerConnection == NULL) {
                 return PJ_EINVAL;
         }
+        pj_status_t status = librtp_register_thread();
+        STATUS_CHECK(librtp_register_thread, status);
 
-        pj_status_t status;
         int nMaxTracks = sizeof(_pPeerConnection->nAvIndex) / sizeof(int);
         for ( int i = 0; i < nMaxTracks; i++) {
                 if (_pPeerConnection->nAvIndex[i] != -1) {
@@ -980,6 +1009,8 @@ int setLocalDescription(IN OUT PeerConnection * _pPeerConnection, IN void * _pSd
         if (_pPeerConnection == NULL || _pSdp == NULL) {
                 return PJ_EINVAL;
         }
+        pj_status_t status = librtp_register_thread();
+        STATUS_CHECK(librtp_register_thread, status);
 
         createSdpPool(_pPeerConnection);
         pjmedia_sdp_session *  pSdp = (pjmedia_sdp_session *) _pSdp;
@@ -1004,6 +1035,8 @@ int setRemoteDescription(IN OUT PeerConnection * _pPeerConnection, IN void * _pS
         if (_pPeerConnection == NULL || _pSdp == NULL) {
                 return PJ_EINVAL;
         }
+        pj_status_t status = librtp_register_thread();
+        STATUS_CHECK(librtp_register_thread, status);
 
         createSdpPool(_pPeerConnection);
         pjmedia_sdp_session *  pSdp = (pjmedia_sdp_session *) _pSdp;
@@ -1266,6 +1299,8 @@ int SendRtpPacket(IN PeerConnection *_pPeerConnection, IN OUT RtpPacket * _pPack
         if (_pPeerConnection == NULL || _pPacket == NULL) {
                 return PJ_EINVAL;
         }
+        pj_status_t status = librtp_register_thread();
+        STATUS_CHECK(librtp_register_thread, status);
 
         if (_pPacket->type == RTP_STREAM_AUDIO) {
                 return SendAudioPacket(_pPeerConnection, _pPacket);
