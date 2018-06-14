@@ -5,13 +5,4 @@ SET(CMAKE_C_FLAGS "${GCC_INCLUDE_PATH} ${GCC_COVERAGE_COMPILE_FLAGS}")
 aux_source_directory(. LIB_SIP_SRC)
 
 add_library (sip ${LIB_SIP_SRC})
-
-add_subdirectory(test/uac_hangup_call/uas/)
-add_subdirectory(test/uac_hangup_call/uac/)
-
-add_subdirectory(test/uas_hangup_call/uas/)
-add_subdirectory(test/uas_hangup_call/uac/)
-
-
-add_subdirectory(test/max_account/)
-add_subdirectory(test/thread_test/)
+add_subdirectory(test/)
