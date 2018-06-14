@@ -90,7 +90,6 @@ static char* getDateString() {
 
     // Format the time correctly
     strftime(date, 100, "[%F %T]", localtime(&t));
-
     return date;
 }
 
@@ -103,6 +102,8 @@ void printData(const char* data)
 }
 
 static LogFunc* debugFunc = printData;
+struct  timeval start;
+struct  timeval end;
 
 void writeLog(int loglvl, const char* file, const char* function, const int line, const char* format, ... )
 {
@@ -144,10 +145,14 @@ void writeLog(int loglvl, const char* file, const char* function, const int line
         vsprintf(printf_buf, format, arg);
         va_end(arg);
         char *output = (char*)malloc(1024);
-        sprintf(output, "%s %s %s [line +%d] %s %s", date, file, function, line, debug, printf_buf);
+        unsigned  long diff;
+        gettimeofday(&end,NULL);
+        diff = 1000000 * (end.tv_sec-start.tv_sec)+ end.tv_usec-start.tv_usec;
+        sprintf(output, "%s DIFF %ld %s %s [line +%d] %s %s", date, diff, file, function, line, debug, printf_buf);
         debugFunc(output);
         free(date);
         free(output);
+        gettimeofday(&start,NULL);
 }
 
 void SetLogFunc(LogFunc *func)
