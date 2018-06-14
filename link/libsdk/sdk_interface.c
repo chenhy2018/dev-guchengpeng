@@ -626,6 +626,7 @@ void cbOnCallStateChange(const int _nCallId, const int _nAccountId, const SipInv
     } else {
             pCallEvent->status = CALL_STATUS_REGISTERED;
     }
+    pCallEvent->pFromAccount = NULL;
     pMessage->pMessage  = (void *)pEvent;
     SendMessage(pUA->pQueue, pMessage);
     UAOnCallStateChange(pUA, _nCallId, _State, _StatusCode, pMedia);
