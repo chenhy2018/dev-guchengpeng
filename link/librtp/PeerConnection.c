@@ -428,6 +428,7 @@ int InitPeerConnectoin(OUT PeerConnection ** _pPeerConnection, IN IceConfig *_pI
                 pPeerConnection->nAvIndex[i] = -1;
         }
         *_pPeerConnection = pPeerConnection;
+        InitMediaStream(&pPeerConnection->mediaStream);
         return 0;
 }
 
@@ -1054,9 +1055,11 @@ static pj_status_t checkAndSendRtcp(MediaStreamTrack *_pMediaTrack, TransportIce
 
 static inline uint64_t getTimestampGapFromLastPacket(IN MediaStreamTrack *_pMediaTrack, uint64_t _timestamp)
 {
-        if (_pMediaTrack->nLastSendPktTimestamp == 0) {
+        MY_PJ_LOG(5, "nLastSendPktTimestamp1:%lld, %d", _pMediaTrack->nLastSendPktTimestamp,_pMediaTrack->nLastSendPktTimestamp == ULLONG_MAX);
+        if (_pMediaTrack->nLastSendPktTimestamp == ULLONG_MAX) {
+                MY_PJ_LOG(5, "nLastSendPktTimestamp:%lld", _pMediaTrack->nLastSendPktTimestamp);
                 _pMediaTrack->nLastSendPktTimestamp = _timestamp;
-                return 0;
+                return TS_BASE_VALUE;
         }
         uint64_t diff = _timestamp - _pMediaTrack->nLastSendPktTimestamp;
         _pMediaTrack->nLastSendPktTimestamp = _timestamp;
@@ -1081,22 +1084,22 @@ static void dealWithTimestamp(IN OUT MediaStreamTrack *_pMediaTrack, IN pj_times
         uint64_t nPktTimestampGap = getTimestampGapFromLastPacket(_pMediaTrack, _pPacket->nTimestamp);
         
         *pRtpTsLen = calcRtpTimestampLen(nPktTimestampGap, _nRate);
+        //MY_PJ_LOG(5, "tslen:%d pkt:%lld gap:%lld now:%lld", *pRtpTsLen, _pPacket->nTimestamp, nPktTimestampGap, _now.u64);
         
         uint32_t nElapse = getMediaTrackElapseTime(_pMediaTrack, _pPacket->nTimestamp);
         pj_timestamp exptectNow;
-        _now.u64 = _now.u64 + nElapse * _pMediaTrack->hzPerSecond.u64 / 1000;
-        exptectNow = _now;
+        exptectNow.u64 = _pMediaTrack->nSysTimeBase.u64 + nElapse * _pMediaTrack->hzPerSecond.u64 / 1000;
         
         pj_uint64_t nLate = 0;
         if (exptectNow.u64 > _now.u64) {
                 nLate = ((exptectNow.u64 - _now.u64) * 1000) / _pMediaTrack->hzPerSecond.u64;
                 if ( nLate > 1) {
-                        MY_PJ_LOG(4, "audio data late:%lld-%lld=%lld",exptectNow.u64, _now.u64, nLate);
+                        MY_PJ_LOG(5, "audio data late:%lld-%lld=%lld",exptectNow.u64, _now.u64, nLate);
                 }
         } else {
                 nLate = ((_now.u64 - exptectNow.u64) * 1000) / _pMediaTrack->hzPerSecond.u64;
                 if ( nLate > 1) {
-                        MY_PJ_LOG(4, "audio data early:%lld-%lld=%lld",_now.u64, exptectNow.u64, nLate);
+                        MY_PJ_LOG(5, "audio data early:%lld-%lld=%lld",_now.u64, exptectNow.u64, nLate);
                 }
         }
 }
@@ -1120,8 +1123,8 @@ static pj_status_t sendPacket(IN OUT MediaStreamTrack *_pMediaTrack, IN Transpor
         STATUS_CHECK(pjmedia_rtp_encode_rtp, status);
         
         pRtpHeader = (const pjmedia_rtp_hdr*) pVoidHeader;
-        MY_PJ_LOG(5, "send data(%d) len:%d with seq=%d ts=%d", _nRtpType, _nDataLen,
-                  pj_ntohs(pRtpHeader->seq), pj_ntohl(pRtpHeader->ts));
+        MY_PJ_LOG(5, "send data(%d) len:%d with seq=%d ts=%d tsLen=%d", _nRtpType, _nDataLen,
+                  pj_ntohs(pRtpHeader->seq), pj_ntohl(pRtpHeader->ts), _nRtpTsLen);
         
         char packet[1500];
         /* Copy RTP header to packet */

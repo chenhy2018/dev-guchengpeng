@@ -11,6 +11,10 @@ void InitMediaStream(IN MediaStream *_pMediaStraem)
 {
         pj_assert(_pMediaStraem != NULL);
         pj_bzero(_pMediaStraem, sizeof(MediaStream));
+        int nCountTrack = sizeof(_pMediaStraem->streamTracks) / sizeof(MediaStreamTrack);
+        for (int i = 0; i < nCountTrack; i++) {
+                _pMediaStraem->streamTracks[i].nLastSendPktTimestamp = ULLONG_MAX;
+        }
 }
 
 pj_status_t MediaConfigSetIsValid(MediaConfigSet *_pConfigSet)

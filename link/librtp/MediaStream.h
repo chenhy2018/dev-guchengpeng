@@ -9,6 +9,8 @@
 #include <pjmedia-codec/h264_packetizer.h>
 #include "JitterBuffer.h"
 
+#define ULLONG_MAX 18446744073709551615ul
+#define TS_BASE_VALUE 40
 
 typedef struct _MediaPacketier MediaPacketier;
 typedef struct _PacketierOperation {
