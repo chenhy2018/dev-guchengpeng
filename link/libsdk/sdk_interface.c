@@ -32,7 +32,6 @@ static UA* FindUA(UAManager* _pUAManager, AccountID _nAccountId, struct list_hea
                 DBG_LOG("FindUA pos %p id %d\n", pos, pUA->id);
                 if (pUA->id == _nAccountId) {
                         *po = pos;
-                        pthread_mutex_unlock(&pUAManager->mutex);
                         return pUA;
                 }
         }
