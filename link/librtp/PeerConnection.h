@@ -49,8 +49,9 @@ typedef struct _PeerConnection
         pj_pool_t *pNegPool;
         IceNegInfo iceNegInfo;
         pj_pool_t *pSdpPool;
-        int nNegFail;
         int nNegSuccess;
+        int nGatherCandidateSuccessCount;
+        int nIsFailCallbackDone;
         pj_mutex_t *pMutex;
         pj_pool_t *pMutexPool;
         int bQuit;

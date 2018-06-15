@@ -95,9 +95,11 @@ typedef struct _IceConfig
 
 typedef enum _IceState{
         ICE_STATE_INIT,
+        ICE_STATE_FAIL,
+        ICE_STATE_GATHERING_FAIL,
+        ICE_STATE_NEGOTIATION_FAIL,
         ICE_STATE_GATHERING_OK,
         ICE_STATE_NEGOTIATION_OK,
-        ICE_STATE_FAIL,
 }IceState;
 
 typedef struct _RtpPacket{
@@ -112,6 +114,7 @@ typedef struct _IceNegInfo {
         IceState state;
         const MediaConfig* configs[2];
         int nCount;
+        void *pData;
 }IceNegInfo;
 
 
@@ -124,10 +127,8 @@ int InitPeerConnectoin(OUT PeerConnection ** pPeerConnectoin,
 
 int AddAudioTrack(IN OUT PeerConnection * pPeerConnection, IN MediaConfigSet *pAudioConfig);
 int AddVideoTrack(IN OUT PeerConnection * pPeerConnection, IN MediaConfigSet *pVideoConfig);
-int createOffer(IN OUT PeerConnection * pPeerConnection,  OUT void **pOffer);
-int createAnswer(IN OUT PeerConnection * pPeerConnection, IN void *pOffer,
-                 OUT void **pAnswer);
-int setLocalDescription(IN OUT PeerConnection * pPeerConnection, IN void * pSdp);
+int createOffer(IN OUT PeerConnection * pPeerConnection);
+int createAnswer(IN OUT PeerConnection * pPeerConnection, IN void *pOffer);
 int setRemoteDescription(IN OUT PeerConnection * pPeerConnection, IN void * pSdp);
 int StartNegotiation(IN PeerConnection * pPeerConnection);
 

@@ -16,6 +16,7 @@ typedef struct _App{
         IceConfig userConfig;
 }App;
 App app;
+pj_oshandle_t gLogFd;
 
 #define TESTCHECK(status, a) if(status != 0){\
 ReleasePeerConnectoin(a.pPeerConnection);\
@@ -258,21 +259,6 @@ static void input_confirm(char * pmt)
         }
 }
 
-static void write_sdp(pjmedia_sdp_session * pSdp, char * pFname)
-{
-        FILE * f = fopen(pFname, "wb");
-        assert(f != NULL);
-        
-        char sdpStr[2048];
-        memset(sdpStr, 0, 2048);
-        int nLen = pjmedia_sdp_print(pSdp, sdpStr, sizeof(sdpStr));
-        
-        int nWlen = fwrite(sdpStr, 1, nLen, f);
-        assert(nWlen == nLen);
-        
-        fclose(f);
-}
-
 static void print_sdp(const pjmedia_sdp_session *pSdp) {
         char sdptxt[2048] = { 0 };
         pjmedia_sdp_print(pSdp, sdptxt, sizeof(sdptxt) - 1);
@@ -285,6 +271,7 @@ static void sdp_from_file(pjmedia_sdp_session ** sdp, char * pFname, pj_pool_t *
 {
 #ifndef SDP_NEG_TESG
         input_confirm("input peer sdp file.(read from file)");
+        pj_file_flush(gLogFd);
 #endif
         
         //FILE * f = fopen("/Users/liuye/Documents/p2p/build/src/work/Debug/r.sdp", "rb");
@@ -548,17 +535,44 @@ void pjmedia_sdp_neg_test_as_answer(pj_pool_factory *_pFactory)
         pj_pool_release(pNegPool);
 }
 
+IceState gatherState = ICE_STATE_INIT;
+
+static int waitState(IN IceState currentState)
+{
+        int nCnt = 0;
+        do{
+                if (nCnt > 5) {
+                        return 1; //fail
+                }
+                nCnt++;
+                pj_thread_sleep(500);
+        }while(gatherState == currentState);
+        
+        return 0;
+}
 
 pj_oshandle_t gPcmuFd;
 pj_oshandle_t gH264Fd;
+
 static void onRxRtp(void *_pUserData, CallbackType _type, void *_pCbData)
 {
         switch (_type){
                 case CALLBACK_ICE:{
                         IceNegInfo *pInfo = (IceNegInfo *)_pCbData;
-                        MY_PJ_LOG(3, "==========>callback_ice: state:%d", pInfo->state);
-                        for ( int i = 0; i < pInfo->nCount; i++) {
-                                MY_PJ_LOG(3, "           codec type:%d", pInfo->configs[i]->codecType);
+                        if (pInfo->state == ICE_STATE_GATHERING_OK) {
+                                gatherState = ICE_STATE_GATHERING_OK;
+                                break;
+                        }
+                        if (pInfo->state == ICE_STATE_GATHERING_FAIL) {
+                                gatherState = ICE_STATE_GATHERING_FAIL;
+                                break;
+                        }
+                        if (pInfo->state == ICE_STATE_NEGOTIATION_OK) {
+                                MY_PJ_LOG(3, "==========>callback_ice: state:%d", pInfo->state);
+                                for ( int i = 0; i < pInfo->nCount; i++) {
+                                        MY_PJ_LOG(3, "           codec type:%d", pInfo->configs[i]->codecType);
+                                }
+                                break;
                         }
                 }
                         break;
@@ -596,7 +610,7 @@ static int receive_data_callback(void *pData, int nDataLen, int nFlag, int64_t t
 }
 
 char * pLogFileName = NULL;
-pj_oshandle_t gLogFd;
+
 void log_to_file(int _nLevel, const char *_pData, int _nLen)
 {
         pj_ssize_t nLen = _nLen;
@@ -927,11 +941,9 @@ int main(int argc, char **argv)
         
 
         if (role == OFFER) {
-                pjmedia_sdp_session *pOffer = NULL;
-                status = createOffer(app.pPeerConnection, (void **)&pOffer);
+                status = createOffer(app.pPeerConnection);
                 TESTCHECK(status, app);
-                setLocalDescription(app.pPeerConnection, pOffer);
-                write_sdp(pOffer, OFFERFILE);
+                waitState(ICE_STATE_INIT);
                 
                 pjmedia_sdp_session *pAnswer = NULL;
                 pRemoteSdpPool =pj_pool_create(&app.cachingPool.factory, "sdpremote", 2048, 1024, NULL);
@@ -944,12 +956,10 @@ int main(int argc, char **argv)
                 pRemoteSdpPool =pj_pool_create(&app.cachingPool.factory, "sdpremote", 2048, 1024, NULL);
                 sdp_from_file(&pOffer, OFFERFILE,  pRemoteSdpPool, textSdpBuf, sizeof(textSdpBuf));
                 setRemoteDescription(app.pPeerConnection, pOffer);
-                
-                pjmedia_sdp_session *pAnswer = NULL;
-                status = createAnswer(app.pPeerConnection, pOffer, (void **)&pAnswer);
+
+                status = createAnswer(app.pPeerConnection, pOffer);
                 TESTCHECK(status, app);
-                setLocalDescription(app.pPeerConnection, pAnswer);
-                write_sdp(pAnswer, ANSWERFILE);
+                waitState(ICE_STATE_INIT);
         }
         
         input_confirm("confirm to negotiation:");

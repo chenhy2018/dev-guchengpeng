@@ -76,5 +76,10 @@ TODO 未解决
 
 已明确，待选择做法:
 1. 回调函数，目前是sleep等待超时ice的状态. 对于用户没有回调，即同步的. 确定是否这样做？
+   做成异步
+	1. 在createoffer/answer的时候在initTransportIce， 而不是在addVideo/AudioTrack的时候
+        2. onIceComplete2 PJ_ICE_STRANS_OP_INIT根据次数(track数)来决定是否往sdp里面添加candidate
+        
+        
 2. StartNegotiation移动到checkAndNeg最后面去，即offer和answer都获取到就自动协商了. 可能最后做，这样做了不好通过文件sdp手动测试了
 
