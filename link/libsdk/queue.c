@@ -30,8 +30,9 @@ MessageQueue* CreateMessageQueue(size_t _nLength)
 	pMem->nSize = 0;
 	pMem->nNextIn = 0;
 	pMem->nNextOut = 0;
-
+        pMem->bIsValid = true;
 	pthread_mutex_init(&pMem->mutex, NULL);
+        pthread_mutex_init(&pMem->destroyMutex, NULL);
 	pthread_cond_init(&pMem->consumerCond, NULL);
 
 	return pMem;
@@ -45,14 +46,19 @@ void DestroyMessageQueue(MessageQueue** _pQueue)
 	if (_pQueue == NULL || *_pQueue == NULL) {
 		return;
 	}
-
+        pthread_mutex_lock(&(*_pQueue)->mutex);
 	MessageQueue* pQueue = *_pQueue;
-
+        pQueue->bIsValid = false;
+        pthread_cond_signal(&(*_pQueue)->consumerCond);
+        pthread_mutex_unlock(&(*_pQueue)->mutex);
+        
+        pthread_mutex_lock(&pQueue->destroyMutex);
 	if (pQueue->pAlloc != NULL) {
 		free(pQueue->pAlloc);
 	}
-
+        pthread_mutex_unlock(&pQueue->destroyMutex);
 	pthread_mutex_destroy(&pQueue->mutex);
+        pthread_mutex_destroy(&pQueue->destroyMutex);
 	pthread_cond_destroy(&pQueue->consumerCond);
 
 	free(*_pQueue);
@@ -95,11 +101,15 @@ Message* ReceiveMessage(MessageQueue* _pQueue)
 	}
 
 	Message* pMessage = NULL;
-
+        pthread_mutex_lock(&_pQueue->destroyMutex);
 	pthread_mutex_lock(&_pQueue->mutex);
-
 	// block here if the queue is empty, wait for event
 	while (_pQueue->nSize == 0) {
+                if (!_pQueue->bIsValid) {
+                        pthread_mutex_unlock(&_pQueue->mutex);
+                        pthread_mutex_unlock(&_pQueue->destroyMutex);
+                        return NULL;
+                }
 		pthread_cond_wait(&_pQueue->consumerCond, &_pQueue->mutex);
 	}
 
@@ -110,9 +120,8 @@ Message* ReceiveMessage(MessageQueue* _pQueue)
 	_pQueue->nNextOut++;
 	_pQueue->nNextOut = _pQueue->nNextOut % _pQueue->nCapacity;
 	_pQueue->nSize--;
-
 	pthread_mutex_unlock(&_pQueue->mutex);
-
+        pthread_mutex_unlock(&_pQueue->destroyMutex);
 	return pMessage;
 }
 

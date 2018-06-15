@@ -78,6 +78,7 @@ ErrorID UAUnRegister(UA* _pUa)
 {
         SipRegAccount(_pUa->id, 0);
         MqttDestroy(_pUa->pMqttInstance);
+        DestroyMessageQueue(&_pUa->pQueue);
         _pUa->pMqttInstance = NULL;
         free(_pUa);
 }
@@ -190,9 +191,9 @@ ErrorID UAPollEvent(UA* _pUa, EventType* _pType, Event* _pEvent, int _pTimeOut)
 }
 
 // mqtt report
-ErrorID UAReport(UA* _pUa, const char* topic, const char* message, int length)
+ErrorID UAReport(UA* _pUa,  const char* message, int length)
 {
-        return MqttPublish(_pUa->pMqttInstance, (char*)(topic), length, message);
+        return MqttPublish(_pUa->pMqttInstance, "/test/test", length, message);
 }
 
 SipAnswerCode UAOnIncomingCall(UA* _pUa, const int _nCallId, const char *pFrom, const void *pMedia)

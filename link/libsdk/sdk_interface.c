@@ -26,11 +26,11 @@ static UA* FindUA(UAManager* _pUAManager, AccountID _nAccountId, struct list_hea
 {
         UA* pUA;
         struct list_head *q, *pos;
-        DBG_LOG("FindUA in %p %p %p AccountID %d \n", &_pUAManager->UAList.list, pos, q, _nAccountId);
+        //DBG_LOG("FindUA in %p %p %p AccountID %d \n", &_pUAManager->UAList.list, pos, q, _nAccountId);
 
         list_for_each_safe(pos, q, &_pUAManager->UAList.list) {
                 pUA = list_entry(pos, UA, list);
-                DBG_LOG("FindUA pos %p id %d\n", pos, pUA->id);
+                //DBG_LOG("FindUA pos %p id %d\n", pos, pUA->id);
                 if (pUA->id == _nAccountId) {
                         *po = pos;
                         return pUA;
@@ -323,11 +323,12 @@ ErrorID UnRegister(AccountID _nAccountId)
 {
     struct list_head *pos;
     pthread_mutex_lock(&pUAManager->mutex);
+    DBG_LOG("UnRegister account id %d\n", _nAccountId);
     UA *pUA = FindUA(pUAManager, _nAccountId, &pos);
     if (pUA != NULL) {
             list_del(pos);
-            UAUnRegister(pUA);
             pthread_mutex_unlock(&pUAManager->mutex);
+            UAUnRegister(pUA);
             return RET_OK;
     }
     pthread_mutex_unlock(&pUAManager->mutex);
@@ -376,18 +377,24 @@ ErrorID PollEvent(AccountID _nAccountID, EventType* _pType, Event** _pEvent, int
     if ( pUA->pLastMessage ) {
         Event *pEvent = (Event *) pUA->pLastMessage->pMessage;
         if (pUA->pLastMessage->nMessageID == EVENT_DATA) {
-                DBG_ERROR("EVENT DATA \n");
+                DBG_LOG("EVENT DATA \n");
                 if (pEvent->body.dataEvent.data) {
                         free( pEvent->body.dataEvent.data );
                         pEvent->body.dataEvent.data = NULL;
                 }
         }
         if (pUA->pLastMessage->nMessageID == EVENT_MESSAGE) {
-                DBG_ERROR("EVENT MESSAGE %p %s\n", pEvent->body.messageEvent.message, pEvent->body.messageEvent.message);
+                DBG_LOG("EVENT MESSAGE %p %s\n", pEvent->body.messageEvent.message, pEvent->body.messageEvent.message);
                 if (pEvent->body.messageEvent.message) {
                         free(pEvent->body.messageEvent.message);
                         pEvent->body.messageEvent.message = NULL;
                 }
+        }
+        if (pUA->pLastMessage->nMessageID == EVENT_CALL) {
+               if (pEvent->body.callEvent.pFromAccount) {
+                      free(pEvent->body.callEvent.pFromAccount);
+                      pEvent->body.callEvent.pFromAccount = NULL;
+               }
         }
         free( pEvent );
         pEvent = NULL;
@@ -396,11 +403,13 @@ ErrorID PollEvent(AccountID _nAccountID, EventType* _pType, Event** _pEvent, int
 #endif
     pthread_mutex_unlock(&pUAManager->mutex);
     DBG_LOG("wait for event, pUA = %p\n", pUA );
+
     if (_nTimeOut) {
         pMessage = ReceiveMessageTimeout( pUA->pQueue, _nTimeOut );
     } else {
         pMessage = ReceiveMessage( pUA->pQueue );
     }
+
     pthread_mutex_lock(&pUAManager->mutex);
     pUA = FindUA(pUAManager, _nAccountID, &pos);
     if (pUA == NULL) {
@@ -484,12 +493,12 @@ ErrorID Report(AccountID id, const char* message, int length)
 {
     struct list_head *pos;
     ErrorID error = RET_ACCOUNT_NOT_EXIST;
-    pthread_mutex_lock(&pUAManager->mutex);
+    //pthread_mutex_lock(&pUAManager->mutex);
     UA *pUA = FindUA(pUAManager, id, &pos);
     if (pUA != NULL) {
             error = UAReport(pUA, message, length);
     }
-    pthread_mutex_unlock(&pUAManager->mutex);
+    //pthread_mutex_unlock(&pUAManager->mutex);
     return error;
 }
 
