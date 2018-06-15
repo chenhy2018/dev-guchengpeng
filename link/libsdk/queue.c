@@ -13,6 +13,7 @@
 #include <errno.h>
 #include <stdio.h>
 #include "queue.h"
+#include "dbg.h"
 
 MessageQueue* CreateMessageQueue(size_t _nLength)
 {
@@ -134,17 +135,27 @@ Message* ReceiveMessageTimeout(MessageQueue* _pQueue, int _nMilliSec)
 	Message* pMessage = NULL;
 	struct timeval now;
 	struct timespec after;
-
+        pthread_mutex_lock(&_pQueue->destroyMutex);
 	pthread_mutex_lock(&_pQueue->mutex);
 
 	// if queue is empty, wait for events until timeout
 	if (_pQueue->nSize == 0) {
 		gettimeofday(&now, NULL);
-		after.tv_sec = now.tv_sec;
-		after.tv_nsec = now.tv_usec * 1000 + _nMilliSec * 1000 * 1000;
+                int sec = (now.tv_usec + _nMilliSec * 1000) / 1000000 + now.tv_sec;
+                int nsec = ((now.tv_usec + _nMilliSec * 1000) % 1000000) * 1000;
+		after.tv_sec = sec;
+		after.tv_nsec = nsec;
+                DBG_LOG("ReceiveMessageTimeout %lld %d \n", after.tv_nsec, after.tv_sec);
 		int nReason = pthread_cond_timedwait(&_pQueue->consumerCond, &_pQueue->mutex, &after);
-		if (nReason == ETIMEDOUT) {
+                if (!_pQueue->bIsValid) {
                         pthread_mutex_unlock(&_pQueue->mutex);
+                        pthread_mutex_unlock(&_pQueue->destroyMutex);
+                        return NULL;
+                }
+		if (nReason == ETIMEDOUT) {
+                        DBG_LOG("ReceiveMessageTimeout %lld %d \n", nsec, sec);
+                        pthread_mutex_unlock(&_pQueue->mutex);
+                        pthread_mutex_unlock(&_pQueue->destroyMutex);
                         return NULL;
 		}
 	}
@@ -160,7 +171,7 @@ Message* ReceiveMessageTimeout(MessageQueue* _pQueue, int _nMilliSec)
 	}
 
 	pthread_mutex_unlock(&_pQueue->mutex);
-
+        pthread_mutex_unlock(&_pQueue->destroyMutex);
 	return pMessage;
 }
 

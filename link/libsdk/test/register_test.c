@@ -8,6 +8,7 @@
  */
 #include "sdk_interface.h"
 #include "unit_test.h"
+#include <unistd.h>
 
 #define HOST "123.59.204.198"
 #define INVALID_SERVER "192.168.1.239"
@@ -51,9 +52,139 @@ RegisterTestCase gRegisterTestCases[] =
         { "0000", "0000", HOST, HOST, HOST, 10, 0 }
     },
     {
+        { "valid account1", CALL_STATUS_REGISTERED },
+        { "1002", "1002", HOST, HOST, HOST, 10, 0 }
+    },
+    {
+        { "valid account2", CALL_STATUS_REGISTERED },
+        { "1003", "1003", HOST, HOST, HOST, 10, 0 }
+    },
+    {
+        { "invalid account1", CALL_STATUS_REGISTER_FAIL },
+        { "1003", "1004", HOST, HOST, HOST, 10, 0 }
+    },
+    {
+        { "invalid account2", CALL_STATUS_REGISTER_FAIL },
+        { "0000", "0000", HOST, HOST, HOST, 10, 0 }
+    },
+    {
+        { "valid account1", CALL_STATUS_REGISTERED },
+        { "1002", "1002", HOST, HOST, HOST, 10, 0 }
+    },
+    {
+        { "valid account2", CALL_STATUS_REGISTERED },
+        { "1003", "1003", HOST, HOST, HOST, 10, 0 }
+    },
+    {
+        { "invalid account1", CALL_STATUS_REGISTER_FAIL },
+        { "1003", "1004", HOST, HOST, HOST, 10, 0 }
+    },
+    {
+        { "invalid account2", CALL_STATUS_REGISTER_FAIL },
+        { "0000", "0000", HOST, HOST, HOST, 10, 0 }
+    },
+    {
+        { "valid account1", CALL_STATUS_REGISTERED },
+        { "1002", "1002", HOST, HOST, HOST, 10, 0 }
+    },
+    {
+        { "valid account2", CALL_STATUS_REGISTERED },
+        { "1003", "1003", HOST, HOST, HOST, 10, 0 }
+    },
+    {
+        { "invalid account1", CALL_STATUS_REGISTER_FAIL },
+        { "1003", "1004", HOST, HOST, HOST, 10, 0 }
+    },
+    {
+        { "invalid account2", CALL_STATUS_REGISTER_FAIL },
+        { "0000", "0000", HOST, HOST, HOST, 10, 0 }
+    },
+    {
+        { "valid account1", CALL_STATUS_REGISTERED },
+        { "1002", "1002", HOST, HOST, HOST, 10, 0 }
+    },
+    {
+        { "valid account2", CALL_STATUS_REGISTERED },
+        { "1003", "1003", HOST, HOST, HOST, 10, 0 }
+    },
+    {
+        { "invalid account1", CALL_STATUS_REGISTER_FAIL },
+        { "1003", "1004", HOST, HOST, HOST, 10, 0 }
+    },
+    {
+        { "invalid account2", CALL_STATUS_REGISTER_FAIL },
+        { "0000", "0000", HOST, HOST, HOST, 10, 0 }
+    },
+    {
+        { "valid account1", CALL_STATUS_REGISTERED },
+        { "1002", "1002", HOST, HOST, HOST, 10, 0 }
+    },
+    {
+        { "valid account2", CALL_STATUS_REGISTERED },
+        { "1003", "1003", HOST, HOST, HOST, 10, 0 }
+    },
+    {
+        { "invalid account1", CALL_STATUS_REGISTER_FAIL },
+        { "1003", "1004", HOST, HOST, HOST, 10, 0 }
+    },
+    {
+        { "invalid account2", CALL_STATUS_REGISTER_FAIL },
+        { "0000", "0000", HOST, HOST, HOST, 10, 0 }
+    },
+    {
+        { "valid account1", CALL_STATUS_REGISTERED },
+        { "1002", "1002", HOST, HOST, HOST, 10, 0 }
+    },
+    {
+        { "valid account2", CALL_STATUS_REGISTERED },
+        { "1003", "1003", HOST, HOST, HOST, 10, 0 }
+    },
+    {
+        { "invalid account1", CALL_STATUS_REGISTER_FAIL },
+        { "1003", "1004", HOST, HOST, HOST, 10, 0 }
+    },
+    {
+        { "invalid account2", CALL_STATUS_REGISTER_FAIL },
+        { "0000", "0000", HOST, HOST, HOST, 10, 0 }
+    },
+    {
+        { "valid account1", CALL_STATUS_REGISTERED },
+        { "1002", "1002", HOST, HOST, HOST, 10, 0 }
+    },
+    {
+        { "valid account2", CALL_STATUS_REGISTERED },
+        { "1003", "1003", HOST, HOST, HOST, 10, 0 }
+    },
+    {
+        { "invalid account1", CALL_STATUS_REGISTER_FAIL },
+        { "1003", "1004", HOST, HOST, HOST, 10, 0 }
+    },
+    {
+        { "invalid account2", CALL_STATUS_REGISTER_FAIL },
+        { "0000", "0000", HOST, HOST, HOST, 10, 0 }
+    },
+    {
+        { "valid account1", CALL_STATUS_REGISTERED },
+        { "1002", "1002", HOST, HOST, HOST, 10, 0 }
+    },
+    {
+        { "valid account2", CALL_STATUS_REGISTERED },
+        { "1003", "1003", HOST, HOST, HOST, 10, 0 }
+    },
+    {
+        { "invalid account1", CALL_STATUS_REGISTER_FAIL },
+        { "1003", "1004", HOST, HOST, HOST, 10, 0 }
+    },
+    {
+        { "invalid account2", CALL_STATUS_REGISTER_FAIL },
+        { "0000", "0000", HOST, HOST, HOST, 10, 0 }
+    }
+#if 0
+    {
         { "invalid sip register server", CALL_STATUS_REGISTER_FAIL },
         { "1003", "1003", INVALID_SERVER, INVALID_SERVER, INVALID_SERVER, 10, 0 }
     }
+#endif
 };
 
 TestSuit gRegisterTestSuit =
@@ -146,6 +277,7 @@ int RegisterTestSuitCallback( TestSuit *this )
             return TEST_FAIL;
         }
         UT_VAL( ret );
+        //UnRegister(sts);
         return TEST_PASS;
     }
 
@@ -182,7 +314,7 @@ void *RegisterEventLoopThread( void *arg )
 
     while ( pTestCase->father.running ) {
         UT_LOG("call PollEvent\n");
-        ret = PollEvent( id, &type, &pEvent, 10000 );
+        ret = PollEvent( id, &type, &pEvent, 0);
         UT_VAL( ret );
         if ( ret >= RET_MEM_ERROR ) {
             UT_ERROR("ret = %d\n", ret );

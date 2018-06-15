@@ -260,8 +260,8 @@ ErrorID InitSDK( Media* _pMediaConfigs, int _nSize)
         config.Cb.OnIncomingCall  = &cbOnIncomingCall;
         config.Cb.OnCallStateChange = &cbOnCallStateChange;
         config.Cb.OnRegStatusChange = &cbOnRegStatusChange;
-        config.nMaxCall = 10;
-        config.nMaxAccount = 10;
+        config.nMaxCall = 16;
+        config.nMaxAccount = 40;
         pUAManager->config.callback.OnRxRtp = &OnRxRtp;
         // debug code.
         SetLogLevel(6);
