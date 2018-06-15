@@ -23,11 +23,13 @@
 int InitAllTestSuit()
 {
     AddTestSuit( &gRegisterTestSuit );
+#if 0
     AddTestSuit( &gMakeCallTestSuit );
     AddTestSuit( &gSendPacketTestSuit );
     AddTestSuit( &gHangupCallTestSuit );
     AddTestSuit( &gAnswerCallTestSuit );
     AddTestSuit( &gRejectCallTestSuit );
+#endif
 
     return 0;
 }

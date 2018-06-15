@@ -1,4 +1,4 @@
-// Last Update:2018-06-14 14:48:41
+// Last Update:2018-06-15 16:18:26
 /**
  * @file unit_test.c
  * @brief 
@@ -225,6 +225,7 @@ int startThread( TestSuit *_pTestSuit, ThreadFn threadFn )
             UT_ERROR("create thread error, ret = %d\n", ret );
             return -1;
         }
+        pTestCase->running = 1;
 
         UT_VAL( ret );
     }
@@ -242,10 +243,11 @@ int CancelThread( TestSuit *_pTestSuit )
     int ret = 0;
     TestCase *pTestCase = NULL;
 
-    DBG_LOG("cancel thread %d\n", (int)_pTestSuit->tid );
     _pTestSuit->GetTestCase( _pTestSuit, &pTestCase );
-    if ( pTestCase )
-        ret = pthread_cancel( pTestCase->tid );
+    if ( pTestCase ) {
+        UT_NOTICE("cancel thread\n");
+        pTestCase->running = 0;
+    }
 
     return ret;
 }
