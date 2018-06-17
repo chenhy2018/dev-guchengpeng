@@ -857,7 +857,7 @@ static pj_bool_t SipUpdateContactIfNat(IN SipAccount *_pAccount, IN struct pjsip
         if (pj_strcmp(&_pAccount->ViaAddr.host, pViaAddr) == 0)
                 return PJ_FALSE;
 
-        pj_strdup(_pAccount->pPool, &_pAccount->ViaAddr.host, pViaAddr);
+        pj_strdup_with_null(_pAccount->pPool, &_pAccount->ViaAddr.host, pViaAddr);
         _pAccount->ViaAddr.port = nRport;
         /* Update Via */
         //pjsip_regc_set_via_sent_by(_pAccount->pRegc, &_pAccount->ViaAddr, _pCbData->rdata->tp_info.transport);

@@ -143,7 +143,6 @@ void OnMessage(IN const void* _pInstance, IN int _nAccountId, IN const char* _pT
 void OnEvent(IN const void* _pInstance, IN int _nAccountId, IN int _nId,  IN const char* _pReason)
 {       
         DBG_LOG("%p id %d, account id %d, reason  %s \n",_pInstance, _nAccountId, _nId, _pReason);
-        // TODO call back to user.
         Message *pMessage = (Message *) malloc ( sizeof(Message) );
         Event *pEvent = (Event *) malloc( sizeof(Event) );
         MessageEvent *pMessageEvent = NULL;
@@ -168,8 +167,9 @@ void OnEvent(IN const void* _pInstance, IN int _nAccountId, IN int _nId,  IN con
         pMessage->nMessageID = EVENT_MESSAGE;
         pMessageEvent = &pEvent->body.messageEvent;
         pMessageEvent->status = _nId;
-        char *message = (char *) malloc (strlen(_pReason));
-        strncpy(message, _pReason, strlen(_pReason) - 1);
+        char *message = (char *) malloc (strlen(_pReason) + 1) ;
+        strncpy(message, _pReason, strlen(_pReason));
+        message[strlen(_pReason)] = 0;
         pMessageEvent->message = message;//_pReason;
         DBG_LOG("message %p  %s\n", pMessageEvent->message, pMessageEvent->message);
         pMessage->pMessage  = (void *)pEvent;
