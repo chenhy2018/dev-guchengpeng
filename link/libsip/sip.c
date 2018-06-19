@@ -418,7 +418,7 @@ SIP_ERROR_CODE SipAnswerCall(IN const int _nCallId, IN const SipAnswerCode _Stat
         if (_pReason) {
                 pEvent->Body.AnswerCall.Reason = (char *)malloc(strlen(_pReason) + 1);
                 strcpy(pEvent->Body.AnswerCall.Reason, _pReason);
-                pEvent->Body.AnswerCall.Reason[strlen(_pReason] = '\0';
+                pEvent->Body.AnswerCall.Reason[strlen(_pReason)] = '\0';
 
         }
         pEvent->Body.AnswerCall.pMedia = (void *)_pMedia;
