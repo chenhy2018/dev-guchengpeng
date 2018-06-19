@@ -1,4 +1,4 @@
-// Last Update:2018-06-14 12:05:29
+// Last Update:2018-06-19 16:20:27
 /**
  * @file test.c
  * @brief 
@@ -37,6 +37,7 @@ int InitAllTestSuit()
 int main()
 {
     UT_LOG("+++++ enter main...\n");
+    SetLogLevel( LOG_FATAL );
     TestSuitManagerInit();
     InitAllTestSuit();
     RunAllTestSuits();

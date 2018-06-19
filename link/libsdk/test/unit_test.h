@@ -1,4 +1,4 @@
-// Last Update:2018-06-15 15:59:30
+// Last Update:2018-06-19 17:46:10
 /**
  * @file unit_test.h
  * @brief 
@@ -59,13 +59,17 @@
 #define DBG_LOG(args...) DBG_BASIC();printf(" ");printf(args)
 #define DBG_ERROR DBG_LOG
 #define UT_LOG(args...) printf("[ UNIT TEST ] ");DBG_LOG(args)
-#define UT_ERROR(args...) printf("[ UNIT TEST] ");DBG_ERROR(args)
+//#define UT_ERROR(args...) printf("[ UNIT TEST] ");DBG_ERROR(args)
 #define UT_VAL(v) printf("[ UNIT TEST ] ");DBG_LOG(#v" = %d\n", v)
 #define UT_STR(s) printf("[ UNIT TEST ]");DBG_LOG(#s" = %s\n", s)
 #define UT_LINE() printf("[ UNIT TEST ]");DBG_LOG("======================\n")
 #define ARRSZ(arr) (sizeof(arr)/sizeof(arr[0]))
 #define TEST_CASE_RESULT_MAX 512
 #define UT_NOTICE(args...) printf( RED"[ %s %s +%d ] "NONE, __FILE__, __FUNCTION__, __LINE__);printf(args)
+#define LOG_RED(args...) printf( RED"" );printf(args);printf(""NONE)
+#define LOG_GREEN(args...) printf( GREEN"" );printf(args);printf(""NONE)
+#define LOG_BLUE(args...) printf( BLUE"" );printf(args);printf(""NONE)
+#define UT_ERROR(args...) LOG_RED("[ UNIT TEST] "); LOG_RED("[ %s %s +%d ] ", __FILE__, __FUNCTION__, __LINE__);LOG_RED(args)
 
 typedef struct _TestSuit TestSuit;
 typedef void *(*ThreadFn)(void *);
@@ -103,9 +107,10 @@ typedef struct {
 
 typedef struct {
     int eventNum;
-	pthread_mutex_t    mutex;
+	pthread_mutex_t mutex;
     EventWait eventWait[EVENT_WAIT_MAX];
     int (*WaitForEvent)( int event, int timeout );
+    int (*DestroyAllEvent)();
 } EventManger;
 
 typedef struct {
@@ -141,5 +146,6 @@ extern int AddPrivateData( void *data );
 extern int startThread( TestSuit *_pTestSuit, ThreadFn threadFn );
 extern int CancelThread( TestSuit *_pTestSuit );
 extern int ResultReport();
+extern int DestroyAllEvent();
 
 #endif  /*UNIT_TEST_H*/
