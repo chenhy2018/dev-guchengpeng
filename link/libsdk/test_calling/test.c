@@ -175,7 +175,7 @@ int RegisterTestSuitCallback( TestSuit *this )
               DBG_LOG("PullEvent end id %d \n", id);
               if (sendflag) {
                      DBG_LOG("send packet STREAM_AUDIO\n");
-                     sleep(1);
+                     usleep(10000);
                      SendPacket(sts, callId, STREAM_AUDIO, "123456788901234567890123456", 15, timecount);
                      timecount += 20;
               }

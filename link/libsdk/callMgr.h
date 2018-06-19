@@ -7,6 +7,8 @@
 Call* CALLMakeCall(AccountID _nAccountId, const char* id, const char* host, OUT int* callID,
                    CallConfig* _pConfig);
 
+void CALLMakeNewCall(Call* _pCall);
+
 ErrorID CALLAnswerCall(Call* _pCall);
 
 ErrorID CALLRejectCall(Call* _pCall);

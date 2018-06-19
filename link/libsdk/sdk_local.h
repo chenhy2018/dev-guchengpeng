@@ -22,6 +22,9 @@
 #define MESSAGE_QUEUE_MAX (256)
 #define CODECS_MAX (128)
 #define MEDIA_CONFIG_MAX (64)
+#define MAX_FROM_NAME_SIZE (64)
+#define MAX_URL_SIZE (64)
+#define INVALID_CALL_ID -1
 
 typedef struct RtpCallback
 {
@@ -30,12 +33,15 @@ typedef struct RtpCallback
 
 typedef struct {
         int id;
+        int nActualId;
         int nAccountId;
+        char from[MAX_FROM_NAME_SIZE];
+        char url[MAX_URL_SIZE];
         struct list_head list;
         SipInviteState callStatus;
         PeerConnection* pPeerConnection;
-        pjmedia_sdp_session* pOffer;
-        pjmedia_sdp_session* pAnswer;
+        pjmedia_sdp_session* pLocal;
+        pjmedia_sdp_session* pRemote;
         IceConfig iceConfig;
 } Call;
 

@@ -17,6 +17,7 @@
 #include "list.h"
 #include "framework.h"
 #include "uaMgr.h"
+#include "callMgr.h"
 
 UAManager gUAManager;
 UAManager *pUAManager = &gUAManager;
@@ -54,51 +55,145 @@ static Codec ConversionFormatToUser(CodecType _nCodec)
         return MEDIA_FORMAT_H264;
 }
 
+void OnIncomingCall(const const int _nAccountId, const int _nCallId, const const char *_pFrom)
+{
+    Message *pMessage = (Message *) malloc( sizeof(Message) );
+    Event *pEvent = (Event *) malloc( sizeof(Event) );
+    CallEvent *pCallEvent = NULL;
+    if ( !pMessage || !pEvent ) {
+        DBG_ERROR("malloc error\n");
+        return;
+    }
+    struct list_head *pos;
+    UA *pUA = FindUA(pUAManager, _nAccountId, &pos);
+    if (pUA == NULL) {
+            return;
+    }
+
+    DBG_LOG("incoming call From %s to %d\n", _pFrom, _nAccountId);
+
+    memset( pMessage, 0, sizeof(Message) );
+    memset( pEvent, 0, sizeof(Event) );
+    pMessage->nMessageID = EVENT_CALL;
+    pCallEvent = &pEvent->body.callEvent;
+    pCallEvent->callID = _nCallId;
+    pCallEvent->status = CALL_STATUS_INCOMING;
+    if ( _pFrom && strlen(_pFrom) > 0) {
+        pCallEvent->pFromAccount = (char *) malloc ( strlen(_pFrom) + 1);
+        memset( pCallEvent->pFromAccount, 0, strlen(_pFrom) + 1 );
+        memcpy( pCallEvent->pFromAccount, _pFrom, strlen(_pFrom) );
+    }
+
+    pMessage->pMessage = pEvent;
+    if ( pUA )
+        SendMessage( pUA->pQueue, pMessage );
+    else {
+        DBG_ERROR("pUA is NULL\n");
+    }
+    return;
+}
+
 // Todo send to message queue.
 static void OnRxRtp(void *_pUserData, CallbackType _type, void *_pCbData)
 {
-        Message *pMessage = (Message *) malloc (sizeof(Message));
-        Event *pEvent = (Event *) malloc(sizeof(Event));
-        if ( !pMessage || !pEvent ) {
-                DBG_ERROR("OnRxRtp malloc error***************\n");
-                return;
-        }
         pthread_mutex_lock(&pUAManager->mutex);
-        struct list_head *pos;
         Call* pCall = (Call*)(_pUserData);
         if (pCall == NULL) {
                 pthread_mutex_unlock(&pUAManager->mutex);
                 DBG_ERROR("OnRxRtp _pUserData is invaild******\n");
                 return;
         }
+        switch (_type) {
+                case CALLBACK_ICE: {
+                        IceNegInfo *pInfo = (IceNegInfo *)_pCbData;
+                        switch (pInfo->state) {
+                                 case ICE_STATE_GATHERING_OK:
+                                 {       
+                                         DBG_LOG("=****=========>callback_ice: state: %d callStatus %d\n", pInfo->state, pCall->callStatus);
+                                         pCall->pLocal = (pjmedia_sdp_session *)(pInfo->pData);
+                                         DBG_LOG("=****=========>callback_ice: state: pLocal %p\n", pCall->pLocal);
+                                         if (pCall->callStatus == INV_STATE_INCOMING) {
+                                                 OnIncomingCall(pCall->id, pCall->nAccountId, pCall->from);
+                                         }
+                                         else if (pCall->callStatus == INV_STATE_CALLING) {
+                                                 CALLMakeNewCall(pCall);
+                                                 DBG_LOG("==========> CALLMakeNewCall end");
+                                         }
+                                         pthread_mutex_unlock(&pUAManager->mutex);
+                                         return;
+                                 }
+                                 case  ICE_STATE_NEGOTIATION_OK:
+                                 {
+                                        //Not do in this time.
+                                        break;
+                                 }
+                                 default :
+                                 {
+                                         DBG_ERROR("==========>callback_ice: state: %d\n", pInfo->state);
+                                         pthread_mutex_unlock(&pUAManager->mutex);
+                                         return;
+                                 }
+                        }
+                 }
+                 default :
+                 {
+                         break;
+                 }
+        }
+
+        Message *pMessage = (Message *) malloc (sizeof(Message));
+        Event *pEvent = (Event *) malloc(sizeof(Event));
+        if ( !pMessage || !pEvent ) {
+                if (pMessage) free(pMessage);
+                if (pEvent) free(pEvent);
+                DBG_ERROR("OnRxRtp malloc error***************\n");
+                return;
+        }
+        struct list_head *pos;
         
         UA *pUA = FindUA(pUAManager, pCall->nAccountId, &pos);
         if (pUA == NULL) {
                 DBG_ERROR("UA is NULL\n");
+                free(pMessage);
+                free(pEvent);
                 pthread_mutex_unlock(&pUAManager->mutex);
                 return;
         }
 
-        switch (_type){
-                case CALLBACK_ICE:{
+        switch (_type) {
+                case CALLBACK_ICE: {
                         IceNegInfo *pInfo = (IceNegInfo *)_pCbData;
                         MediaEvent* event = &pEvent->body.mediaEvent;
                         pMessage->nMessageID = EVENT_MEDIA;
-                        DBG_LOG("==========>callback_ice: state: %d\n", pInfo->state);
-                        for ( int i = 0; i < pInfo->nCount; i++) {
-                                DBG_LOG(" codec type: %d\n", pInfo->configs[i]->codecType);
-                                event->media[i].codecType = ConversionFormatToUser(pInfo->configs[i]->codecType);
-                                if (pInfo->configs[i]->streamType == RTP_STREAM_VIDEO) {
-                                        event->media[i].streamType = STREAM_VIDEO;
-                                } else {
-                                        event->media[i].streamType = STREAM_AUDIO;
-                                }
-                                event->media[i].sampleRate = pInfo->configs[i]->nSampleOrClockRate;
-                                event->media[i].channels = pInfo->configs[i]->nChannel;
+                        switch (pInfo->state) {
+                                 case  ICE_STATE_NEGOTIATION_OK:
+                                 {
+                                         DBG_LOG("==========>callback_ice: state: %d\n", pInfo->state);
+                                         for ( int i = 0; i < pInfo->nCount; i++) {
+                                                 DBG_LOG(" codec type: %d\n", pInfo->configs[i]->codecType);
+                                                 event->media[i].codecType = ConversionFormatToUser(pInfo->configs[i]->codecType);
+                                                 if (pInfo->configs[i]->streamType == RTP_STREAM_VIDEO) {
+                                                         event->media[i].streamType = STREAM_VIDEO;
+                                                 } else {
+                                                         event->media[i].streamType = STREAM_AUDIO;
+                                                 }
+                                                 event->media[i].sampleRate = pInfo->configs[i]->nSampleOrClockRate;
+                                                 event->media[i].channels = pInfo->configs[i]->nChannel;
+                                         }
+                                         event->callID = pCall->id;
+                                         event->nCount = pInfo->nCount;
+                                         break;
+                                 }
+                                 default :
+                                 {
+                                         DBG_ERROR("==========>callback_ice: state: %d\n", pInfo->state);
+                                         free(pMessage);
+                                         free(pEvent);
+                                         pthread_mutex_unlock(&pUAManager->mutex);
+                                         return;
+                                 }
                         }
-                        event->callID =  pCall->id;
-                        event->nCount = pInfo->nCount;
-                }
+                 }
                         break;
                 case CALLBACK_RTP:{
                         DBG_LOG("==========>callback_rtp\n");
@@ -127,6 +222,7 @@ static void OnRxRtp(void *_pUserData, CallbackType _type, void *_pCbData)
         }
         pMessage->pMessage  = (void *)pEvent;
         SendMessage(pUA->pQueue, pMessage);
+        DBG_LOG("==========>callback_rtp end ******\n");
         pthread_mutex_unlock(&pUAManager->mutex);
 }
 
@@ -480,13 +576,6 @@ ErrorID Report(AccountID id, const char* message, int length)
 SipAnswerCode cbOnIncomingCall(const const int _nAccountId, const int _nCallId,
                                const const char *_pFrom, const void *_pUser, IN const void *_pMedia)
 {   
-    Message *pMessage = (Message *) malloc( sizeof(Message) );
-    Event *pEvent = (Event *) malloc( sizeof(Event) );
-    CallEvent *pCallEvent = NULL;
-    if ( !pMessage || !pEvent ) {
-        DBG_ERROR("malloc error\n");
-        return 0;
-    }
     pthread_mutex_lock(&pUAManager->mutex);
     const UA *_pUA = _pUser;
     struct list_head *pos;
@@ -496,27 +585,8 @@ SipAnswerCode cbOnIncomingCall(const const int _nAccountId, const int _nCallId,
             return DOES_NOT_EXIST_ANYWHERE;
     }
     
-    DBG_LOG("incoming call From %s to %d\n", _pFrom, _nAccountId);
+    DBG_LOG("incoming call From %s to %d %p\n", _pFrom, _nAccountId, _pMedia);
     UAOnIncomingCall(pUA, _nCallId, _pFrom, _pMedia);
-    
-    memset( pMessage, 0, sizeof(Message) );
-    memset( pEvent, 0, sizeof(Event) );
-    pMessage->nMessageID = EVENT_CALL;
-    pCallEvent = &pEvent->body.callEvent;
-    pCallEvent->callID = _nCallId;
-    pCallEvent->status = CALL_STATUS_INCOMING;
-    if ( _pFrom ) {
-        pCallEvent->pFromAccount = (char *) malloc ( strlen(_pFrom) + 1);
-        memset( pCallEvent->pFromAccount, 0, strlen(_pFrom) + 1 );
-        memcpy( pCallEvent->pFromAccount, _pFrom, strlen(_pFrom) );
-    }
-    
-    pMessage->pMessage = pEvent;
-    if ( pUA )
-        SendMessage( pUA->pQueue, pMessage );
-    else {
-        DBG_ERROR("pUA is NULL\n");
-    }
     pthread_mutex_unlock(&pUAManager->mutex);
     return OK;
 }
@@ -528,12 +598,10 @@ void cbOnRegStatusChange(const int _nAccountId, const SipAnswerCode _regStatusCo
     CallEvent *pCallEvent = NULL;
     UA *_pUA = ( UA *)_pUser;
     struct list_head *pos;
-    pthread_mutex_lock(&pUAManager->mutex);
     UA *pUA = FindUA(pUAManager, _nAccountId, &pos);
 
     if (pUA == NULL) {
             DBG_ERROR("pUser is NULL %p\n", _pUA);
-            pthread_mutex_unlock(&pUAManager->mutex);
             return;
     }
     
@@ -556,7 +624,6 @@ void cbOnRegStatusChange(const int _nAccountId, const SipAnswerCode _regStatusCo
         SendMessage( pUA->pQueue, pMessage );
     } else {
         DBG_ERROR("pUA is NULL\n");
-        pthread_mutex_unlock(&pUAManager->mutex);
         return;
     }
 
@@ -569,7 +636,6 @@ void cbOnRegStatusChange(const int _nAccountId, const SipAnswerCode _regStatusCo
             pUA->regStatus = _regStatusCode;
         }
     }
-    pthread_mutex_unlock(&pUAManager->mutex);
 }
 
 void cbOnCallStateChange(const int _nCallId, const int _nAccountId, const SipInviteState _State,
@@ -587,11 +653,9 @@ void cbOnCallStateChange(const int _nCallId, const int _nAccountId, const SipInv
             DBG_ERROR("malloc error\n");
             return;
     }
-    pthread_mutex_lock(&pUAManager->mutex);
     UA *pUA = FindUA(pUAManager, _nAccountId, &pos);
 
     if (pUA == NULL) {
-            pthread_mutex_unlock(&pUAManager->mutex);
             DBG_ERROR("pUser is NULL\n");
             return;
     }
@@ -611,5 +675,4 @@ void cbOnCallStateChange(const int _nCallId, const int _nAccountId, const SipInv
     pMessage->pMessage  = (void *)pEvent;
     SendMessage(pUA->pQueue, pMessage);
     UAOnCallStateChange(pUA, _nCallId, _State, _StatusCode, pMedia);
-    pthread_mutex_unlock(&pUAManager->mutex);
 }
