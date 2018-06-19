@@ -1,7 +1,7 @@
 #include "JitterBuffer.h"
 
 typedef struct _JitterBufferFrame {
-        uint32_t nSeq;
+        int nSeq;
         uint32_t nTs;
         int nFrameSize;
         void * pData;
@@ -102,7 +102,7 @@ void JitterBufferPop(IN JitterBuffer *_pJbuf, OUT void *_pFrame, IN OUT int *_pF
         heap_entry *pEntry = NULL;
         heap_min(&_pJbuf->heap, &pEntry);
 
-        uint32_t nMinSeq = (uint32_t)(pEntry->key);
+        int nMinSeq = (int)(pEntry->key);
 
         JitterBufferFrame *pFrame = (JitterBufferFrame*)pEntry->immutable;
         //what should I do if 65535 is lost. set nMinSeq = nMinSeq & 0x0000FFF
