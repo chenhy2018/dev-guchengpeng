@@ -180,9 +180,9 @@ typedef struct SipInstanceConfig
 
 typedef struct SipAccountConfig
 {
-        const char *pUserName;
-        const char *pPassWord;
-        const char *pDomain;
+        char *pUserName;
+        char *pPassWord;
+        char *pDomain;
         void *pUserData;
 
         int nMaxOngoingCall;
