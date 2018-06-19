@@ -1,4 +1,4 @@
-// Last Update:2018-06-19 16:50:05
+// Last Update:2018-06-19 18:42:47
 /**
  * @file register_test.c
  * @brief 
@@ -38,7 +38,7 @@ RegisterTestCase gRegisterTestCases[] =
 {
     {
         { "valid account1", CALL_STATUS_REGISTERED },
-        { "1002", "1002", HOST, HOST, HOST, 10, 1 }
+        { "1002", "1002", HOST, HOST, HOST, 10, 0 }
     },
     {
         { "valid account2", CALL_STATUS_REGISTERED },
@@ -201,9 +201,26 @@ TestSuit gRegisterTestSuit =
 
 int RegisterTestSuitInit( TestSuit *this, TestSuitManager *_pManager )
 {
+    Media media[2];
+    ErrorID sts = 0;
+
     this->total = ARRSZ(gRegisterTestCases);
     this->index = 0;
     this->pManager = _pManager;
+
+    media[0].streamType = STREAM_VIDEO;
+    media[0].codecType = CODEC_H264;
+    media[0].sampleRate = 90000;
+    media[0].channels = 0;
+    media[1].streamType = STREAM_AUDIO;
+    media[1].codecType = CODEC_G711A;
+    media[1].sampleRate = 8000;
+    media[1].channels = 1;
+    sts = InitSDK( media, 2 );
+    if ( RET_OK != sts ) {
+        UT_ERROR("sdk init error\n");
+        return -1;
+    }
 
     return 0;
 }
