@@ -28,6 +28,8 @@ typedef struct RtpCallback
         void (*OnRxRtp)(void *_pUserData, CallbackType _type, void *_pCbData);
 }RtpCallback;
 
+typedef void LogFunc(const char *data);
+
 typedef struct {
         int id;
         int nAccountId;
