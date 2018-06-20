@@ -49,8 +49,11 @@ static int MqttErrorStatusChange(int nStatus)
 static void MallocAndStrcpy(char** des, const char* src)
 {
       if (src) {
-              *des = malloc(sizeof(src));
-              if (*des) strcpy(*des, src);
+              *des = malloc(strlen(src) + 1);
+              if (*des) {
+                      strncpy(*des, src, strlen(src));
+                      des[strlen(src)] = '\0';
+              }
       }
       else {
               *des = NULL;
