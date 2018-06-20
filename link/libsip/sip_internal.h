@@ -6,7 +6,7 @@
 #include <pjsip_simple.h>
 #include <pjlib-util.h>
 #include <pjlib.h>
-#include "queue.h"
+#include "../util/queue.h"
 #define SIP_MAX_CRED 1
 #define SIP_PORT 5060
 
