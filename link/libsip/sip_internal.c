@@ -74,8 +74,10 @@ SIP_ERROR_CODE OnSipAddNewAccount(IN const SipAccountConfig *_pConfig, OUT int *
 
         /* Copy account info */
         char ID[80], Registrar[80];
-        sprintf(ID, "sip:%s@%s", _pConfig->pUserName, _pConfig->pDomain);
-        sprintf(Registrar, "sip:%s;transport=tcp", _pConfig->pDomain);
+        memset(ID, '\0', 80);
+        memset(Registrar, '\0', 80);
+        snprintf(ID, 79, "sip:%s@%s", _pConfig->pUserName, _pConfig->pDomain);
+        snprintf(Registrar, 79, "sip:%s;transport=tcp", _pConfig->pDomain);
         pj_str_t PJID = pj_str(ID);
         pj_str_t PJReg = pj_str(Registrar);
         pj_str_t PJUserName = pj_str((char *)_pConfig->pUserName);
