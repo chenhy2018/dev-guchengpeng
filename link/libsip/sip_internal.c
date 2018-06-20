@@ -267,7 +267,7 @@ static pj_status_t SipRegcInit(IN const int _nAccountId)
                 pj_ansi_sprintf(tmpContact, "<sip:%s@%s:%d>", pAccount->UserName.ptr, LocalIp, SipAppData.LocalPort);
         }
         pj_str_t Contact = pj_str(tmpContact);
-        pj_strdup(pAccount->pPool, &pAccount->Contact, &Contact);
+        pj_strdup_with_null(pAccount->pPool, &pAccount->Contact, &Contact);
         Status = pjsip_regc_init(pAccount->pRegc,
                                  &pAccount->RegUri,
                                  &pAccount->Id,
