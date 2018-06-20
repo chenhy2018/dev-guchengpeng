@@ -320,13 +320,17 @@ static void ReleaseMsgResource(Message *pMsg)
         switch (pMsg->nMessageID) {
         case SIP_MAKE_CALL:
                 free(pEvent->Body.MakeCall.pDestUri);
+                pEvent->Body.MakeCall.pDestUri = NULL;
                 break;
         case SIP_ANSWER_CALL:
                 free(pEvent->Body.AnswerCall.Reason);
+                pEvent->Body.AnswerCall.Reason = NULL;
                 break;
         }
         free(pEvent);
+        pEvent = NULL;
         free(pMsg);
+        pMsg = NULL;
 }
 
 SIP_ERROR_CODE SipAddNewAccount(IN const SipAccountConfig *_pConfig, OUT int *_pAccountId)
