@@ -16,6 +16,7 @@ typedef enum SIP_ERROR_CODE {
 
         SIP_SUCCESS,
         SIP_INVALID_ARG,
+        SIP_MALLOC_FAILED,
 
         /* SipCreateInstance Error Code */
         SIP_PJ_INIT_FAILED,
@@ -239,15 +240,15 @@ SIP_ERROR_CODE SipMakeNewCall(IN const int nFromAccountId, IN const char *pDestU
  * @param nCallId, hangup call id
  *
  */
-void  SipHangUp(IN const int nCallId);
+SIP_ERROR_CODE SipHangUp(IN const int nCallId);
 
 /**
  * Hangup all calls
  *
  **/
-void SipHangUpAll();
+SIP_ERROR_CODE SipHangUpAll();
 
-void SipHangUpByAccountId(int nAccountId);
+SIP_ERROR_CODE SipHangUpByAccountId(int nAccountId);
 
 /**
  * Destroy sip instance

@@ -351,12 +351,20 @@ SIP_ERROR_CODE SipRegAccount(IN const int _nAccountId, IN const int _bDeReg)
         CHECK_RETURN(SipAppData.Accounts[_nAccountId].bValid, SIP_INVALID_ARG);
 
         SipEvent *pEvent = (SipEvent *)malloc(sizeof(SipEvent));
+        if (!pEvent)
+                return SIP_MALLOC_FAILED;
+
         memset(pEvent, 0, sizeof(SipEvent));
         pEvent->Body.Reg.nAccountId = _nAccountId;
         pEvent->Body.Reg.Reg = _bDeReg;
         pEvent->Type = SIP_REG_ACCOUNT;
 
         Message *pMessage = (Message *)malloc(sizeof(Message));
+        if (!pMessage) {
+                free(pEvent);
+                pEvent = NULL;
+                return SIP_MALLOC_FAILED;
+        }
         memset(pMessage, 0, sizeof(Message));
         pMessage->nMessageID = SIP_REG_ACCOUNT;
         pMessage->pMessage = (void*)pEvent;
@@ -391,6 +399,9 @@ SIP_ERROR_CODE SipMakeNewCall(IN const int _nFromAccountId, IN const char *_pDes
         *_pCallId = nCallId;
 
         SipEvent *pEvent = (SipEvent *)malloc(sizeof(SipEvent));
+        if (!pEvent)
+                return SIP_MALLOC_FAILED;
+
         memset(pEvent, 0, sizeof(SipEvent));
         pEvent->Body.MakeCall.nAccountId = _nFromAccountId;
 
@@ -403,6 +414,12 @@ SIP_ERROR_CODE SipMakeNewCall(IN const int _nFromAccountId, IN const char *_pDes
         pEvent->Type = SIP_MAKE_CALL;
 
         Message *pMessage = (Message *)malloc(sizeof(Message));
+        if (!pMessage) {
+                free(pEvent);
+                pEvent = NULL;
+                return SIP_MALLOC_FAILED;
+        }
+
         memset(pMessage, 0, sizeof(Message));
         pMessage->nMessageID = SIP_MAKE_CALL;
         pMessage->pMessage = (void*)pEvent;
@@ -417,6 +434,9 @@ SIP_ERROR_CODE SipAnswerCall(IN const int _nCallId, IN const SipAnswerCode _Stat
         CHECK_RETURN(SipAppData.Calls[_nCallId].pInviteSession || SipAppData.Calls[_nCallId].bValid, SIP_INVALID_ARG);
 
         SipEvent *pEvent = (SipEvent *)malloc(sizeof(SipEvent));
+        if (!pEvent)
+                return SIP_MALLOC_FAILED;
+
         memset(pEvent, 0, sizeof(SipEvent));
         pEvent->Body.AnswerCall.nCallId = _nCallId;
         pEvent->Body.AnswerCall.StatusCode = _StatusCode;
@@ -430,51 +450,87 @@ SIP_ERROR_CODE SipAnswerCall(IN const int _nCallId, IN const SipAnswerCode _Stat
         pEvent->Type = SIP_ANSWER_CALL;
 
         Message *pMessage = (Message *)malloc(sizeof(Message));
+        if (!pMessage) {
+                free(pEvent);
+                pEvent = NULL;
+                return SIP_MALLOC_FAILED;
+        }
+
         memset(pMessage, 0, sizeof(Message));
         pMessage->nMessageID = SIP_ANSWER_CALL;
         pMessage->pMessage = (void*)pEvent;
         SendMessage(SipAppData.pMq, pMessage);
         return SIP_SUCCESS;
 }
-void SipHangUp(IN const int _nCallId)
+SIP_ERROR_CODE SipHangUp(IN const int _nCallId)
 {
         SipEvent *pEvent = (SipEvent *)malloc(sizeof(SipEvent));
+        if (!pEvent)
+                return SIP_MALLOC_FAILED;
+
         memset(pEvent, 0, sizeof(SipEvent));
         pEvent->Body.HangUp.nCallId = _nCallId;
         pEvent->Type = SIP_HANGUP;
 
         Message *pMessage = (Message *)malloc(sizeof(Message));
+        if (!pMessage) {
+                free(pEvent);
+                pEvent = NULL;
+                return SIP_MALLOC_FAILED;
+        }
+
         memset(pMessage, 0, sizeof(Message));
         pMessage->nMessageID = SIP_HANGUP;
         pMessage->pMessage = (void*)pEvent;
         SendMessage(SipAppData.pMq, pMessage);
+        return SIP_SUCCESS;
 }
 
-void SipHangUpAll()
+SIP_ERROR_CODE SipHangUpAll()
 {
         SipEvent *pEvent = (SipEvent *)malloc(sizeof(SipEvent));
+        if (!pEvent)
+                return SIP_MALLOC_FAILED;
+
         memset(pEvent, 0, sizeof(SipEvent));
         pEvent->Type = SIP_HANGUP_ALL;
 
         Message *pMessage = (Message *)malloc(sizeof(Message));
+        if (!pMessage) {
+                free(pEvent);
+                pEvent = NULL;
+                return SIP_MALLOC_FAILED;
+        }
+
         memset(pMessage, 0, sizeof(Message));
         pMessage->nMessageID = SIP_HANGUP_ALL;
         pMessage->pMessage = (void*)pEvent;
         SendMessage(SipAppData.pMq, pMessage);
+        return SIP_SUCCESS;
 }
 
-void SipHangUpByAccountId(int _nAccountId)
+SIP_ERROR_CODE SipHangUpByAccountId(int _nAccountId)
 {
         SipEvent *pEvent = (SipEvent *)malloc(sizeof(SipEvent));
+        if (!pEvent)
+                return SIP_MALLOC_FAILED;
+
         memset(pEvent, 0, sizeof(SipEvent));
         pEvent->Body.HangUpByAcc.nAccount = _nAccountId;
         pEvent->Type = SIP_HANGUP_BY_ACCOUNT;
 
         Message *pMessage = (Message *)malloc(sizeof(Message));
+        if (!pMessage) {
+                free(pEvent);
+                pEvent = NULL;
+                return SIP_MALLOC_FAILED;
+        }
+
         memset(pMessage, 0, sizeof(Message));
         pMessage->nMessageID = SIP_HANGUP_BY_ACCOUNT;
         pMessage->pMessage = (void*)pEvent;
         SendMessage(SipAppData.pMq, pMessage);
+        return SIP_SUCCESS;
 }
 
 int CreateTmpSDP(OUT void **_pSdp)

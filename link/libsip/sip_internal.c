@@ -74,8 +74,8 @@ SIP_ERROR_CODE OnSipAddNewAccount(IN const SipAccountConfig *_pConfig, OUT int *
 
         /* Copy account info */
         char ID[80], Registrar[80];
-        memset(ID, '\0', 80);
-        memset(Registrar, '\0', 80);
+        memset(ID, 0, 80);
+        memset(Registrar, 0, 80);
         snprintf(ID, 79, "sip:%s@%s", _pConfig->pUserName, _pConfig->pDomain);
         snprintf(Registrar, 79, "sip:%s;transport=tcp", _pConfig->pDomain);
         pj_str_t PJID = pj_str(ID);
@@ -594,7 +594,8 @@ static pj_bool_t SipUpdateContactIfNat(IN SipAccount *_pAccount, IN struct pjsip
 
         /*Update Contact */
         char tmpContact[64];
-        pj_ansi_sprintf(tmpContact, "<sip:%s@%s:%d>", _pAccount->UserName.ptr,  _pAccount->ViaAddr.host.ptr, _pAccount->ViaAddr.port);
+        memset(tmpContact, 0, 64);
+        snprintf(tmpContact, 64, "<sip:%s@%s:%d>", _pAccount->UserName.ptr,  _pAccount->ViaAddr.host.ptr, _pAccount->ViaAddr.port);
         PJ_LOG(4, (THIS_FILE, "Contact change from %s to %s", _pAccount->Contact.ptr, tmpContact));
         pj_strdup2_with_null(_pAccount->pPool, &_pAccount->Contact, tmpContact);
         //        pjsip_regc_update_contact(_pAccount->pRegc, 1, &_pAccount->Contact);
@@ -632,8 +633,8 @@ SIP_ERROR_CODE OnSipMakeNewCall(IN const SipEvent *_pEvent)
         pj_str_t Dest = pj_str((char *)_pDestUri);
         /* Create SIP dialog */
         char LocalUri[60];
-
-        pj_ansi_sprintf(LocalUri, "<sip:%s@%s>", SipAppData.Accounts[_nFromAccountId].UserName.ptr, SipAppData.Accounts[_nFromAccountId].SipDomain.ptr);
+        memset(LocalUri, 0, 60);
+        snprintf(LocalUri, 60, "<sip:%s@%s>", SipAppData.Accounts[_nFromAccountId].UserName.ptr, SipAppData.Accounts[_nFromAccountId].SipDomain.ptr);
         pj_str_t Local = pj_str(LocalUri);
         Status = pjsip_dlg_create_uac(pjsip_ua_instance(), &Local, &SipAppData.Accounts[_nFromAccountId].Contact, &Dest,  &Dest, &pDialog);
         if (Status != PJ_SUCCESS) {
