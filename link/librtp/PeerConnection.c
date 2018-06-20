@@ -211,6 +211,7 @@ static void onIceComplete2(pjmedia_transport *pTransport, pj_ice_strans_op op,
 
 static int iceWorkerThread(void * _pArg)
 {
+        fprintf(stderr, "iceWorkerThread start");
         TransportIce * pTransportIce = (TransportIce *)_pArg;
         pj_ice_strans_cfg * pIceCfg = &pTransportIce->iceConfig;
         PeerConnection * pPeerConnection = (PeerConnection*)pTransportIce->pPeerConnection;
@@ -633,9 +634,6 @@ int AddAudioTrack(IN OUT PeerConnection * _pPeerConnection, IN MediaConfigSet * 
         if(nAudioIndex == -1) {
                 return -1;
         }
-        
-        status = initTransportIce(_pPeerConnection, &_pPeerConnection->transportIce[nAudioIndex]);
-        STATUS_CHECK(audio initTransportIce, status);
         
         AddMediaTrack(&_pPeerConnection->mediaStream, _pAudioConfig, nAudioIndex, RTP_STREAM_AUDIO, _pPeerConnection);
         _pPeerConnection->nAvIndex[nAudioIndex] = nAudioIndex;
