@@ -576,14 +576,14 @@ int ReleasePeerConnectoin(IN OUT PeerConnection * _pPeerConnection)
                 _pPeerConnection->pNegPool = NULL;
         }
 
-        if (_pPeerConnection->pMutexPool) {
-                pj_pool_release(_pPeerConnection->pMutexPool);
-                _pPeerConnection->pMutexPool = NULL;
-        }
-
         if (_pPeerConnection->pSdpPool) {
                 pj_pool_release(_pPeerConnection->pSdpPool);
                 _pPeerConnection->pSdpPool = NULL;
+        }
+
+        if (_pPeerConnection->pMutexPool) {
+                pj_pool_release(_pPeerConnection->pMutexPool);
+                _pPeerConnection->pMutexPool = NULL;
         }
 
         if (_pPeerConnection->pMutex) {
@@ -748,7 +748,6 @@ static void createSdpPool(IN OUT PeerConnection * _pPeerConnection)
         if(pPool == NULL) {
                 pPool = pj_pool_create(&_pPeerConnection->cachingPool.factory,
                                        NULL, 2048, 512, NULL);
-                MY_PJ_LOG(1, "pj_pool_create fail. may out of memory");
                 pj_assert(pPool != NULL);
                 _pPeerConnection->pSdpPool = pPool;
         }
