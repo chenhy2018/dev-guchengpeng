@@ -1,4 +1,4 @@
-// Last Update:2018-06-12 19:05:03
+// Last Update:2018-06-15 16:17:11
 /**
  * @file register_test.c
  * @brief 
@@ -8,7 +8,7 @@
  */
 #include "sdk_interface.h"
 #include "unit_test.h"
-#include "dbg.h"
+#include <unistd.h>
 
 #define HOST "123.59.204.198"
 #define INVALID_SERVER "192.168.1.239"
@@ -36,30 +36,160 @@ typedef struct {
 RegisterTestCase gRegisterTestCases[] =
 {
     {
-        { "valid_account1", CALL_STATUS_REGISTERED },
+        { "valid account1", CALL_STATUS_REGISTERED },
         { "1002", "1002", HOST, HOST, HOST, 10, 1 }
     },
     {
-        { "valid_account2", CALL_STATUS_REGISTERED },
+        { "valid account2", CALL_STATUS_REGISTERED },
         { "1003", "1003", HOST, HOST, HOST, 10, 0 }
     },
     {
-        { "invalid_account1", CALL_STATUS_REGISTER_FAIL },
+        { "invalid account1", CALL_STATUS_REGISTER_FAIL },
         { "1003", "1004", HOST, HOST, HOST, 10, 0 }
     },
     {
-        { "invalid_account2", CALL_STATUS_REGISTER_FAIL },
+        { "invalid account2", CALL_STATUS_REGISTER_FAIL },
         { "0000", "0000", HOST, HOST, HOST, 10, 0 }
     },
     {
-        { "invalid_sip_register_server", CALL_STATUS_REGISTER_FAIL },
+        { "valid account1", CALL_STATUS_REGISTERED },
+        { "1002", "1002", HOST, HOST, HOST, 10, 0 }
+    },
+    {
+        { "valid account2", CALL_STATUS_REGISTERED },
+        { "1003", "1003", HOST, HOST, HOST, 10, 0 }
+    },
+    {
+        { "invalid account1", CALL_STATUS_REGISTER_FAIL },
+        { "1003", "1004", HOST, HOST, HOST, 10, 0 }
+    },
+    {
+        { "invalid account2", CALL_STATUS_REGISTER_FAIL },
+        { "0000", "0000", HOST, HOST, HOST, 10, 0 }
+    },
+    {
+        { "valid account1", CALL_STATUS_REGISTERED },
+        { "1002", "1002", HOST, HOST, HOST, 10, 0 }
+    },
+    {
+        { "valid account2", CALL_STATUS_REGISTERED },
+        { "1003", "1003", HOST, HOST, HOST, 10, 0 }
+    },
+    {
+        { "invalid account1", CALL_STATUS_REGISTER_FAIL },
+        { "1003", "1004", HOST, HOST, HOST, 10, 0 }
+    },
+    {
+        { "invalid account2", CALL_STATUS_REGISTER_FAIL },
+        { "0000", "0000", HOST, HOST, HOST, 10, 0 }
+    },
+    {
+        { "valid account1", CALL_STATUS_REGISTERED },
+        { "1002", "1002", HOST, HOST, HOST, 10, 0 }
+    },
+    {
+        { "valid account2", CALL_STATUS_REGISTERED },
+        { "1003", "1003", HOST, HOST, HOST, 10, 0 }
+    },
+    {
+        { "invalid account1", CALL_STATUS_REGISTER_FAIL },
+        { "1003", "1004", HOST, HOST, HOST, 10, 0 }
+    },
+    {
+        { "invalid account2", CALL_STATUS_REGISTER_FAIL },
+        { "0000", "0000", HOST, HOST, HOST, 10, 0 }
+    },
+    {
+        { "valid account1", CALL_STATUS_REGISTERED },
+        { "1002", "1002", HOST, HOST, HOST, 10, 0 }
+    },
+    {
+        { "valid account2", CALL_STATUS_REGISTERED },
+        { "1003", "1003", HOST, HOST, HOST, 10, 0 }
+    },
+    {
+        { "invalid account1", CALL_STATUS_REGISTER_FAIL },
+        { "1003", "1004", HOST, HOST, HOST, 10, 0 }
+    },
+    {
+        { "invalid account2", CALL_STATUS_REGISTER_FAIL },
+        { "0000", "0000", HOST, HOST, HOST, 10, 0 }
+    },
+    {
+        { "valid account1", CALL_STATUS_REGISTERED },
+        { "1002", "1002", HOST, HOST, HOST, 10, 0 }
+    },
+    {
+        { "valid account2", CALL_STATUS_REGISTERED },
+        { "1003", "1003", HOST, HOST, HOST, 10, 0 }
+    },
+    {
+        { "invalid account1", CALL_STATUS_REGISTER_FAIL },
+        { "1003", "1004", HOST, HOST, HOST, 10, 0 }
+    },
+    {
+        { "invalid account2", CALL_STATUS_REGISTER_FAIL },
+        { "0000", "0000", HOST, HOST, HOST, 10, 0 }
+    },
+    {
+        { "valid account1", CALL_STATUS_REGISTERED },
+        { "1002", "1002", HOST, HOST, HOST, 10, 0 }
+    },
+    {
+        { "valid account2", CALL_STATUS_REGISTERED },
+        { "1003", "1003", HOST, HOST, HOST, 10, 0 }
+    },
+    {
+        { "invalid account1", CALL_STATUS_REGISTER_FAIL },
+        { "1003", "1004", HOST, HOST, HOST, 10, 0 }
+    },
+    {
+        { "invalid account2", CALL_STATUS_REGISTER_FAIL },
+        { "0000", "0000", HOST, HOST, HOST, 10, 0 }
+    },
+    {
+        { "valid account1", CALL_STATUS_REGISTERED },
+        { "1002", "1002", HOST, HOST, HOST, 10, 0 }
+    },
+    {
+        { "valid account2", CALL_STATUS_REGISTERED },
+        { "1003", "1003", HOST, HOST, HOST, 10, 0 }
+    },
+    {
+        { "invalid account1", CALL_STATUS_REGISTER_FAIL },
+        { "1003", "1004", HOST, HOST, HOST, 10, 0 }
+    },
+    {
+        { "invalid account2", CALL_STATUS_REGISTER_FAIL },
+        { "0000", "0000", HOST, HOST, HOST, 10, 0 }
+    },
+    {
+        { "valid account1", CALL_STATUS_REGISTERED },
+        { "1002", "1002", HOST, HOST, HOST, 10, 0 }
+    },
+    {
+        { "valid account2", CALL_STATUS_REGISTERED },
+        { "1003", "1003", HOST, HOST, HOST, 10, 0 }
+    },
+    {
+        { "invalid account1", CALL_STATUS_REGISTER_FAIL },
+        { "1003", "1004", HOST, HOST, HOST, 10, 0 }
+    },
+    {
+        { "invalid account2", CALL_STATUS_REGISTER_FAIL },
+        { "0000", "0000", HOST, HOST, HOST, 10, 0 }
+    }
+#if 0
+    {
+        { "invalid sip register server", CALL_STATUS_REGISTER_FAIL },
         { "1003", "1003", INVALID_SERVER, INVALID_SERVER, INVALID_SERVER, 10, 0 }
     }
+#endif
 };
 
 TestSuit gRegisterTestSuit =
 {
-    "Register",
+    "Register()",
     RegisterTestSuitCallback,
     RegisterTestSuitInit,
     RegisterTestSuitGetTestCase,
@@ -93,9 +223,9 @@ int RegisterTestSuitGetTestCase( TestSuit *this, TestCase **testCase )
 
 int RegisterTestSuitCallback( TestSuit *this )
 {
-    RegisterTestCase *pTestCases = NULL;
     RegisterData *pData = NULL;
     RegisterTestCase *pTestCase = NULL;
+    RegisterTestCase *pTestCases = NULL;
     Media media;
     int i = 0;
     int ret = 0;
@@ -130,7 +260,7 @@ int RegisterTestSuitCallback( TestSuit *this )
         return TEST_FAIL;
     }
     UT_VAL( sts );
-    this->pManager->AddPrivateData( &sts );
+    pTestCase->father.data = (void *)sts;
     if ( pTestCase->father.threadEntry )
         this->pManager->startThread( this, pTestCase->father.threadEntry );
     else
@@ -147,18 +277,11 @@ int RegisterTestSuitCallback( TestSuit *this )
             return TEST_FAIL;
         }
         UT_VAL( ret );
+        //UnRegister(sts);
         return TEST_PASS;
     }
 
     return TEST_FAIL;
-}
-
-
-static void cleanup( void *arg )
-{
-    pthread_t thread = (pthread_t )arg;
-
-    printf("+++++++++ thread %d exit\n", (int)thread );
 }
 
 void *RegisterEventLoopThread( void *arg )
@@ -171,37 +294,46 @@ void *RegisterEventLoopThread( void *arg )
     Event event, *pEvent;
     CallEvent *pCallEvent;
     EventManger *pEventManager = &pManager->eventManager;
+    RegisterTestCase *pTestCase = NULL;
+    RegisterTestCase *pTestCases = NULL;
+    static int count = 0;
 
-    UT_LOG("EventLoopThread enter ...\n");
+    UT_NOTICE("EventLoopThread enter ..., count = %d\n", count );
     if ( !pManager ) {
         UT_ERROR("check param error\n");
         return NULL;
     }
 
-    if ( !pManager->data ) {
-        UT_ERROR("check data error\n");
-        return NULL;
-    }
+    count++;
 
-    id = *(AccountID *)pManager->data;
+    pTestCases = ( RegisterTestCase *) pTestSuit->testCases;
+    pTestCase = &pTestCases[pTestSuit->index];
+    id = (AccountID)(long) pTestCase->father.data;
+
     UT_VAL( id );
 
-
-    for (;;) {
+    while ( pTestCase->father.running ) {
         UT_LOG("call PollEvent\n");
-        pthread_cleanup_push( cleanup, (void *)pTestSuit->tid );
-        ret = PollEvent( id, &type, &pEvent, 0 );
-        pthread_cleanup_pop( 0 );
+        ret = PollEvent( id, &type, &pEvent, 0);
+        UT_VAL( ret );
+        if ( ret >= RET_MEM_ERROR ) {
+            UT_ERROR("ret = %d\n", ret );
+            return NULL;
+        }
         UT_VAL( type );
         if ( type == EVENT_CALL ) {
             UT_LINE();
-            pCallEvent = &pEvent->body.callEvent;
-            if ( pManager->NotifyAllEvent ) {
-                UT_VAL( pCallEvent->status );
-                pManager->NotifyAllEvent( pCallEvent->status );
+            if ( pEvent ) {
+                pCallEvent = &pEvent->body.callEvent;
+                if ( pManager->NotifyAllEvent ) {
+                    UT_VAL( pCallEvent->status );
+                    pManager->NotifyAllEvent( pCallEvent->status );
+                }
             }
         }
     }
+
+    UT_NOTICE("thread %ld exit ....\n", pTestSuit->tid );
 
     return NULL;
 }

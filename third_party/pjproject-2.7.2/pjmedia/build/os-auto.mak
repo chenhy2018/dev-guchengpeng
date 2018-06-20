@@ -52,10 +52,10 @@ export LDFLAGS += $(SDL_LDFLAGS) $(FFMPEG_LDFLAGS) $(V4L2_LDFLAGS) \
 #   - alsa:		Unix ALSA (alsa_dev.c)
 #   - null:	    	Null sound device (nullsound.c)
 #   - external:		Link with no sounddev (app will provide)
-AC_PJMEDIA_SND=alsa
+AC_PJMEDIA_SND=null
 
 # For Unix, specify if ALSA should be supported
-AC_PA_USE_ALSA=0
+AC_PA_USE_ALSA=
 
 # Additional PortAudio CFLAGS are in  -DHAVE_SYS_SOUNDCARD_H -DHAVE_LINUX_SOUNDCARD_H -DPA_LITTLE_ENDIAN
 
@@ -195,7 +195,7 @@ endif
 #
 # libyuv
 #
-ifeq (,1)
+ifeq (1,1)
 export CFLAGS += -DPJMEDIA_HAS_LIBYUV=0
 else
 export CFLAGS += -DPJMEDIA_HAS_LIBYUV=1
@@ -207,7 +207,7 @@ endif
 #
 # libwebrtc
 #
-ifeq (,1)
+ifeq (1,1)
 export CFLAGS += -DPJMEDIA_HAS_WEBRTC_AEC=0
 else
 export CFLAGS += -DPJMEDIA_HAS_WEBRTC_AEC=1
@@ -233,11 +233,11 @@ endif
 #
 # Unix specific
 #
-#ifneq ($(findstring alsa,$(AC_PJMEDIA_SND)),)
-#export CFLAGS += -DPJMEDIA_AUDIO_DEV_HAS_ALSA=1 \
-#		 -DPJMEDIA_AUDIO_DEV_HAS_PORTAUDIO=0 \
-#		 -DPJMEDIA_AUDIO_DEV_HAS_WMME=0
-#endif
+ifneq ($(findstring alsa,$(AC_PJMEDIA_SND)),)
+export CFLAGS += -DPJMEDIA_AUDIO_DEV_HAS_ALSA=1 \
+		 -DPJMEDIA_AUDIO_DEV_HAS_PORTAUDIO=0 \
+		 -DPJMEDIA_AUDIO_DEV_HAS_WMME=0
+endif
 
 #
 # Windows specific

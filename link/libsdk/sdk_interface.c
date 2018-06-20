@@ -18,6 +18,7 @@
 #include "framework.h"
 #include "uaMgr.h"
 #include "callMgr.h"
+#include <sys/types.h>
 
 UAManager gUAManager;
 UAManager *pUAManager = &gUAManager;
@@ -26,14 +27,13 @@ static UA* FindUA(UAManager* _pUAManager, AccountID _nAccountId, struct list_hea
 {
         UA* pUA;
         struct list_head *q, *pos;
-        DBG_LOG("FindUA in %p %p %p AccountID %d \n", &_pUAManager->UAList.list, pos, q, _nAccountId);
+        //DBG_LOG("FindUA in %p %p %p AccountID %d \n", &_pUAManager->UAList.list, pos, q, _nAccountId);
 
         list_for_each_safe(pos, q, &_pUAManager->UAList.list) {
                 pUA = list_entry(pos, UA, list);
-                DBG_LOG("FindUA pos %p id %d\n", pos, pUA->id);
+                //DBG_LOG("FindUA pos %p id %d\n", pos, pUA->id);
                 if (pUA->id == _nAccountId) {
                         *po = pos;
-                        pthread_mutex_unlock(&pUAManager->mutex);
                         return pUA;
                 }
         }
@@ -214,6 +214,11 @@ static void OnRxRtp(void *_pUserData, CallbackType _type, void *_pCbData)
                         event->size = nLen;
                         event->codec = ConversionFormatToUser(pPkt->format);
                         event->data = (uint8_t*)malloc(nLen);
+                        if (event->data == NULL) {
+                                DBG_ERROR("OnRxRtp data malloc error***************\n");
+                                pthread_mutex_unlock(&pUAManager->mutex);
+                                return;
+                        }
                         memcpy(event->data, pPkt->pData, nLen);
                 }
                         break;
@@ -235,7 +240,6 @@ void OnMessage(IN const void* _pInstance, IN int _nAccountId, IN const char* _pT
 void OnEvent(IN const void* _pInstance, IN int _nAccountId, IN int _nId,  IN const char* _pReason)
 {       
         DBG_LOG("%p id %d, account id %d, reason  %s \n",_pInstance, _nAccountId, _nId, _pReason);
-        // TODO call back to user.
         Message *pMessage = (Message *) malloc ( sizeof(Message) );
         Event *pEvent = (Event *) malloc( sizeof(Event) );
         MessageEvent *pMessageEvent = NULL;
@@ -260,10 +264,11 @@ void OnEvent(IN const void* _pInstance, IN int _nAccountId, IN int _nId,  IN con
         pMessage->nMessageID = EVENT_MESSAGE;
         pMessageEvent = &pEvent->body.messageEvent;
         pMessageEvent->status = _nId;
-        char *message = (char *) malloc (strlen(_pReason));
-        strncpy(message, _pReason, strlen(_pReason) - 1);
+        char *message = (char *) malloc (strlen(_pReason) + 1) ;
+        strncpy(message, _pReason, strlen(_pReason));
+        message[strlen(_pReason)] = 0;
         pMessageEvent->message = message;//_pReason;
-        DBG_ERROR("message %p  %s\n", pMessageEvent->message, pMessageEvent->message);
+        DBG_LOG("message %p  %s\n", pMessageEvent->message, pMessageEvent->message);
         pMessage->pMessage  = (void *)pEvent;
         SendMessage(pUA->pQueue, pMessage);
         pthread_mutex_unlock(&pUAManager->mutex);
@@ -352,8 +357,8 @@ ErrorID InitSDK( Media* _pMediaConfigs, int _nSize)
         config.Cb.OnIncomingCall  = &cbOnIncomingCall;
         config.Cb.OnCallStateChange = &cbOnCallStateChange;
         config.Cb.OnRegStatusChange = &cbOnRegStatusChange;
-        config.nMaxCall = 10;
-        config.nMaxAccount = 10;
+        config.nMaxCall = 16;
+        config.nMaxAccount = 40;
         pUAManager->config.callback.OnRxRtp = &OnRxRtp;
         // debug code.
         SetLogLevel(6);
@@ -415,11 +420,12 @@ ErrorID UnRegister(AccountID _nAccountId)
 {
     struct list_head *pos;
     pthread_mutex_lock(&pUAManager->mutex);
+    DBG_LOG("UnRegister account id %d\n", _nAccountId);
     UA *pUA = FindUA(pUAManager, _nAccountId, &pos);
     if (pUA != NULL) {
             list_del(pos);
-            UAUnRegister(pUA);
             pthread_mutex_unlock(&pUAManager->mutex);
+            UAUnRegister(pUA);
             return RET_OK;
     }
     pthread_mutex_unlock(&pUAManager->mutex);
@@ -430,6 +436,8 @@ ErrorID MakeCall(AccountID _nAccountId, const char* id, const char* _pDestUri, O
 {
     struct list_head *pos;
     ErrorID res = RET_ACCOUNT_NOT_EXIST;
+    pid_t tid = pthread_self();
+    DBG_ERROR("MakeCall pid %d\n", tid);
 
     if ( !_pDestUri || !_pCallId )
         return RET_PARAM_ERROR;
@@ -440,6 +448,7 @@ ErrorID MakeCall(AccountID _nAccountId, const char* id, const char* _pDestUri, O
             res = UAMakeCall(pUA, id, _pDestUri, _pCallId);
     }
     pthread_mutex_unlock(&pUAManager->mutex);
+
     return res;
 }
 
@@ -465,29 +474,45 @@ ErrorID PollEvent(AccountID _nAccountID, EventType* _pType, Event** _pEvent, int
     if ( pUA->pLastMessage ) {
         Event *pEvent = (Event *) pUA->pLastMessage->pMessage;
         if (pUA->pLastMessage->nMessageID == EVENT_DATA) {
-                DBG_ERROR("EVENT DATA \n");
+                DBG_LOG("EVENT DATA \n");
                 if (pEvent->body.dataEvent.data) {
                         free( pEvent->body.dataEvent.data );
                         pEvent->body.dataEvent.data = NULL;
                 }
         }
         if (pUA->pLastMessage->nMessageID == EVENT_MESSAGE) {
-                DBG_ERROR("EVENT MESSAGE %p %s\n", pEvent->body.messageEvent.message, pEvent->body.messageEvent.message);
+                DBG_LOG("EVENT MESSAGE %p %s\n", pEvent->body.messageEvent.message, pEvent->body.messageEvent.message);
                 if (pEvent->body.messageEvent.message) {
                         free(pEvent->body.messageEvent.message);
                         pEvent->body.messageEvent.message = NULL;
                 }
+        }
+        if (pUA->pLastMessage->nMessageID == EVENT_CALL) {
+               if (pEvent->body.callEvent.pFromAccount) {
+                      free(pEvent->body.callEvent.pFromAccount);
+                      pEvent->body.callEvent.pFromAccount = NULL;
+               }
         }
         free( pEvent );
         pEvent = NULL;
         pUA->pLastMessage = NULL;
     }
 #endif
+    pthread_mutex_unlock(&pUAManager->mutex);
     DBG_LOG("wait for event, pUA = %p\n", pUA );
+
     if (_nTimeOut) {
         pMessage = ReceiveMessageTimeout( pUA->pQueue, _nTimeOut );
     } else {
         pMessage = ReceiveMessage( pUA->pQueue );
+    }
+
+    pthread_mutex_lock(&pUAManager->mutex);
+    pUA = FindUA(pUAManager, _nAccountID, &pos);
+    if (pUA == NULL) {
+            DBG_ERROR( "RET_ACCOUNT_NOT_EXIST\n");
+            pthread_mutex_unlock(&pUAManager->mutex);
+            return RET_ACCOUNT_NOT_EXIST;
     }
 
     DBG_LOG("[ LIBSDK ]get one event\n");
@@ -565,12 +590,12 @@ ErrorID Report(AccountID id, const char* message, int length)
 {
     struct list_head *pos;
     ErrorID error = RET_ACCOUNT_NOT_EXIST;
-    pthread_mutex_lock(&pUAManager->mutex);
+    //pthread_mutex_lock(&pUAManager->mutex);
     UA *pUA = FindUA(pUAManager, id, &pos);
     if (pUA != NULL) {
             error = UAReport(pUA, message, length);
     }
-    pthread_mutex_unlock(&pUAManager->mutex);
+    //pthread_mutex_unlock(&pUAManager->mutex);
     return error;
 }
 
@@ -594,6 +619,7 @@ SipAnswerCode cbOnIncomingCall(const const int _nAccountId, const int _nCallId,
 
 void cbOnRegStatusChange(const int _nAccountId, const SipAnswerCode _regStatusCode, const void *_pUser )
 {
+    DBG_LOG("pUA address is, _regStatusCode = %d\n", _regStatusCode );
     Message *pMessage = (Message *) malloc( sizeof(Message) );
     Event *pEvent = (Event *) malloc( sizeof(Event) );
     if ( !pMessage || !pEvent ) {
@@ -603,17 +629,18 @@ void cbOnRegStatusChange(const int _nAccountId, const SipAnswerCode _regStatusCo
     CallEvent *pCallEvent = NULL;
     UA *_pUA = ( UA *)_pUser;
     struct list_head *pos;
+    //pthread_mutex_lock(&pUAManager->mutex);
     UA *pUA = FindUA(pUAManager, _nAccountId, &pos);
 
     if (pUA == NULL) {
             DBG_ERROR("pUser is NULL %p\n", _pUA);
             free(pMessage);
             free(pEvent);
+            //pthread_mutex_unlock(&pUAManager->mutex);
             return;
     }
     
     DBG_VAL(_nAccountId);
-    DBG_LOG("pUA address is %p, _regStatusCode = %d\n", pUA, _regStatusCode );
     memset( pMessage, 0, sizeof(Message) );
     memset( pEvent, 0, sizeof(Event) );
     pMessage->nMessageID = EVENT_CALL;
@@ -631,6 +658,7 @@ void cbOnRegStatusChange(const int _nAccountId, const SipAnswerCode _regStatusCo
         SendMessage( pUA->pQueue, pMessage );
     } else {
         DBG_ERROR("pUA is NULL\n");
+        //pthread_mutex_unlock(&pUAManager->mutex);
         return;
     }
 
@@ -643,8 +671,10 @@ void cbOnRegStatusChange(const int _nAccountId, const SipAnswerCode _regStatusCo
             pUA->regStatus = _regStatusCode;
         }
     }
+    //pthread_mutex_unlock(&pUAManager->mutex);
 }
 
+//This function may call by sync. Disable lock firstly.
 void cbOnCallStateChange(const int _nCallId, const int _nAccountId, const SipInviteState _State,
                          const SipAnswerCode _StatusCode, const void *pUser, const void *pMedia)
 {
@@ -655,7 +685,8 @@ void cbOnCallStateChange(const int _nCallId, const int _nAccountId, const SipInv
     struct list_head *pos;
 
     DBG_LOG("state = %d, status code = %d\n", _State, _StatusCode);
-
+    pid_t tid = pthread_self();
+    DBG_ERROR("cbOnCallStateChange pid %d\n", tid);
     if ( !pMessage || !pEvent ) {
             DBG_ERROR("malloc error\n");
             return;
@@ -663,6 +694,11 @@ void cbOnCallStateChange(const int _nCallId, const int _nAccountId, const SipInv
     UA *pUA = FindUA(pUAManager, _nAccountId, &pos);
 
     if (pUA == NULL) {
+    //pthread_mutex_lock(&pUAManager->mutex);
+    UA *pUA = FindUA(pUAManager, _nAccountId, &pos);
+
+    if (pUA == NULL) {
+            //pthread_mutex_unlock(&pUAManager->mutex);
             DBG_ERROR("pUser is NULL\n");
             free(pMessage);
             free(pEvent);
@@ -681,7 +717,9 @@ void cbOnCallStateChange(const int _nCallId, const int _nAccountId, const SipInv
     } else {
             pCallEvent->status = CALL_STATUS_REGISTERED;
     }
+    pCallEvent->pFromAccount = NULL;
     pMessage->pMessage  = (void *)pEvent;
     SendMessage(pUA->pQueue, pMessage);
     UAOnCallStateChange(pUA, _nCallId, _State, _StatusCode, pMedia);
+    //pthread_mutex_unlock(&pUAManager->mutex);
 }

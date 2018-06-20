@@ -15,6 +15,7 @@
 #include <sys/time.h>
 #include <errno.h>
 #include <stdio.h>
+#include <stdbool.h>
 
 typedef struct
 {
@@ -29,8 +30,9 @@ typedef struct
 	int                nNextOut;
 	int                nCapacity;
 	int                nSize;
-
+        bool               bIsValid;
 	pthread_mutex_t    mutex;
+        pthread_mutex_t    destroyMutex;
 	pthread_cond_t     consumerCond;
 } MessageQueue;
 

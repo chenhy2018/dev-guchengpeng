@@ -86,9 +86,14 @@ typedef int AccountID;
 #define LOG_WARN     3     // Any circumstance that may not affect normal operation
 #define LOG_DEBUG    4     // Standard debug messages
 #define LOG_VERBOSE  5     // All debug messages
-typedef void LogFunc(const char *data);
+
+typedef enum {
+        LOG_PRINT = 0,
+        LOG_FILE  //Todo.
+} LOG_MODE;
+
 void SetLogLevel(int level);
-void SetLogFunc(LogFunc *func);
+void SetLogMode(LOG_MODE mode);
 
 typedef struct {
     int callID;
@@ -154,7 +159,7 @@ ErrorID SendPacket(AccountID id, int callID, Stream streamID, const uint8_t* buf
 // poll a event
 // if the EventData have video or audio data
 // the user shuould copy the the packet data as soon as possible
-ErrorID PollEvent(AccountID id, EventType* type, Event** event, int timeOut );
+ErrorID PollEvent(AccountID id, EventType* type, Event** event, int timeOut);
 
 // mqtt report
 ErrorID Report(AccountID id, const char* message, int length);
