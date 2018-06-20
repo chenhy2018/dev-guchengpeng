@@ -691,9 +691,6 @@ void cbOnCallStateChange(const int _nCallId, const int _nAccountId, const SipInv
             DBG_ERROR("malloc error\n");
             return;
     }
-    UA *pUA = FindUA(pUAManager, _nAccountId, &pos);
-
-    if (pUA == NULL) {
     //pthread_mutex_lock(&pUAManager->mutex);
     UA *pUA = FindUA(pUAManager, _nAccountId, &pos);
 
