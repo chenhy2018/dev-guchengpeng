@@ -155,11 +155,6 @@ void writeLog(int loglvl, const char* file, const char* function, const int line
         gettimeofday(&start,NULL);
 }
 
-void SetLogFunc(LogFunc *func)
-{
-        debugFunc = func;
-}
-
 void pjLogFunc(int level, const char *data, int len)
 {
          if (level > dbgLevel) {
