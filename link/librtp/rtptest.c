@@ -568,6 +568,7 @@ static void onRxRtp(void *_pUserData, CallbackType _type, void *_pCbData)
                                 break;
                         }
                         if (pInfo->state == ICE_STATE_NEGOTIATION_OK) {
+                                gatherState = ICE_STATE_NEGOTIATION_OK;
                                 MY_PJ_LOG(3, "==========>callback_ice: state:%d", pInfo->state);
                                 for ( int i = 0; i < pInfo->nCount; i++) {
                                         MY_PJ_LOG(3, "           codec type:%d", pInfo->configs[i]->codecType);
@@ -913,11 +914,13 @@ int main(int argc, char **argv)
                 app.audioConfig.configs[1].codecType = MEDIA_FORMAT_PCMA;
                 app.audioConfig.configs[1].nChannel = 1;
                 app.audioConfig.nCount = 2;
+#if 0
                 if ( role == ANSWER ){
                         app.audioConfig.configs[0] = app.audioConfig.configs[1];
                         app.audioConfig.configs[1].nSampleOrClockRate = 8000;
                         app.audioConfig.configs[1].codecType = MEDIA_FORMAT_G729;
                 }
+#endif
                 status = AddAudioTrack(app.pPeerConnection, &app.audioConfig);
                 TESTCHECK(status, app);
         }
@@ -931,10 +934,12 @@ int main(int argc, char **argv)
                 app.videoConfig.configs[1].nSampleOrClockRate = 90000;
                 app.videoConfig.configs[1].codecType = MEDIA_FORMAT_H265;
                 app.videoConfig.nCount = 2;
+#if 0
                 if ( role == ANSWER ){
                         app.videoConfig.nCount = 1;
                         //app.videoConfig.configs[0] = app.videoConfig.configs[1];
                 }
+#endif
                 status = AddVideoTrack(app.pPeerConnection, &app.videoConfig);
                 TESTCHECK(status, app);
         }
@@ -944,6 +949,7 @@ int main(int argc, char **argv)
                 status = createOffer(app.pPeerConnection);
                 TESTCHECK(status, app);
                 waitState(ICE_STATE_INIT);
+                pj_assert(gatherState == ICE_STATE_GATHERING_OK);
                 
                 pjmedia_sdp_session *pAnswer = NULL;
                 pRemoteSdpPool =pj_pool_create(&app.cachingPool.factory, "sdpremote", 2048, 1024, NULL);
@@ -960,10 +966,14 @@ int main(int argc, char **argv)
                 status = createAnswer(app.pPeerConnection, pOffer);
                 TESTCHECK(status, app);
                 waitState(ICE_STATE_INIT);
+                pj_assert(gatherState == ICE_STATE_GATHERING_OK);
         }
         
         input_confirm("confirm to negotiation:");
         StartNegotiation(app.pPeerConnection);
+        
+        waitState(ICE_STATE_GATHERING_OK);
+        pj_assert(gatherState == ICE_STATE_NEGOTIATION_OK);
 
         if (role == ANSWER) {
 #if 0
