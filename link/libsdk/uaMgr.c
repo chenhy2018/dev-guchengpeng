@@ -50,9 +50,9 @@ UA* UARegister(const char* _pId, const char* _pPassword, const char* _pSigHost,
                 return NULL;
         }
         SipAccountConfig sipConfig;
-        sipConfig.pUserName = _pId;
-        sipConfig.pPassWord = _pPassword;
-        sipConfig.pDomain = _pSigHost;
+        sipConfig.pUserName = (char*)_pId;
+        sipConfig.pPassWord = (char*)_pPassword;
+        sipConfig.pDomain = (char*)_pSigHost;
         sipConfig.pUserData = (void *)pUA;
         sipConfig.nMaxOngoingCall = 10;
         int nAccountId = 0;

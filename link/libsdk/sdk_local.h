@@ -23,7 +23,7 @@
 #define CODECS_MAX (128)
 #define MEDIA_CONFIG_MAX (64)
 #define MAX_FROM_NAME_SIZE (64)
-#define MAX_URL_SIZE (64)
+#define MAX_URL_SIZE (128)
 #define INVALID_CALL_ID -1
 
 typedef struct RtpCallback

@@ -61,12 +61,16 @@ void OnIncomingCall(const const int _nAccountId, const int _nCallId, const const
     Event *pEvent = (Event *) malloc( sizeof(Event) );
     CallEvent *pCallEvent = NULL;
     if ( !pMessage || !pEvent ) {
+        if (pMessage) free(pMessage);
+        if (pEvent) free(pEvent);
         DBG_ERROR("malloc error\n");
         return;
     }
     struct list_head *pos;
     UA *pUA = FindUA(pUAManager, _nAccountId, &pos);
     if (pUA == NULL) {
+            free(pMessage);
+            free(pEvent);
             return;
     }
 
@@ -246,6 +250,8 @@ void OnEvent(IN const void* _pInstance, IN int _nAccountId, IN int _nId,  IN con
         
         if ( !pMessage || !pEvent ) {
                 DBG_ERROR("malloc error\n");
+                if (pMessage) free(pMessage);
+                if (pEvent) free(pEvent);
                 return;
         }
         struct list_head *pos;

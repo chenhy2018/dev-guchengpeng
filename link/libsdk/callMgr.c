@@ -50,9 +50,9 @@ ErrorID InitRtp(Call** _pCall, CallConfig* _pConfig)
         // rtp to do. ice config.media info. and check error)
         InitIceConfig(&pCall->iceConfig);
         if (!_pConfig->turnHost) DBG_LOG("InitRtp _pHost NULL \n");
-        strcpy(&pCall->iceConfig.turnHost[0], _pConfig->turnHost);
-        strcpy(&pCall->iceConfig.turnUsername[0], "root");// _pId);
-        strcpy(&pCall->iceConfig.turnPassword[0], "root"); //_pPassword);
+        strncpy(&pCall->iceConfig.turnHost[0], _pConfig->turnHost, MAX_TURN_HOST_SIZE);
+        strncpy(&pCall->iceConfig.turnUsername[0], "root", MAX_TURN_USR_SIZE);// _pId);
+        strncpy(&pCall->iceConfig.turnPassword[0], "root", MAX_TURN_PWD_SIZE); //_pPassword);
         pCall->iceConfig.userCallback = _pConfig->pCallback->OnRxRtp;
         pCall->iceConfig.pCbUserData = *_pCall;
         //todo check status
@@ -100,15 +100,14 @@ Call* CALLMakeCall(AccountID _nAccountId, const char* id, const char* _pDestUri,
                    OUT int* _pCallId, CallConfig* _pConfig) 
 {
         DBG_LOG("CALLMakeCall start \n");
-        char *pUri = NULL;
         int nSize = 0;
         Call* pCall = (Call*)malloc(sizeof(Call));
         if (pCall == NULL) {
                 return NULL;
         }
 
-        nSize = strlen(id) + strlen(_pDestUri) + 23;// <sip:id@_pDestUri>
-        pUri = (char *) malloc( nSize );
+        nSize = strlen(id) + strlen(_pDestUri) + 50;// <sip:id@_pDestUri>
+        char *pUri = (char *) malloc( nSize );
         if ( !pUri ) {
             DBG_ERROR("[ LIBSDK ] malloc error, malloc size %d\n", nSize );
             return NULL;
@@ -143,7 +142,7 @@ Call* CALLMakeCall(AccountID _nAccountId, const char* id, const char* _pDestUri,
                 return NULL;
         }
 #endif
-        strncpy(pCall->url, pUri, strlen(pUri) + 1);
+        strncpy(pCall->url, pUri, MAX_URL_SIZE);
         pCall->id = CallId++;
         pCall->nAccountId = _nAccountId;
         pCall->callStatus = INV_STATE_CALLING;
@@ -243,8 +242,8 @@ SipAnswerCode CALLOnIncomingCall(Call** _pCall, const int _nAccountId, const int
         pCall->nAccountId = _nAccountId;
         pCall->callStatus =  INV_STATE_INCOMING;
         pCall->pRemote = (pjmedia_sdp_session*)pMedia;
-        strncpy(pCall->from, pFrom, strlen(pFrom));
-        pCall->from[strlen(pFrom)] = '\0';
+        strncpy(pCall->from, pFrom, MAX_FROM_NAME_SIZE);
+        pCall->from[MAX_FROM_NAME_SIZE - 1] = '\0';
         DBG_LOG("call %p\n", pCall);
         int res = 0;
         DBG_LOG("pPeerConnection pRemote %p %p\n", pCall->pPeerConnection, pCall->pRemote);
