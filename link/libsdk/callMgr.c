@@ -107,7 +107,7 @@ Call* CALLMakeCall(AccountID _nAccountId, const char* id, const char* _pDestUri,
                 return NULL;
         }
 
-        nSize = strlen(id) + strlen(_pDestUri) + 22;// <sip:id@_pDestUri>
+        nSize = strlen(id) + strlen(_pDestUri) + 23;// <sip:id@_pDestUri>
         pUri = (char *) malloc( nSize );
         if ( !pUri ) {
             DBG_ERROR("[ LIBSDK ] malloc error, malloc size %d\n", nSize );

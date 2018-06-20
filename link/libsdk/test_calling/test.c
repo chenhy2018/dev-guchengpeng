@@ -178,6 +178,7 @@ int RegisterTestSuitCallback( TestSuit *this )
                      usleep(10000);
                      SendPacket(sts, callId, STREAM_AUDIO, "123456788901234567890123456", 15, timecount);
                      timecount += 20;
+                     continue;
               }
               if (id != RET_OK) {
                     usleep(1000000);
@@ -211,7 +212,6 @@ int RegisterTestSuitCallback( TestSuit *this )
                            break;
                      }
               }
-              usleep(100000);
             }
             UT_LOG("HangupCall in\n");
             int ret = HangupCall(sts, nCallId1);

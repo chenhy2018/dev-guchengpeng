@@ -208,6 +208,7 @@ static void OnRxRtp(void *_pUserData, CallbackType _type, void *_pCbData)
                                 //pj_file_write(gH264Fd, pPkt->pData, &nLen);
                                 event->stream = STREAM_VIDEO;
                         }
+                        DBG_LOG("==========>callback_rtp nTimestamp %lld\n", pPkt->nTimestamp);
                         event->pts = pPkt->nTimestamp;
                         event->callID = pCall->id;
                         event->size = nLen;
@@ -595,6 +596,10 @@ void cbOnRegStatusChange(const int _nAccountId, const SipAnswerCode _regStatusCo
 {
     Message *pMessage = (Message *) malloc( sizeof(Message) );
     Event *pEvent = (Event *) malloc( sizeof(Event) );
+    if ( !pMessage || !pEvent ) {
+            DBG_ERROR("malloc error\n");
+            return;
+    }
     CallEvent *pCallEvent = NULL;
     UA *_pUA = ( UA *)_pUser;
     struct list_head *pos;
@@ -602,6 +607,8 @@ void cbOnRegStatusChange(const int _nAccountId, const SipAnswerCode _regStatusCo
 
     if (pUA == NULL) {
             DBG_ERROR("pUser is NULL %p\n", _pUA);
+            free(pMessage);
+            free(pEvent);
             return;
     }
     
@@ -657,6 +664,8 @@ void cbOnCallStateChange(const int _nCallId, const int _nAccountId, const SipInv
 
     if (pUA == NULL) {
             DBG_ERROR("pUser is NULL\n");
+            free(pMessage);
+            free(pEvent);
             return;
     }
 

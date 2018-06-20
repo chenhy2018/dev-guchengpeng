@@ -1219,7 +1219,7 @@ static inline uint64_t getMediaTrackElapseTime(IN MediaStreamTrack *_pMediaTrack
 static inline uint32_t calcRtpTimestampLen(uint64_t _nPktTimestampGap, int nRate)
 {
         uint32_t rate = (uint32_t)nRate;
-        return _nPktTimestampGap * nRate / rate;
+        return _nPktTimestampGap * nRate / 1000;
 }
 
 static void dealWithTimestamp(IN OUT MediaStreamTrack *_pMediaTrack, IN pj_timestamp _now,

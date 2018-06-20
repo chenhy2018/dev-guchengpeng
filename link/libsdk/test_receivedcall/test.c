@@ -151,7 +151,7 @@ int RegisterTestSuitCallback( TestSuit *this )
                      case EVENT_DATA:
                      {
                             DataEvent *pDataEvent = &(event->body.dataEvent);
-                            DBG_LOG("Data size %d call id %d call account id %d timestamp %ld \n", pDataEvent->size, pDataEvent->callID, sts, pDataEvent->pts);
+                            DBG_LOG("Data size %d call id %d call account id %d timestamp %lld \n", pDataEvent->size, pDataEvent->callID, sts, pDataEvent->pts);
                             if (timecount == 0) {
                                     timecount = pDataEvent->pts;
                             }
