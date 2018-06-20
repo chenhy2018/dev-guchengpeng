@@ -1,4 +1,4 @@
-// Last Update:2018-06-15 16:17:11
+// Last Update:2018-06-19 18:42:47
 /**
  * @file register_test.c
  * @brief 
@@ -7,6 +7,7 @@
  * @date 2018-06-12
  */
 #include "sdk_interface.h"
+#include "dbg.h"
 #include "unit_test.h"
 #include <unistd.h>
 
@@ -37,7 +38,7 @@ RegisterTestCase gRegisterTestCases[] =
 {
     {
         { "valid account1", CALL_STATUS_REGISTERED },
-        { "1002", "1002", HOST, HOST, HOST, 10, 1 }
+        { "1002", "1002", HOST, HOST, HOST, 10, 0 }
     },
     {
         { "valid account2", CALL_STATUS_REGISTERED },
@@ -200,9 +201,26 @@ TestSuit gRegisterTestSuit =
 
 int RegisterTestSuitInit( TestSuit *this, TestSuitManager *_pManager )
 {
+    Media media[2];
+    ErrorID sts = 0;
+
     this->total = ARRSZ(gRegisterTestCases);
     this->index = 0;
     this->pManager = _pManager;
+
+    media[0].streamType = STREAM_VIDEO;
+    media[0].codecType = CODEC_H264;
+    media[0].sampleRate = 90000;
+    media[0].channels = 0;
+    media[1].streamType = STREAM_AUDIO;
+    media[1].codecType = CODEC_G711A;
+    media[1].sampleRate = 8000;
+    media[1].channels = 1;
+    sts = InitSDK( media, 2 );
+    if ( RET_OK != sts ) {
+        UT_ERROR("sdk init error\n");
+        return -1;
+    }
 
     return 0;
 }
@@ -232,13 +250,12 @@ int RegisterTestSuitCallback( TestSuit *this )
     static ErrorID sts = 0;
     EventManger *pEventManager = &this->pManager->eventManager;
 
-    UT_LINE();
+    /*UT_LINE();*/
     if ( !this ) {
         return -1;
     }
 
     pTestCases = (RegisterTestCase *) this->testCases;
-    UT_LOG("this->index = %d\n", this->index );
     pTestCase = &pTestCases[this->index];
     pData = &pTestCase->data;
 
@@ -250,16 +267,11 @@ int RegisterTestSuitCallback( TestSuit *this )
         }
     }
 
-    UT_STR( pData->id );
-    UT_STR( pData->password );
-    UT_STR( pData->sigHost );
-
     sts = Register( pData->id, pData->password, pData->sigHost, pData->mediaHost, pData->imHost );
     if ( sts >= RET_MEM_ERROR ) {
         DBG_ERROR("sts = %d\n", sts );
         return TEST_FAIL;
     }
-    UT_VAL( sts );
     pTestCase->father.data = (void *)sts;
     if ( pTestCase->father.threadEntry )
         this->pManager->startThread( this, pTestCase->father.threadEntry );
@@ -267,7 +279,6 @@ int RegisterTestSuitCallback( TestSuit *this )
         this->pManager->startThread( this, this->threadEntry );
 
     if ( pEventManager->WaitForEvent ) {
-        UT_VAL( pTestCase->father.expact );
         ret = pEventManager->WaitForEvent( pTestCase->father.expact, pData->timeOut );
         if ( ret == ERROR_TIMEOUT ) {
             UT_ERROR("ERROR_TIMEOUT\n");
@@ -276,7 +287,7 @@ int RegisterTestSuitCallback( TestSuit *this )
             UT_ERROR("ERROR_INVAL\n");
             return TEST_FAIL;
         }
-        UT_VAL( ret );
+        /*UT_VAL( ret );*/
         //UnRegister(sts);
         return TEST_PASS;
     }
@@ -298,7 +309,7 @@ void *RegisterEventLoopThread( void *arg )
     RegisterTestCase *pTestCases = NULL;
     static int count = 0;
 
-    UT_NOTICE("EventLoopThread enter ..., count = %d\n", count );
+    /*UT_NOTICE("EventLoopThread enter ..., count = %d\n", count );*/
     if ( !pManager ) {
         UT_ERROR("check param error\n");
         return NULL;
@@ -310,30 +321,26 @@ void *RegisterEventLoopThread( void *arg )
     pTestCase = &pTestCases[pTestSuit->index];
     id = (AccountID)(long) pTestCase->father.data;
 
-    UT_VAL( id );
-
     while ( pTestCase->father.running ) {
-        UT_LOG("call PollEvent\n");
         ret = PollEvent( id, &type, &pEvent, 0);
-        UT_VAL( ret );
         if ( ret >= RET_MEM_ERROR ) {
             UT_ERROR("ret = %d\n", ret );
             return NULL;
         }
-        UT_VAL( type );
         if ( type == EVENT_CALL ) {
-            UT_LINE();
+            DBG_LOG("EVENT_CALL\n");
             if ( pEvent ) {
                 pCallEvent = &pEvent->body.callEvent;
                 if ( pManager->NotifyAllEvent ) {
-                    UT_VAL( pCallEvent->status );
+                    char * pStr = DbgCallStatusGetStr( pCallEvent->status );
+                    UT_STR( pStr );
                     pManager->NotifyAllEvent( pCallEvent->status );
                 }
             }
         }
     }
 
-    UT_NOTICE("thread %ld exit ....\n", pTestSuit->tid );
+    /*UT_NOTICE("thread %ld exit ...., count = %d\n", pTestSuit->tid, count );*/
 
     return NULL;
 }

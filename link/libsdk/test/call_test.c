@@ -58,7 +58,7 @@ TestSuit gMakeCallTestSuit =
     MakeCallTestSuitInit,
     MakeCallTestSuitGetTestCase,
     (void*)&gMakeCallTestCases,
-    0,
+    1,
     MakeCallEventLoopThread
 };
 
