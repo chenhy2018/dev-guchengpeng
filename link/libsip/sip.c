@@ -532,7 +532,7 @@ int CreateTmpSDP(OUT void **_pSdp)
                 char ptstr[10];
 
                 sprintf(ptstr, "%d", 0);
-                pj_strdup2(_pPool, &pMedia->desc.fmt[0], ptstr);
+                pj_strdup2_with_null(_pPool, &pMedia->desc.fmt[0], ptstr);
                 rtpmap.pt = pMedia->desc.fmt[0];
                 rtpmap.clock_rate = 8000;
                 rtpmap.enc_name = pj_str("PCMU");
