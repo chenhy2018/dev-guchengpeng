@@ -38,14 +38,16 @@ MQTT_PATH=../libmqtt
 OUTPUT=output
 SIP_OUT_PATH=$(OUTPUT)/libsip
 MQTT_OUT_PATH=$(OUTPUT)/libmqtt
-LIBSIP=$(SIP_OUT_PATH)/sip.o
 SDK_OBJS_PATH=$(OUTPUT)/libsdk
 LIBSDK=queue.o sdk_interface.o \
        test.o dbg.o uaMgr.o callMgr.o
+LIBSIP=sip.o sip_internal.o
 TARGET_LIBRARY=$(OUTPUT)/lib/$(ARCH)/libua.a
 LIBPJ=$(OUTPUT)/ori/$(ARCH)
-LIBMQTT=$(SIP_OUT_PATH)/mqtt.o
+LIBMQTT=$(MQTT_OUT_PATH)/mqtt.o
 LIBRTP=
+LIBSIP_OBJS_PATH=$(OUTPUT)/libsip
+LIBSIP_SOURCE_PATH=../libsip
 
 all : $(TARGET_LIBRARY)
 
@@ -76,9 +78,11 @@ pjsip $(LIBPJ) : #pjclean depclean
 	&& make install
 
 
-$(LIBSIP):$(SIP_PATH)/sip.c
-	mkdir -p $(SIP_OUT_PATH)
-	$(CC) $(INCLUDE_PATH) -c $< -o $@
+vpath %.o $(OUTPUT)
+vpath %.c $(LIBSIP_SOURCE_PATH)
+$(LIBSIP) : %.o : %.c
+	mkdir -p $(LIBSIP_OBJS_PATH) 
+	$(CC) $(CFLAGS) $(INCLUDE_PATH) -c $< -o $(LIBSIP_OBJS_PATH)/$@
 
 $(LIBMQTT):$(MQTT_PATH)/mqtt.c
 	mkdir -p $(MQTT_OUT_PATH)
@@ -86,7 +90,7 @@ $(LIBMQTT):$(MQTT_PATH)/mqtt.c
 
 
 # set .o file search path
-vpath %.o $(SDK_OBJS_PATH)
+#vpath %.o $(SDK_OBJS_PATH)
 sdk $(TARGET_LIBRARY) : $(LIBPJ) $(LIBSIP) $(LIBSDK) $(LIBMQTT) $(LIBRTP)
 	./merge-lib.sh $(ARCH)
 	make -C test clean
