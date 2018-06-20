@@ -63,7 +63,7 @@ UA* UARegister(const char* _pId, const char* _pPassword, const char* _pSigHost,
         pUA->regStatus == TRYING;
         //mqtt create instance.
         _pOptions->nAccountId = nAccountId;
-        //pUA->pMqttInstance = MqttCreateInstance(_pOptions);
+        pUA->pMqttInstance = MqttCreateInstance(_pOptions);
         pUA->id = nAccountId;
         pUA->config.pVideoConfigs = &_pConfig->videoConfigs;
         pUA->config.pAudioConfigs = &_pConfig->audioConfigs;
