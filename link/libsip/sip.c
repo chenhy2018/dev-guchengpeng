@@ -323,7 +323,8 @@ static void ReleaseMsgResource(Message *pMsg)
                 pEvent->Body.MakeCall.pDestUri = NULL;
                 break;
         case SIP_ANSWER_CALL:
-                free(pEvent->Body.AnswerCall.Reason);
+                if (pEvent->Body.AnswerCall.Reason)
+                        free(pEvent->Body.AnswerCall.Reason);
                 pEvent->Body.AnswerCall.Reason = NULL;
                 break;
         }
