@@ -34,20 +34,24 @@ INCLUDE_PATH=-I$(PJSIP_PATH)/pjlib/include \
 			 -I $(PROJECT_PATH)/mosquitto-1.4.8/lib/ 
 
 SIP_PATH=../libsip
+RTP_PATH=../librtp
 MQTT_PATH=../libmqtt
 OUTPUT=output
 SIP_OUT_PATH=$(OUTPUT)/libsip
+RTP_OUT_PATH=$(OUTPUT)/librtp
 MQTT_OUT_PATH=$(OUTPUT)/libmqtt
 SDK_OBJS_PATH=$(OUTPUT)/libsdk
 LIBSDK=queue.o sdk_interface.o \
        test.o dbg.o uaMgr.o callMgr.o
 LIBSIP=sip.o sip_internal.o
+LIBRTP=JitterBuffer.o MediaStream.o PeerConnection.o heap.o
 TARGET_LIBRARY=$(OUTPUT)/lib/$(ARCH)/libua.a
 LIBPJ=$(OUTPUT)/ori/$(ARCH)
 LIBMQTT=$(MQTT_OUT_PATH)/mqtt.o
-LIBRTP=
 LIBSIP_OBJS_PATH=$(OUTPUT)/libsip
+LIBRTP_OBJS_PATH=$(OUTPUT)/librtp
 LIBSIP_SOURCE_PATH=../libsip
+LIBRTP_SOURCE_PATH=../librtp
 
 all : $(TARGET_LIBRARY)
 
@@ -84,6 +88,11 @@ $(LIBSIP) : %.o : %.c
 	mkdir -p $(LIBSIP_OBJS_PATH) 
 	$(CC) $(CFLAGS) $(INCLUDE_PATH) -c $< -o $(LIBSIP_OBJS_PATH)/$@
 
+vpath %.c $(LIBRTP_SOURCE_PATH)
+$(LIBRTP) : %.o : %.c
+	mkdir -p $(LIBRTP_OBJS_PATH) 
+	$(CC) $(CFLAGS) $(INCLUDE_PATH) -c $< -o $(LIBRTP_OBJS_PATH)/$@
+
 $(LIBMQTT):$(MQTT_PATH)/mqtt.c
 	mkdir -p $(MQTT_OUT_PATH)
 	$(CC) $(INCLUDE_PATH) -c $< -o $@
@@ -94,9 +103,9 @@ $(LIBMQTT):$(MQTT_PATH)/mqtt.c
 sdk $(TARGET_LIBRARY) : $(LIBPJ) $(LIBSIP) $(LIBSDK) $(LIBMQTT) $(LIBRTP)
 	./merge-lib.sh $(ARCH)
 	make -C test clean
-	make -C test
+	make -C test ARCH=$(ARCH)
 	make -C test/callee clean
-	make -C test/callee
+	make -C test/callee ARCH=$(ARCH)
 
 $(LIBSDK) : %.o : %.c
 	mkdir -p $(SDK_OBJS_PATH) 
