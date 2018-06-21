@@ -114,6 +114,9 @@ libsdk : $(LIBSDK)
 
 clean:
 	make -C test clean
-	rm -rvf output
+	rm -rvf output/libmqtt
+	rm -rvf output/libsdk
+	rm -rvf output/libsip
+	rm -rvf output/librtp
 
 
