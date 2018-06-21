@@ -1,4 +1,4 @@
-// Last Update:2018-06-21 12:41:25
+// Last Update:2018-06-21 14:57:05
 /**
  * @file call_test.c
  * @brief 
@@ -29,6 +29,7 @@ void *MakeCallEventLoopThread( void *arg );
 int MakeCallTestSuitCallback( TestSuit *this );
 int MakeCallTestSuitGetTestCase( TestSuit *this, TestCase **testCase );
 void *CalleeThread( void *arg );
+int MakeCallTestSuitInit( TestSuit *this, TestSuitManager *_pManager );
 
 MakeCallTestCase gMakeCallTestCases[] =
 {
@@ -52,9 +53,9 @@ MakeCallTestCase gMakeCallTestCases[] =
 
 TestSuit gMakeCallTestSuit =
 {
-    "MakeCall",
+    "MakeCall()",
     MakeCallTestSuitCallback,
-    NULL,
+    MakeCallTestSuitInit,
     MakeCallTestSuitGetTestCase,
     (void*)&gMakeCallTestCases,
     1,
@@ -84,7 +85,7 @@ void *MakeCallEventLoopThread( void *arg )
     pTestCase = &pTestCases[pTestSuit->index];
     id = (AccountID)(long) pTestCase->father.data;
 
-    for (;;) {
+    while ( pTestCase->father.running ) {
         UT_LOG("call PollEvent\n");
         ret = PollEvent( id, &type, &pEvent, 0 );
         UT_VAL( type );
@@ -183,6 +184,19 @@ int MakeCallTestSuitCallback( TestSuit *this )
     return TEST_FAIL;
 }
 
+int MakeCallTestSuitInit( TestSuit *this, TestSuitManager *_pManager )
+{
+    int ret = 0;
+    pthread_t tid = 0;
+    
+    ret = pthread_create( &tid, NULL, CalleeThread, this );
+    if ( ret != 0 ) {
+        UT_ERROR("pthread_create() error, ret = %d\n", ret );
+        return -1;
+    }
+    return 0;
+}
+
 void *CalleeThread( void *arg )
 {
     ErrorID sts = 0;
@@ -209,10 +223,12 @@ void *CalleeThread( void *arg )
         switch( type ) {
         case EVENT_CALL:
             UT_LOG("get event EVENT_CALL\n");
-            pCallEvent = &pEvent->body.callEvent;
-            char *callSts = DbgCallStatusGetStr( pCallEvent->status );
-            UT_LOG("status : %s\n", callSts );
-            UT_STR( pCallEvent->pFromAccount );
+            if ( pEvent ) {
+                pCallEvent = &pEvent->body.callEvent;
+                char *callSts = DbgCallStatusGetStr( pCallEvent->status );
+                UT_LOG("status : %s\n", callSts );
+                UT_STR( pCallEvent->pFromAccount );
+            }
             break;
         case EVENT_DATA:
             UT_LOG("get event EVENT_DATA\n");
