@@ -30,6 +30,6 @@ SipAnswerCode UAOnIncomingCall(UA* _pUa, const int _nCallId, const char *pFrom, 
 
 void UAOnRegStatusChange(UA* _pUa, const SipAnswerCode RegStatusCode);
 
-void UAOnCallStateChange(UA* _pUa, const int nCallId, const SipInviteState State, const SipAnswerCode StatusCode, const void *pMedia);
+void UAOnCallStateChange(UA* _pUa, const int nCallId, const SipInviteState State, const SipAnswerCode StatusCode, const void *pMedia, int* nId);
 
 #endif

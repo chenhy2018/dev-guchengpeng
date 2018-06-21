@@ -74,7 +74,7 @@ void OnIncomingCall(const const int _nAccountId, const int _nCallId, const const
             return;
     }
 
-    DBG_LOG("incoming call From %s to %d\n", _pFrom, _nAccountId);
+    DBG_LOG("incoming call From %s to %d  _nCallId %d\n", _pFrom, _nAccountId, _nCallId);
 
     memset( pMessage, 0, sizeof(Message) );
     memset( pEvent, 0, sizeof(Event) );
@@ -115,9 +115,9 @@ static void OnRxRtp(void *_pUserData, CallbackType _type, void *_pCbData)
                                  {       
                                          DBG_LOG("=****=========>callback_ice: state: %d callStatus %d\n", pInfo->state, pCall->callStatus);
                                          pCall->pLocal = (pjmedia_sdp_session *)(pInfo->pData);
-                                         DBG_LOG("=****=========>callback_ice: state: pLocal %p\n", pCall->pLocal);
+                                         DBG_LOG("=****=========>callback_ice: state: pLocal %p accountid %d call id %d\n", pCall->pLocal, pCall->nAccountId, pCall->id);
                                          if (pCall->callStatus == INV_STATE_INCOMING) {
-                                                 OnIncomingCall(pCall->id, pCall->nAccountId, pCall->from);
+                                                 OnIncomingCall(pCall->nAccountId,pCall->id, pCall->from);
                                          }
                                          else if (pCall->callStatus == INV_STATE_CALLING) {
                                                  CALLMakeNewCall(pCall);
@@ -200,7 +200,6 @@ static void OnRxRtp(void *_pUserData, CallbackType _type, void *_pCbData)
                  }
                         break;
                 case CALLBACK_RTP:{
-                        DBG_LOG("==========>callback_rtp\n");
                         pMessage->nMessageID = EVENT_DATA;
                         RtpPacket *pPkt = (RtpPacket *)_pCbData;
                         pj_ssize_t nLen = pPkt->nDataLen;
@@ -212,7 +211,7 @@ static void OnRxRtp(void *_pUserData, CallbackType _type, void *_pCbData)
                                 //pj_file_write(gH264Fd, pPkt->pData, &nLen);
                                 event->stream = STREAM_VIDEO;
                         }
-                        DBG_LOG("==========>callback_rtp nTimestamp %lld\n", pPkt->nTimestamp);
+                        //DBG_LOG("==========>callback_rtp nTimestamp %lld\n", pPkt->nTimestamp);
                         event->pts = pPkt->nTimestamp;
                         event->callID = pCall->id;
                         event->size = nLen;
@@ -232,7 +231,6 @@ static void OnRxRtp(void *_pUserData, CallbackType _type, void *_pCbData)
         }
         pMessage->pMessage  = (void *)pEvent;
         SendMessage(pUA->pQueue, pMessage);
-        DBG_LOG("==========>callback_rtp end ******\n");
         pthread_mutex_unlock(&pUAManager->mutex);
 }
 
@@ -480,14 +478,14 @@ ErrorID PollEvent(AccountID _nAccountID, EventType* _pType, Event** _pEvent, int
     if ( pUA->pLastMessage ) {
         Event *pEvent = (Event *) pUA->pLastMessage->pMessage;
         if (pUA->pLastMessage->nMessageID == EVENT_DATA) {
-                DBG_LOG("EVENT DATA \n");
+                //DBG_LOG("EVENT DATA \n");
                 if (pEvent->body.dataEvent.data) {
                         free( pEvent->body.dataEvent.data );
                         pEvent->body.dataEvent.data = NULL;
                 }
         }
         if (pUA->pLastMessage->nMessageID == EVENT_MESSAGE) {
-                DBG_LOG("EVENT MESSAGE %p %s\n", pEvent->body.messageEvent.message, pEvent->body.messageEvent.message);
+                //DBG_LOG("EVENT MESSAGE %p %s\n", pEvent->body.messageEvent.message, pEvent->body.messageEvent.message);
                 if (pEvent->body.messageEvent.message) {
                         free(pEvent->body.messageEvent.message);
                         pEvent->body.messageEvent.message = NULL;
@@ -505,7 +503,7 @@ ErrorID PollEvent(AccountID _nAccountID, EventType* _pType, Event** _pEvent, int
     }
 #endif
     pthread_mutex_unlock(&pUAManager->mutex);
-    DBG_LOG("wait for event, pUA = %p\n", pUA );
+    //DBG_LOG("wait for event, pUA = %p\n", pUA );
 
     if (_nTimeOut) {
         pMessage = ReceiveMessageTimeout( pUA->pQueue, _nTimeOut );
@@ -521,7 +519,7 @@ ErrorID PollEvent(AccountID _nAccountID, EventType* _pType, Event** _pEvent, int
             return RET_ACCOUNT_NOT_EXIST;
     }
 
-    DBG_LOG("[ LIBSDK ]get one event\n");
+    //DBG_LOG("[ LIBSDK ]get one event\n");
     if (!pMessage) {
         pthread_mutex_unlock(&pUAManager->mutex);
         return RET_RETRY;
@@ -617,7 +615,7 @@ SipAnswerCode cbOnIncomingCall(const const int _nAccountId, const int _nCallId,
             return DOES_NOT_EXIST_ANYWHERE;
     }
     
-    DBG_LOG("incoming call From %s to %d %p\n", _pFrom, _nAccountId, _pMedia);
+    DBG_LOG("incoming call From %s to %d %p call id %d\n", _pFrom, _nAccountId, _pMedia, _nCallId);
     UAOnIncomingCall(pUA, _nCallId, _pFrom, _pMedia);
     pthread_mutex_unlock(&pUAManager->mutex);
     return OK;
@@ -712,6 +710,7 @@ void cbOnCallStateChange(const int _nCallId, const int _nAccountId, const SipInv
     memset( pEvent, 0, sizeof(Event) );
     pMessage->nMessageID = EVENT_CALL;
     pCallEvent = &pEvent->body.callEvent;
+    UAOnCallStateChange(pUA, _nCallId, _State, _StatusCode, pMedia, &pCallEvent->callID);
     pCallEvent->callID = _nCallId;
     if ( _State == INV_STATE_CONFIRMED ) {
             pCallEvent->status = CALL_STATUS_ESTABLISHED;
@@ -723,6 +722,5 @@ void cbOnCallStateChange(const int _nCallId, const int _nAccountId, const SipInv
     pCallEvent->pFromAccount = NULL;
     pMessage->pMessage  = (void *)pEvent;
     SendMessage(pUA->pQueue, pMessage);
-    UAOnCallStateChange(pUA, _nCallId, _State, _StatusCode, pMedia);
     //pthread_mutex_unlock(&pUAManager->mutex);
 }

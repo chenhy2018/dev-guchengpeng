@@ -50,9 +50,9 @@ ErrorID InitRtp(Call** _pCall, CallConfig* _pConfig)
         // rtp to do. ice config.media info. and check error)
         InitIceConfig(&pCall->iceConfig);
         if (!_pConfig->turnHost) DBG_LOG("InitRtp _pHost NULL \n");
-        strncpy(&pCall->iceConfig.turnHost[0], _pConfig->turnHost, MAX_TURN_HOST_SIZE);
-        strncpy(&pCall->iceConfig.turnUsername[0], "root", MAX_TURN_USR_SIZE);// _pId);
-        strncpy(&pCall->iceConfig.turnPassword[0], "root", MAX_TURN_PWD_SIZE); //_pPassword);
+        strncpy(&pCall->iceConfig.turnHost[0], "123.59.204.198:4478", MAX_TURN_HOST_SIZE);//_pConfig->turnHost, MAX_TURN_HOST_SIZE);
+        //strncpy(&pCall->iceConfig.turnUsername[0], "root", MAX_TURN_USR_SIZE);// _pId);
+        //strncpy(&pCall->iceConfig.turnPassword[0], "root", MAX_TURN_PWD_SIZE); //_pPassword);
         pCall->iceConfig.userCallback = _pConfig->pCallback->OnRxRtp;
         pCall->iceConfig.pCbUserData = *_pCall;
         //todo check status
@@ -93,6 +93,7 @@ void CALLMakeNewCall(Call* _pCall)
                 return;
         }
         _pCall->nActualId = nCallId;
+        DBG_LOG("CALLMakeCall end call id %d", _pCall->nActualId);
 }
 
 // make a call, user need to save call id . add parameter for ice info and media info.
@@ -133,22 +134,12 @@ Call* CALLMakeCall(AccountID _nAccountId, const char* id, const char* _pDestUri,
                 free(pCall);
                 return NULL;
         }
-        DBG_LOG("CALLMakeCall start url %s\n", pUri);
-#if 0
-        SIP_ERROR_CODE error = SipMakeNewCall(_nAccountId, pUri, pCall->pOffer, _pCallId);
-        if (error != SIP_SUCCESS) {
-                DBG_ERROR("SipMakeNewCall failed %d \n", res);
-                free(pCall);
-                return NULL;
-        }
-#endif
         strncpy(pCall->url, pUri, MAX_URL_SIZE);
-        pCall->id = CallId++;
+        pCall->id = ++CallId;
         pCall->nAccountId = _nAccountId;
         pCall->callStatus = INV_STATE_CALLING;
         CheckCallStatus(pCall, CALL_STATUS_RING);
         free(pUri);
-        DBG_LOG("CALLMakeCall end %p \n", pCall);
         return pCall;
 }
 
@@ -171,8 +162,8 @@ ErrorID CALLAnswerCall(Call* _pCall)
         createAnswer(_pCall->pPeerConnection, _pCall->pOffer, &_pCall->pAnswer);
         setLocalDescription(pCall->pPeerConnection, pCall->pAnswer);
 #endif
-        DBG_LOG("CALLAnswerCall  %p id %d \n", _pCall, _pCall->id);
-        return SipAnswerCall(_pCall->id, OK, "answser call", _pCall->pLocal);
+        DBG_LOG("CALLAnswerCall  %p id %d \n", _pCall, _pCall->nActualId);
+        return SipAnswerCall(_pCall->nActualId, OK, "answser call", _pCall->pLocal);
 }
 
 ErrorID CALLRejectCall(Call* _pCall)
@@ -231,20 +222,20 @@ SipAnswerCode CALLOnIncomingCall(Call** _pCall, const int _nAccountId, const int
                 return NOT_ACCEPTABLE;
         }
         memset(pCall, 0, sizeof(Call));
+        *_pCall = pCall;
+        pCall->id = ++CallId;
+        pCall->nActualId = _nCallId;
+        pCall->nAccountId = _nAccountId;
+        pCall->callStatus =  INV_STATE_INCOMING;
+        strncpy(pCall->from, pFrom, MAX_FROM_NAME_SIZE);
+        pCall->from[MAX_FROM_NAME_SIZE - 1] = '\0';
+        DBG_LOG("call %p CALLOnIncomingCall id %d\n", pCall, pCall->id);
         ErrorID id = InitRtp(&pCall, _pConfig);
         if (id != RET_OK) {
               DBG_ERROR("InitRtp failed %d\n", id);
               return INTERNAL_SERVER_ERROR;
         }
-        *_pCall = pCall;
-        pCall->id = CallId ++;
-        pCall->nActualId = _nCallId;
-        pCall->nAccountId = _nAccountId;
-        pCall->callStatus =  INV_STATE_INCOMING;
         pCall->pRemote = (pjmedia_sdp_session*)pMedia;
-        strncpy(pCall->from, pFrom, MAX_FROM_NAME_SIZE);
-        pCall->from[MAX_FROM_NAME_SIZE - 1] = '\0';
-        DBG_LOG("call %p\n", pCall);
         int res = 0;
         DBG_LOG("pPeerConnection pRemote %p %p\n", pCall->pPeerConnection, pCall->pRemote);
         res = setRemoteDescription(pCall->pPeerConnection, pCall->pRemote);
@@ -252,14 +243,12 @@ SipAnswerCode CALLOnIncomingCall(Call** _pCall, const int _nAccountId, const int
                 DBG_ERROR("setRemoteDescription failed %d \n", res);
                 return INTERNAL_SERVER_ERROR;
         }
-        DBG_LOG("call answer call\n");
         res = createAnswer(pCall->pPeerConnection, pCall->pRemote);
         if (res != 0) {
                 DBG_ERROR("createAnswer failed %d \n", res);
                 return INTERNAL_SERVER_ERROR;
         }
 
-        DBG_LOG("call answer call end\n");
         return OK;
 }
 
