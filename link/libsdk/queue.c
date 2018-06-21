@@ -145,15 +145,15 @@ Message* ReceiveMessageTimeout(MessageQueue* _pQueue, int _nMilliSec)
                 int nsec = ((now.tv_usec + _nMilliSec * 1000) % 1000000) * 1000;
 		after.tv_sec = sec;
 		after.tv_nsec = nsec;
-                DBG_LOG("ReceiveMessageTimeout %lld %d \n", after.tv_nsec, after.tv_sec);
-		int nReason = pthread_cond_timedwait(&_pQueue->consumerCond, &_pQueue->mutex, &after);
+                //DBG_LOG("ReceiveMessageTimeout %lld %d \n", after.tv_nsec, after.tv_sec);
+	        int nReason = pthread_cond_timedwait(&_pQueue->consumerCond, &_pQueue->mutex, &after);
                 if (!_pQueue->bIsValid) {
                         pthread_mutex_unlock(&_pQueue->mutex);
                         pthread_mutex_unlock(&_pQueue->destroyMutex);
                         return NULL;
                 }
 		if (nReason == ETIMEDOUT) {
-                        DBG_LOG("ReceiveMessageTimeout %lld %d \n", nsec, sec);
+                        //DBG_LOG("ReceiveMessageTimeout %lld %d \n", nsec, sec);
                         pthread_mutex_unlock(&_pQueue->mutex);
                         pthread_mutex_unlock(&_pQueue->destroyMutex);
                         return NULL;

@@ -28,6 +28,10 @@ typedef struct {
     char *imHost;
     int timeOut;
     unsigned char init;
+    int accountid;
+    int callid;
+    int64_t timecount;
+    int count;
 } RegisterData;
 
 typedef struct {
@@ -44,8 +48,20 @@ RegisterTestCase gRegisterTestCases[] =
     },
     {
         { "invalid_account", 0 },
-        { "1007", "1007", HOST, HOST, HOST, 100, 0 }
-    }
+        { "1016", "1016", HOST, HOST, HOST, 100, 0 }
+    },
+    {   
+        { "normal", 0 },
+        { "1017", "1017", HOST, HOST, HOST, 100, 1 }
+    },
+    {   
+        { "invalid_account", 0 },
+        { "1018", "1018", HOST, HOST, HOST, 100, 0 }
+    },
+    {   
+        { "normal", 0 },
+        { "1019", "1019", HOST, HOST, HOST, 100, 1 }
+    },
 };
 
 TestSuit gRegisterTestSuit =
@@ -103,7 +119,7 @@ int RegisterTestSuitCallback( TestSuit *this )
 
     pTestCases = (RegisterTestCase *) this->testCases;
     DBG_LOG("this->index = %d\n", this->index );
-    pData = &pTestCases[this->index].data;
+    pData = &pTestCases[0].data;
 
     if ( pData->init ) {
         DBG_LOG("InitSDK");
@@ -114,14 +130,18 @@ int RegisterTestSuitCallback( TestSuit *this )
         }
     }
 
-    DBG_STR( pData->id );
-    DBG_STR( pData->password );
-    DBG_STR( pData->sigHost );
-    DBG_LOG("Register in\n");
-    sts = Register( pData->id, pData->password, pData->sigHost, pData->mediaHost, pData->imHost);
-    DBG_LOG("Register out %x %x\n", sts, pTestCases->father.expact);
-    TEST_GT( sts, pTestCases->father.expact );
-    int nCallId1 = -1;
+    for (int count = 0; count < 5; ++count) {
+            pData = &pTestCases[count].data;
+            pData->timecount = 0;
+            pData->count = 0;
+            DBG_STR( pData->id );
+            DBG_STR( pData->password );
+            DBG_STR( pData->sigHost );
+            DBG_LOG("Register in\n");
+            pData->accountid = Register( pData->id, pData->password, pData->sigHost, pData->mediaHost, pData->imHost);
+            DBG_LOG("Register out %x %x\n", pData->accountid, pTestCases->father.expact);
+    }
+    pData->callid = -1;
     ErrorID id;
     //sleep(10);
     int count = 0;
@@ -129,56 +149,55 @@ int RegisterTestSuitCallback( TestSuit *this )
     Event* event = (Event*) malloc(sizeof(Event));
     int64_t timecount = 0;
     while (1) {
-            DBG_LOG("PullEvent start \n");
-            id = PollEvent(sts, &type, &event, 0);
-            DBG_LOG("PullEvent end id %d \n", id);
-            if (id != RET_OK) {
-                    usleep(1000000);
-                    continue;
-            }
-            switch (type) {
-                     case EVENT_CALL:
-                     {
-                             CallEvent *pCallEvent = &(event->body.callEvent);
-                             DBG_LOG("Call status %d call id %d call account id %d\n", pCallEvent->status, pCallEvent->callID, sts);
-                             if (pCallEvent->status == CALL_STATUS_INCOMING) {
+            for (int count = 0; count < 5; ++count) {
+                    pData = &pTestCases[count].data;
+                    id = PollEvent(pData->accountid, &type, &event, 10);
+                    if (id != RET_OK) {
+                           continue;
+                    }
+                    switch (type) {
+                            case EVENT_CALL:
+                            {
+                                  CallEvent *pCallEvent = &(event->body.callEvent);
+                                  DBG_LOG("Call status %d call id %d call account id %d\n", pCallEvent->status, pCallEvent->callID, pData->accountid);
+                                  if (pCallEvent->status == CALL_STATUS_INCOMING) {
                                       DBG_LOG("AnswerCall ******************\n");
-                                      AnswerCall(sts, pCallEvent->callID);
+                                      AnswerCall(pData->accountid, pCallEvent->callID);
                                       DBG_LOG("AnswerCall end *****************\n");
-                             }
-                             break;
-                     }
-                     case EVENT_DATA:
-                     {
-                            DataEvent *pDataEvent = &(event->body.dataEvent);
-                            DBG_LOG("Data size %d call id %d call account id %d timestamp %lld \n", pDataEvent->size, pDataEvent->callID, sts, pDataEvent->pts);
-                            if (timecount == 0) {
-                                    timecount = pDataEvent->pts;
+                                  }
+                                  break;
                             }
-                            else {
-                                    if (pDataEvent->pts != timecount + 1) {
-                                            DBG_ERROR("*****************error timestamp %ld last timestamp %ld", pDataEvent->pts, timecount);
-                                    }
-                                    timecount = pDataEvent->pts;
+                            case EVENT_DATA:
+                            {
+                                  DataEvent *pDataEvent = &(event->body.dataEvent);
+                                  //DBG_LOG("Data size %d call id %d call account id %d timestamp %lld \n", pDataEvent->size, pDataEvent->callID, pData->accountid, pDataEvent->pts);
+                                  if (pData->timecount == 0) {
+                                         pData->timecount = pDataEvent->pts;
+                                  }
+                                  else {
+                                         if (pDataEvent->pts != pData->timecount + 1) {
+                                                 DBG_ERROR("*********size %d****error timestamp %ld last timestamp %ld callid %d count %d \n",pDataEvent->size, pDataEvent->pts, pData->timecount, pDataEvent->callID, pData->count);
+                                         }
+                                         ++pData->count;
+                                         pData->timecount = pDataEvent->pts;
+                                  }
+                                  break;
+                            } 
+                            case EVENT_MESSAGE:
+                            {
+                                  MessageEvent *pMessage = &(event->body.messageEvent);
+                                  DBG_LOG("Message %s status id %d account id %d\n", pMessage->message, pMessage->status, pData->accountid);
+                                  break;
                             }
-                            break;
-                     }
-                     case EVENT_MESSAGE:
-                     {
-                           MessageEvent *pMessage = &(event->body.messageEvent);
-                           DBG_LOG("Message %s status id %d account id %d\n", pMessage->message, pMessage->status, sts);
-                           break;
-                     }
-                     case EVENT_MEDIA:
-                     {
-                           MediaEvent *pMedia = &(event->body.mediaEvent);
-                           DBG_LOG("Callid %d ncount %d type 1 %d type 2 %d\n", pMedia->callID, pMedia->nCount, pMedia->media[0].codecType, pMedia->media[1].codecType);
-                           break;
-                     }
-            }
-            usleep(100000);
+                            case EVENT_MEDIA:
+                            {
+                                 MediaEvent *pMedia = &(event->body.mediaEvent);
+                                 DBG_LOG("Callid %d ncount %d type 1 %d type 2 %d\n", pMedia->callID, pMedia->nCount, pMedia->media[0].codecType, pMedia->media[1].codecType);
+                                 break;
+                            }
+                    }
+           }
     }
-    UnRegister(sts);
 }
 
 int InitAllTestSuit()
