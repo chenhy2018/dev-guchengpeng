@@ -1,4 +1,4 @@
-// Last Update:2018-06-19 18:16:09
+// Last Update:2018-06-21 12:36:04
 /**
  * @file unit_test.c
  * @brief 
@@ -39,8 +39,6 @@ int RunAllTestSuits()
     TestSuit *pTestSuit = NULL;
     int res = 0;
     TestCase *pTestCase = NULL;
-    TestSuitResult *pSuitResult = NULL;
-    TestCaseResult *pCaseResult = NULL;
     EventManger *pEventManager = &pTestSuitManager->eventManager;
 
     UT_VAL( pTestSuitManager->num );
@@ -49,8 +47,8 @@ int RunAllTestSuits()
         if ( !pTestSuit->enable ) {
             continue;
         }
-        pSuitResult = &pTestSuitManager->testSuitResults[i];
-        pSuitResult->pTestSuitName = pTestSuit->suitName;
+        pTestSuit->pManager = pTestSuitManager;
+        pTestSuit->index = 0;
         if ( pTestSuit->OnInit ) {
             pTestSuit->OnInit( pTestSuit, pTestSuitManager );
         }
@@ -58,7 +56,6 @@ int RunAllTestSuits()
         LOG("run the test suit : %s, %d test cases\n", pTestSuit->suitName, pTestSuit->total );
         if ( pTestSuit->GetTestCase ) {
             for ( j=0; j<pTestSuit->total; j++ ) {
-                pCaseResult = &pSuitResult->results[j];
                 pTestSuit->index = j;
                 pTestSuit->GetTestCase( pTestSuit, &pTestCase );
                 if ( !pTestCase ) {
@@ -74,11 +71,9 @@ int RunAllTestSuits()
                 } else {
                     res = pTestCase->TestCaseCb( pTestSuit );
                 }
+                pTestCase->res = res;
                 /*LOG("----- test case [ %s ] result ( %s ) \n", pTestCase->caseName, */
                     /*res == TEST_PASS ? "pass" : "fail" );*/
-                pCaseResult->pTestCaseName = pTestCase->caseName;
-                pCaseResult->res = res;
-                pSuitResult->num++;
                 pTestSuitManager->CancelThread( pTestSuit );
             }
         }
@@ -104,13 +99,14 @@ int TestSuitManagerInit()
     int i = 0;
 
     memset( pTestSuitManager, 0, sizeof(*pTestSuitManager) );
-    pTestSuitManager->eventManager.WaitForEvent = WaitForEvent;
-    pTestSuitManager->NotifyAllEvent = NotifyAllEvent;
     pTestSuitManager->AddPrivateData = AddPrivateData;
     pTestSuitManager->startThread = startThread;
     pTestSuitManager->CancelThread = CancelThread;
     pTestSuitManager->Report = ResultReport;
     pTestSuitManager->eventManager.DestroyAllEvent = DestroyAllEvent;
+    pTestSuitManager->eventManager.GetEventDataAddr = GetEventDataAddr;
+    pTestSuitManager->eventManager.WaitForEvent = WaitForEvent;
+    pTestSuitManager->eventManager.NotifyAllEvent = NotifyAllEvent;
     pthread_mutex_init( &pTestSuitManager->eventManager.mutex, NULL );
 
 
@@ -140,11 +136,12 @@ int TestSuitManagerInit()
  *               
  *
  * */
-int NotifyAllEvent( int _nEventId )
+int NotifyAllEvent( int _nEventId, void *data )
 {
     int i = 0;
     int j = 0;
     EventManger *pEventManager = &pTestSuitManager->eventManager;
+    CondWait *pCondWait = NULL;
 
     /*UT_VAL( pEventManager->eventNum );*/
 
@@ -156,7 +153,11 @@ int NotifyAllEvent( int _nEventId )
         if ( _nEventId == pEventWait->eventId ) {
             /*UT_VAL( pEventWait->condNum );*/
             for ( j=0; j<pEventWait->condNum; j++ ) {
-                pthread_cond_signal( &pEventWait->condList[j] );
+                pCondWait = &pEventWait->waitList[j];
+                pthread_cond_signal( &pCondWait->cond );
+                if ( pCondWait->eventCallBack ) {
+                    pCondWait->eventCallBack( pCondWait->pTestCase, data );
+                }
             }
         }
     }
@@ -165,13 +166,19 @@ int NotifyAllEvent( int _nEventId )
     return 0;
 }
 
-int AddEventWait( EventManger *pEventManager, EventWait *pEventWait, int nTimeOut )
+int AddEventWait( EventManger *pEventManager, EventWait *pEventWait,
+                  EventCallBack eventCallBack, int nTimeOut, TestSuit *pTestSuit, void *data )
 {
     struct timeval now;
     struct timespec after;
     int ret = 0;
+    TestCase *pTestCase = NULL;
 
-    ret = pthread_cond_init( &pEventWait->condList[pEventWait->condNum], NULL );
+    if ( !pTestSuit ) {
+        return -1;
+    }
+
+    ret = pthread_cond_init( &pEventWait->waitList[pEventWait->condNum].cond, NULL );
     if ( ret == EINVAL ) {
         UT_ERROR("pthread_cond_init error, EINVAL\n");
         return ERROR_INVAL;
@@ -187,7 +194,17 @@ int AddEventWait( EventManger *pEventManager, EventWait *pEventWait, int nTimeOu
     after.tv_sec = now.tv_sec + nTimeOut;
     /*after.tv_nsec = now.tv_usec * 1000 + 10 * 1000 * 1000;*/
     after.tv_nsec = 1000;
-    int nReason = pthread_cond_timedwait( &pEventWait->condList[pEventWait->condNum++],
+    pTestSuit->GetTestCase( pTestSuit, &pTestCase );
+    if ( !pTestCase ) {
+        UT_ERROR("GetTestCase() error\n");
+        return -1;
+    }
+    pEventWait->waitList[pEventWait->condNum].eventCallBack = eventCallBack;
+    pEventWait->waitList[pEventWait->condNum].pTestCase = pTestCase;
+    UT_VAL( pEventWait->condNum );
+    pEventWait->waitList[pEventWait->condNum].data = data;
+    pTestCase->pCondWait = &pEventWait->waitList[pEventWait->condNum];
+    int nReason = pthread_cond_timedwait( &pEventWait->waitList[pEventWait->condNum++].cond,
                                           &pEventManager->mutex, &after );
     if (nReason == ETIMEDOUT) {
         UT_ERROR("pthread_cond_timedwait time out\n");
@@ -203,7 +220,8 @@ int AddEventWait( EventManger *pEventManager, EventWait *pEventWait, int nTimeOu
     return STS_OK;
 }
 
-int WaitForEvent( int _nEventId, int nTimeOut )
+int WaitForEvent( int _nEventId, int nTimeOut, EventCallBack eventCallBack,
+                  TestSuit *pTestSuit, void *data )
 {
     int i = 0;
     int j = 0;
@@ -218,7 +236,7 @@ int WaitForEvent( int _nEventId, int nTimeOut )
     for ( i=0; i<pEventManager->eventNum; i++ ) {
         pEventWait= &pEventManager->eventWait[i];
         if ( _nEventId == pEventWait->eventId ) {
-            ret = AddEventWait( pEventManager, pEventWait, nTimeOut);
+            ret = AddEventWait( pEventManager, pEventWait, eventCallBack, nTimeOut, pTestSuit, data );
             /*UT_VAL( ret );*/
             found = 1;
         }
@@ -228,7 +246,7 @@ int WaitForEvent( int _nEventId, int nTimeOut )
         pEventWait = &pEventManager->eventWait[pEventManager->eventNum];
         pEventWait->eventId = _nEventId;
         pEventManager->eventNum++;
-        ret = AddEventWait( pEventManager, pEventWait, nTimeOut);
+        ret = AddEventWait( pEventManager, pEventWait, eventCallBack, nTimeOut, pTestSuit, data );
         UT_VAL( ret );
     }
     pthread_mutex_unlock( &pEventManager->mutex );
@@ -236,19 +254,26 @@ int WaitForEvent( int _nEventId, int nTimeOut )
     return ret;
 } 
 
-int startThread( TestSuit *_pTestSuit, ThreadFn threadFn )
+int startThread( TestSuit *_pTestSuit )
 {
     int ret = 0;
     TestCase *pTestCase = NULL;
 
-    if ( !threadFn || !_pTestSuit ) {
+    if ( !_pTestSuit ) {
         return -1;
     }
 
     _pTestSuit->GetTestCase( _pTestSuit, &pTestCase );
     if ( pTestCase ) {
-        ret = pthread_create( &pTestCase->tid, NULL,
-                              threadFn, (void *)_pTestSuit );
+        if ( pTestCase->threadEntry ) {
+            ret = pthread_create( &pTestCase->tid, NULL,
+                                  pTestCase->threadEntry, (void *)_pTestSuit );
+        } else {
+            if ( _pTestSuit->threadEntry ) {
+                ret = pthread_create( &pTestCase->tid, NULL,
+                                      _pTestSuit->threadEntry, (void *)_pTestSuit );
+            }
+        }
         if ( 0 != ret ) {
             UT_ERROR("create thread error, ret = %d\n", ret );
             return -1;
@@ -281,27 +306,32 @@ int CancelThread( TestSuit *_pTestSuit )
 int ResultReport()
 {
     int i = 0, j=0;
-    TestSuitResult *pSuitResult = NULL;
+    TestSuit *pTestSuit = NULL;
+    TestCase *pTestCase = NULL;
 
     LOG("total %d test suits\n", pTestSuitManager->num );
     for ( i=0; i<pTestSuitManager->num; i++ ) {
-        pSuitResult = &pTestSuitManager->testSuitResults[i];
-        if ( !pSuitResult->num )
+        pTestSuit = &pTestSuitManager->testSuits[i];
+        if ( !pTestSuit->enable )
             continue;
-        LOG("------------ test suit name : %s, %d test cases\n", pSuitResult->pTestSuitName, pSuitResult->num );
-        for ( j=0; j<pSuitResult->num; j++ ) {
-            LOG("*** test case ( %s ) result [ ", pSuitResult->results[j].pTestCaseName );
-            if ( pSuitResult->results[j].res == TEST_PASS ) {
-                LOG_GREEN("PASS ");
-                LOG("]\n");
-            } else {
-                LOG_RED("FAIL ");
-                LOG("]\n");
+        LOG("[============] test suit : %s, %d test(s)\n", pTestSuit->suitName, pTestSuit->total );
+        for ( j=0; j<pTestSuit->total; j++ ) {
+            pTestSuit->index = j;
+            pTestSuit->GetTestCase( pTestSuit, &pTestCase );
+            if ( pTestCase ) {
+                /*LOG("*** test case ( %s ) result [ ", pTestCase->caseName );*/
+                if ( pTestCase->res == TEST_PASS ) {
+                    LOG("[    ");
+                    LOG_GREEN("PASS");
+                    LOG("    ]");
+                    LOG(" %s\n", pTestCase->caseName );
+                } else {
+                    LOG("[    ");
+                    LOG_RED("FAIL");
+                    LOG("    ]");
+                    LOG(" %s\n", pTestCase->caseName );
+                }
             }
-#if 0
-            LOG("*** test case ( %s ) result [ %s ] \n", pSuitResult->results[j].pTestCaseName,
-                pSuitResult->results[j].res == TEST_PASS ? "PASS" : "FAIL" );
-#endif
         }
     }
     return 0;
@@ -315,7 +345,7 @@ int DestroyAllEvent()
     for ( i=0; i<pEventManager->eventNum; i++ ) {
         EventWait *pEventWait = &pEventManager->eventWait[i];
         for ( j=0; j<pEventWait->condNum; j++ ) {
-            int ret = pthread_cond_destroy( &pEventWait->condList[j] );
+            int ret = pthread_cond_destroy( &pEventWait->waitList[j].cond );
             if ( ret == EINVAL ) {
                 UT_ERROR("pthread_cond_destroy() EINVAL\n");
                 return ERROR_INVAL;
@@ -331,6 +361,21 @@ int DestroyAllEvent()
     pEventManager->eventNum = 0;
 
     return 0;
+}
+
+int GetEventDataAddr( TestSuit *pTestSuit, void **data )
+{
+    TestCase *pTestCase = NULL;
+
+    if ( pTestSuit ) {
+        pTestSuit->GetTestCase( pTestSuit, &pTestCase );
+        if ( pTestCase && pTestCase->pCondWait ) {
+            *data = pTestCase->pCondWait->data;
+            return 0;
+        }
+    }
+
+    return -1;
 }
 
 

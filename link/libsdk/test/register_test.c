@@ -1,4 +1,4 @@
-// Last Update:2018-06-19 18:42:47
+// Last Update:2018-06-20 19:26:26
 /**
  * @file register_test.c
  * @brief 
@@ -239,6 +239,11 @@ int RegisterTestSuitGetTestCase( TestSuit *this, TestCase **testCase )
     return 0;
 }
 
+int RegisterTestEventCallBack( TestCase *pTestCase, void *data )
+{
+    return 0;
+}
+
 int RegisterTestSuitCallback( TestSuit *this )
 {
     RegisterData *pData = NULL;
@@ -249,6 +254,7 @@ int RegisterTestSuitCallback( TestSuit *this )
     int ret = 0;
     static ErrorID sts = 0;
     EventManger *pEventManager = &this->pManager->eventManager;
+    int event = 0;
 
     /*UT_LINE();*/
     if ( !this ) {
@@ -273,13 +279,10 @@ int RegisterTestSuitCallback( TestSuit *this )
         return TEST_FAIL;
     }
     pTestCase->father.data = (void *)sts;
-    if ( pTestCase->father.threadEntry )
-        this->pManager->startThread( this, pTestCase->father.threadEntry );
-    else
-        this->pManager->startThread( this, this->threadEntry );
+    this->pManager->startThread( this );
 
     if ( pEventManager->WaitForEvent ) {
-        ret = pEventManager->WaitForEvent( pTestCase->father.expact, pData->timeOut );
+        ret = pEventManager->WaitForEvent( pTestCase->father.expact, pData->timeOut, RegisterTestEventCallBack, this, NULL );
         if ( ret == ERROR_TIMEOUT ) {
             UT_ERROR("ERROR_TIMEOUT\n");
             return TEST_FAIL;
@@ -331,10 +334,10 @@ void *RegisterEventLoopThread( void *arg )
             DBG_LOG("EVENT_CALL\n");
             if ( pEvent ) {
                 pCallEvent = &pEvent->body.callEvent;
-                if ( pManager->NotifyAllEvent ) {
+                if ( pManager->eventManager.NotifyAllEvent ) {
                     char * pStr = DbgCallStatusGetStr( pCallEvent->status );
                     UT_STR( pStr );
-                    pManager->NotifyAllEvent( pCallEvent->status );
+                    pManager->eventManager.NotifyAllEvent( pCallEvent->status, NULL );
                 }
             }
         }

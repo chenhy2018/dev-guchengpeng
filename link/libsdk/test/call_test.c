@@ -1,4 +1,4 @@
-// Last Update:2018-06-14 09:49:05
+// Last Update:2018-06-21 12:41:25
 /**
  * @file call_test.c
  * @brief 
@@ -28,7 +28,6 @@ typedef struct {
 void *MakeCallEventLoopThread( void *arg );
 int MakeCallTestSuitCallback( TestSuit *this );
 int MakeCallTestSuitGetTestCase( TestSuit *this, TestCase **testCase );
-int MakeCallTestSuitInit( TestSuit *this, TestSuitManager *_pManager );
 void *CalleeThread( void *arg );
 
 MakeCallTestCase gMakeCallTestCases[] =
@@ -55,19 +54,13 @@ TestSuit gMakeCallTestSuit =
 {
     "MakeCall",
     MakeCallTestSuitCallback,
-    MakeCallTestSuitInit,
+    NULL,
     MakeCallTestSuitGetTestCase,
     (void*)&gMakeCallTestCases,
     1,
-    MakeCallEventLoopThread
+    MakeCallEventLoopThread,
+    ARRSZ(gMakeCallTestCases) 
 };
-
-static void cleanup( void *arg )
-{
-    pthread_t thread = (pthread_t )arg;
-
-    printf("+++++++++ thread %d exit\n", (int)thread );
-}
 
 void *MakeCallEventLoopThread( void *arg )
 {
@@ -79,34 +72,28 @@ void *MakeCallEventLoopThread( void *arg )
     Event event, *pEvent;
     CallEvent *pCallEvent;
     EventManger *pEventManager = &pManager->eventManager;
+    MakeCallTestCase *pTestCase = NULL;
+    MakeCallTestCase *pTestCases = NULL;
 
     UT_LOG("EventLoopThread enter ...\n");
     if ( !pManager ) {
         UT_ERROR("check param error\n");
         return NULL;
     }
-
-    if ( !pManager->data ) {
-        UT_ERROR("check data error\n");
-        return NULL;
-    }
-
-    id = *(AccountID *)pManager->data;
-    UT_VAL( id );
-
+    pTestCases = ( MakeCallTestCase *) pTestSuit->testCases;
+    pTestCase = &pTestCases[pTestSuit->index];
+    id = (AccountID)(long) pTestCase->father.data;
 
     for (;;) {
         UT_LOG("call PollEvent\n");
-        pthread_cleanup_push( cleanup, (void *)pTestSuit->tid );
         ret = PollEvent( id, &type, &pEvent, 0 );
-        pthread_cleanup_pop( 0 );
         UT_VAL( type );
         if ( type == EVENT_CALL ) {
             UT_LINE();
             pCallEvent = &pEvent->body.callEvent;
-            if ( pManager->NotifyAllEvent ) {
+            if ( pManager->eventManager.NotifyAllEvent ) {
                 UT_VAL( pCallEvent->status );
-                pManager->NotifyAllEvent( pCallEvent->status );
+                pManager->eventManager.NotifyAllEvent( pCallEvent->status, NULL );
             }
         }
     }
@@ -155,16 +142,13 @@ int MakeCallTestSuitCallback( TestSuit *this )
         DBG_ERROR("sts = %d\n", sts );
         return TEST_FAIL;
     }
+    pTestCase->father.data = (void *)sts;
     UT_VAL( sts );
-    this->pManager->AddPrivateData( &sts );
-    if ( pTestCase->father.threadEntry )
-        this->pManager->startThread( this, pTestCase->father.threadEntry );
-    else
-        this->pManager->startThread( this, this->threadEntry );
+    this->pManager->startThread( this );
 
     if ( pEventManager->WaitForEvent ) {
         UT_VAL( pTestCase->father.expact );
-        ret = pEventManager->WaitForEvent( CALL_STATUS_REGISTERED, 10 );
+        ret = pEventManager->WaitForEvent( CALL_STATUS_REGISTERED, 10, NULL, this, NULL );
         if ( ret == ERROR_TIMEOUT ) {
             UT_ERROR("ERROR_TIMEOUT\n");
             return TEST_FAIL;
@@ -180,9 +164,15 @@ int MakeCallTestSuitCallback( TestSuit *this )
                 return TEST_FAIL;
             }
             UT_VAL( callId );
-            ret = pEventManager->WaitForEvent( pTestCase->father.expact, pData->timeOut );
+            ret = pEventManager->WaitForEvent( pTestCase->father.expact, pData->timeOut, NULL, this, NULL  );
             if ( ret != STS_OK ) {
-                UT_ERROR(" MakeCall fail, ret = %d\n", ret );
+                if ( ret == ERROR_TIMEOUT ) {
+                    UT_ERROR(" MakeCall fail, ret = ERROR_TIMEOUT\n" );
+                } else if ( ret == ERROR_INVAL ) {
+                    UT_ERROR(" MakeCall fail, ret = ERROR_INVAL\n" );
+                } else {
+                    UT_ERROR(" MakeCall fail, ret = unknow errorf\n" );
+                }
                 return TEST_FAIL;
             } else {
                 return TEST_PASS;
@@ -191,36 +181,6 @@ int MakeCallTestSuitCallback( TestSuit *this )
     }
 
     return TEST_FAIL;
-}
-
-
-int MakeCallTestSuitInit( TestSuit *this, TestSuitManager *_pManager )
-{
-    pthread_t tid = 0;
-    ErrorID sts = 0;
-    Media media[2];
-
-    this->total = ARRSZ(gMakeCallTestCases);
-    this->index = 0;
-    this->pManager = _pManager;
-
-    media[0].streamType = STREAM_VIDEO;
-    media[0].codecType = CODEC_H264;
-    media[0].sampleRate = 90000;
-    media[0].channels = 0;
-    media[1].streamType = STREAM_AUDIO;
-    media[1].codecType = CODEC_G711A;
-    media[1].sampleRate = 8000;
-    media[1].channels = 1;
-    sts = InitSDK( media, 2 );
-    if ( RET_OK != sts ) {
-        UT_ERROR("sdk init error\n");
-        return -1;
-    }
-
-    /*pthread_create( &tid,  NULL, CalleeThread, (void *)this );*/
-
-    return 0;
 }
 
 void *CalleeThread( void *arg )

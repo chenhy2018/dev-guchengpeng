@@ -14,7 +14,7 @@ all:$(TARGET)
 
 
 $(TARGET_OBJS) : %.o : %.c
-	mkdir -p $(TESTCASE_OBJS_DIR) 
+#	mkdir -p $(TESTCASE_OBJS_DIR) 
 	$(CC) $(CFLAGS) $(INCLUDE_PATH) -c $< -o $(TESTCASE_OBJS_DIR)/$@
 
 OBJ_FILES = $(addprefix objs/,$(notdir $(TARGET_OBJS)))
