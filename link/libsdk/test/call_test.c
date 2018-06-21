@@ -1,4 +1,4 @@
-// Last Update:2018-06-21 14:57:05
+// Last Update:2018-06-21 16:47:04
 /**
  * @file call_test.c
  * @brief 
@@ -35,8 +35,9 @@ MakeCallTestCase gMakeCallTestCases[] =
 {
     {
         { "valid account1", CALL_STATUS_ESTABLISHED },
-        { "1015", "123.59.204.198", 1, 10, 1 }
+        { "1003", "123.59.204.198", 1, 10, 1 }
     },
+#if 0
     {
         { "valid account2", CALL_STATUS_ESTABLISHED },
         { "1002", "123.59.204.198", 1, 10, 1 }
@@ -49,6 +50,7 @@ MakeCallTestCase gMakeCallTestCases[] =
         { "invalid sip server", CALL_STATUS_TIMEOUT },
         { "0000", "123.59.204.198", 1, 10, 1 }
     },
+#endif
 };
 
 TestSuit gMakeCallTestSuit =
@@ -86,15 +88,24 @@ void *MakeCallEventLoopThread( void *arg )
     id = (AccountID)(long) pTestCase->father.data;
 
     while ( pTestCase->father.running ) {
-        UT_LOG("call PollEvent\n");
-        ret = PollEvent( id, &type, &pEvent, 0 );
-        UT_VAL( type );
+        ret = PollEvent( id, &type, &pEvent, 1000 );
+        if ( ret >= RET_MEM_ERROR ) {
+            UT_ERROR("PollEvent error, ret = %d\n", ret );
+            return NULL;
+        } else if ( ret == RET_RETRY ) {
+            continue;
+        }
+
         if ( type == EVENT_CALL ) {
-            UT_LINE();
-            pCallEvent = &pEvent->body.callEvent;
-            if ( pManager->eventManager.NotifyAllEvent ) {
-                UT_VAL( pCallEvent->status );
-                pManager->eventManager.NotifyAllEvent( pCallEvent->status, NULL );
+            UT_LOG("get event EVENT_CALL\n");
+            if ( pEvent ) {
+                pCallEvent = &pEvent->body.callEvent;
+                UT_VAL( pCallEvent->callID );
+                if ( pManager->eventManager.NotifyAllEvent ) {
+                    char *str = DbgCallStatusGetStr( pCallEvent->status );
+                    UT_STR( str );
+                    pManager->eventManager.NotifyAllEvent( pCallEvent->status, NULL );
+                }
             }
         }
     }
@@ -126,25 +137,21 @@ int MakeCallTestSuitCallback( TestSuit *this )
     static ErrorID sts = 0;
     EventManger *pEventManager = &this->pManager->eventManager;
 
-    UT_LINE();
     if ( !this ) {
         return -1;
     }
 
     pTestCases = (MakeCallTestCase *) this->testCases;
-    UT_LOG("this->index = %d\n", this->index );
     pTestCase = &pTestCases[this->index];
     pData = &pTestCase->data;
 
-    UT_STR( pData->id );
-
     sts = Register( "1003", "1003", "123.59.204.198", "123.59.204.198", "123.59.204.198" );
     if ( sts >= RET_MEM_ERROR ) {
-        DBG_ERROR("sts = %d\n", sts );
+        char *str = DbgSdkRetGetStr( sts );
+        UT_ERROR("str = %s\n", str );
         return TEST_FAIL;
     }
     pTestCase->father.data = (void *)sts;
-    UT_VAL( sts );
     this->pManager->startThread( this );
 
     if ( pEventManager->WaitForEvent ) {
@@ -188,6 +195,22 @@ int MakeCallTestSuitInit( TestSuit *this, TestSuitManager *_pManager )
 {
     int ret = 0;
     pthread_t tid = 0;
+    Media media[2];
+    ErrorID sts = 0;
+
+    media[0].streamType = STREAM_VIDEO;
+    media[0].codecType = CODEC_H264;
+    media[0].sampleRate = 90000;
+    media[0].channels = 0;
+    media[1].streamType = STREAM_AUDIO;
+    media[1].codecType = CODEC_G711A;
+    media[1].sampleRate = 8000;
+    media[1].channels = 1;
+    sts = InitSDK( media, 2 );
+    if ( RET_OK != sts && RET_SDK_ALREADY_INITED != sts ) {
+        UT_ERROR("sdk init error\n");
+        return -1;
+    }
     
     ret = pthread_create( &tid, NULL, CalleeThread, this );
     if ( ret != 0 ) {
@@ -204,43 +227,65 @@ void *CalleeThread( void *arg )
     Event *pEvent = NULL;
     CallEvent *pCallEvent = NULL;
     Media media;
+    AccountID accountID = 0;
+    TestSuit *pTestSuit = (TestSuit *)arg;
+    MakeCallTestCase *pTestCases = NULL;
+    MakeCallTestCase *pTestCase = NULL;
 
     UT_LOG("CalleeThread() entry...\n");
 
-    sts = Register( "1015", "1015", "123.59.204.198", "123.59.204.198", "123.59.204.198" );
+    pTestCases = (MakeCallTestCase *) pTestSuit->testCases;
+    pTestCase = &pTestCases[pTestSuit->index];
+
+    sts = Register( "1005", "1005", "123.59.204.198", "123.59.204.198", "123.59.204.198" );
     if ( sts >= RET_MEM_ERROR ) {
-        UT_ERROR("Register error, sts = %d\n", sts );
+        UT_ERROR("[ callee ] Register error, sts = %d\n", sts );
         return NULL;
     }
+    accountID = (AccountID)sts;
 
-    for (;;) {
-        sts = PollEvent( sts, &type, &pEvent, 5 );
+    while( pTestCase->father.running ) {
+        sts = PollEvent( accountID, &type, &pEvent, 1000 );
         if ( sts >= RET_MEM_ERROR ) {
-            UT_ERROR("PollEvent error, sts = %d\n", sts );
+            char *str = DbgSdkRetGetStr( sts );
+            UT_ERROR("ret = %s\n", str );
             return NULL;
+        }
+        if ( sts == RET_RETRY ) {
+            continue;
         }
         UT_VAL( type );
         switch( type ) {
         case EVENT_CALL:
-            UT_LOG("get event EVENT_CALL\n");
+            UT_LOG("[ callee ] get event EVENT_CALL\n");
             if ( pEvent ) {
                 pCallEvent = &pEvent->body.callEvent;
                 char *callSts = DbgCallStatusGetStr( pCallEvent->status );
-                UT_LOG("status : %s\n", callSts );
-                UT_STR( pCallEvent->pFromAccount );
+                UT_LOG("[ callee ] status : %s\n", callSts );
+                UT_VAL( pCallEvent->callID );
+                if ( pCallEvent->status == CALL_STATUS_INCOMING ) {
+                    if ( pCallEvent->pFromAccount ) {
+                        UT_STR( pCallEvent->pFromAccount );
+                    }
+                    ErrorID ret = AnswerCall( accountID, pCallEvent->callID );
+                    if ( ret >= RET_MEM_ERROR ) {
+                        UT_ERROR("AnswerCall() error, ret = %s\n", DbgSdkRetGetStr(ret) );
+                        return NULL;
+                    }
+                }
             }
             break;
         case EVENT_DATA:
-            UT_LOG("get event EVENT_DATA\n");
+            UT_LOG("[ callee ] get event EVENT_DATA\n");
             break;
         case EVENT_MESSAGE:
-            UT_LOG("get event EVENT_MESSAGE\n");
+            UT_LOG("[ callee ] get event EVENT_MESSAGE\n");
             break;
         case EVENT_MEDIA:
-            UT_LOG("get event EVENT_MEDIA\n");
+            UT_LOG("[ callee ] get event EVENT_MEDIA\n");
             break;
         default:
-            UT_LOG("unknow event, type = %d\n", type );
+            UT_LOG("[ callee ] unknow event, type = %d\n", type );
             break;
         }
     }
