@@ -1,4 +1,4 @@
-// Last Update:2018-06-21 16:47:04
+// Last Update:2018-06-21 17:16:08
 /**
  * @file call_test.c
  * @brief 
@@ -37,7 +37,6 @@ MakeCallTestCase gMakeCallTestCases[] =
         { "valid account1", CALL_STATUS_ESTABLISHED },
         { "1003", "123.59.204.198", 1, 10, 1 }
     },
-#if 0
     {
         { "valid account2", CALL_STATUS_ESTABLISHED },
         { "1002", "123.59.204.198", 1, 10, 1 }
@@ -47,10 +46,29 @@ MakeCallTestCase gMakeCallTestCases[] =
         { "0000", "123.59.204.198", 1, 10, 1 }
     },
     {
+        { "invalid account2", CALL_STATUS_TIMEOUT },
+        { "abcd", "123.59.204.198", 1, 10, 1 }
+    },
+    {
         { "invalid sip server", CALL_STATUS_TIMEOUT },
         { "0000", "123.59.204.198", 1, 10, 1 }
     },
-#endif
+    {
+        { "invalid sip server2", CALL_STATUS_TIMEOUT },
+        { "0000", "www.google.com", 1, 10, 1 }
+    },
+    {
+        { "illegal_account_id", CALL_STATUS_TIMEOUT },
+        { NULL, "123.59.204.198", 1, 10, 1 }
+    },
+    {
+        { "illegal_server_address", CALL_STATUS_TIMEOUT },
+        { "1002", NULL, 1, 10, 1 }
+    },
+    {
+        { "illegal_account_id_and_server_address", CALL_STATUS_TIMEOUT },
+        { NULL, NULL, 1, 10, 1 }
+    },
 };
 
 TestSuit gMakeCallTestSuit =
