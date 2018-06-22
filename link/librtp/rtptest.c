@@ -595,6 +595,7 @@ static void onRxRtp(void *_pUserData, CallbackType _type, void *_pCbData)
 
 static int receive_data_callback(void *pData, int nDataLen, int nFlag, int64_t timestamp)
 {
+        MY_PJ_LOG(3, "data------:%d", nDataLen);
         RtpPacket rtpPacket;
         pj_bzero(&rtpPacket, sizeof(rtpPacket));
         if (nFlag == THIS_IS_AUDIO) {
@@ -866,8 +867,8 @@ int main(int argc, char **argv)
         test_sdp_neg();
         //---------------------start------------
 
-        //offer send to answer
-        if (role == ANSWER) {
+        //answer send to offer
+        if (role == OFFER) {
                 //test receive pcmu
                 pj_pool_t * apool = pj_pool_create(&app.cachingPool.factory, "rxrtpa", 2000, 2000, NULL);
                 status = pj_file_open(apool, "/Users/liuye/Documents/p2p/build/src/work/Debug/rxrtp.mulaw", PJ_O_WRONLY, &gPcmuFd);
@@ -887,7 +888,7 @@ int main(int argc, char **argv)
         }
         
         InitIceConfig(&app.userConfig);
-        app.userConfig.nForceStun = 1;
+        //app.userConfig.nForceStun = 1;
         strcpy(app.userConfig.turnHost, "123.59.204.198");
         strcpy(app.userConfig.turnUsername, "root");
         strcpy(app.userConfig.turnPassword, "root");
@@ -975,7 +976,7 @@ int main(int argc, char **argv)
         waitState(ICE_STATE_GATHERING_OK);
         pj_assert(gatherState == ICE_STATE_NEGOTIATION_OK);
 
-        if (role == ANSWER) {
+        if (role == OFFER) {
 #if 0
                 char packet[120];
                 while(1){
@@ -995,19 +996,19 @@ int main(int argc, char **argv)
                 input_confirm("confirm to sendfile:");
                 if ((hasAudioVideo & HAS_AUDIO) && (hasAudioVideo & HAS_VIDEO)) {
                         start_file_test("/Users/liuye/Documents/p2p/build/src/mysiprtp/Debug/8000_1.mulaw",
-                                        "/Users/liuye/Documents/p2p/build/src/mysiprtp/Debug/hks.h264",
+                                        "/Users/liuye/Documents/qml/iceplayer/v.h264",
                                         receive_data_callback);
                 } else if (hasAudioVideo & HAS_AUDIO) {
                         start_file_test("/Users/liuye/Documents/p2p/build/src/mysiprtp/Debug/8000_1.mulaw",
                                         NULL, receive_data_callback);
                 } else {
-                        start_file_test(NULL, "/Users/liuye/Documents/p2p/build/src/mysiprtp/Debug/hks.h264",
+                        start_file_test(NULL, "/Users/liuye/Documents/qml/iceplayer/v.h264",
                                         receive_data_callback);
                 }
         }
         
         input_confirm("quit");
-        if (role == ANSWER) {
+        if (role == OFFER) {
                 pj_file_close(gPcmuFd);
 #ifdef HAS_VIDEO
                 pj_file_close(gH264Fd);
