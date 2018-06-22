@@ -92,8 +92,8 @@ ErrorID InitRtp(Call** _pCall, CallConfig* _pConfig)
 void CALLMakeNewCall(Call* _pCall)
 {
         int nCallId;
-        DBG_LOG("CALLMakeNewCall start url %s accountId %d pLocal %p\n", _pCall->url, _pCall->nAccountId, _pCall->pLocal);
-        SIP_ERROR_CODE error = SipMakeNewCall(_pCall->nAccountId, _pCall->url, _pCall->pLocal, &nCallId);
+        DBG_LOG("CALLMakeCall start url %s accountId %d pLocal %p\n", _pCall->url, _pCall->nAccountId, _pCall->pLocal);
+        SipAnswerCode error = SipMakeNewCall(_pCall->nAccountId, _pCall->url, _pCall->pLocal, &nCallId);
         if (error != SIP_SUCCESS) {
                 DBG_ERROR("SipMakeNewCall failed %d \n", error);
                 return;

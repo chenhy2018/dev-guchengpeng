@@ -36,7 +36,7 @@ void RegisterToPjLib() {
         if( !pj_thread_is_registered())
                 pj_thread_register(NULL, threaddesc, &thread);
 }
-SIP_ERROR_CODE OnSipAddNewAccount(IN const SipAccountConfig *_pConfig, OUT int *_pAccountId)
+SipAnswerCode OnSipAddNewAccount(IN const SipAccountConfig *_pConfig, OUT int *_pAccountId)
 {
         RegisterToPjLib();
         /* Input check */
@@ -110,7 +110,7 @@ SIP_ERROR_CODE OnSipAddNewAccount(IN const SipAccountConfig *_pConfig, OUT int *
         return SIP_SUCCESS;
 }
 
-SIP_ERROR_CODE OnSipDeleteAccount(IN const int _nAccountId)
+SipAnswerCode OnSipDeleteAccount(IN const int _nAccountId)
 {
         RegisterToPjLib();
         CHECK_RETURN(_nAccountId >= 0 && _nAccountId < (int)SipAppData.nMaxAccount,
@@ -161,7 +161,7 @@ SIP_ERROR_CODE OnSipDeleteAccount(IN const int _nAccountId)
         return SIP_SUCCESS;
 }
 
-SIP_ERROR_CODE OnSipRegAccount(IN const SipEvent *_pEvent)
+SipAnswerCode OnSipRegAccount(IN const SipEvent *_pEvent)
 {
         int _nAccountId = _pEvent->Body.Reg.nAccountId;
         int _bDeReg = _pEvent->Body.Reg.Reg;
@@ -601,7 +601,7 @@ int SipGetFreeCallId(void)
         }
         return -1;
 }
-SIP_ERROR_CODE OnSipMakeNewCall(IN const SipEvent *_pEvent)
+SipAnswerCode OnSipMakeNewCall(IN const SipEvent *_pEvent)
 {
         int _nFromAccountId = _pEvent->Body.MakeCall.nAccountId;
         char *_pDestUri = _pEvent->Body.MakeCall.pDestUri;
@@ -696,7 +696,7 @@ SIP_ERROR_CODE OnSipMakeNewCall(IN const SipEvent *_pEvent)
         return SIP_SUCCESS;
 }
 
-SIP_ERROR_CODE OnSipAnswerCall(IN const SipEvent *_pEvent)
+SipAnswerCode OnSipAnswerCall(IN const SipEvent *_pEvent)
 {
         int _nCallId = _pEvent->Body.AnswerCall.nCallId;
         int _StatusCode = _pEvent->Body.AnswerCall.StatusCode;
@@ -749,7 +749,7 @@ SIP_ERROR_CODE OnSipAnswerCall(IN const SipEvent *_pEvent)
         MUTEX_FREE(SipAppData.pMutex);
         return Status;
 }
-SIP_ERROR_CODE OnSipHangUp(IN const SipEvent *_pEvent)
+SipAnswerCode OnSipHangUp(IN const SipEvent *_pEvent)
 {
         pjsip_tx_data *pTxData;
         pj_status_t Status;
@@ -767,7 +767,7 @@ SIP_ERROR_CODE OnSipHangUp(IN const SipEvent *_pEvent)
         return SIP_SUCCESS;
 }
 
-SIP_ERROR_CODE OnSipHangUpAll(IN const SipEvent *_pEvent)
+SipAnswerCode OnSipHangUpAll(IN const SipEvent *_pEvent)
 {
         int i;
         for (i = 0; i < SipAppData.nMaxCall; ++i) {
@@ -780,7 +780,7 @@ SIP_ERROR_CODE OnSipHangUpAll(IN const SipEvent *_pEvent)
         return SIP_SUCCESS;
 }
 
-SIP_ERROR_CODE OnSipHangUpByAccountId(IN const SipEvent *_pEvent)
+SipAnswerCode OnSipHangUpByAccountId(IN const SipEvent *_pEvent)
 {
         int nAccountId = _pEvent->Body.HangUpByAcc.nAccount;
         int i;

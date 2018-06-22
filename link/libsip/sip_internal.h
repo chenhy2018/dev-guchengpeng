@@ -196,13 +196,13 @@ void onSipCallOnForked(IN pjsip_inv_session *pInviteSession, IN pjsip_event *pEv
 
 int SipGetFreeCallId();
 void RegisterToPjLib();
-SIP_ERROR_CODE OnSipAddNewAccount(IN const SipAccountConfig *_pConfig, OUT int *_pAccountId);
-SIP_ERROR_CODE OnSipDeleteAccount(IN const int _nAccountId);
-SIP_ERROR_CODE OnSipRegAccount(IN const SipEvent *pEvent);
-SIP_ERROR_CODE OnSipMakeNewCall(IN const SipEvent *pEvent);
-SIP_ERROR_CODE OnSipAnswerCall(IN const SipEvent *pEvent);
-SIP_ERROR_CODE OnSipHangUp(IN const SipEvent *pEvent);
-SIP_ERROR_CODE OnSipHangUpAll(IN const SipEvent *pEvent);
-SIP_ERROR_CODE OnSipHangUpByAccountId(IN const SipEvent *pEvent);
+SipAnswerCode OnSipAddNewAccount(IN const SipAccountConfig *_pConfig, OUT int *_pAccountId);
+SipAnswerCode OnSipDeleteAccount(IN const int _nAccountId);
+SipAnswerCode OnSipRegAccount(IN const SipEvent *pEvent);
+SipAnswerCode OnSipMakeNewCall(IN const SipEvent *pEvent);
+SipAnswerCode OnSipAnswerCall(IN const SipEvent *pEvent);
+SipAnswerCode OnSipHangUp(IN const SipEvent *pEvent);
+SipAnswerCode OnSipHangUpAll(IN const SipEvent *pEvent);
+SipAnswerCode OnSipHangUpByAccountId(IN const SipEvent *pEvent);
 
 #endif
