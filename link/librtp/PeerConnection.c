@@ -11,10 +11,10 @@ enum { RTCP_INTERVAL = 5000, RTCP_RAND = 2000 };
 
 static pj_status_t librtp_register_thread()
 {
-        static pj_thread_desc desc;
+        pj_thread_desc pc_desc;
         if(!pj_thread_is_registered()){
                 pj_thread_t *pThread;
-                return pj_thread_register(NULL, desc, &pThread);
+                return pj_thread_register(NULL, pc_desc, &pThread);
         }
         return PJ_SUCCESS;
 }
@@ -136,11 +136,11 @@ static void onIceComplete2(pjmedia_transport *pTransport, pj_ice_strans_op op,
         PeerConnection * pPeerConnection = (PeerConnection *)pTransportIce->pPeerConnection;
 
         if (pPeerConnection->nIsFailCallbackDone) {
-                MY_PJ_LOG(3, "ice already fail and callback to user:state:%d status:%d",op, status);
+                MY_PJ_LOG(1, "ice already fail and callback to user:state:%d status:%d",op, status);
                 return;
         }
         if(status != PJ_SUCCESS){
-                MY_PJ_LOG(3, "onIceComplete2 status:%state:%d status:%d",op, status);
+                MY_PJ_LOG(1, "onIceComplete2 status:%state:%d status:%d",op, status);
                 if (!pPeerConnection->nIsFailCallbackDone) {
                         pPeerConnection->nIsFailCallbackDone = 1;
                         pTransportIce->iceState = ICE_STATE_FAIL;
@@ -165,7 +165,7 @@ static void onIceComplete2(pjmedia_transport *pTransport, pj_ice_strans_op op,
                                 return;
                         }
                         if (status != PJ_SUCCESS) {
-                                MY_PJ_LOG(3, "--->gathering candidates finish. addCandidate status:%d", status);
+                                MY_PJ_LOG(1, "--->gathering candidates finish. but addCandidate fail:%d", status);
                                 doUserCallback(pPeerConnection, ICE_STATE_GATHERING_FAIL, NULL);
                                 return;
                         }
@@ -187,7 +187,7 @@ static void onIceComplete2(pjmedia_transport *pTransport, pj_ice_strans_op op,
                                 return;
                         }
                         if (status != PJ_SUCCESS) {
-                                MY_PJ_LOG(3, "--->negotiation finish, but fail. status:%d", status);
+                                MY_PJ_LOG(1, "--->negotiation finish, but fail. status:%d", status);
                                 doUserCallback(pPeerConnection, ICE_STATE_NEGOTIATION_FAIL, NULL);
                                 return;
                         }
@@ -837,7 +837,7 @@ static void on_rx_rtcp(void *pUserData, void *pPkt, pj_ssize_t size)
         MediaStreamTrack *pMediaTrack = (MediaStreamTrack *)pUserData;
         
         if (size < 0) {
-                MY_PJ_LOG(3, "Error receiving RTCP packet:%d", size);
+                MY_PJ_LOG(1, "Error receiving RTCP packet:%d", size);
                 return;
         }
         
@@ -857,7 +857,7 @@ static void on_rx_rtp(void *pUserData, void *pPkt, pj_ssize_t size)
 
         /* Check for errors */
         if (size < 0) {
-                MY_PJ_LOG(3, "RTP recv() error:%d", size);
+                MY_PJ_LOG(1, "RTP recv() error:%d", size);
                 return;
         }
 
@@ -866,7 +866,7 @@ static void on_rx_rtp(void *pUserData, void *pPkt, pj_ssize_t size)
                                         pPkt, (int)size,
                                         &pRtpHeader, &pPayload, &nPayloadLen);
         if (status != PJ_SUCCESS) {
-                MY_PJ_LOG(3, "RTP decode error:%d", status);
+                MY_PJ_LOG(1, "RTP decode error:%d", status);
                 return;
         }
         
@@ -885,7 +885,7 @@ static void on_rx_rtp(void *pUserData, void *pPkt, pj_ssize_t size)
         JitterBufferPush(&pMediaTrack->jbuf, pPayload, nPayloadLen, pj_ntohs(pRtpHeader->seq),
                          nRtpTs, &nIsDiscard);
         if (nIsDiscard) {
-                MY_PJ_LOG(3, "rtp packet disacrded by jitter buffer");
+                MY_PJ_LOG(2, "rtp packet disacrded by jitter buffer");
                 return;
         }
 
@@ -926,7 +926,7 @@ static void on_rx_rtp(void *pUserData, void *pPkt, pj_ssize_t size)
                         break;
                 }
 
-                MY_PJ_LOG(3, "%d-->get_frame:%d  rtp seq:%d, ts=%d", ++nTestCnt, nPayloadLen, nSeq, nTs);
+                MY_PJ_LOG(4, "%d-->get_frame:%d  rtp seq:%d, ts=%d", ++nTestCnt, nPayloadLen, nSeq, nTs);
 
                 //deal with payload
                 pj_bool_t bTryAgain = PJ_FALSE;
@@ -1290,12 +1290,12 @@ static int SendAudioPacket(IN PeerConnection *_pPeerConnection, IN RtpPacket * _
 {
         MediaStreamTrack * pMediaTrack = GetAudioTrack(&_pPeerConnection->mediaStream);
         if (pMediaTrack == NULL) {
-                MY_PJ_LOG(3, "no audio track in stream");
+                MY_PJ_LOG(1, "no audio track in stream");
                 return -1;
         }
         int nTransportIndex = GetMediaTrackIndex(&_pPeerConnection->mediaStream, pMediaTrack);
         if (nTransportIndex < 0){
-                MY_PJ_LOG(3, "no found match track in stream");
+                MY_PJ_LOG(1, "no found match track in stream");
                 return -2;
         }
         TransportIce * pTransportIce = &_pPeerConnection->transportIce[nTransportIndex];
@@ -1333,7 +1333,7 @@ static int SendVideoPacket(IN PeerConnection *_pPeerConnection, IN OUT RtpPacket
         MediaStreamTrack *pMediaTrack = GetVideoTrack(&_pPeerConnection->mediaStream);
         int nTransportIndex = GetMediaTrackIndex(&_pPeerConnection->mediaStream, pMediaTrack);
         if (nTransportIndex < 0){
-                MY_PJ_LOG(3, "no found match track in stream");
+                MY_PJ_LOG(1, "no found match track in stream");
                 return -2;
         }
         TransportIce * pTransportIce = &_pPeerConnection->transportIce[nTransportIndex];

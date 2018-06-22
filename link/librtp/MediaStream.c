@@ -189,7 +189,7 @@ void AddMediaTrack(IN OUT MediaStream *_pMediaStraem, IN MediaConfigSet *_pMedia
         
         for (int i = 0; i < _pMediaStraem->nCount; i++) {
                 if ( _pMediaStraem->streamTracks[i].type == _type ){
-                        MY_PJ_LOG(3, "media type exists");
+                        MY_PJ_LOG(1, "media type exists");
                         return;
                 }
         }
@@ -414,7 +414,7 @@ pj_status_t h264_unpacketize(IN OUT MediaPacketier *_pKtz,
                 pPktz->nUnpackBufLen = 0;
                 pPktz->bFuAStartbit = PJ_FALSE;
                 *_pTryAgain = PJ_TRUE;
-                MY_PJ_LOG(3, "rtp packet lost\n");
+                MY_PJ_LOG(2, "rtp packet lost\n");
                 return status;
         }
         *_pTryAgain = PJ_FALSE;
