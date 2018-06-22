@@ -400,8 +400,10 @@ SIP_ERROR_CODE SipMakeNewCall(IN const int _nFromAccountId, IN const char *_pDes
         *_pCallId = nCallId;
 
         SipEvent *pEvent = (SipEvent *)malloc(sizeof(SipEvent));
-        if (!pEvent)
+        if (!pEvent) {
+                SipAppData.Calls[nCallId].bValid = PJ_FALSE;
                 return SIP_MALLOC_FAILED;
+        }
 
         memset(pEvent, 0, sizeof(SipEvent));
         pEvent->Body.MakeCall.nAccountId = _nFromAccountId;
@@ -416,6 +418,7 @@ SIP_ERROR_CODE SipMakeNewCall(IN const int _nFromAccountId, IN const char *_pDes
 
         Message *pMessage = (Message *)malloc(sizeof(Message));
         if (!pMessage) {
+                SipAppData.Calls[nCallId].bValid = PJ_FALSE;
                 free(pEvent);
                 pEvent = NULL;
                 return SIP_MALLOC_FAILED;
@@ -424,6 +427,8 @@ SIP_ERROR_CODE SipMakeNewCall(IN const int _nFromAccountId, IN const char *_pDes
         memset(pMessage, 0, sizeof(Message));
         pMessage->nMessageID = SIP_MAKE_CALL;
         pMessage->pMessage = (void*)pEvent;
+        SipAppData.nCallCount++;
+        SipAppData.Accounts[_nFromAccountId].nOngoingCall++;
         SendMessage(SipAppData.pMq, pMessage);
         return SIP_SUCCESS;
 }

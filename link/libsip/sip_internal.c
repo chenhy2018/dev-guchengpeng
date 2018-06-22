@@ -631,6 +631,8 @@ SIP_ERROR_CODE OnSipMakeNewCall(IN const SipEvent *_pEvent)
                 PrintErrorMsg(Status, "Create uac dialg failed");
                 MUTEX_FREE(SipAppData.pMutex);
                 pCall->bValid = PJ_FALSE;
+                SipAppData.nCallCount--;
+                SipAppData.Accounts[_nFromAccountId].nOngoingCall--;
                 return SIP_CREATE_DLG_FAILED;
         }
         /* TODO get Local SDP */
@@ -646,6 +648,8 @@ SIP_ERROR_CODE OnSipMakeNewCall(IN const SipEvent *_pEvent)
                 pjsip_dlg_terminate(pDialog);
                 /* TODO destory media resouce */
                 pCall->bValid = PJ_FALSE;
+                SipAppData.nCallCount--;
+                SipAppData.Accounts[_nFromAccountId].nOngoingCall--;
                 MUTEX_FREE(SipAppData.pMutex);
                 return SIP_CREATE_INV_SESS_FAILED;
         }
@@ -654,6 +658,8 @@ SIP_ERROR_CODE OnSipMakeNewCall(IN const SipEvent *_pEvent)
                 PrintErrorMsg(Status, "Session Timer init failed");
                 pjsip_dlg_terminate(pDialog);
                 pCall->bValid = PJ_FALSE;
+                SipAppData.nCallCount--;
+                SipAppData.Accounts[_nFromAccountId].nOngoingCall--;
                 /* TODO destory media resouce */
                 MUTEX_FREE(SipAppData.pMutex);
                 return SIP_SESS_TIMER_INIT_FALIED;
@@ -669,6 +675,8 @@ SIP_ERROR_CODE OnSipMakeNewCall(IN const SipEvent *_pEvent)
                 pjsip_dlg_terminate(pDialog);
                 /* TODO destory media resouce */
                 pCall->bValid = PJ_FALSE;
+                SipAppData.nCallCount--;
+                SipAppData.Accounts[_nFromAccountId].nOngoingCall--;
                 MUTEX_FREE(SipAppData.pMutex);
                 return SIP_CREATE_INV_REQ_FAILED;
         }
@@ -678,12 +686,12 @@ SIP_ERROR_CODE OnSipMakeNewCall(IN const SipEvent *_pEvent)
                 pjsip_dlg_terminate(pDialog);
                 /* TODO destory media resouce */
                 pCall->bValid = PJ_FALSE;
+                SipAppData.nCallCount--;
+                SipAppData.Accounts[_nFromAccountId].nOngoingCall--;
                 MUTEX_FREE(SipAppData.pMutex);
                 return SIP_SNED_INV_REQ_FAILED;
         }
 
-        SipAppData.nCallCount++;
-        SipAppData.Accounts[_nFromAccountId].nOngoingCall++;
         MUTEX_FREE(SipAppData.pMutex);
         return SIP_SUCCESS;
 }
