@@ -38,6 +38,7 @@ typedef struct {
         int id;
         int nActualId;
         int nAccountId;
+        bool error;
         char from[MAX_FROM_NAME_SIZE];
         char url[MAX_URL_SIZE];
         struct list_head list;

@@ -174,7 +174,6 @@ void Mthread1(void* data)
                                     HangupCall(pData->accountid, pData->callid);
                                     sendflag = 0;
                                     DBG_LOG("makecall ******************\n");
-                                    MakeCall(pData->accountid, "1010", "123.59.204.198", &pData->callid);
                                     timecount = 0;
                                     continue;
                             }
@@ -198,6 +197,13 @@ void Mthread1(void* data)
                                       AnswerCall(pData->accountid, pCallEvent->callID);
                                       DBG_LOG("AnswerCall end *****************\n");
                                   }
+                                  if (pCallEvent->status == CALL_STATUS_ERROR || pCallEvent->status == CALL_STATUS_HANGUP) {
+                                        DBG_LOG("makecall *****************  ERROR ****************************8*\n");
+                                        do {
+                                                id = MakeCall(pData->accountid, "1010", "123.59.204.198", &pData->callid);
+                                        } while (id != RET_OK);
+                                  }
+
                                   break;
                             }
                             case EVENT_DATA:
@@ -223,7 +229,6 @@ void Mthread1(void* data)
                                          DBG_ERROR("pMedia->nCount %d, HangupCall %d", pMedia->nCount, pMedia->callID); 
                                          HangupCall(pData->accountid, pMedia->callID);
                                          DBG_LOG("makecall ******************\n");
-                                         MakeCall(pData->accountid, "1010", "123.59.204.198", &pData->callid);
                                  }
                                  break;
                             }
@@ -309,7 +314,7 @@ int RegisterTestSuitCallback( TestSuit *this )
                             if (pData->timecount > 5000) continue;
                             SendPacket(pData->accountid, pData->callid, STREAM_AUDIO, data, 100, pData->timecount);
                             pData->timecount += 1;
-                            usleep(100);
+                            usleep(10000);
                             continue;
                    }
                    id = PollEvent(pData->accountid, &type, &event, 1);
@@ -322,6 +327,7 @@ int RegisterTestSuitCallback( TestSuit *this )
                            {
                                    CallEvent *pCallEvent = &(event->body.callEvent);
                                    DBG_LOG("Call status %d call id %d call account id %d\n", pCallEvent->status, pCallEvent->callID, pData->accountid);
+                                   if (pCallEvent->status == CALL_STATUS_ERROR) 
                                    break;
                            }
                            case EVENT_DATA:

@@ -262,17 +262,22 @@ void CALLOnCallStateChange(Call** _pCall, const SipInviteState State, const SipA
         int res = 0;
         (*_pCall)->callStatus = State;
         if ((*_pCall)->callStatus == INV_STATE_CONNECTING) {
+                (*_pCall)->error = false;
                 DBG_LOG("====================stats %d state %d call %p\n", State, StatusCode, *_pCall);
                 if (pMedia != NULL) {
                         res = setRemoteDescription((*_pCall)->pPeerConnection, (pjmedia_sdp_session*)(pMedia));
+                        if (res != 0) {
+                                (*_pCall)->error = true;
+                        }
                 }
         }
         else if ((*_pCall)->callStatus == INV_STATE_CONFIRMED) {
                 if (res == 0) {
                         res = StartNegotiation((*_pCall)->pPeerConnection);
                 }
-                if (res != 0) {
+                if (res != 0 || (*_pCall)->error) {
                         DBG_ERROR("StartNegotiation failed %d %d todo\n", res, (*_pCall)->nActualId);
+                        (*_pCall)->error = true;
                         SipHangUp((*_pCall)->nActualId);
                         //SipAnswerCall((*_pCall)->nActualId, INTERNAL_SERVER_ERROR, "StartNegotiation failed", NULL);
                 }
@@ -281,8 +286,10 @@ void CALLOnCallStateChange(Call** _pCall, const SipInviteState State, const SipA
         if ((*_pCall)->callStatus == INV_STATE_DISCONNECTED) {
                 //CALLHangupCall(*_pCall);
                 if ((*_pCall)->pPeerConnection) {
+                         pthread_mutex_unlock(&pUAManager->mutex);
                          ReleasePeerConnectoin((*_pCall)->pPeerConnection);
                          (*_pCall)->pPeerConnection = NULL;
+                         pthread_mutex_lock(&pUAManager->mutex);
                 }
                 free(*_pCall);
                 DBG_LOG("Free call\n");
