@@ -1,4 +1,4 @@
-// Last Update:2018-06-13 14:46:25
+// Last Update:2018-06-21 15:24:24
 /**
  * @file dbg.c
  * @brief 
@@ -30,6 +30,25 @@ DbgStr callStatusStr[] =
     DBG_STRING( CALL_STATUS_REJECT ),
     DBG_STRING( CALL_STATUS_HANGUP ),
     DBG_STRING( CALL_STATUS_ERROR ),
+};
+
+DbgStr sdkRetStr[] = 
+{
+    DBG_STRING( RET_OK ),
+    DBG_STRING( RET_MEM_ERROR ),
+    DBG_STRING( RET_ACCOUNT_NOT_EXIST ),
+    DBG_STRING( RET_FAIL ),
+    DBG_STRING( RET_REGISTERING ),
+    DBG_STRING( RET_INIT_ERROR ),
+    DBG_STRING( RET_CALL_NOT_EXIST ),
+    DBG_STRING( RET_PARAM_ERROR ),
+    DBG_STRING( RET_USER_UNAUTHORIZED ),
+    DBG_STRING( RET_CALL_INVAILD_CONNECTION ),
+    DBG_STRING( RET_TIMEOUT_FROM_SERVER ),
+    DBG_STRING( RET_CALL_INVAILD_SDP ),
+    DBG_STRING( RET_INTERAL_FAIL ),
+    DBG_STRING( RET_REGISTER_TIMEOUT ),
+    DBG_STRING( RET_SDK_ALREADY_INITED ),
 };
 
 #if 0
@@ -74,6 +93,18 @@ char * DbgCallStatusGetStr( CallStatus status )
         }
     }
 
+    return "NULL";
+}
+
+char *DbgSdkRetGetStr( ErrorID id )
+{
+    int i = 0;
+
+    for ( i=0; i<ARRSZ(sdkRetStr); i++ ) {
+        if ( id == sdkRetStr[i].val ) {
+            return sdkRetStr[i].str;
+        }
+    }
     return "NULL";
 }
 

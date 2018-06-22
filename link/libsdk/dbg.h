@@ -1,4 +1,4 @@
-// Last Update:2018-06-13 14:42:48
+// Last Update:2018-06-21 15:24:37
 /**
  * @file dbg.h
  * @brief 
@@ -43,10 +43,12 @@ typedef void LogFunc(const char *data);
 void DumpUAList();
 void DbgBacktrace();
 char * DbgCallStatusGetStr(CallStatus status);
+char *DbgSdkRetGetStr( ErrorID id );
 #else
 #define DumpUAList()
 #define DbgBacktrace()
 #define DbgCallStatusGetStr( CallStatus status )
+#define DbgSdkRetGetStr( ErrorID id )
 #endif
 
 #endif  /*DBG_H*/

@@ -1,4 +1,4 @@
-// Last Update:2018-06-19 17:46:10
+// Last Update:2018-06-20 19:25:47
 /**
  * @file unit_test.h
  * @brief 
@@ -71,6 +71,7 @@
 #define LOG_BLUE(args...) printf( BLUE"" );printf(args);printf(""NONE)
 #define UT_ERROR(args...) LOG_RED("[ UNIT TEST] "); LOG_RED("[ %s %s +%d ] ", __FILE__, __FUNCTION__, __LINE__);LOG_RED(args)
 
+typedef struct _CondWait CondWait;
 typedef struct _TestSuit TestSuit;
 typedef void *(*ThreadFn)(void *);
 typedef struct {
@@ -81,8 +82,11 @@ typedef struct {
     pthread_t tid;
     void *data;
     unsigned char running;
+    int res;
+    CondWait *pCondWait;
 } TestCase;
 
+typedef int (*EventCallBack)( TestCase *pTestCase, void *data );
 typedef struct _TestSuitManager TestSuitManager; 
 struct _TestSuit {
     char *suitName;
@@ -99,18 +103,28 @@ struct _TestSuit {
     pthread_t tid;
 };
 
+struct _CondWait {
+    pthread_cond_t cond;
+    TestCase *pTestCase;
+    EventCallBack eventCallBack;
+    void *data;
+};
+
 typedef struct {
     int eventId;
     int condNum;
-    pthread_cond_t condList[COND_MAX];
+    CondWait waitList[COND_MAX];
 } EventWait;
 
 typedef struct {
     int eventNum;
 	pthread_mutex_t mutex;
     EventWait eventWait[EVENT_WAIT_MAX];
-    int (*WaitForEvent)( int event, int timeout );
+    int (*WaitForEvent)( int _nEventId, int nTimeOut, EventCallBack eventCallback,
+                  TestSuit *pTestSuit, void *data );
+    int (* NotifyAllEvent)( int _nEventId, void *data );
     int (*DestroyAllEvent)();
+    int (*GetEventDataAddr)( TestSuit *pTestSuit, void **data );
 } EventManger;
 
 typedef struct {
@@ -118,21 +132,13 @@ typedef struct {
     int res;
 } TestCaseResult;
 
-typedef struct {
-    TestCaseResult results[TEST_CASE_RESULT_MAX];
-    char *pTestSuitName;
-    int num;
-}  TestSuitResult;
-
 struct _TestSuitManager{
     void *data;
     int num;
     TestSuit testSuits[TEST_SUIT_MAX];
-    TestSuitResult testSuitResults[TEST_SUIT_MAX];
     EventManger eventManager;
-    int (* NotifyAllEvent)( int _nEventId );
     int (*AddPrivateData)( void *data );
-    int (*startThread)( TestSuit *_pTestSuit,  ThreadFn threadFn );
+    int (*startThread)( TestSuit *_pTestSuit );
     int (*CancelThread)( TestSuit *pTestSuit );
     int (*Report)();
 };
@@ -140,12 +146,14 @@ struct _TestSuitManager{
 extern int AddTestSuit( TestSuit *pTestSuit );
 extern int RunAllTestSuits();
 extern int TestSuitManagerInit();
-extern int NotifyAllEvent( int event );
-extern int WaitForEvent( int _nEventId, int nTimeOut );
+extern int NotifyAllEvent( int event, void *data );
 extern int AddPrivateData( void *data );
-extern int startThread( TestSuit *_pTestSuit, ThreadFn threadFn );
+extern int startThread( TestSuit *_pTestSuit );
 extern int CancelThread( TestSuit *_pTestSuit );
 extern int ResultReport();
 extern int DestroyAllEvent();
+extern int GetEventDataAddr( TestSuit *pTestSuit, void **data );
+extern int WaitForEvent( int _nEventId, int nTimeOut,
+                         EventCallBack eventCallback, TestSuit *pTestSuit, void *data );
 
 #endif  /*UNIT_TEST_H*/
