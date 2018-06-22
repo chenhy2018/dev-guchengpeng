@@ -721,6 +721,9 @@ SipAnswerCode OnSipAnswerCall(IN const SipEvent *_pEvent)
                 pSdp = (pjmedia_sdp_session*)_pMedia;
         else
                 pSdp = NULL;
+        if (!pCall->bValid || !pCall->pInviteSession)
+                return SIP_SUCCESS;
+
         MUTEX_LOCK(SipAppData.pMutex);
         Status = pjsip_inv_answer(pCall->pInviteSession,
                                   _StatusCode, pReason,
@@ -754,7 +757,7 @@ SipAnswerCode OnSipHangUp(IN const SipEvent *_pEvent)
         pjsip_tx_data *pTxData;
         pj_status_t Status;
         int nCallId = _pEvent->Body.HangUp.nCallId;
-        if (SipAppData.Calls[nCallId].pInviteSession == NULL)
+        if (SipAppData.Calls[nCallId].pInviteSession == NULL || SipAppData.Calls[nCallId].bValid == PJ_FALSE)
                 return SIP_SUCCESS;
 
         /* TODO release media resource */
