@@ -155,15 +155,18 @@ static void onIceComplete2(pjmedia_transport *pTransport, pj_ice_strans_op op,
                         /** Initialization (candidate gathering) */
                 case PJ_ICE_STRANS_OP_INIT:
                         pTransportIce->iceState = ICE_STATE_GATHERING_OK;
+                        pj_mutex_lock(pPeerConnection->pMutex);
                         pPeerConnection->nGatherCandidateSuccessCount++;
-                        MY_PJ_LOG(3, "--->gathering candidates finish. total:%d count:%d", pPeerConnection->mediaStream.nCount,
-                                  pPeerConnection->nGatherCandidateSuccessCount);
+                        MY_PJ_LOG(3, "--->gathering candidates finish. total:%d count:%d pPeerConnection %p", pPeerConnection->mediaStream.nCount,
+                                  pPeerConnection->nGatherCandidateSuccessCount, pPeerConnection);
                         pjmedia_sdp_session *pSdp = NULL;
                         if (pPeerConnection->nGatherCandidateSuccessCount == pPeerConnection->mediaStream.nCount) {
                                 status = addCandidate(pTransportIce, &pSdp);
                         } else {
+                                pj_mutex_unlock(pPeerConnection->pMutex);
                                 return;
                         }
+                        pj_mutex_unlock(pPeerConnection->pMutex);
                         if (status != PJ_SUCCESS) {
                                 MY_PJ_LOG(1, "--->gathering candidates finish. but addCandidate fail:%d", status);
                                 doUserCallback(pPeerConnection, ICE_STATE_GATHERING_FAIL, NULL);
