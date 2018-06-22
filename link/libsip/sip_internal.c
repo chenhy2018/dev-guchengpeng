@@ -30,15 +30,15 @@ static void SipScheduleReRegistration(SipAccount *_pAccount);
 static void SipReRegTimerCallBack(pj_timer_heap_t *_pTimerHeap, pj_timer_entry *_pTimerEntry);
 
 
-static void register_thread() {
-        static pj_thread_desc threaddesc;
+void RegisterToPjLib() {
+        pj_thread_desc threaddesc;
         pj_thread_t *thread = 0;
         if( !pj_thread_is_registered())
                 pj_thread_register(NULL, threaddesc, &thread);
 }
 SIP_ERROR_CODE OnSipAddNewAccount(IN const SipAccountConfig *_pConfig, OUT int *_pAccountId)
 {
-        register_thread();
+        RegisterToPjLib();
         /* Input check */
         CHECK_RETURN(_pConfig->pUserName && _pConfig->pPassWord && _pConfig->pDomain, SIP_INVALID_ARG);
 
@@ -112,7 +112,7 @@ SIP_ERROR_CODE OnSipAddNewAccount(IN const SipAccountConfig *_pConfig, OUT int *
 
 SIP_ERROR_CODE OnSipDeleteAccount(IN const int _nAccountId)
 {
-        register_thread();
+        RegisterToPjLib();
         CHECK_RETURN(_nAccountId >= 0 && _nAccountId < (int)SipAppData.nMaxAccount,
                      SIP_INVALID_ARG);
         CHECK_RETURN(SipAppData.Accounts[_nAccountId].bValid, SIP_INVALID_ARG);
@@ -221,16 +221,6 @@ SIP_ERROR_CODE OnSipRegAccount(IN const SipEvent *_pEvent)
         /* Invoke callback function */
         MUTEX_FREE(SipAppData.pMutex);
         return SIP_SUCCESS;
-}
-
-static int PullForEndPointEvent(void *_arg)
-{
-        PJ_UNUSED_ARG(_arg);
-        while (!SipAppData.bThreadQuit) {
-                pj_time_val timeout = {0, 10};
-                pjsip_endpt_handle_events(SipAppData.pSipEndPoint, &timeout);
-        }
-        return 0;
 }
 
 static pj_status_t SipRegcInit(IN const int _nAccountId)
@@ -606,7 +596,7 @@ int SipGetFreeCallId(void)
 {
         int nCallId;
         for (nCallId = 0; nCallId < SipAppData.nMaxCall; ++nCallId) {
-                if (SipAppData.Calls[nCallId].bValid == PJ_FALSE)
+                if (SipAppData.Calls[nCallId].bValid == PJ_FALSE && (SipAppData.Calls[nCallId].pInviteSession == NULL))
                         return nCallId;
         }
         return -1;
@@ -761,7 +751,6 @@ SIP_ERROR_CODE OnSipHangUp(IN const SipEvent *_pEvent)
 
         /* TODO release media resource */
         MUTEX_LOCK(SipAppData.pMutex);
-        SipAppData.Calls[nCallId].bValid = PJ_FALSE;
         Status = pjsip_inv_end_session(SipAppData.Calls[nCallId].pInviteSession, 0, NULL, &pTxData);
         if (Status == PJ_SUCCESS && pTxData != NULL)
                 pjsip_inv_send_msg(SipAppData.Calls[nCallId].pInviteSession, pTxData);

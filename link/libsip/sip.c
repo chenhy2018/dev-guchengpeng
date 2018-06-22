@@ -222,6 +222,7 @@ SIP_ERROR_CODE SipCreateInstance(IN const SipInstanceConfig *_pConfig)
 
 void SipDestroyInstance()
 {
+        RegisterToPjLib();
         if (SipAppData.pSipEndPoint) {
                 PJ_LOG(4, (THIS_FILE, "Destroy libSip instance ..."));
         }
@@ -380,7 +381,7 @@ SIP_ERROR_CODE SipMakeNewCall(IN const int _nFromAccountId, IN const char *_pDes
 
         /* Check arguments */
         CHECK_RETURN(_pDestUri, SIP_INVALID_ARG);
-
+        RegisterToPjLib();
         MUTEX_LOCK(SipAppData.pMutex);
         /* Find free call id */
         int nCallId = SipGetFreeCallId();

@@ -14,19 +14,19 @@
 #endif
 typedef enum SIP_ERROR_CODE {
 
-        SIP_SUCCESS,
+        SIP_SUCCESS = 0,
         SIP_INVALID_ARG,
         SIP_MALLOC_FAILED,
 
         /* SipCreateInstance Error Code */
         SIP_PJ_INIT_FAILED,
         SIP_CREATE_ENDPOINT_FALIED,
-        SIP_START_TP_FAILED,
+        SIP_START_TP_FAILED = 5,
         SIP_INIT_TRANS_FAILED,
         SIP_UA_LAYER_INIT_FAILED,
         SIP_INIT_INV_SESS_FALIED,
         SIP_INIT_100_REL_FALIED,
-        SIP_INIT_SESS_TIMER_FAILED,
+        SIP_INIT_SESS_TIMER_FAILED = 10,
         SIP_REG_INCOMING_FAILED,
         SIP_REG_LOG_FAILED,
 
@@ -35,7 +35,7 @@ typedef enum SIP_ERROR_CODE {
 
         /* SipRegAccount Error Code */
         SIP_CREATE_REG_FAILED,
-        SIP_USR_NOT_REGISTERED,
+        SIP_USR_NOT_REGISTERED = 15,
         SIP_SEND_REG_FAILED,
 
 
@@ -43,14 +43,14 @@ typedef enum SIP_ERROR_CODE {
         SIP_CREATE_DLG_FAILED,
         SIP_CREATE_INV_SESS_FAILED,
         SIP_SESS_TIMER_INIT_FALIED,
-        SIP_CREATE_INV_REQ_FAILED,
+        SIP_CREATE_INV_REQ_FAILED = 20,
         SIP_SNED_INV_REQ_FAILED,
         SIP_TOO_MANY_CALLS_FOR_INSTANCE,
         SIP_TOO_MANY_CALLS_FOR_ACCOUNT,
 
         /* SipAnswerCall Error Code */
         SIP_CREATE_RES_FAILED,
-        SIP_SEND_RES_FAILED,
+        SIP_SEND_RES_FAILED = 25
 } SIP_ERROR_CODE;
 /**
  * This enumeration lists standard SIP status codes according to RFC 3261.

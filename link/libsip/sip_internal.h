@@ -195,6 +195,7 @@ void onSipCallOnStateChanged( IN pjsip_inv_session *pInviteSession,
 void onSipCallOnForked(IN pjsip_inv_session *pInviteSession, IN pjsip_event *pEvent);
 
 int SipGetFreeCallId();
+void RegisterToPjLib();
 SIP_ERROR_CODE OnSipAddNewAccount(IN const SipAccountConfig *_pConfig, OUT int *_pAccountId);
 SIP_ERROR_CODE OnSipDeleteAccount(IN const int _nAccountId);
 SIP_ERROR_CODE OnSipRegAccount(IN const SipEvent *pEvent);
