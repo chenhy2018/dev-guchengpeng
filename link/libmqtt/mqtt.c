@@ -131,7 +131,6 @@ void OnConnectCallback(struct mosquitto* _pMosq, void* _pObj, int result)
         struct MqttInstance* pInstance = (struct MqttInstance*)(_pObj);
         pInstance->connected = true;
         if (result) {
-                fprintf(stderr, "%s\n", mosquitto_connack_string(result));
                 pInstance->status = STATUS_CONNECT_ERROR;
         }
         else {
@@ -210,19 +209,15 @@ bool ClientOptSet(struct MqttInstance* _pInstance, struct mosquitto* _pMosq, str
 {
         int rc = 0;
         if (info.nAuthenicatinMode & MQTT_AUTHENTICATION_USER) {
-                printf("mosquitto_username_pw_set \n");
                 rc = mosquitto_username_pw_set(_pMosq, info.pUsername, info.pPassword);
                 if (rc)
                         return rc;
         }
         if (info.nAuthenicatinMode & MQTT_AUTHENTICATION_ONEWAY_SSL) {
-                printf("mosquitto_tls_set %s \n", info.pCafile);
                 rc = mosquitto_tls_set(_pMosq, info.pCafile, NULL, NULL, NULL, NULL);
-                printf("mosquitto_tls_set rc %d \n", rc);
         }
         else if (info.nAuthenicatinMode & MQTT_AUTHENTICATION_TWOWAY_SSL) {
                 rc = mosquitto_tls_set(_pMosq, info.pCafile, NULL, info.pCertfile, info.pKeyfile, NULL);
-                printf("mosquitto_tls_set 111 rc %d \n", rc);
         }
         if (rc) {
                 printf("ClientOptSet error %d\n", rc);
@@ -260,7 +255,6 @@ void * Mqttthread(void* _pData)
         
         do {
                  if (!pInstance->connected && pInstance->status == STATUS_IDLE) {
-                         fprintf(stderr, "connecting \n");
                          pInstance->status = STATUS_CONNECTING;
                          rc = ClientOptSet(pInstance, pInstance->mosq, pInstance->options.primaryUserInfo);
                          if (rc == 0) {
@@ -268,13 +262,11 @@ void * Mqttthread(void* _pData)
                          }
                          if (rc) {
                                  OnEventCallback(pInstance, rc, mosquitto_strerror(rc));
-                                 fprintf(stderr, "Unable to connect (%s). try to reconnect to secondary server. \n", mosquitto_strerror(rc));
                                  rc = ClientOptSet(pInstance, pInstance->mosq, pInstance->options.secondaryUserInfo);
                                  if (rc == 0) {
                                          rc = mosquitto_connect(pInstance->mosq, pInstance->options.secondaryUserInfo.pHostname, pInstance->options.secondaryUserInfo.nPort, pInstance->options.nKeepalive);
                                  }
                                  if (rc) {
-                                         fprintf(stderr, "Unable to connect Secondary server  %s \n", mosquitto_strerror(rc) );
                                          pInstance->status = STATUS_IDLE;
                                          OnEventCallback(pInstance, rc, mosquitto_strerror(rc));
                                          sleep(30);
@@ -369,11 +361,9 @@ int MqttSubscribe(IN const void* _pInstance, IN char* _pTopic)
 {
         struct MqttInstance* pInstance = (struct MqttInstance*)(_pInstance);
         if (_pTopic == NULL) {
-               fprintf(stderr, "Error: Invalid input.\n");
                return MQTT_ERR_INVAL;
         }
         int rc = mosquitto_subscribe(pInstance->mosq, NULL, _pTopic, pInstance->options.nQos);
-        fprintf(stderr, "mos sub %d", rc);
         if (!rc) {
                 pthread_mutex_lock(&pInstance->listMutex);
                 InsertNode(&pInstance->pSubsribeList, _pTopic);
