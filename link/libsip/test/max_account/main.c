@@ -45,8 +45,8 @@ int main()
 
         int ret = SipAddNewAccount(&AccountConfig, &nid);
         if (ret != SIP_SUCCESS)
-                printf("Add sip account failed");
-
+                printf("Add 1039 failed, ret = %d\n", ret);
+        printf("Add 1039 success\n");
 
         AccountConfig.pUserName = "1038";
         AccountConfig.pPassWord = "1038";
@@ -56,8 +56,8 @@ int main()
 
         ret = SipAddNewAccount(&AccountConfig, &nid);
         if (ret != SIP_SUCCESS)
-                printf("Add sip account failed ret = %d\n", ret);
-
+                printf("Add 1038 failed ret = %d\n", ret);
+        printf("Add 1038 success\n");
         AccountConfig.pUserName = "1037";
         AccountConfig.pPassWord = "1037";
         AccountConfig.pDomain = "123.59.204.198";
@@ -66,8 +66,8 @@ int main()
 
         ret =  SipAddNewAccount(&AccountConfig, &nid);
         if (ret != SIP_SUCCESS)
-                printf("Add sip account failed, ret = %d\n", ret);
-
+                printf("Add 1037 failed, ret = %d\n", ret);
+        printf("Add 1037 success\n");
         AccountConfig.pUserName = "1036";
         AccountConfig.pPassWord = "1036";
         AccountConfig.pDomain = "123.59.204.198";
@@ -76,8 +76,7 @@ int main()
 
         ret = SipAddNewAccount(&AccountConfig, &nid);
         assert(ret == SIP_TOO_MANY_ACCOUNT);
-        if (ret != SIP_SUCCESS)
-                printf("Add sip account failed, ret = %d\n", ret);
+
 
         return 0;
 }
