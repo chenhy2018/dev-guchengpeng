@@ -50,9 +50,15 @@ ErrorID InitRtp(Call** _pCall, CallConfig* _pConfig)
         // rtp to do. ice config.media info. and check error)
         InitIceConfig(&pCall->iceConfig);
         if (!_pConfig->turnHost) DBG_LOG("InitRtp _pHost NULL \n");
+#if 1
         strncpy(&pCall->iceConfig.turnHost[0], "123.59.204.198:4478", MAX_TURN_HOST_SIZE);//_pConfig->turnHost, MAX_TURN_HOST_SIZE);
         //strncpy(&pCall->iceConfig.turnUsername[0], "root", MAX_TURN_USR_SIZE);// _pId);
         //strncpy(&pCall->iceConfig.turnPassword[0], "root", MAX_TURN_PWD_SIZE); //_pPassword);
+#else
+        strncpy(&pCall->iceConfig.turnHost[0], _pConfig->turnHost, MAX_TURN_HOST_SIZE);
+        strncpy(&pCall->iceConfig.turnUsername[0], "root", MAX_TURN_USR_SIZE);// _pId);
+        strncpy(&pCall->iceConfig.turnPassword[0], "root", MAX_TURN_PWD_SIZE); //_pPassword);
+#endif
         pCall->iceConfig.userCallback = _pConfig->pCallback->OnRxRtp;
         pCall->iceConfig.pCbUserData = *_pCall;
         //todo check status
@@ -86,7 +92,7 @@ ErrorID InitRtp(Call** _pCall, CallConfig* _pConfig)
 void CALLMakeNewCall(Call* _pCall)
 {
         int nCallId;
-        DBG_LOG("CALLMakeCall start url %s accountId %d pLocal %p\n", _pCall->url, _pCall->nAccountId, _pCall->pLocal);
+        DBG_LOG("CALLMakeNewCall start url %s accountId %d pLocal %p\n", _pCall->url, _pCall->nAccountId, _pCall->pLocal);
         SIP_ERROR_CODE error = SipMakeNewCall(_pCall->nAccountId, _pCall->url, _pCall->pLocal, &nCallId);
         if (error != SIP_SUCCESS) {
                 DBG_ERROR("SipMakeNewCall failed %d \n", error);
@@ -136,6 +142,7 @@ Call* CALLMakeCall(AccountID _nAccountId, const char* id, const char* _pDestUri,
         }
         strncpy(pCall->url, pUri, MAX_URL_SIZE);
         pCall->id = ++CallId;
+        *_pCallId = pCall->id;
         pCall->nAccountId = _nAccountId;
         pCall->callStatus = INV_STATE_CALLING;
         CheckCallStatus(pCall, CALL_STATUS_RING);
@@ -200,7 +207,6 @@ ErrorID CALLSendPacket(Call* _pCall, Stream streamID, const uint8_t* buffer, int
         if (id != RET_OK) {
               return id;
         }
-        DBG_LOG("call %p\n", _pCall);
         RtpStreamType type;
         if (streamID == STREAM_AUDIO) {
                 type = RTP_STREAM_AUDIO;
@@ -209,7 +215,6 @@ ErrorID CALLSendPacket(Call* _pCall, Stream streamID, const uint8_t* buffer, int
                 type = RTP_STREAM_VIDEO;
         }
         RtpPacket packet = {(uint8_t*)(buffer), size, nTimestamp, type};
-        DBG_LOG("call %p sendpack\n", _pCall);
         return SendRtpPacket(_pCall->pPeerConnection, &packet);
 }
 
@@ -261,19 +266,23 @@ void CALLOnCallStateChange(Call** _pCall, const SipInviteState State, const SipA
                 if (pMedia != NULL) {
                         res = setRemoteDescription((*_pCall)->pPeerConnection, (pjmedia_sdp_session*)(pMedia));
                 }
+        }
+        else if ((*_pCall)->callStatus == INV_STATE_CONFIRMED) {
                 if (res == 0) {
                         res = StartNegotiation((*_pCall)->pPeerConnection);
                 }
                 if (res != 0) {
-                        DBG_ERROR("StartNegotiation failed %d todo\n", res);
-                        SipAnswerCall((*_pCall)->nActualId, INTERNAL_SERVER_ERROR, "StartNegotiation failed", (*_pCall)->pLocal);
+                        DBG_ERROR("StartNegotiation failed %d %d todo\n", res, (*_pCall)->nActualId);
+                        SipHangUp((*_pCall)->nActualId);
+                        //SipAnswerCall((*_pCall)->nActualId, INTERNAL_SERVER_ERROR, "StartNegotiation failed", NULL);
                 }
         }
-        DBG_LOG("stats %d state %d call %p\n", State, StatusCode, *_pCall);
+        DBG_LOG("stats %d state %d call %p id %d aid %d \n", State, StatusCode, *_pCall, (*_pCall)->id, (*_pCall)->nActualId);
         if ((*_pCall)->callStatus == INV_STATE_DISCONNECTED) {
                 //CALLHangupCall(*_pCall);
                 if ((*_pCall)->pPeerConnection) {
                          ReleasePeerConnectoin((*_pCall)->pPeerConnection);
+                         (*_pCall)->pPeerConnection = NULL;
                 }
                 free(*_pCall);
                 DBG_LOG("Free call\n");

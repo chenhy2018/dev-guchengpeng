@@ -537,6 +537,7 @@ pj_status_t MediaPacketize(IN MediaPacketier *_pPktz,IN pj_uint8_t *_pBitstream,
 pj_status_t MediaUnPacketize(IN OUT MediaPacketier *_pPKtz, IN const pj_uint8_t *_pPayload, IN pj_size_t _nPlyloadLen,
                              OUT pj_uint8_t **_pBitstream, OUT unsigned *_pBitstreamPos, IN int _nRtpMarker, IN pj_bool_t *_pTryAgain)
 {
+        if (_pPKtz== NULL) return -1;
         return _pPKtz->pOperation.unpacketize(_pPKtz, _pPayload, _nPlyloadLen, _pBitstream, _pBitstreamPos, _nRtpMarker, _pTryAgain);
 }
 

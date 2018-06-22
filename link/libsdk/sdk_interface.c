@@ -100,10 +100,10 @@ void OnIncomingCall(const const int _nAccountId, const int _nCallId, const const
 // Todo send to message queue.
 static void OnRxRtp(void *_pUserData, CallbackType _type, void *_pCbData)
 {
-        pthread_mutex_lock(&pUAManager->mutex);
+        //pthread_mutex_lock(&pUAManager->mutex);
         Call* pCall = (Call*)(_pUserData);
         if (pCall == NULL) {
-                pthread_mutex_unlock(&pUAManager->mutex);
+                //pthread_mutex_unlock(&pUAManager->mutex);
                 DBG_ERROR("OnRxRtp _pUserData is invaild******\n");
                 return;
         }
@@ -115,15 +115,13 @@ static void OnRxRtp(void *_pUserData, CallbackType _type, void *_pCbData)
                                  {       
                                          DBG_LOG("=****=========>callback_ice: state: %d callStatus %d\n", pInfo->state, pCall->callStatus);
                                          pCall->pLocal = (pjmedia_sdp_session *)(pInfo->pData);
-                                         DBG_LOG("=****=========>callback_ice: state: pLocal %p accountid %d call id %d\n", pCall->pLocal, pCall->nAccountId, pCall->id);
                                          if (pCall->callStatus == INV_STATE_INCOMING) {
                                                  OnIncomingCall(pCall->nAccountId,pCall->id, pCall->from);
                                          }
                                          else if (pCall->callStatus == INV_STATE_CALLING) {
                                                  CALLMakeNewCall(pCall);
-                                                 DBG_LOG("==========> CALLMakeNewCall end");
                                          }
-                                         pthread_mutex_unlock(&pUAManager->mutex);
+                                         //pthread_mutex_unlock(&pUAManager->mutex);
                                          return;
                                  }
                                  case  ICE_STATE_NEGOTIATION_OK:
@@ -134,7 +132,7 @@ static void OnRxRtp(void *_pUserData, CallbackType _type, void *_pCbData)
                                  default :
                                  {
                                          DBG_ERROR("==========>callback_ice: state: %d\n", pInfo->state);
-                                         pthread_mutex_unlock(&pUAManager->mutex);
+                                         //pthread_mutex_unlock(&pUAManager->mutex);
                                          return;
                                  }
                         }
@@ -144,7 +142,7 @@ static void OnRxRtp(void *_pUserData, CallbackType _type, void *_pCbData)
                          break;
                  }
         }
-
+        pthread_mutex_lock(&pUAManager->mutex);
         Message *pMessage = (Message *) malloc (sizeof(Message));
         Event *pEvent = (Event *) malloc(sizeof(Event));
         if ( !pMessage || !pEvent ) {
@@ -205,10 +203,8 @@ static void OnRxRtp(void *_pUserData, CallbackType _type, void *_pCbData)
                         pj_ssize_t nLen = pPkt->nDataLen;
                         DataEvent* event = &pEvent->body.dataEvent;
                         if (pPkt->type == RTP_STREAM_AUDIO && nLen == 160) {
-                                //pj_file_write(gPcmuFd, pPkt->pData, &nLen);
                                 event->stream = STREAM_AUDIO;
                         } else if (pPkt->type == RTP_STREAM_VIDEO) {
-                                //pj_file_write(gH264Fd, pPkt->pData, &nLen);
                                 event->stream = STREAM_VIDEO;
                         }
                         //DBG_LOG("==========>callback_rtp nTimestamp %lld\n", pPkt->nTimestamp);
@@ -443,7 +439,7 @@ ErrorID MakeCall(AccountID _nAccountId, const char* id, const char* _pDestUri, O
     pid_t tid = pthread_self();
     DBG_ERROR("MakeCall pid %d\n", tid);
 
-    if ( !_pDestUri || !_pCallId )
+    if ( !_pDestUri || !_pCallId || !id )
         return RET_PARAM_ERROR;
 
     pthread_mutex_lock(&pUAManager->mutex);
@@ -473,19 +469,16 @@ ErrorID PollEvent(AccountID _nAccountID, EventType* _pType, Event** _pEvent, int
             pthread_mutex_unlock(&pUAManager->mutex);
             return RET_ACCOUNT_NOT_EXIST;
     }
-#if 1
     // pLastMessage use to free last message
     if ( pUA->pLastMessage ) {
         Event *pEvent = (Event *) pUA->pLastMessage->pMessage;
         if (pUA->pLastMessage->nMessageID == EVENT_DATA) {
-                //DBG_LOG("EVENT DATA \n");
                 if (pEvent->body.dataEvent.data) {
                         free( pEvent->body.dataEvent.data );
                         pEvent->body.dataEvent.data = NULL;
                 }
         }
         if (pUA->pLastMessage->nMessageID == EVENT_MESSAGE) {
-                //DBG_LOG("EVENT MESSAGE %p %s\n", pEvent->body.messageEvent.message, pEvent->body.messageEvent.message);
                 if (pEvent->body.messageEvent.message) {
                         free(pEvent->body.messageEvent.message);
                         pEvent->body.messageEvent.message = NULL;
@@ -501,7 +494,6 @@ ErrorID PollEvent(AccountID _nAccountID, EventType* _pType, Event** _pEvent, int
         pEvent = NULL;
         pUA->pLastMessage = NULL;
     }
-#endif
     pthread_mutex_unlock(&pUAManager->mutex);
     //DBG_LOG("wait for event, pUA = %p\n", pUA );
 
@@ -581,6 +573,9 @@ ErrorID SendPacket(AccountID id, int _nCallId, Stream streamID, const uint8_t* b
 {
     struct list_head *pos;
     ErrorID error = RET_ACCOUNT_NOT_EXIST;
+    if (streamID == STREAM_AUDIO && size > MAX_AUDIO_SIZE) {
+            return RET_PARAM_ERROR;
+    }
     pthread_mutex_lock(&pUAManager->mutex);
     UA *pUA = FindUA(pUAManager, id, &pos);
     if (pUA != NULL) {
@@ -594,12 +589,12 @@ ErrorID Report(AccountID id, const char* message, int length)
 {
     struct list_head *pos;
     ErrorID error = RET_ACCOUNT_NOT_EXIST;
-    //pthread_mutex_lock(&pUAManager->mutex);
+    pthread_mutex_lock(&pUAManager->mutex);
     UA *pUA = FindUA(pUAManager, id, &pos);
     if (pUA != NULL) {
             error = UAReport(pUA, message, length);
     }
-    //pthread_mutex_unlock(&pUAManager->mutex);
+    pthread_mutex_unlock(&pUAManager->mutex);
     return error;
 }
 
@@ -688,18 +683,18 @@ void cbOnCallStateChange(const int _nCallId, const int _nAccountId, const SipInv
     const UA *_pUA = pUser;
     struct list_head *pos;
 
-    DBG_LOG("state = %d, status code = %d\n", _State, _StatusCode);
+    DBG_LOG("state = %d, status code = %d callid %d accountid %d\n", _State, _StatusCode, _nCallId, _nAccountId);
     pid_t tid = pthread_self();
-    DBG_ERROR("cbOnCallStateChange pid %d\n", tid);
+    DBG_LOG("cbOnCallStateChange pid %d\n", tid);
     if ( !pMessage || !pEvent ) {
             DBG_ERROR("malloc error\n");
             return;
     }
-    //pthread_mutex_lock(&pUAManager->mutex);
+    pthread_mutex_lock(&pUAManager->mutex);
     UA *pUA = FindUA(pUAManager, _nAccountId, &pos);
 
     if (pUA == NULL) {
-            //pthread_mutex_unlock(&pUAManager->mutex);
+            pthread_mutex_unlock(&pUAManager->mutex);
             DBG_ERROR("pUser is NULL\n");
             free(pMessage);
             free(pEvent);
@@ -711,7 +706,7 @@ void cbOnCallStateChange(const int _nCallId, const int _nAccountId, const SipInv
     pMessage->nMessageID = EVENT_CALL;
     pCallEvent = &pEvent->body.callEvent;
     UAOnCallStateChange(pUA, _nCallId, _State, _StatusCode, pMedia, &pCallEvent->callID);
-    pCallEvent->callID = _nCallId;
+    //pCallEvent->callID = _nCallId;
     if ( _State == INV_STATE_CONFIRMED ) {
             pCallEvent->status = CALL_STATUS_ESTABLISHED;
     } else if ( _State == INV_STATE_DISCONNECTED ) {
@@ -722,5 +717,5 @@ void cbOnCallStateChange(const int _nCallId, const int _nAccountId, const SipInv
     pCallEvent->pFromAccount = NULL;
     pMessage->pMessage  = (void *)pEvent;
     SendMessage(pUA->pQueue, pMessage);
-    //pthread_mutex_unlock(&pUAManager->mutex);
+    pthread_mutex_unlock(&pUAManager->mutex);
 }

@@ -14,11 +14,13 @@
 #include "test.h"
 #include <unistd.h> 
 #include <stdlib.h>
+#include <pthread.h>
 
 #define ARRSZ(arr) (sizeof(arr)/sizeof(arr[0]))
 #define HOST "123.59.204.198"
 #define INVALID_SERVER "192,.168.1.239"
 
+#define MAX_COUNT 9
 int RegisterTestSuitCallback( TestSuit *this );
 int RegisterTestSuitInit( TestSuit *this, TestSuitManager *_pManager );
 int RegisterTestSuitGetTestCase( TestSuit *this, TestCase **testCase );
@@ -69,7 +71,23 @@ RegisterTestCase gRegisterTestCases[] =
     {
         { "invalid_sip_register_server", CALL_STATUS_REGISTER_FAIL, UA5_EventLoopThread },
         { "1015", "1015", INVALID_SERVER, INVALID_SERVER, INVALID_SERVER, 10, 0 }
-    }
+    },
+    {
+        { "invalid_account", 0 },
+        { "1016", "1016", HOST, HOST, HOST, 100, 0 }
+    },
+    {
+        { "normal", 0 },
+        { "1017", "1017", HOST, HOST, HOST, 100, 1 }
+    },
+    {
+        { "invalid_account", 0 },
+        { "1018", "1018", HOST, HOST, HOST, 100, 0 }
+    },
+    {
+        { "normal", 0 },
+        { "1019", "1019", HOST, HOST, HOST, 100, 1 }
+    },
 };
 
 RegisterTestCase gCallTestCases[] =
@@ -139,6 +157,73 @@ int RegisterTestSuitGetTestCase( TestSuit *this, TestCase **testCase )
     return 0;
 }
 
+void Mthread1(void* data)
+{   
+    RegisterData *pData = (RegisterData*) data;
+    Event * event= (Event*) malloc(sizeof(Event));
+    ErrorID id = 0;
+    EventType type;
+    int timecount = 0;
+    int sendflag = 0;
+    char data1[100] = {1};
+    DBG_LOG("send pack *****%d call id %d\n", pData->accountid, pData->callid);
+    while (1) {     
+                    if (sendflag) {
+                            if (timecount > 500) {
+                                    DBG_LOG("hangcall ******************\n");
+                                    HangupCall(pData->accountid, pData->callid);
+                                    sendflag = 0;
+                                    DBG_LOG("makecall ******************\n");
+                                    MakeCall(pData->accountid, "1010", "123.59.204.198", &pData->callid);
+                                    timecount = 0;
+                                    continue;
+                            }
+                            id = SendPacket(pData->accountid, pData->callid, STREAM_AUDIO, data1, 100, timecount);
+                            if (id > 0) DBG_LOG("send pack *****%d\n", id);
+                            timecount += 1;
+                            usleep(10000);
+                            continue;
+                    }
+                    id = PollEvent(pData->accountid, &type, &event, 10);
+                    if (id != RET_OK) {
+                           continue;
+                    }
+                    switch (type) {
+                            case EVENT_CALL:
+                            {     
+                                  CallEvent *pCallEvent = &(event->body.callEvent);
+                                  DBG_LOG("Call status %d call id %d call account id %d\n", pCallEvent->status, pCallEvent->callID, pData->accountid);
+                                  if (pCallEvent->status == CALL_STATUS_INCOMING) {
+                                      DBG_LOG("AnswerCall ******************\n");
+                                      AnswerCall(pData->accountid, pCallEvent->callID);
+                                      DBG_LOG("AnswerCall end *****************\n");
+                                  }
+                                  break;
+                            }
+                            case EVENT_DATA:
+                            {     
+                                  DataEvent *pDataEvent = &(event->body.dataEvent);
+                                  //DBG_LOG("Data size %d call id %d call account id %d timestamp %lld \n", pDataEvent->size, pDataEvent->callID, pData->accountid, pDataEvent->pts);
+                                  break;
+                            }
+                            case EVENT_MESSAGE:
+                            {
+                                  MessageEvent *pMessage = &(event->body.messageEvent);
+                                  DBG_LOG("Message %s status id %d account id %d\n", pMessage->message, pMessage->status, pData->accountid);
+                                  break;
+                            }
+                            case EVENT_MEDIA:
+                            {
+                                 MediaEvent *pMedia = &(event->body.mediaEvent);
+                                 DBG_LOG("Callid %d ncount %d type 1 %d type 2 %d\n", pMedia->callID, pMedia->nCount, pMedia->media[0].codecType, pMedia->media[1].codecType);
+                                 
+                                 sendflag = 1;
+                                 break;
+                            }
+                    }
+           }
+}
+
 int RegisterTestSuitCallback( TestSuit *this )
 {
     RegisterTestCase *pTestCases = NULL;
@@ -158,7 +243,7 @@ int RegisterTestSuitCallback( TestSuit *this )
     if ( !this ) {
         return -1;
     }
-
+    int all_count = 0;
     pTestCases = (RegisterTestCase *) this->testCases;
     UT_LOG("this->index = %d\n", this->index );
     pData = &pTestCases[this->index].data;
@@ -173,7 +258,7 @@ int RegisterTestSuitCallback( TestSuit *this )
     }
 
     UT_STR( pData->id );
-    for (int count = 0; count < 5; ++ count) {
+    for (int count = 0; count < MAX_COUNT; ++ count) {
             pData = &pTestCases[count].data;
             UT_STR(pData->password);
             UT_STR(pData->sigHost);
@@ -183,9 +268,15 @@ int RegisterTestSuitCallback( TestSuit *this )
             int nCallId1 = -1;
     }
     sleep(10);
+
+        pthread_t t_1;
+        pthread_attr_t attr_1;
+        pthread_attr_init(&attr_1);
+        pthread_attr_setdetachstate(&attr_1, PTHREAD_CREATE_DETACHED);
+
     Event* event = (Event*) malloc(sizeof(Event));
     ErrorID id;
-    for (int count = 0; count < 5; ++ count) {
+    for (int count = 0; count < MAX_COUNT; ++ count) {
            pData = &pTestCases[count].data;
            pData->sendflag = 0;
            pData->timecount = 0;
@@ -196,16 +287,19 @@ int RegisterTestSuitCallback( TestSuit *this )
                     fprintf(stderr, "call error %d \n", id);
                      continue;
            }
+           UT_LOG("MakeCall in callidid %d\n", pData->callid);
+           pthread_create(&t_1, &attr_1, Mthread1, pData);
     }
+    while(1) { sleep(10); }
     int count = 0;
     char data[1024 * 1024] = {1};
     while (1) {
             ErrorID id;
-            for (int count = 0; count < 5; ++ count) {
+            for (int count = 0; count < MAX_COUNT; ++ count) {
                    pData = &pTestCases[count].data;
                    EventType type;
                    if (pData->sendflag) {
-                            DBG_LOG("send packet STREAM_AUDIO\n");
+                            if (pData->timecount > 5000) continue;
                             SendPacket(pData->accountid, pData->callid, STREAM_AUDIO, data, 100, pData->timecount);
                             pData->timecount += 1;
                             usleep(100);
@@ -246,12 +340,6 @@ int RegisterTestSuitCallback( TestSuit *this )
                    }
              }
       }
-      UT_LOG("HangupCall in\n");
-      //      int ret = HangupCall(sts, nCallId1);
-            UT_LOG("HangupCall out\n");
-            sleep(1);
-            ++ count;
-    //UnRegister(sts);
 }
 
 int RegisterTestSuitCallback2( TestSuit *this )

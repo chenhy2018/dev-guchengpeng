@@ -140,7 +140,7 @@ static void onIceComplete2(pjmedia_transport *pTransport, pj_ice_strans_op op,
                 return;
         }
         if(status != PJ_SUCCESS){
-                MY_PJ_LOG(1, "onIceComplete2 status:%state:%d status:%d",op, status);
+                MY_PJ_LOG(1, "onIceComplete2 state:%d status:%d",op, status);
                 if (!pPeerConnection->nIsFailCallbackDone) {
                         pPeerConnection->nIsFailCallbackDone = 1;
                         pTransportIce->iceState = ICE_STATE_FAIL;

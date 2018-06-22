@@ -32,12 +32,12 @@ static Call* FindCallByActualId(UA* _pUa, int _nCallId, struct list_head **pos)
         Call* pCall;
         struct list_head *q;
         struct list_head *po;
-        //DBG_LOG("Findcall in %p %p %p\n", &_pUa->callList.list, *pos, q);
+        DBG_LOG("Findcall in %p %p %p\n", &_pUa->callList.list, *pos, q);
         list_for_each_safe(po, q, &_pUa->callList.list) {
                 pCall = list_entry(po, Call, list);
                 if (pCall->nActualId == _nCallId) {
                         *pos = po;
-                        //DBG_LOG("Findcall out %p %p\n", pCall, *pos);
+                        DBG_LOG("Findcall out %p %p\n", pCall, *pos);
                         return pCall;
                 }
         }
@@ -79,14 +79,20 @@ UA* UARegister(const char* _pId, const char* _pPassword, const char* _pSigHost,
         pUA->regStatus == TRYING;
         //mqtt create instance.
         _pOptions->nAccountId = nAccountId;
-        //pUA->pMqttInstance = MqttCreateInstance(_pOptions);
+        pUA->pMqttInstance = MqttCreateInstance(_pOptions);
         pUA->id = nAccountId;
         pUA->config.pVideoConfigs = &_pConfig->videoConfigs;
         pUA->config.pAudioConfigs = &_pConfig->audioConfigs;
         pUA->config.pCallback = &_pConfig->callback;
-        strncpy(pUA->config.turnHost, _pMediaHost, MAX_TURN_HOST_SIZE - 1);
-        strncpy(pUA->config.turnUsername, _pId, MAX_TURN_USR_SIZE -1);
-        strncpy(pUA->config.turnPassword, _pPassword, MAX_TURN_PWD_SIZE -1);
+        if (_pMediaHost) {
+                strncpy(pUA->config.turnHost, _pMediaHost, MAX_TURN_HOST_SIZE - 1);
+        }
+        if (_pId) {
+                strncpy(pUA->config.turnUsername, _pId, MAX_TURN_USR_SIZE -1);
+        }
+        if (_pPassword) {
+                strncpy(pUA->config.turnPassword, _pPassword, MAX_TURN_PWD_SIZE -1);
+        }
         return pUA;
 }
 
@@ -242,7 +248,7 @@ void UAOnCallStateChange(UA* _pUa, const int nCallId, const SipInviteState State
                 *pId = call->id;
                 DBG_LOG("call %p\n", call);
                 //CALLOnCallStateChange(&call, State, StatusCode, pMedia);
-                if (StatusCode >= 400 && State == INV_STATE_DISCONNECTED) {
+                if (State == INV_STATE_DISCONNECTED) {
                                 DBG_LOG("*******UAOnCallStateChange del %p \n", pos);
                                 list_del(pos);
                 }
