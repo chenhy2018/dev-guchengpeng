@@ -216,8 +216,15 @@ void Mthread1(void* data)
                             {
                                  MediaEvent *pMedia = &(event->body.mediaEvent);
                                  DBG_LOG("Callid %d ncount %d type 1 %d type 2 %d\n", pMedia->callID, pMedia->nCount, pMedia->media[0].codecType, pMedia->media[1].codecType);
-                                 
-                                 sendflag = 1;
+                                 if (pMedia->nCount == 2) {
+                                         sendflag = 1;
+                                 }
+                                 else {
+                                         DBG_ERROR("pMedia->nCount %d, HangupCall %d", pMedia->nCount, pMedia->callID); 
+                                         HangupCall(pData->accountid, pMedia->callID);
+                                         DBG_LOG("makecall ******************\n");
+                                         MakeCall(pData->accountid, "1010", "123.59.204.198", &pData->callid);
+                                 }
                                  break;
                             }
                     }
