@@ -96,7 +96,7 @@ static pjsip_module SipLogger =
 };
 
 /* Sip handlers for sdk, indexed by state */
-static SIP_ERROR_CODE  (*SipHandlers[])(const SipEvent *) =
+static SipAnswerCode  (*SipHandlers[])(const SipEvent *) =
 {
         &OnSipRegAccount,
         &OnSipMakeNewCall,
@@ -107,7 +107,7 @@ static SIP_ERROR_CODE  (*SipHandlers[])(const SipEvent *) =
 
 };
 
-SIP_ERROR_CODE SipCreateInstance(IN const SipInstanceConfig *_pConfig)
+SipAnswerCode SipCreateInstance(IN const SipInstanceConfig *_pConfig)
 {
         pj_status_t Status;
         Status = pj_init();
@@ -287,7 +287,7 @@ static int MQConsumer(void *_arg)
                         continue;
 
                 SipEvent *pEvent = (SipEvent *)pMsg->pMessage;
-                SIP_ERROR_CODE Ret = SipHandlers[pMsg->nMessageID](pEvent);
+                SipAnswerCode Ret = SipHandlers[pMsg->nMessageID](pEvent);
                 if (Ret != SIP_SUCCESS) {
                         if (pMsg->nMessageID == SIP_REG_ACCOUNT) {
                                 int nAccountId = pEvent->Body.Reg.nAccountId;
@@ -335,7 +335,7 @@ static void ReleaseMsgResource(Message *pMsg)
         pMsg = NULL;
 }
 
-SIP_ERROR_CODE SipAddNewAccount(IN const SipAccountConfig *_pConfig, OUT int *_pAccountId)
+SipAnswerCode SipAddNewAccount(IN const SipAccountConfig *_pConfig, OUT int *_pAccountId)
 {
         return OnSipAddNewAccount(_pConfig, _pAccountId);
 }
@@ -345,7 +345,7 @@ void SipDeleteAccount(IN const int _nAccountId)
         OnSipDeleteAccount(_nAccountId);
 }
 
-SIP_ERROR_CODE SipRegAccount(IN const int _nAccountId, IN const int _bDeReg)
+SipAnswerCode SipRegAccount(IN const int _nAccountId, IN const int _bDeReg)
 {
         CHECK_RETURN(_nAccountId >= 0 && _nAccountId < (int)SipAppData.nMaxAccount,
                      SIP_INVALID_ARG);
@@ -373,7 +373,7 @@ SIP_ERROR_CODE SipRegAccount(IN const int _nAccountId, IN const int _bDeReg)
         return SIP_SUCCESS;
 }
 
-SIP_ERROR_CODE SipMakeNewCall(IN const int _nFromAccountId, IN const char *_pDestUri, IN const void *_pMedia, OUT int *_pCallId)
+SipAnswerCode SipMakeNewCall(IN const int _nFromAccountId, IN const char *_pDestUri, IN const void *_pMedia, OUT int *_pCallId)
 {
         /* Check that account is valid */
         CHECK_RETURN(_nFromAccountId >=0 || _nFromAccountId < SipAppData.nMaxAccount,
@@ -433,7 +433,7 @@ SIP_ERROR_CODE SipMakeNewCall(IN const int _nFromAccountId, IN const char *_pDes
         return SIP_SUCCESS;
 }
 
-SIP_ERROR_CODE SipAnswerCall(IN const int _nCallId, IN const SipAnswerCode _StatusCode, IN const char *_pReason, IN const void *_pMedia)
+SipAnswerCode SipAnswerCall(IN const int _nCallId, IN const SipAnswerCode _StatusCode, IN const char *_pReason, IN const void *_pMedia)
 {
         CHECK_RETURN(_nCallId >=0 || _nCallId < SipAppData.nMaxCall, SIP_INVALID_ARG);
 
@@ -468,7 +468,7 @@ SIP_ERROR_CODE SipAnswerCall(IN const int _nCallId, IN const SipAnswerCode _Stat
         SendMessage(SipAppData.pMq, pMessage);
         return SIP_SUCCESS;
 }
-SIP_ERROR_CODE SipHangUp(IN const int _nCallId)
+SipAnswerCode SipHangUp(IN const int _nCallId)
 {
         SipEvent *pEvent = (SipEvent *)malloc(sizeof(SipEvent));
         if (!pEvent)
@@ -492,7 +492,7 @@ SIP_ERROR_CODE SipHangUp(IN const int _nCallId)
         return SIP_SUCCESS;
 }
 
-SIP_ERROR_CODE SipHangUpAll()
+SipAnswerCode SipHangUpAll()
 {
         SipEvent *pEvent = (SipEvent *)malloc(sizeof(SipEvent));
         if (!pEvent)
@@ -515,7 +515,7 @@ SIP_ERROR_CODE SipHangUpAll()
         return SIP_SUCCESS;
 }
 
-SIP_ERROR_CODE SipHangUpByAccountId(int _nAccountId)
+SipAnswerCode SipHangUpByAccountId(int _nAccountId)
 {
         SipEvent *pEvent = (SipEvent *)malloc(sizeof(SipEvent));
         if (!pEvent)
