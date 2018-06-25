@@ -63,9 +63,8 @@ do
         cd ../../ori/$1
     fi
 done
-
 cd ../../objs
 # 4. strip all the .o files
-${prefix}strip *.o --strip-unneeded
+#${prefix}strip *.o --strip-unneeded
 # 5. gen new library
 ${prefix}ar r ../../${target} *.o
