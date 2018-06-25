@@ -30,6 +30,7 @@ typedef struct _TransportIce
         IceState iceState;
         pj_ice_strans_cfg iceConfig;
         void *pPeerConnection;
+        int *pQuit;
 }TransportIce;
 
 typedef struct _PeerConnection

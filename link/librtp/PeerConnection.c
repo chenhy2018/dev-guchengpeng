@@ -221,8 +221,9 @@ static int iceWorkerThread(void * _pArg)
         TransportIce * pTransportIce = (TransportIce *)_pArg;
         pj_ice_strans_cfg * pIceCfg = &pTransportIce->iceConfig;
         PeerConnection * pPeerConnection = (PeerConnection*)pTransportIce->pPeerConnection;
+        int *pIsQuit = pTransportIce->pQuit;
         
-        while (!pPeerConnection->bQuit) {
+        while ((*pIsQuit) == 0) {
                 enum { MAX_NET_EVENTS = 1 };
                 pj_time_val maxTimeout = {0, 0};
                 pj_time_val timeout = { 0, 0};
@@ -277,6 +278,7 @@ static int iceWorkerThread(void * _pArg)
                 count += nNetEventCount;
         }
         
+        free(pIsQuit);
         return 0;
 }
 
