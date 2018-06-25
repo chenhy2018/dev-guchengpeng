@@ -130,6 +130,8 @@ Call* CALLMakeCall(AccountID _nAccountId, const char* id, const char* _pDestUri,
         ErrorID nId = InitRtp(&pCall, _pConfig);
         if (nId != RET_OK) {
                 DBG_ERROR("InitRtp failed %d \n", nId);
+                if (pCall->pPeerConnection)
+                        ReleasePeerConnectoin(pCall->pPeerConnection);
                 free(pCall);
                 return NULL;
         }
@@ -137,6 +139,8 @@ Call* CALLMakeCall(AccountID _nAccountId, const char* id, const char* _pDestUri,
         res = createOffer(pCall->pPeerConnection);
         if (res != 0) {
                 DBG_ERROR("createOffer failed %d \n", res);
+                if (pCall->pPeerConnection)
+                        ReleasePeerConnectoin(pCall->pPeerConnection);
                 free(pCall);
                 return NULL;
         }

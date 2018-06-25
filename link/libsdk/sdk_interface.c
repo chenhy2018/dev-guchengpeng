@@ -116,6 +116,7 @@ static void OnRxRtp(void *_pUserData, CallbackType _type, void *_pCbData)
         Message *pMessage = (Message *) malloc (sizeof(Message));
         Event *pEvent = (Event *) malloc(sizeof(Event));
         if ( !pMessage || !pEvent ) {
+
                 if (pMessage) free(pMessage);
                 if (pEvent) free(pEvent);
                 DBG_ERROR("OnRxRtp malloc error***************\n");
@@ -178,8 +179,9 @@ static void OnRxRtp(void *_pUserData, CallbackType _type, void *_pCbData)
                                          pMessage->nMessageID = EVENT_CALL;;
                                          event->callID = pCall->id;
                                          event->status = CALL_STATUS_ERROR;
+                                         if (pCall->pPeerConnection)
+                                             ReleasePeerConnectoin(pCall->pPeerConnection);
                                          DBG_ERROR("==========>callback_ice: state: %d\n", pInfo->state);
-                                         
                                  }
                         }
                  }
