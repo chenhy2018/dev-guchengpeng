@@ -116,15 +116,11 @@ static int addCandidate(TransportIce *_pTransportIce, pjmedia_sdp_session **_pSd
 
 static void doUserCallback(PeerConnection * _pPeerConnection, IceState _state, void *_pData)
 {
-        pj_mutex_lock(_pPeerConnection->pMutex);
         _pPeerConnection->iceNegInfo.state = _state;
         _pPeerConnection->iceNegInfo.pData = _pData;
         if (_pPeerConnection->userIceConfig.userCallback) {
-                pj_mutex_unlock(_pPeerConnection->pMutex);
                 _pPeerConnection->userIceConfig.userCallback(_pPeerConnection->userIceConfig.pCbUserData,
                                                             CALLBACK_ICE, &_pPeerConnection->iceNegInfo);
-        } else {
-                pj_mutex_unlock(_pPeerConnection->pMutex);
         }
         return;
 }
@@ -133,9 +129,11 @@ static void onIceComplete2(pjmedia_transport *pTransport, pj_ice_strans_op op,
                            pj_status_t status, void *pUserData) {
         TransportIce *pTransportIce = (TransportIce *)pUserData;
         PeerConnection * pPeerConnection = (PeerConnection *)pTransportIce->pPeerConnection;
+        pj_mutex_lock(pPeerConnection->pMutex);
 
         if (pPeerConnection->nIsFailCallbackDone) {
                 MY_PJ_LOG(1, "ice already fail and callback to user:state:%d status:%d",op, status);
+                pj_mutex_unlock(pPeerConnection->pMutex);
                 return;
         }
         if(status != PJ_SUCCESS){
@@ -145,6 +143,7 @@ static void onIceComplete2(pjmedia_transport *pTransport, pj_ice_strans_op op,
                         pTransportIce->iceState = ICE_STATE_FAIL;
                         doUserCallback(pPeerConnection, ICE_STATE_FAIL, NULL);
                 }
+                pj_mutex_unlock(pPeerConnection->pMutex);
                 return;
         }
 
@@ -154,7 +153,6 @@ static void onIceComplete2(pjmedia_transport *pTransport, pj_ice_strans_op op,
                         /** Initialization (candidate gathering) */
                 case PJ_ICE_STRANS_OP_INIT:
                         pTransportIce->iceState = ICE_STATE_GATHERING_OK;
-                        pj_mutex_lock(pPeerConnection->pMutex);
                         pPeerConnection->nGatherCandidateSuccessCount++;
                         MY_PJ_LOG(3, "--->gathering candidates finish. total:%d count:%d pPeerConnection %p", pPeerConnection->mediaStream.nCount,
                                   pPeerConnection->nGatherCandidateSuccessCount, pPeerConnection);
@@ -165,15 +163,16 @@ static void onIceComplete2(pjmedia_transport *pTransport, pj_ice_strans_op op,
                                 pj_mutex_unlock(pPeerConnection->pMutex);
                                 return;
                         }
-                        pj_mutex_unlock(pPeerConnection->pMutex);
+
                         if (status != PJ_SUCCESS) {
                                 MY_PJ_LOG(1, "--->gathering candidates finish. but addCandidate fail:%d", status);
                                 doUserCallback(pPeerConnection, ICE_STATE_GATHERING_FAIL, NULL);
+                                pj_mutex_unlock(pPeerConnection->pMutex);
                                 return;
                         }
                         MY_PJ_LOG(3, "--->gathering candidates finish. addCandidate ok");
                         doUserCallback(pPeerConnection, ICE_STATE_GATHERING_OK, pSdp);
-
+                        pj_mutex_unlock(pPeerConnection->pMutex);
                         break;
                         
                         /** Negotiation */
@@ -186,27 +185,32 @@ static void onIceComplete2(pjmedia_transport *pTransport, pj_ice_strans_op op,
                         if (pPeerConnection->nNegSuccess == pPeerConnection->mediaStream.nCount) {
                                 status = negotiationSettingAfterSuccess(pPeerConnection);
                         } else {
+                                pj_mutex_unlock(pPeerConnection->pMutex);
                                 return;
                         }
                         if (status != PJ_SUCCESS) {
                                 MY_PJ_LOG(1, "--->negotiation finish, but fail. status:%d", status);
                                 doUserCallback(pPeerConnection, ICE_STATE_NEGOTIATION_FAIL, NULL);
+                                pj_mutex_unlock(pPeerConnection->pMutex);
                                 return;
                         }
                         MY_PJ_LOG(3, "--->negotiation ok");
 
                         doUserCallback(pPeerConnection, ICE_STATE_NEGOTIATION_OK, NULL);
+                        pj_mutex_unlock(pPeerConnection->pMutex);
                         break;
                         
                         /** This operation is used to report failure in keep-alive operation.
                          *  Currently it is only used to report TURN Refresh failure.  */
                 case PJ_ICE_STRANS_OP_KEEP_ALIVE:
                         MY_PJ_LOG(3, "--->PJ_ICE_STRANS_OP_KEEP_ALIVE");
+                        pj_mutex_unlock(pPeerConnection->pMutex);
                         break;
                         
                         /** IP address change notification from STUN keep-alive operation.  */
                 case PJ_ICE_STRANS_OP_ADDR_CHANGE:
                         MY_PJ_LOG(3, "--->PJ_ICE_STRANS_OP_ADDR_CHANGE");
+                        pj_mutex_unlock(pPeerConnection->pMutex);
                         break;
         }
 }
@@ -1114,6 +1118,7 @@ int setLocalDescription(IN OUT PeerConnection * _pPeerConnection, IN void * _pSd
         createSdpPool(_pPeerConnection);
         pjmedia_sdp_session *  pSdp = (pjmedia_sdp_session *) _pSdp;
         if (pSdp != _pPeerConnection->pOfferSdp && pSdp != _pPeerConnection->pAnswerSdp) {
+                pj_assert(0); //cannot be here
                 _pPeerConnection->pLocalSdp = pjmedia_sdp_session_clone(_pPeerConnection->pSdpPool, _pSdp);
                 if (_pPeerConnection->pLocalSdp == NULL) {
                         MY_PJ_LOG(1, "PJ_NO_MEMORY_EXCEPTION, clone sdp fail");
