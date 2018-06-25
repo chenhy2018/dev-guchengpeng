@@ -17,7 +17,7 @@ ErrorID UARejectCall(UA* _pUa, int nCallId);
 // hangup a call
 ErrorID UAHangupCall(UA* _pUa, int nCallId);
 // send a packet
-ErrorID UASendPacket(UA* _pUa, int callID, Stream streamID, const char* buffer, int size, int64_t nTimestamp);
+ErrorID UASendPacket(UA* _pUa, int callID, Stream streamID, const uint8_t* buffer, int size, int64_t nTimestamp);
 // poll a event
 // if the EventData have video or audio data
 // the user shuould copy the the packet data as soon as possible
@@ -25,6 +25,8 @@ ErrorID UAPollEvent(UA* _pUa, EventType* type, Event* event, int timeOut);
 
 // mqtt report
 ErrorID UAReport(UA* _pUa, const char* message, int length);
+
+void UADeleteCall(UA* _pUa, const int nCallId);
 
 SipAnswerCode UAOnIncomingCall(UA* _pUa, const int _nCallId, const char *pFrom, const void *pMedia);
 

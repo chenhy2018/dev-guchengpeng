@@ -50,7 +50,7 @@ ErrorID InitRtp(Call** _pCall, CallConfig* _pConfig)
         // rtp to do. ice config.media info. and check error)
         InitIceConfig(&pCall->iceConfig);
         if (!_pConfig->turnHost) DBG_LOG("InitRtp _pHost NULL \n");
-#if 1
+#if 0
         strncpy(&pCall->iceConfig.turnHost[0], "123.59.204.198:4478", MAX_TURN_HOST_SIZE);//_pConfig->turnHost, MAX_TURN_HOST_SIZE);
         //strncpy(&pCall->iceConfig.turnUsername[0], "root", MAX_TURN_USR_SIZE);// _pId);
         //strncpy(&pCall->iceConfig.turnPassword[0], "root", MAX_TURN_PWD_SIZE); //_pPassword);

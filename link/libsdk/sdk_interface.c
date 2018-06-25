@@ -179,8 +179,8 @@ static void OnRxRtp(void *_pUserData, CallbackType _type, void *_pCbData)
                                          pMessage->nMessageID = EVENT_CALL;;
                                          event->callID = pCall->id;
                                          event->status = CALL_STATUS_ERROR;
-                                         if (pCall->pPeerConnection)
-                                             ReleasePeerConnectoin(pCall->pPeerConnection);
+                                         UADeleteCall(pUA, pCall->id);
+                                         event->pFromAccount = NULL;
                                          DBG_ERROR("==========>callback_ice: state: %d\n", pInfo->state);
                                  }
                         }

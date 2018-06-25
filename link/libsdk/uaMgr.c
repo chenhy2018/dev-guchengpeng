@@ -32,7 +32,6 @@ static Call* FindCallByActualId(UA* _pUa, int _nCallId, struct list_head **pos)
         Call* pCall;
         struct list_head *q;
         struct list_head *po;
-        DBG_LOG("Findcall in %p %p %p\n", &_pUa->callList.list, *pos, q);
         list_for_each_safe(po, q, &_pUa->callList.list) {
                 pCall = list_entry(po, Call, list);
                 if (pCall->nActualId == _nCallId) {
@@ -98,11 +97,17 @@ UA* UARegister(const char* _pId, const char* _pPassword, const char* _pSigHost,
 
 ErrorID UAUnRegister(UA* _pUa)
 {
-        SipRegAccount(_pUa->id, 0);
+        SipAnswerCode code = SipRegAccount(_pUa->id, 0);
         MqttDestroy(_pUa->pMqttInstance);
         DestroyMessageQueue(&_pUa->pQueue);
         _pUa->pMqttInstance = NULL;
         free(_pUa);
+        if (code !=OK) {
+                return RET_OK;
+        }
+        else {
+                return RET_FAIL;
+        }
 }
 
 // make a call, user need to save call id
@@ -173,7 +178,7 @@ ErrorID UAHangupCall(UA* _pUa, int nCallId)
 }
 
 // send a packet
-ErrorID UASendPacket(UA* _pUa, int nCallId, Stream streamID, const char* buffer, int size, int64_t nTimestamp)
+ErrorID UASendPacket(UA* _pUa, int nCallId, Stream streamID, const uint8_t* buffer, int size, int64_t nTimestamp)
 {
         struct list_head *pos;
         Call* call = FindCall(_pUa, nCallId, &pos);
@@ -225,6 +230,7 @@ SipAnswerCode UAOnIncomingCall(UA* _pUa, const int _nCallId, const char *pFrom, 
         DBG_LOG("UAOnIncomingCall \n");
         SipAnswerCode code = CALLOnIncomingCall(&call, _pUa->id, _nCallId, pFrom, pMedia, &_pUa->config);
         list_add(&(call->list), &(_pUa->callList.list));
+        return code;
 }
 
 void UAOnRegStatusChange(UA* _pUa, const SipAnswerCode _nRegStatusCode)
@@ -254,5 +260,18 @@ void UAOnCallStateChange(UA* _pUa, const int nCallId, const SipInviteState State
                 }
                 CALLOnCallStateChange(&call, State, StatusCode, pMedia);
                 DBG_LOG("call change end \n");
+        }
+}
+
+void UADeleteCall(UA* _pUa, const int nCallId)
+{
+        struct list_head *pos = NULL;
+        DBG_LOG("UA Delete call \n");
+        Call* pCall = FindCall(_pUa, nCallId, &pos);
+        if (pCall) {
+                DBG_LOG("call %p\n", pCall);
+                list_del(pos);
+                free(pCall);
+                DBG_LOG("call delete call end \n");
         }
 }
