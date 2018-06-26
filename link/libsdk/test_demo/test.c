@@ -331,7 +331,7 @@ static int receive_data_callback(void *pData, int nDataLen, int nFlag, int64_t t
                 return SendPacket(id, callID, STREAM_AUDIO, pData, nDataLen, timestamp);
         } else {
                 DBG_LOG("send %d bytes vidoe data to rtp with timestamp:%ld\n", nDataLen, timestamp);
-                //return SendPacket(id, callID, STREAM_VIDEO, pData, nDataLen, timestamp);
+                return SendPacket(id, callID, STREAM_VIDEO, pData, nDataLen, timestamp);
         }
         return 0;
 }
@@ -462,60 +462,6 @@ int RegisterTestSuitCallback( TestSuit *this )
     //sleep(10);
     int count = 0;
     while (1) { sleep(100); }
-    Event* event= (Event*) malloc(sizeof(Event));
-    while (1) {
-            for (int count = 0; count < MAX_COUNT; ++count) {
-                    pData = &pTestCases[count].data;
-                    id = PollEvent(pData->accountid, &type, &event, 1);
-                    if (id != RET_OK) {
-                           continue;
-                    }
-                    switch (type) {
-                            case EVENT_CALL:
-                            {
-                                  CallEvent *pCallEvent = &(event->body.callEvent);
-                                  DBG_LOG("Call status %d call id %d call account id %d\n", pCallEvent->status, pCallEvent->callID, pData->accountid);
-                                  if (pCallEvent->status == CALL_STATUS_INCOMING) {
-                                      DBG_LOG("AnswerCall ******************\n");
-                                      AnswerCall(pData->accountid, pCallEvent->callID);
-                                      DBG_LOG("AnswerCall end *****************\n");
-                                  }
-                                  break;
-                            }
-                            case EVENT_DATA:
-                            {
-                                  DataEvent *pDataEvent = &(event->body.dataEvent);
-                                  allcount += 1;
-                                  //DBG_LOG("Data size %d call id %d call account id %d timestamp %lld \n", pDataEvent->size, pDataEvent->callID, pData->accountid, pDataEvent->pts);
-                                  if (pData->timecount == 0) {
-                                         pData->timecount = pDataEvent->pts;
-                                  }
-                                  else {
-
-                                         if (allcount %10 == 0) {
-                                         //        pData->misscount += pDataEvent->pts - pData->timecount;
-                                                 DBG_ERROR("***miss %d*****size %d****error timestamp %ld last timestamp %ld callid %d count %d \n",
-                                                pData->misscount, pDataEvent->size, pDataEvent->pts, pData->timecount, pDataEvent->callID, allcount);
-                                         }
-                                         pData->timecount = pDataEvent->pts;
-                                  }
-                                  break;
-                            } 
-                            case EVENT_MESSAGE:
-                            {
-                                  MessageEvent *pMessage = &(event->body.messageEvent);
-                                  DBG_LOG("Message %s status id %d account id %d\n", pMessage->message, pMessage->status, pData->accountid);
-                                  break;
-                            }
-                            case EVENT_MEDIA:
-                            {
-                                 MediaEvent *pMedia = &(event->body.mediaEvent);
-                                 DBG_LOG("Callid %d ncount %d type 1 %d type 2 %d\n", pMedia->callID, pMedia->nCount, pMedia->media[0].codecType, pMedia->media[1].codecType);
-                                 break;
-                            }
-                    }
-           }
-    }
 }
 
 int InitAllTestSuit()
