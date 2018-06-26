@@ -345,6 +345,10 @@ void SipDeleteAccount(IN const int _nAccountId)
         OnSipDeleteAccount(_nAccountId);
 }
 
+int SipIsUserAlreadyExist(IN const SipAccountConfig *_pConfig)
+{
+        return OnSipIsUserAlreadyExist(_pConfig);
+}
 SipAnswerCode SipRegAccount(IN const int _nAccountId, IN const int _bDeReg)
 {
         CHECK_RETURN(_nAccountId >= 0 && _nAccountId < (int)SipAppData.nMaxAccount,

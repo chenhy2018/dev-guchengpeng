@@ -44,6 +44,7 @@ int main()
         AccountConfig.nMaxOngoingCall = 2;
 
         int ret = SipAddNewAccount(&AccountConfig, &nid);
+        SipRegAccount(nid, 1);
         if (ret != SIP_SUCCESS)
                 printf("Add 1039 failed, ret = %d\n", ret);
         printf("Add 1039 success\n");
@@ -57,7 +58,9 @@ int main()
         ret = SipAddNewAccount(&AccountConfig, &nid);
         if (ret != SIP_SUCCESS)
                 printf("Add 1038 failed ret = %d\n", ret);
+        SipRegAccount(nid, 1);
         printf("Add 1038 success\n");
+
         AccountConfig.pUserName = "1037";
         AccountConfig.pPassWord = "1037";
         AccountConfig.pDomain = "123.59.204.198";
@@ -67,7 +70,9 @@ int main()
         ret =  SipAddNewAccount(&AccountConfig, &nid);
         if (ret != SIP_SUCCESS)
                 printf("Add 1037 failed, ret = %d\n", ret);
+        SipRegAccount(nid, 1);
         printf("Add 1037 success\n");
+
         AccountConfig.pUserName = "1036";
         AccountConfig.pPassWord = "1036";
         AccountConfig.pDomain = "123.59.204.198";
@@ -76,7 +81,19 @@ int main()
 
         ret = SipAddNewAccount(&AccountConfig, &nid);
         assert(ret == SIP_TOO_MANY_ACCOUNT);
+        SipRegAccount(nid, 1);
 
+        /* add already account case */
+        AccountConfig.pUserName = "1038";
+        AccountConfig.pPassWord = "1038";
+        AccountConfig.pDomain = "123.59.204.198";
+        AccountConfig.pUserData = (void *)user;
+        AccountConfig.nMaxOngoingCall = 2;
+
+        sleep(2);
+        SipDeleteAccount(nid);
+        ret =  SipIsUserAlreadyExist(&AccountConfig);
+        assert(ret == 1);
 
         return 0;
 }

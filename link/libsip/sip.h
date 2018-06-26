@@ -86,41 +86,42 @@ typedef enum SipAnswerCode
         /* for user function(SipRegAccount/SipMakeNewCall etc), after user call it
            we just send it to our messageque below answer code is error when we handle it */
         SIP_INVALID_ARG = 701,
-        SIP_MALLOC_FAILED = 702,
+        SIP_MALLOC_FAILED,
 
         /* SipCreateInstance Error Code */
-        SIP_PJ_INIT_FAILED = 703,
-        SIP_CREATE_ENDPOINT_FALIED =704,
-        SIP_START_TP_FAILED = 705,
-        SIP_INIT_TRANS_FAILED = 706,
-        SIP_UA_LAYER_INIT_FAILED = 707,
-        SIP_INIT_INV_SESS_FALIED = 708,
-        SIP_INIT_100_REL_FALIED = 709,
-        SIP_INIT_SESS_TIMER_FAILED = 710,
-        SIP_REG_INCOMING_FAILED = 711,
-        SIP_REG_LOG_FAILED = 712,
+        SIP_PJ_INIT_FAILED,
+        SIP_CREATE_ENDPOINT_FALIED,
+        SIP_START_TP_FAILED,
+        SIP_INIT_TRANS_FAILED,
+        SIP_UA_LAYER_INIT_FAILED,
+        SIP_INIT_INV_SESS_FALIED,
+        SIP_INIT_100_REL_FALIED,
+        SIP_INIT_SESS_TIMER_FAILED,
+        SIP_REG_INCOMING_FAILED,
+        SIP_REG_LOG_FAILED,
 
         /* SipAddNewAccount Error Code */
-        SIP_TOO_MANY_ACCOUNT = 713,
+        SIP_TOO_MANY_ACCOUNT,
+        SIP_USR_ALREADY_EXIST,
 
         /* SipRegAccount Error Code */
-        SIP_CREATE_REG_FAILED = 714,
-        SIP_USR_NOT_REGISTERED = 715,
-        SIP_SEND_REG_FAILED = 716,
+        SIP_CREATE_REG_FAILED,
+        SIP_USR_NOT_REGISTERED,
+        SIP_SEND_REG_FAILED,
 
 
         /* SipMakeNewCall Error Code */
-        SIP_CREATE_DLG_FAILED = 717,
-        SIP_CREATE_INV_SESS_FAILED = 718,
-        SIP_SESS_TIMER_INIT_FALIED = 719,
-        SIP_CREATE_INV_REQ_FAILED = 720,
-        SIP_SNED_INV_REQ_FAILED = 721,
-        SIP_TOO_MANY_CALLS_FOR_INSTANCE = 722,
-        SIP_TOO_MANY_CALLS_FOR_ACCOUNT =723,
+        SIP_CREATE_DLG_FAILED,
+        SIP_CREATE_INV_SESS_FAILED,
+        SIP_SESS_TIMER_INIT_FALIED,
+        SIP_CREATE_INV_REQ_FAILED,
+        SIP_SNED_INV_REQ_FAILED,
+        SIP_TOO_MANY_CALLS_FOR_INSTANCE,
+        SIP_TOO_MANY_CALLS_FOR_ACCOUNT,
 
         /* SipAnswerCall Error Code */
-        SIP_CREATE_RES_FAILED = 724,
-        SIP_SEND_RES_FAILED = 725
+        SIP_CREATE_RES_FAILED,
+        SIP_SEND_RES_FAILED,
 } SipAnswerCode;
 
 
@@ -210,6 +211,7 @@ SipAnswerCode SipCreateInstance(IN const SipInstanceConfig *pConfig);
  */
 SipAnswerCode SipAddNewAccount(IN const SipAccountConfig *pConfig, OUT int *nAccountId);
 
+int SipIsUserAlreadyExist(IN const SipAccountConfig *_pConfig);
 /**
  * Delete Account
  *

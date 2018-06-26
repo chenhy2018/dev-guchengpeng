@@ -36,6 +36,20 @@ void RegisterToPjLib() {
         if( !pj_thread_is_registered())
                 pj_thread_register(NULL, threaddesc, &thread);
 }
+int OnSipIsUserAlreadyExist(IN const SipAccountConfig *_pConfig) {
+        RegisterToPjLib();
+        int ret = 0;
+        MUTEX_LOCK(SipAppData.pMutex);
+        /* Check User already exist */
+        for (int i = 0; i < SipAppData.nAccountCount; i++) {
+                if (strncmp(_pConfig->pUserName, SipAppData.Accounts[i].UserName.ptr, strlen(_pConfig->pUserName)) == 0 &&
+                    strncmp(_pConfig->pDomain, SipAppData.Accounts[i].SipDomain.ptr, strlen(_pConfig->pDomain)) == 0 &&
+                    SipAppData.Accounts[i].pRegc != NULL)
+                        ret = 1;
+        }
+        MUTEX_FREE(SipAppData.pMutex);
+        return ret;
+}
 SipAnswerCode OnSipAddNewAccount(IN const SipAccountConfig *_pConfig, OUT int *_pAccountId)
 {
         RegisterToPjLib();

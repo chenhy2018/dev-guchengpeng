@@ -204,5 +204,5 @@ SipAnswerCode OnSipAnswerCall(IN const SipEvent *pEvent);
 SipAnswerCode OnSipHangUp(IN const SipEvent *pEvent);
 SipAnswerCode OnSipHangUpAll(IN const SipEvent *pEvent);
 SipAnswerCode OnSipHangUpByAccountId(IN const SipEvent *pEvent);
-
+int OnSipIsUserAlreadyExist(IN const SipAccountConfig *_pConfig);
 #endif

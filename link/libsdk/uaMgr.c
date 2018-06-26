@@ -57,13 +57,7 @@ UA* UARegister(const char* _pId, const char* _pPassword, const char* _pSigHost,
                 return NULL;
         }
         memset( pUA, 0, sizeof(UA) );
-        INIT_LIST_HEAD(&pUA->callList.list);
-        pUA->pQueue = CreateMessageQueue(MESSAGE_QUEUE_MAX);
-        if (!pUA->pQueue) {
-                DBG_ERROR("queue malloc fail\n");
-                free(pUA);
-                return NULL;
-        }
+
         SipAccountConfig sipConfig;
         sipConfig.pUserName = (char*)_pId;
         sipConfig.pPassWord = (char*)_pPassword;
@@ -73,8 +67,24 @@ UA* UARegister(const char* _pId, const char* _pPassword, const char* _pSigHost,
         int nAccountId = 0;
         DBG_LOG("UARegister %s %s %s %p ongoing call %d\n",
                 sipConfig.pUserName, sipConfig.pPassWord, sipConfig.pDomain, sipConfig.pUserData, sipConfig.nMaxOngoingCall);
-        SipAddNewAccount(&sipConfig, &nAccountId);
-        SipRegAccount(nAccountId, 1);
+        if (SipIsUserAlreadyExist(&sipConfig)) {
+                DBG_ERROR("user Already Exist\n");
+                free(pUA);
+                return NULL;
+        }
+        SipAnswerCode Ret = SipAddNewAccount(&sipConfig, &nAccountId);
+        if (Ret != SIP_SUCCESS) {
+                DBG_ERROR("Add Account Error, Ret = %d\n", Ret);
+                free(pUA);
+                return NULL;
+        }
+        Ret = SipRegAccount(nAccountId, 1);
+        if (Ret != SIP_SUCCESS) {
+                SipDeleteAccount(nAccountId);
+                DBG_ERROR("Register Account Error, Ret = %d\n", Ret);
+                free(pUA);
+                return NULL;
+        }
         pUA->regStatus == TRYING;
         //mqtt create instance.
         _pOptions->nAccountId = nAccountId;
@@ -91,6 +101,14 @@ UA* UARegister(const char* _pId, const char* _pPassword, const char* _pSigHost,
         }
         if (_pPassword) {
                 strncpy(pUA->config.turnPassword, _pPassword, MAX_TURN_PWD_SIZE -1);
+        }
+
+        INIT_LIST_HEAD(&pUA->callList.list);
+        pUA->pQueue = CreateMessageQueue(MESSAGE_QUEUE_MAX);
+        if (!pUA->pQueue) {
+                DBG_ERROR("queue malloc fail\n");
+                free(pUA);
+                return NULL;
         }
         return pUA;
 }
