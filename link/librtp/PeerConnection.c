@@ -43,21 +43,6 @@ static inline int GetTransportIndex(IN PeerConnection * _pPeerConnection, IN Tra
         return -1;
 }
 
-static void internal_write_sdp(pjmedia_sdp_session * pSdp, char * pFname)
-{
-        FILE * f = fopen(pFname, "wb");
-        assert(f != NULL);
-        
-        char sdpStr[2048];
-        memset(sdpStr, 0, 2048);
-        int nLen = pjmedia_sdp_print(pSdp, sdpStr, sizeof(sdpStr));
-        
-        int nWlen = fwrite(sdpStr, 1, nLen, f);
-        assert(nWlen == nLen);
-        
-        fclose(f);
-}
-
 static int addCandidate(TransportIce *_pTransportIce, pjmedia_sdp_session **_pSdp)
 {
         pj_assert(_pTransportIce->iceState == ICE_STATE_GATHERING_OK);
@@ -85,7 +70,6 @@ static int addCandidate(TransportIce *_pTransportIce, pjmedia_sdp_session **_pSd
                         }
                 }
                 setLocalDescription(pPeerConnection, pSdp);
-                internal_write_sdp(pSdp, "offer.sdp");
                 print_sdp(pSdp, "offer sdp add candidate");
         } else {
                 pSdp = pPeerConnection->pAnswerSdp;
@@ -106,7 +90,6 @@ static int addCandidate(TransportIce *_pTransportIce, pjmedia_sdp_session **_pSd
                         }
                 }
                 setLocalDescription(pPeerConnection, pSdp);
-                internal_write_sdp(pSdp, "answer.sdp");
                 print_sdp(pSdp, "answer sdp add candidate");
         }
 
