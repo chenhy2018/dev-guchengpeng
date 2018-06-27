@@ -10,12 +10,12 @@ struct connect_status {
 
 struct connect_status Status[10];
 
-void OnMessage(IN const void* _pInstance, IN const char* _pTopic, IN const char* _pMessage, IN size_t nLength)
+void OnMessage(IN const void* _pInstance, IN int _nAccountId, IN const char* _pTopic, IN const char* _pMessage, IN size_t nLength)
 {
         fprintf(stderr, "%p topic %s message %s \n", _pInstance, _pTopic, _pMessage);
 }
 
-void OnEvent(IN const void* _pInstance, IN int _nId,  IN const char* _pReason)
+void OnEvent(IN const void* _pInstance, IN int _nAccountId, IN int _nId,  IN const char* _pReason)
 {
         fprintf(stderr, "%p id %d, reason  %s \n",_pInstance, _nId, _pReason);
         struct connect_status* pStatus;

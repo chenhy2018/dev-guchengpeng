@@ -273,8 +273,8 @@ void InitMqtt(struct MqttOptions* options, const char* _pId, const char* _pPassw
         //strcpy(options.bindaddress, "172.17.0.2");
         options->secondaryUserInfo.pHostname = NULL;
         //strcpy(options.secondBindaddress, "172.17.0.2`");
-        options->primaryUserInfo.pUsername = "root";//(char*)(_pId);
-        options->primaryUserInfo.pPassword = "root";//(char*)(_pPassword);
+        options->primaryUserInfo.pUsername = (char*)(_pId);
+        options->primaryUserInfo.pPassword = (char*)(_pPassword);
         options->secondaryUserInfo.pUsername = NULL;
         options->secondaryUserInfo.pPassword = NULL;
         options->secondaryUserInfo.nPort = 0;

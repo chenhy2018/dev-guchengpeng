@@ -49,10 +49,14 @@ static int MqttErrorStatusChange(int nStatus)
 static void MallocAndStrcpy(char** des, const char* src)
 {
       if (src) {
-              *des = malloc(strlen(src) + 1);
-              if (*des) {
-                      strncpy(*des, src, strlen(src));
-                      des[strlen(src)] = '\0';
+              char* p = malloc(strlen(src) + 1);
+              if (p) {
+                      strncpy(p, src, strlen(src));
+                      p[strlen(src)]= '\0';
+                      *des = p;
+              }
+              else {
+                      *des = NULL;
               }
       }
       else {
@@ -183,6 +187,7 @@ void OnPublishCallback(struct mosquitto* _pMosq, void* _pObj, int mid)
 static void MqttInstanceInit(struct MqttInstance* _pInstance, const struct MqttOptions* _pOption)
 {
         /* copy options */
+
         memcpy(&_pInstance->options, _pOption, sizeof(struct MqttOptions));
         MallocAndStrcpy(&_pInstance->options.pId, _pOption->pId);
         MallocAndStrcpy(&_pInstance->options.primaryUserInfo.pUsername, _pOption->primaryUserInfo.pUsername);
@@ -260,6 +265,7 @@ void * Mqttthread(void* _pData)
                          if (rc == 0) {
                                  rc = mosquitto_connect(pInstance->mosq, pInstance->options.primaryUserInfo.pHostname, pInstance->options.primaryUserInfo.nPort, pInstance->options.nKeepalive);
                          }
+#if 0
                          if (rc) {
                                  OnEventCallback(pInstance, rc, mosquitto_strerror(rc));
                                  rc = ClientOptSet(pInstance, pInstance->mosq, pInstance->options.secondaryUserInfo);
@@ -275,6 +281,7 @@ void * Mqttthread(void* _pData)
                                          pInstance->status = STATUS_CONNECTING;
                                  }
                          }
+#endif
                          sleep(1);
                  }
                  rc = mosquitto_loop(pInstance->mosq, -1, 1);
