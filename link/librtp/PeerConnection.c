@@ -9,14 +9,15 @@ int setLocalDescription(IN OUT PeerConnection * _pPeerConnection, IN void * _pSd
 
 enum { RTCP_INTERVAL = 5000, RTCP_RAND = 2000 };
 
-
-#define  LIBRTP_REGISTER_THREAD() {\
-        pj_thread_desc pc_desc; \
-        if(!pj_thread_is_registered()){ \
-                pj_thread_t *pThread; \
-                pj_thread_register("test", pc_desc, &pThread); \
-        } \
-} \
+static pj_status_t librtp_register_thread()
+{
+        static pj_thread_desc pc_desc;
+        if(!pj_thread_is_registered()){
+                pj_thread_t *pThread;
+                return pj_thread_register(NULL, pc_desc, &pThread);
+        }
+        return PJ_SUCCESS;
+}
 
 static void print_sdp(pjmedia_sdp_session * _pSdp, const char * _pLogPrefix)
 {
@@ -394,6 +395,8 @@ static pj_status_t initTransportIce(IN PeerConnection * _pPeerConnectoin, OUT Tr
         pj_pool_t * pThreadPool = pj_pool_create(_pPeerConnectoin->pPoolFactory, NULL, 512, 512, NULL);
         ASSERT_RETURN_CHECK(pThreadPool, pj_pool_create);
         _pTransportIce->pThreadPool = pThreadPool;
+        _pTransportIce->pQuit = malloc(sizeof(int));
+        *(_pTransportIce->pQuit) = 0;
         status = pj_thread_create(pThreadPool, "iceWorkerThread", &iceWorkerThread, _pTransportIce, 0, 0, &pThread);
         STATUS_CHECK(pj_thread_create, status);
         _pTransportIce->pPollThread = pThread;
