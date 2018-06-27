@@ -9,6 +9,15 @@ int setLocalDescription(IN OUT PeerConnection * _pPeerConnection, IN void * _pSd
 
 enum { RTCP_INTERVAL = 5000, RTCP_RAND = 2000 };
 
+#define  LIBRTP_REGISTER_THREAD() {\
+        pj_thread_desc pc_desc; \
+        if(!pj_thread_is_registered()){ \
+                pj_thread_t *pThread; \
+                pj_thread_register("test", pc_desc, &pThread); \
+        } \
+}
+
+#if 0
 static pj_status_t librtp_register_thread()
 {
         static pj_thread_desc pc_desc;
@@ -18,6 +27,7 @@ static pj_status_t librtp_register_thread()
         }
         return PJ_SUCCESS;
 }
+#endif
 
 static void print_sdp(pjmedia_sdp_session * _pSdp, const char * _pLogPrefix)
 {
