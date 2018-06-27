@@ -43,6 +43,19 @@ ErrorID CheckCallStatus(Call* _pCall, CallStatus expectedState)
        return RET_FAIL;
 }
 
+void ReleaseCall(Call* _pCall)
+{
+        if (_pCall != NULL) {
+                if (_pCall->pPeerConnection) {
+                        pthread_mutex_unlock(&pUAManager->mutex);
+                        ReleasePeerConnectoin(_pCall->pPeerConnection);
+                        pthread_mutex_lock(&pUAManager->mutex);
+                        _pCall->pPeerConnection = NULL;
+                }
+                free(_pCall);
+        }
+}
+
 ErrorID InitRtp(Call** _pCall, CallConfig* _pConfig)
 {
         int res = 0;
@@ -130,18 +143,15 @@ Call* CALLMakeCall(AccountID _nAccountId, const char* id, const char* _pDestUri,
         ErrorID nId = InitRtp(&pCall, _pConfig);
         if (nId != RET_OK) {
                 DBG_ERROR("InitRtp failed %d \n", nId);
-                if (pCall->pPeerConnection)
-                        ReleasePeerConnectoin(pCall->pPeerConnection);
-                free(pCall);
+                ReleaseCall(pCall);
                 return NULL;
         }
         int res = 0;
         res = createOffer(pCall->pPeerConnection);
         if (res != 0) {
                 DBG_ERROR("createOffer failed %d \n", res);
-                if (pCall->pPeerConnection)
-                        ReleasePeerConnectoin(pCall->pPeerConnection);
-                free(pCall);
+                ReleaseCall(pCall);
+                setPjLogLevel(6);
                 return NULL;
         }
         strncpy(pCall->url, pUri, MAX_URL_SIZE);
@@ -289,15 +299,9 @@ void CALLOnCallStateChange(Call** _pCall, const SipInviteState State, const SipA
         DBG_LOG("stats %d state %d call %p id %d aid %d \n", State, StatusCode, *_pCall, (*_pCall)->id, (*_pCall)->nActualId);
         if ((*_pCall)->callStatus == INV_STATE_DISCONNECTED) {
                 //CALLHangupCall(*_pCall);
-                if ((*_pCall)->pPeerConnection) {
-                         pthread_mutex_unlock(&pUAManager->mutex);
-                         ReleasePeerConnectoin((*_pCall)->pPeerConnection);
-                         (*_pCall)->pPeerConnection = NULL;
-                         pthread_mutex_lock(&pUAManager->mutex);
-                }
-                free(*_pCall);
-                DBG_LOG("Free call\n");
+                ReleaseCall(*_pCall);
                 *_pCall = NULL;
+                DBG_LOG("Free call\n");
         }
         DBG_LOG("stats CALLOnCallStateChange end\n");
 }

@@ -95,6 +95,9 @@ typedef enum {
 void SetLogLevel(int level);
 void SetLogMode(LOG_MODE mode);
 
+// for test::
+void setPjLogLevel(int level);
+
 typedef struct {
     int callID;
     void *data;

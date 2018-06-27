@@ -173,7 +173,6 @@ void Mthread1(void* data)
                                     DBG_LOG("hangcall ******************\n");
                                     HangupCall(pData->accountid, pData->callid);
                                     sendflag = 0;
-                                    DBG_LOG("makecall ******************\n");
                                     timecount = 0;
                                     continue;
                             }
@@ -303,56 +302,6 @@ int RegisterTestSuitCallback( TestSuit *this )
            pthread_create(&t_1, &attr_1, Mthread1, pData);
     }
     while(1) { sleep(10); }
-    int count = 0;
-    char data[1024 * 1024] = {1};
-    while (1) {
-            ErrorID id;
-            for (int count = 0; count < MAX_COUNT; ++ count) {
-                   pData = &pTestCases[count].data;
-                   EventType type;
-                   if (pData->sendflag) {
-                            if (pData->timecount > 5000) continue;
-                            SendPacket(pData->accountid, pData->callid, STREAM_AUDIO, data, 100, pData->timecount);
-                            pData->timecount += 1;
-                            usleep(10000);
-                            continue;
-                   }
-                   id = PollEvent(pData->accountid, &type, &event, 1);
-
-                   if (id != RET_OK) {
-                            continue;
-                   }
-                   switch (type) {
-                           case EVENT_CALL:
-                           {
-                                   CallEvent *pCallEvent = &(event->body.callEvent);
-                                   DBG_LOG("Call status %d call id %d call account id %d\n", pCallEvent->status, pCallEvent->callID, pData->accountid);
-                                   if (pCallEvent->status == CALL_STATUS_ERROR) 
-                                   break;
-                           }
-                           case EVENT_DATA:
-                           {
-                                 DataEvent *pDataEvent = &(event->body.dataEvent);
-                                 DBG_LOG("Data size %d call id %d call account id %d\n", pDataEvent->size, pDataEvent->callID, pData->accountid);
-                                 break;
-                           }
-                           case EVENT_MESSAGE:
-                           {
-                                 MessageEvent *pMessage = &(event->body.messageEvent);
-                                 DBG_LOG("Message %s status id %d account id %d\n", pMessage->message, pMessage->status, pData->accountid);
-                                 break;
-                           }
-                           case EVENT_MEDIA:
-                           {
-                                  MediaEvent *pMedia = &(event->body.mediaEvent);
-                                  DBG_LOG("Callid %d ncount %d type 1 %d type 2 %d account id %d \n", pMedia->callID, pMedia->nCount, pMedia->media[0].codecType, pMedia->media[1].codecType, pData->accountid);
-                                  pData->callid = pMedia->callID;
-                                  pData->sendflag = 1;
-                                  break;
-                           }
-                   }
-             }
-      }
 }
 
 int RegisterTestSuitCallback2( TestSuit *this )

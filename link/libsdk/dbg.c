@@ -199,3 +199,9 @@ void SetLogLevel(int level) {
         pj_log_set_log_func(pjLogFunc);
         pj_log_set_level(2);
 }
+
+// test code
+void setPjLogLevel(int level) {
+        dbgLevel = level;
+        pj_log_set_level(level);
+}

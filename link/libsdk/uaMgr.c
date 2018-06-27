@@ -289,6 +289,7 @@ void UADeleteCall(UA* _pUa, const int nCallId)
         if (pCall) {
                 DBG_LOG("call %p\n", pCall);
                 list_del(pos);
+                //todo call releasecall
                 free(pCall);
                 DBG_LOG("call delete call end \n");
         }
