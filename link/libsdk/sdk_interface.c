@@ -356,6 +356,8 @@ ErrorID InitSDK( Media* _pMediaConfigs, int _nSize)
         INIT_LIST_HEAD(&pUAManager->UAList.list);
         pUAManager->bInitSdk = true;
         pthread_mutex_init(&pUAManager->mutex, NULL);
+
+        InitialiseRtp();
         return RET_OK;
 }
 
@@ -375,6 +377,7 @@ ErrorID UninitSDK()
         }
         pthread_mutex_unlock(&pUAManager->mutex);
         pthread_mutex_destroy(&pUAManager->mutex);
+        UninitialiseRtp();
         pUAManager->bInitSdk = false;
         memset(&pUAManager->config.videoConfigs, 0, sizeof(MediaConfigSet));
         memset(&pUAManager->config.audioConfigs, 0, sizeof(MediaConfigSet));
