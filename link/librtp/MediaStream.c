@@ -332,6 +332,17 @@ int SetActiveCodec(IN OUT MediaStream *_pMediaStream, IN const pjmedia_sdp_sessi
         return PJ_SUCCESS;
 }
 
+void DestroyMediaStream(IN MediaStream *_pMediaStraem)
+{
+        for ( int i = 0 ; i < _pMediaStraem->nCount; i++) {
+	        pj_pool_t *pTmp = _pMediaStraem->streamTracks[i].pPacketizerPool;
+                if (pTmp) {
+                        pj_pool_release(pTmp);
+                        _pMediaStraem->streamTracks[i].pPacketizerPool = NULL;
+                }
+                JitterBufferDestroy(&_pMediaStraem->streamTracks[i].jbuf);
+        }
+}
 
 //packetizer
 static pj_str_t pcmuPktzName = {"pcmu", 4};

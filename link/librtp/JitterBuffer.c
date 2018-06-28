@@ -7,6 +7,16 @@ typedef struct _JitterBufferFrame {
         void * pData;
 }JitterBufferFrame;
 
+void JitterBufferDestroy(OUT JitterBuffer *_pJbuf)
+{
+        if (_pJbuf->pJitterPool) {
+	        heap_destroy(&_pJbuf->heap);
+                pj_pool_release(_pJbuf->pJitterPool);
+                _pJbuf->pJitterPool = NULL;
+        }
+}
+
+
 pj_status_t JitterBufferInit(OUT JitterBuffer *_pJbuf, IN int _nMaxBufferCount, IN int _nInitCacheCount,
                       IN pj_pool_t *_pJitterPool, IN int _nMaxFrameSize)
 {

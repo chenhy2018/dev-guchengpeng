@@ -42,5 +42,5 @@ void JitterBufferPop(IN JitterBuffer *pJbuf, OUT void *pFrame, IN OUT int *pFram
                      OUT int *pFrameSeq, OUT uint32_t *pTs, OUT JBFrameStatus *pFrameStatus);
 void JitterBufferPeek(IN JitterBuffer *pJbuf, OUT const void **pFrame, OUT int *pFrameSize,
                      OUT int *pFrameSeq, OUT uint32_t *pTs, OUT JBFrameStatus *pFrameStatus);
-
+void JitterBufferDestroy(IN JitterBuffer *pJbuf);
 #endif

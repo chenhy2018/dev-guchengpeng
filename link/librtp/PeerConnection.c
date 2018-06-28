@@ -214,7 +214,7 @@ static int iceWorkerThread(void * _pArg)
         fprintf(stderr, "iceWorkerThread start");
         TransportIce * pTransportIce = (TransportIce *)_pArg;
         pj_ice_strans_cfg * pIceCfg = &pTransportIce->iceConfig;
-        PeerConnection * pPeerConnection = (PeerConnection*)pTransportIce->pPeerConnection;
+        //PeerConnection * pPeerConnection = (PeerConnection*)pTransportIce->pPeerConnection;
         int *pIsQuit = pTransportIce->pQuit;
         
         while ((*pIsQuit) == 0) {
@@ -598,11 +598,7 @@ int ReleasePeerConnectoin(IN OUT PeerConnection * _pPeerConnection)
         }
         
         for ( int i = 0 ; i < _pPeerConnection->mediaStream.nCount; i++) {
-                pj_pool_t *pTmp = _pPeerConnection->mediaStream.streamTracks[i].pPacketizerPool;
-                if (pTmp) {
-                        pj_pool_release(pTmp);
-                        _pPeerConnection->mediaStream.streamTracks[i].pPacketizerPool = NULL;
-                }
+                DestroyMediaStream(&_pPeerConnection->mediaStream);
         }
 
         pj_caching_pool_destroy (&_pPeerConnection->cachingPool);
@@ -1214,7 +1210,6 @@ static inline uint64_t getMediaTrackElapseTime(IN MediaStreamTrack *_pMediaTrack
 // _nPktTimestampGap millisecond?
 static inline uint32_t calcRtpTimestampLen(uint64_t _nPktTimestampGap, int nRate)
 {
-        uint32_t rate = (uint32_t)nRate;
         return _nPktTimestampGap * nRate / 1000;
 }
 
