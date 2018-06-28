@@ -332,7 +332,7 @@ static void onIceComplete2(pjmedia_transport *pTransport, pj_ice_strans_op op,
 
 static int iceWorkerThread(void * _pArg)
 {
-        fprintf(stderr, "iceWorkerThread start");
+        MY_PJ_LOG(5,"iceWorkerThread start");
         TransportIce * pTransportIce = (TransportIce *)_pArg;
         pj_ice_strans_cfg * pIceCfg = &pTransportIce->iceConfig;
         //PeerConnection * pPeerConnection = (PeerConnection*)pTransportIce->pPeerConnection;
@@ -1018,7 +1018,7 @@ static void on_rx_rtp(void *pUserData, void *pPkt, pj_ssize_t size)
         JitterBufferPush(&pMediaTrack->jbuf, pPayload, nPayloadLen, pj_ntohs(pRtpHeader->seq),
                          nRtpTs, &nIsDiscard);
         if (nIsDiscard) {
-                MY_PJ_LOG(2, "rtp packet disacrded by jitter buffer");
+                MY_PJ_LOG(2, "rtp packet disacrded by jitter buffer: code:%d seq:%d", nIsDiscard, pj_ntohs(pRtpHeader->seq));
                 return;
         }
 

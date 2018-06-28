@@ -54,13 +54,12 @@ void JitterBufferPush(IN JitterBuffer *_pJbuf, IN const void *_pFrame, IN int _n
         *_pDiscarded = 0;
 
         //rtp sequence number restart
-        if (_nFrameSeq < _pJbuf->nMaxBufferCount+1 && _pJbuf->nLastRecvRtpSeq > 65000) {
+        if (_nFrameSeq < 65536/2 && _pJbuf->nLastRecvRtpSeq > 65536/2) {
                 _nFrameSeq += 65536;
         }
 
         //drop frame that is arrive too late
-        if (_nFrameSeq < _pJbuf->nLastRecvRtpSeq || (_pJbuf->nLastRecvRtpSeq > _nFrameSeq &&
-                                                     (_pJbuf->nLastRecvRtpSeq - _nFrameSeq) > 10000 )) {
+        if (_nFrameSeq < _pJbuf->nLastRecvRtpSeq) {
                 *_pDiscarded = 1;
                 return;
         }
@@ -73,7 +72,7 @@ void JitterBufferPush(IN JitterBuffer *_pJbuf, IN const void *_pFrame, IN int _n
                 
                 pFrame = (JitterBufferFrame*)(pEntry->immutable);
                 if (_nFrameSeq < pFrame->nSeq) {
-                        *_pDiscarded = 1;
+                        *_pDiscarded = 2;
                         return;
                 }
                 // drop oldest frame
@@ -156,7 +155,6 @@ void JitterBufferPop(IN JitterBuffer *_pJbuf, OUT void *_pFrame, IN OUT int *_pF
                 }
                 if (*_pFrameSeq < _pJbuf->nLastRecvRtpSeq || *_pFrameSeq == 0) {
                         _pJbuf->nLastRecvRtpSeq = *_pFrameSeq;
-                        //TOTO rebuild heap
                         heap_rebuild(&_pJbuf->heap);
                 }
 
