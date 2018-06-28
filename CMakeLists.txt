@@ -2,5 +2,7 @@ cmake_minimum_required (VERSION 2.8)
 
 project (linking)
 
-add_subdirectory(third_party)
+SET(GCC_COVERAGE_COMPILE_FLAGS "-Wall -Wno-unused -g")
+
+#add_subdirectory(third_party)
 add_subdirectory(link)
