@@ -31,7 +31,7 @@ INCLUDE_PATH=-I$(PJSIP_PATH)/pjlib/include \
 			 -I../libsip \
 			 -I ../libmqtt \
 			 -I ../librtp \
-			 -I $(PROJECT_PATH)/mosquitto-1.4.8/lib/ 
+			 -I $(PROJECT_PATH)/mosquitto-1.5/lib/ 
 
 SIP_PATH=../libsip
 RTP_PATH=../librtp
