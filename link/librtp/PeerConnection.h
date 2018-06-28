@@ -57,6 +57,7 @@ typedef struct _PeerConnection
         pj_pool_t *pMutexPool;
         int bQuit;
         IceRole role;
+        pj_timestamp releaseTime;
 }PeerConnection;
 
 #endif

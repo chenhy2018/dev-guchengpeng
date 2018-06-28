@@ -6,6 +6,7 @@ static int createMediaSdpMLine(IN pjmedia_endpt *_pMediaEndpt, IN pjmedia_transp
 static int createSdpMline(IN OUT PeerConnection * _pPeerConnection, pj_pool_t *_pPool, pjmedia_sdp_session *pSdp);
 static int negotiationSettingAfterSuccess(IN PeerConnection * _pPeerConnection);
 int setLocalDescription(IN OUT PeerConnection * _pPeerConnection, IN void * _pSdp);
+int releasePeerConnectoin(IN OUT PeerConnection * _pPeerConnection);
 
 enum { RTCP_INTERVAL = 5000, RTCP_RAND = 2000 };
 
@@ -28,6 +29,126 @@ static pj_status_t librtp_register_thread()
         return PJ_SUCCESS;
 }
 #endif
+
+typedef struct _ResourceMgr
+{
+        pj_caching_pool   cachingPool;
+        pj_thread_t       *pPollThread;
+        pj_pool_t         *pThreadPool;
+        pj_mutex_t *pMutex;
+        pj_pool_t *pMutexPool;
+        int nQuit;
+        heap pcHeep;
+        pj_timestamp hzPerSecond;
+}ResourceMgr;
+ResourceMgr manager;
+
+static int mgrThread(void * _pArg)
+{
+        static uint64_t releaseCount = 0;
+        pj_time_val timeout = { 2, 0};
+        while(!manager.nQuit) {
+                heap_entry *pEntry = NULL;
+                heap_min(&manager.pcHeep, &pEntry);
+
+                while (pEntry) {
+                        pj_timestamp now;
+                        pj_get_timestamp(&now);
+                        PeerConnection *pPc = (PeerConnection *)pEntry->value;
+
+                        pj_uint64_t diff = now.u64 - pPc->releaseTime.u64;
+                        if (diff * 1000 / manager.hzPerSecond.u64 > 5000) {
+                                releasePeerConnectoin(pPc);
+                                releaseCount++;
+                                MY_PJ_LOG(5, "releaseCount:%lld", releaseCount);
+                                heap_delmin(&manager.pcHeep, &pEntry);
+                                pEntry = NULL;
+                                heap_min(&manager.pcHeep, &pEntry);
+                        } else {
+                                break;
+                        }
+                }
+                pj_thread_sleep(PJ_TIME_VAL_MSEC(timeout));
+        }
+
+        return PJ_SUCCESS;
+}
+
+static int compare_time(register void* key1, register void* key2) {
+        // Cast them as int and read them in
+        register uint64_t key1_v = (uint64_t)key1;
+        register uint64_t key2_v = (uint64_t)key2;
+
+        // Perform the comparison
+        if (key1_v < key2_v)
+                return -1;
+        else if (key1_v == key2_v)
+                return 0;
+        else
+                return 1;
+}
+
+static void insert_peer_connection(PeerConnection *_pPeerConnection)
+{
+        pj_mutex_lock(manager.pMutex);
+        pj_get_timestamp(&_pPeerConnection->releaseTime);
+        heap_insert(&manager.pcHeep, _pPeerConnection->releaseTime.u64, _pPeerConnection);
+        pj_mutex_unlock(manager.pMutex);
+}
+
+int InitialiseRtp()
+{
+        pj_caching_pool_init(&manager.cachingPool, &pj_pool_factory_default_policy, 0);
+
+        pj_status_t status;
+
+        pj_get_timestamp_freq(&manager.hzPerSecond);
+
+        pj_thread_t * pThread;
+        pj_pool_t * pThreadPool = pj_pool_create(&manager.cachingPool.factory, NULL, 512, 512, NULL);
+        ASSERT_RETURN_CHECK(pThreadPool, pj_pool_create);
+        manager.pThreadPool = pThreadPool;
+        status = pj_thread_create(pThreadPool, "mgrThread", &mgrThread, NULL, 0, 0, &pThread);
+        STATUS_CHECK(pj_thread_create, status);
+        manager.pPollThread = pThread;
+
+        heap_create(&manager.pcHeep, 64, compare_time);
+
+        pj_pool_t *pPool = pj_pool_create(&manager.cachingPool.factory, NULL, 128, 128, NULL);
+        ASSERT_RETURN_CHECK(pPool, pj_pool_create);
+        manager.pMutexPool = pPool;
+        status = pj_mutex_create(pPool, NULL, PJ_MUTEX_DEFAULT, &manager.pMutex);
+        STATUS_CHECK(pj_mutex_create, status);
+
+        return PJ_SUCCESS;
+}
+
+void UninitialiseRtp()
+{
+        manager.nQuit = 1;
+        if (manager.pPollThread) {
+                pj_thread_join(manager.pPollThread);
+                pj_thread_destroy(manager.pPollThread);
+                manager.pPollThread = NULL;
+        }
+
+        if (manager.pThreadPool) {
+                pj_pool_release(manager.pThreadPool);
+                manager.pThreadPool = NULL;
+        }
+
+        if (manager.pMutexPool) {
+                pj_pool_release(manager.pMutexPool);
+                manager.pMutexPool = NULL;
+        }
+
+        if (manager.pMutex) {
+                pj_mutex_destroy(manager.pMutex);
+                manager.pMutex = NULL;
+        }
+
+        pj_caching_pool_destroy (&manager.cachingPool);
+}
 
 static void print_sdp(pjmedia_sdp_session * _pSdp, const char * _pLogPrefix)
 {
@@ -427,13 +548,13 @@ static pj_status_t initTransportIce(IN PeerConnection * _pPeerConnectoin, OUT Tr
 
 static void transportIceDestroy(IN OUT TransportIce * _pTransportIce)
 {
-        if (_pTransportIce->pPollThread) {
-                pj_thread_join(_pTransportIce->pPollThread);
+        *(_pTransportIce->pQuit) = 1;
+        if (_pTransportIce->pTransport) {
+                _pTransportIce->pTransport = NULL;
         }
 
-        if (_pTransportIce->pTransport) {
-                pjmedia_transport_media_stop(_pTransportIce->pTransport);
-                _pTransportIce->pTransport = NULL;
+        if (_pTransportIce->pPollThread) {
+                pj_thread_join(_pTransportIce->pPollThread);
         }
         
         if (_pTransportIce->pPollThread) {
@@ -566,6 +687,21 @@ int ReleasePeerConnectoin(IN OUT PeerConnection * _pPeerConnection)
         LIBRTP_REGISTER_THREAD();
 
         _pPeerConnection->bQuit = 1;
+        for ( int i = 0; i < sizeof(_pPeerConnection->nAvIndex) / sizeof(int); i++) {
+                if (_pPeerConnection->nAvIndex[i] != -1) {
+                        if (_pPeerConnection->transportIce[i].pTransport) {
+                                pjmedia_transport_media_stop(_pPeerConnection->transportIce[i].pTransport);
+                                pjmedia_transport_close(_pPeerConnection->transportIce[i].pTransport);
+                        }
+                }
+        }
+
+        insert_peer_connection(_pPeerConnection);
+        return PJ_SUCCESS;
+}
+
+int releasePeerConnectoin(IN OUT PeerConnection * _pPeerConnection)
+{
         for ( int i = 0; i < sizeof(_pPeerConnection->nAvIndex) / sizeof(int); i++) {
                 if (_pPeerConnection->nAvIndex[i] != -1) {
                         transportIceDestroy(&_pPeerConnection->transportIce[i]);
