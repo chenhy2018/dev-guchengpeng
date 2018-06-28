@@ -36,7 +36,6 @@ typedef void LogFunc(const char *data);
 
 typedef struct {
         int id;
-        int nActualId;
         int nAccountId;
         bool error;
         char from[MAX_FROM_NAME_SIZE];

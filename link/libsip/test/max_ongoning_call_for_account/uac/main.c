@@ -4,24 +4,31 @@
 #include <stdlib.h>
 #include <assert.h>
 
-int destroy = 0;
-SipAnswerCode cbOnIncomingCall(int _nAccountId, int _nCallId, const char *_pFrom, const void *_pUser, const void *_pMedia)
+SipAnswerCode cbOnIncomingCall(int _nAccountId, const char *_pFrom, const void *_pUser, const void *_pMedia, int *_pCallId)
 {
-        printf("ncallId = %d ------>_nAccountId = %d----->incoming call From %s to %d--------------userdata = %d\n",  _nCallId, _nAccountId, _pFrom, _nAccountId, *(int*)_pUser);
-       return OK ;
+        static int callid = 0;
+
+        *_pCallId = callid++;
+        printf("----->incoming call From %s to %d--------------userdata = %d\n", _pFrom, _nAccountId, *(int*)_pUser);
+        return OK ;
 }
 
 void cbOnRegStatusChange(const int _nAccountId, const SipAnswerCode _StatusCode, const void *_pUser)
 {
-        printf("Account Id = %d ---->>reg status = %d------------------------>userdata = %d\n",_nAccountId,  _StatusCode,  *(int*)_pUser);
+        printf("_nAccountId = %d ---->>reg status = %d------------------------>userdata = %d\n", _nAccountId, _StatusCode,  *(int*)_pUser);
+        if (_nAccountId == 3)
+                assert(_StatusCode == SIP_TOO_MANY_ACCOUNT);
+        if (_nAccountId == 6)
+                assert(_StatusCode == SIP_USR_ALREADY_EXIST);
 }
 
 void cbOnCallStateChange(const int _nCallId, const int _nAccountId, const SipInviteState _State, const SipAnswerCode _StatusCode, const void *_pUser, const void *_pMedia)
 {
-       if (_State == INV_STATE_DISCONNECTED)
-                destroy = 1;
-        printf("ncallId = %d ------>_nAccountId = %d ---->state = %d, status code = %d----->userdata = %d\n", _nCallId, _nAccountId, _State, _StatusCode,  *(int*)_pUser);
+        printf("Callid = %d-- nAccountId = %d --->state = %d, status code = %d------------>userdata = %d\n", _nCallId, _nAccountId, _State, _StatusCode,  *(int*)_pUser);
+        if (_nCallId == 6)
+                assert(_StatusCode == SIP_TOO_MANY_CALLS_FOR_ACCOUNT);
 }
+
 int main()
 {
         SipInstanceConfig Config;
@@ -44,41 +51,34 @@ int main()
         AccountConfig.pUserData = (void *)user;
         AccountConfig.nMaxOngoingCall = 3;
 
-        int ret = SipAddNewAccount(&AccountConfig, &nid1);
+        int ret = SipRegAccount(&AccountConfig, 2);
         assert(ret == SIP_SUCCESS);
-        ret = SipRegAccount(nid1, 1);
-        assert(ret == SIP_SUCCESS);
-        sleep(10);
+        sleep(4);
         void *pLocalSdp;
         CreateTmpSDP(&pLocalSdp);
-        int nCallId1 = -1;
-        int nCallId2 = -1;
-        int nCallId3 = -1;
-        int nCallId4 = -1;
-
-        ret = SipMakeNewCall(nid1, "<sip:1040@123.59.204.198;transport=tcp>", pLocalSdp, &nCallId1);
+        ret = SipMakeNewCall(2, "<sip:1040@123.59.204.198;transport=tcp>", pLocalSdp, 3);
         assert(ret == SIP_SUCCESS);
 
-        ret = SipMakeNewCall(nid1, "<sip:1038@123.59.204.198;transport=tcp>", pLocalSdp, &nCallId2);
+        ret = SipMakeNewCall(2, "<sip:1038@123.59.204.198;transport=tcp>", pLocalSdp, 4);
         assert(ret == SIP_SUCCESS);
 
-        ret = SipMakeNewCall(nid1, "<sip:1037@123.59.204.198;transport=tcp>", pLocalSdp, &nCallId3);
+        ret = SipMakeNewCall(2, "<sip:1037@123.59.204.198;transport=tcp>", pLocalSdp, 5);
         assert(ret == SIP_SUCCESS);
 
-        ret = SipMakeNewCall(nid1, "<sip:1036@123.59.204.198;transport=tcp>", pLocalSdp, &nCallId4);
-        assert(ret == SIP_TOO_MANY_CALLS_FOR_ACCOUNT);
+        ret = SipMakeNewCall(2, "<sip:1036@123.59.204.198;transport=tcp>", pLocalSdp, 6);
+        assert(ret == SIP_SUCCESS);
         sleep(5);
-        SipHangUp(nCallId3);
+        SipHangUp(5);
         sleep(5);
         printf("setup a new call\n");
-        ret = SipMakeNewCall(nid1, "<sip:1036@123.59.204.198;transport=tcp>", pLocalSdp, &nCallId4);
+        ret = SipMakeNewCall(2, "<sip:1036@123.59.204.198;transport=tcp>", pLocalSdp, 7);
         assert(ret == SIP_SUCCESS);
         sleep(20);
-        SipHangUp(nCallId1);
-        SipHangUp(nCallId2);
-        SipHangUp(nCallId4);
+        SipHangUp(3);
+        SipHangUp(4);
+        SipHangUp(7);
         sleep(10);
-        ret = SipRegAccount(nid1, 0);
+        ret = SipUnRegAccount(2);
         sleep(10);
         SipDestroyInstance();
         sleep(10);

@@ -2,7 +2,6 @@
 #include "callMgr.h"
 #include "dbg.h"
 
-static int CallId = 0;
 //to do change the CallStatus to INV_STATE
 ErrorID CheckCallStatus(Call* _pCall, CallStatus expectedState)
 {
@@ -18,6 +17,7 @@ ErrorID CheckCallStatus(Call* _pCall, CallStatus expectedState)
                switch (_pCall->callStatus) {
                       case INV_STATE_CALLING:
                       case INV_STATE_INCOMING:
+                      case INV_STATE_EARLY:
                                return RET_OK;
                       default:
                                return RET_CALL_INVAILD_OPERATING;
@@ -104,20 +104,18 @@ ErrorID InitRtp(Call** _pCall, CallConfig* _pConfig)
 
 void CALLMakeNewCall(Call* _pCall)
 {
-        int nCallId;
-        DBG_LOG("CALLMakeCall start url %s accountId %d pLocal %p\n", _pCall->url, _pCall->nAccountId, _pCall->pLocal);
-        SipAnswerCode error = SipMakeNewCall(_pCall->nAccountId, _pCall->url, _pCall->pLocal, &nCallId);
+        DBG_LOG("CALLMakeCall start url %s accountId %d pLocal %p\n", _pCall->url, _pCall->id, _pCall->pLocal);
+        SipAnswerCode error = SipMakeNewCall(_pCall->nAccountId, _pCall->url, _pCall->pLocal, _pCall->id);
         if (error != SIP_SUCCESS) {
                 DBG_ERROR("SipMakeNewCall failed %d \n", error);
                 return;
         }
-        _pCall->nActualId = nCallId;
-        DBG_LOG("CALLMakeCall end call id %d", _pCall->nActualId);
+        DBG_LOG("CALLMakeCall end call id %d", _pCall->id);
 }
 
 // make a call, user need to save call id . add parameter for ice info and media info.
 Call* CALLMakeCall(AccountID _nAccountId, const char* id, const char* _pDestUri,
-                   OUT int* _pCallId, CallConfig* _pConfig) 
+                   IN int _nCallId, CallConfig* _pConfig)
 {
         DBG_LOG("CALLMakeCall start \n");
         int nSize = 0;
@@ -134,7 +132,6 @@ Call* CALLMakeCall(AccountID _nAccountId, const char* id, const char* _pDestUri,
         }
         memset( pUri, 0, nSize );
         memset(pCall, 0, sizeof(Call));
-        pCall->nActualId = -1;
         strcat( pUri, "<sip:" );
         strcat( pUri, id );
         strcat( pUri, "@" );
@@ -155,8 +152,7 @@ Call* CALLMakeCall(AccountID _nAccountId, const char* id, const char* _pDestUri,
                 return NULL;
         }
         strncpy(pCall->url, pUri, MAX_URL_SIZE);
-        pCall->id = ++CallId;
-        *_pCallId = pCall->id;
+        pCall->id = _nCallId;
         pCall->nAccountId = _nAccountId;
         pCall->callStatus = INV_STATE_CALLING;
         CheckCallStatus(pCall, CALL_STATUS_RING);
@@ -170,9 +166,6 @@ ErrorID CALLAnswerCall(Call* _pCall)
         if (id != RET_OK) {
               return id;
         }
-        if (_pCall->nActualId == INVALID_CALL_ID) {
-              return RET_CALL_NOT_EXIST;
-        }
         // rtp to do. ice config.media info. and check error)
 #if 0
         InitIceConfig(&pCall->iceConfig);
@@ -183,8 +176,8 @@ ErrorID CALLAnswerCall(Call* _pCall)
         createAnswer(_pCall->pPeerConnection, _pCall->pOffer, &_pCall->pAnswer);
         setLocalDescription(pCall->pPeerConnection, pCall->pAnswer);
 #endif
-        DBG_LOG("CALLAnswerCall  %p id %d \n", _pCall, _pCall->nActualId);
-        return SipAnswerCall(_pCall->nActualId, OK, "answser call", _pCall->pLocal);
+        DBG_LOG("CALLAnswerCall  %p id %d \n", _pCall, _pCall->id);
+        return SipAnswerCall(_pCall->id, OK, "answser call", _pCall->pLocal);
 }
 
 ErrorID CALLRejectCall(Call* _pCall)
@@ -193,10 +186,7 @@ ErrorID CALLRejectCall(Call* _pCall)
         if (id != RET_OK) {
               return id;
         }
-        if (_pCall->nActualId == INVALID_CALL_ID) {
-              return RET_CALL_NOT_EXIST;
-        }
-        id = SipAnswerCall(_pCall->nActualId, BUSY_HERE, "reject call", _pCall->pLocal);
+        id = SipAnswerCall(_pCall->id, BUSY_HERE, "reject call", _pCall->pLocal);
         return id;
 }
 
@@ -207,13 +197,9 @@ ErrorID CALLHangupCall(Call* _pCall)
         if (id != RET_OK) {
               return id;
         }
-        if (_pCall->nActualId == INVALID_CALL_ID) {
-              return RET_CALL_NOT_EXIST;
-        }
-        SipHangUp(_pCall->nActualId);
+        SipHangUp(_pCall->id);
         return id;
 }
-
 // send a packet
 ErrorID CALLSendPacket(Call* _pCall, Stream streamID, const uint8_t* buffer, int size, int64_t nTimestamp)
 {
@@ -242,8 +228,7 @@ SipAnswerCode CALLOnIncomingCall(Call** _pCall, const int _nAccountId, const int
         }
         memset(pCall, 0, sizeof(Call));
         *_pCall = pCall;
-        pCall->id = ++CallId;
-        pCall->nActualId = _nCallId;
+        pCall->id = _nCallId;
         pCall->nAccountId = _nAccountId;
         pCall->callStatus =  INV_STATE_INCOMING;
         strncpy(pCall->from, pFrom, MAX_FROM_NAME_SIZE);
@@ -290,13 +275,13 @@ void CALLOnCallStateChange(Call** _pCall, const SipInviteState State, const SipA
                         res = StartNegotiation((*_pCall)->pPeerConnection);
                 }
                 if (res != 0 || (*_pCall)->error) {
-                        DBG_ERROR("StartNegotiation failed %d %d todo\n", res, (*_pCall)->nActualId);
+                        DBG_ERROR("StartNegotiation failed %d %d todo\n", res, (*_pCall)->id);
                         (*_pCall)->error = true;
-                        SipHangUp((*_pCall)->nActualId);
-                        //SipAnswerCall((*_pCall)->nActualId, INTERNAL_SERVER_ERROR, "StartNegotiation failed", NULL);
+                        SipHangUp((*_pCall)->id);
+                        //SipAnswerCall((*_pCall)->id, INTERNAL_SERVER_ERROR, "StartNegotiation failed", NULL);
                 }
         }
-        DBG_LOG("stats %d state %d call %p id %d aid %d \n", State, StatusCode, *_pCall, (*_pCall)->id, (*_pCall)->nActualId);
+        DBG_LOG("stats %d state %d call %p id %d aid %d \n", State, StatusCode, *_pCall, (*_pCall)->id, (*_pCall)->id);
         if ((*_pCall)->callStatus == INV_STATE_DISCONNECTED) {
                 //CALLHangupCall(*_pCall);
                 ReleaseCall(*_pCall);

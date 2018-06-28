@@ -9,7 +9,7 @@ struct SipData SipAppData;
  *transports and timer heap are handled in timely manner
  */
 static int PullForEndPointEvent(IN void *_arg);
-static int MQConsumer(void *_arg);
+static void* MQConsumer(void *_arg);
 static void ReleaseMsgResource(Message *pMsg);
 
 /* This is a PJSIP module to be registered by application to handle
@@ -99,11 +99,13 @@ static pjsip_module SipLogger =
 static SipAnswerCode  (*SipHandlers[])(const SipEvent *) =
 {
         &OnSipRegAccount,
+        &OnSipUnRegAccount,
         &OnSipMakeNewCall,
         &OnSipHangUp,
         &OnSipHangUpByAccountId,
         &OnSipHangUpAll,
         &OnSipAnswerCall,
+        &OnSipDestroyInstance,
 
 };
 
@@ -211,66 +213,45 @@ SipAnswerCode SipCreateInstance(IN const SipInstanceConfig *_pConfig)
         }
 
         /* Create a thraed to pull pjsip endpoint transport event*/
-        pj_thread_create(SipAppData.pPool, "SipWorkThread", &PullForEndPointEvent, NULL, 0, 0, &SipAppData.pSipThread[0]);
+        pj_thread_create(SipAppData.pPool, "SipWorkThread", &PullForEndPointEvent, NULL, 0, 0, &SipAppData.pSipThread);
 
         /* Create Message Queue */
         SipAppData.pMq = CreateMessageQueue(MESSAGE_QUEUE_MAX);
         /* Create a thread to consume user function */
-        pj_thread_create(SipAppData.pPool, "MessageQueueConsumer", &MQConsumer, NULL, 0, 0, &SipAppData.pSipThread[1]);
+        int Ret = pthread_create(&SipAppData.MqThread, NULL, MQConsumer, NULL);
+        if (Ret != 0)
+                return SIP_CREATE_MQ_THREAD_FAILED;
+
         return SIP_SUCCESS;
 }
 
-void SipDestroyInstance()
+SipAnswerCode SipDestroyInstance()
 {
-        RegisterToPjLib();
-        if (SipAppData.pSipEndPoint) {
-                PJ_LOG(4, (THIS_FILE, "Destroy libSip instance ..."));
+        SipEvent *pEvent = (SipEvent *)malloc(sizeof(SipEvent));
+        if (!pEvent)
+                return SIP_MALLOC_FAILED;
+
+        memset(pEvent, 0, sizeof(SipEvent));
+        pEvent->Type = SIP_DESTROY_INSTANCE;
+
+        Message *pMessage = (Message *)malloc(sizeof(Message));
+        if (!pMessage) {
+                free(pEvent);
+                pEvent = NULL;
+                return SIP_MALLOC_FAILED;
         }
 
-        /* offline all account */
-        int i;
-        for (i = 0; i < SipAppData.nMaxAccount; ++i) {
-                if (SipAppData.Accounts[i].bValid) {
-                        SipDeleteAccount(i);
-                }
-        }
-        /* Sleep sometime to wait de-register complete */
-        PJ_LOG(4, (THIS_FILE, "Destroying ...."));
-        pj_thread_sleep(5000);
+        memset(pMessage, 0, sizeof(Message));
+        pMessage->nMessageID = SIP_DESTROY_INSTANCE;
+        pMessage->pMessage = (void*)pEvent;
+        SendMessage(SipAppData.pMq, pMessage);
 
-        /* Stop working thread */
-        SipAppData.bThreadQuit = PJ_TRUE;
-        for (i = 0; i< 2; ++i) {
-                pj_thread_join(SipAppData.pSipThread[i]);
-                pj_thread_destroy(SipAppData.pSipThread[i]);
-                SipAppData.pSipThread[i] = NULL;
-        }
-        PJ_LOG(4, (THIS_FILE, "Working thread has destroyed"));
-        pjsip_endpt_destroy(SipAppData.pSipEndPoint);
-        SipAppData.pSipEndPoint = NULL;
-
-        /* Destroy mutex */
-        if (SipAppData.pMutex) {
-                pj_mutex_destroy(SipAppData.pMutex);
-                SipAppData.pMutex = NULL;
-        }
-        /* Destroy mem pool */
-        if (SipAppData.pPool) {
-                pj_pool_release(SipAppData.pPool);
-                SipAppData.pPool = NULL;
-                pj_caching_pool_destroy(&SipAppData.Cp);
-        }
-
-        PJ_LOG(4, (THIS_FILE, "LibSip destroyed..."));
-
-        pj_shutdown();
-
-        pj_bzero(&SipAppData, sizeof(SipAppData));
+        pthread_join(SipAppData.MqThread, NULL);
+        return SIP_SUCCESS;
 }
 
 static int PullForEndPointEvent(void *_arg)
 {
-        PJ_UNUSED_ARG(_arg);
         while (!SipAppData.bThreadQuit) {
                 pj_time_val timeout = {0, 10};
                 pjsip_endpt_handle_events(SipAppData.pSipEndPoint, &timeout);
@@ -278,38 +259,56 @@ static int PullForEndPointEvent(void *_arg)
         return 0;
 }
 
-static int MQConsumer(void *_arg)
+static void* MQConsumer(void *_arg)
 {
-        PJ_UNUSED_ARG(_arg);
-        while (!SipAppData.bThreadQuit) {
+        pj_thread_desc threaddesc;
+        pj_thread_t *thread = 0;
+        if( !pj_thread_is_registered())
+                pj_thread_register(NULL, threaddesc, &thread);
+        while (1) {
                 Message *pMsg = ReceiveMessageTimeout(SipAppData.pMq, 5000);
                 if (!pMsg)
                         continue;
-
                 SipEvent *pEvent = (SipEvent *)pMsg->pMessage;
                 SipAnswerCode Ret = SipHandlers[pMsg->nMessageID](pEvent);
                 if (Ret != SIP_SUCCESS) {
                         if (pMsg->nMessageID == SIP_REG_ACCOUNT) {
-                                int nAccountId = pEvent->Body.Reg.nAccountId;
+                                int nSdkAccountId = pEvent->Body.Reg.nAccountId;
                                 if (SipAppData.OnRegStateChange)
-                                        (SipAppData.OnRegStateChange)(nAccountId, Ret, SipAppData.Accounts[nAccountId].pUserData);
+                                        (SipAppData.OnRegStateChange)(nSdkAccountId, Ret, pEvent->Body.Reg.AccConfig.pUserData);
+                        }
+                        else if (pMsg->nMessageID == SIP_UN_REG_ACCOUNT) {
+                                int nSdkAccountId = pEvent->Body.UnReg.nAccountId;
+                                int nAccountId = SdkAccToInterAcc(nSdkAccountId);
+                                void *pUser = nAccountId == -1? NULL: SipAppData.Accounts[nAccountId].pUserData;
+                                if (SipAppData.OnRegStateChange)
+                                        (SipAppData.OnRegStateChange)(nSdkAccountId, Ret, pUser);
                         }
                         else if (pMsg->nMessageID == SIP_MAKE_CALL){
-                                int nFromAccountId = pEvent->Body.MakeCall.nAccountId;
+                                int nSdkAccountId = pEvent->Body.MakeCall.nAccountId;
                                 int nCallId = pEvent->Body.MakeCall.nCallId;
+                                int nAccountId = SdkAccToInterAcc(nSdkAccountId);
+                                void *pUser = nAccountId == -1? NULL: SipAppData.Accounts[nAccountId].pUserData;
                                 if (SipAppData.OnCallStateChange)
-                                        (SipAppData.OnCallStateChange)(nCallId, nFromAccountId, INV_STATE_DISCONNECTED, Ret,  SipAppData.Accounts[nFromAccountId].pUserData, NULL);
+                                        (SipAppData.OnCallStateChange)(nCallId, nSdkAccountId, INV_STATE_DISCONNECTED, Ret, pUser, NULL);
                         }
                         else if (pMsg->nMessageID == SIP_ANSWER_CALL) {
                                 int nCallId = pEvent->Body.AnswerCall.nCallId;
-                                int nAccountId = SipAppData.Calls[nCallId].nAccountId;
+                                int nSdkAccountId = SipAppData.Calls[nCallId].nAccountId;
+                                int nAccountId = SdkAccToInterAcc(nSdkAccountId);
+                                void *pUser = nAccountId == -1? NULL: SipAppData.Accounts[nAccountId].pUserData;
                                 if (SipAppData.OnCallStateChange)
-                                        (SipAppData.OnCallStateChange)(nCallId, nAccountId, INV_STATE_DISCONNECTED, Ret,  SipAppData.Accounts[nAccountId].pUserData, NULL);
+                                        (SipAppData.OnCallStateChange)(nCallId, nSdkAccountId, INV_STATE_DISCONNECTED, Ret, pUser, NULL);
                         }
 
                 }
 
                 /* release msg after handled */
+                /*exit from  thread if Destroy */
+                if (pMsg->nMessageID == SIP_DESTROY_INSTANCE) {
+                        ReleaseMsgResource(pMsg);
+                        break;
+                }
                 ReleaseMsgResource(pMsg);
         }
         return 0;
@@ -319,15 +318,27 @@ static void ReleaseMsgResource(Message *pMsg)
 {
         SipEvent *pEvent = (SipEvent *)pMsg->pMessage;
         switch (pMsg->nMessageID) {
+        case SIP_REG_ACCOUNT:
+                {
+                        free(pEvent->Body.Reg.AccConfig.pDomain);
+                        free(pEvent->Body.Reg.AccConfig.pPassWord);
+                        free(pEvent->Body.Reg.AccConfig.pUserName);
+                        break;
+
+                }
         case SIP_MAKE_CALL:
-                free(pEvent->Body.MakeCall.pDestUri);
-                pEvent->Body.MakeCall.pDestUri = NULL;
-                break;
+                {
+                        free(pEvent->Body.MakeCall.pDestUri);
+                        pEvent->Body.MakeCall.pDestUri = NULL;
+                        break;
+                }
         case SIP_ANSWER_CALL:
-                if (pEvent->Body.AnswerCall.Reason)
-                        free(pEvent->Body.AnswerCall.Reason);
-                pEvent->Body.AnswerCall.Reason = NULL;
-                break;
+                {
+                        if (pEvent->Body.AnswerCall.Reason)
+                                free(pEvent->Body.AnswerCall.Reason);
+                        pEvent->Body.AnswerCall.Reason = NULL;
+                        break;
+                }
         }
         free(pEvent);
         pEvent = NULL;
@@ -335,33 +346,30 @@ static void ReleaseMsgResource(Message *pMsg)
         pMsg = NULL;
 }
 
-SipAnswerCode SipAddNewAccount(IN const SipAccountConfig *_pConfig, OUT int *_pAccountId)
-{
-        return OnSipAddNewAccount(_pConfig, _pAccountId);
-}
 
-void SipDeleteAccount(IN const int _nAccountId)
+SipAnswerCode SipRegAccount(IN const SipAccountConfig *_pConfig, IN const int _nAccountId)
 {
-        OnSipDeleteAccount(_nAccountId);
-}
-
-int SipIsUserAlreadyExist(IN const SipAccountConfig *_pConfig)
-{
-        return OnSipIsUserAlreadyExist(_pConfig);
-}
-SipAnswerCode SipRegAccount(IN const int _nAccountId, IN const int _bDeReg)
-{
-        CHECK_RETURN(_nAccountId >= 0 && _nAccountId < (int)SipAppData.nMaxAccount,
-                     SIP_INVALID_ARG);
-        CHECK_RETURN(SipAppData.Accounts[_nAccountId].bValid, SIP_INVALID_ARG);
-
         SipEvent *pEvent = (SipEvent *)malloc(sizeof(SipEvent));
         if (!pEvent)
                 return SIP_MALLOC_FAILED;
 
         memset(pEvent, 0, sizeof(SipEvent));
         pEvent->Body.Reg.nAccountId = _nAccountId;
-        pEvent->Body.Reg.Reg = _bDeReg;
+        pEvent->Body.Reg.AccConfig.nMaxOngoingCall = _pConfig->nMaxOngoingCall;
+        pEvent->Body.Reg.AccConfig.pUserData = _pConfig->pUserData;
+
+        pEvent->Body.Reg.AccConfig.pDomain = (char *)malloc(strlen(_pConfig->pDomain) + 1);
+        strcpy(pEvent->Body.Reg.AccConfig.pDomain, _pConfig->pDomain);
+        pEvent->Body.Reg.AccConfig.pDomain[strlen(_pConfig->pDomain)] = '\0';
+
+        pEvent->Body.Reg.AccConfig.pUserName = (char *)malloc(strlen(_pConfig->pUserName) + 1);
+        strcpy(pEvent->Body.Reg.AccConfig.pUserName, _pConfig->pUserName);
+        pEvent->Body.Reg.AccConfig.pUserName[strlen(_pConfig->pUserName)] = '\0';
+
+        pEvent->Body.Reg.AccConfig.pPassWord = (char *)malloc(strlen(_pConfig->pPassWord) + 1);
+        strcpy(pEvent->Body.Reg.AccConfig.pPassWord, _pConfig->pPassWord);
+        pEvent->Body.Reg.AccConfig.pPassWord[strlen(_pConfig->pPassWord)] = '\0';
+
         pEvent->Type = SIP_REG_ACCOUNT;
 
         Message *pMessage = (Message *)malloc(sizeof(Message));
@@ -377,35 +385,34 @@ SipAnswerCode SipRegAccount(IN const int _nAccountId, IN const int _bDeReg)
         return SIP_SUCCESS;
 }
 
-SipAnswerCode SipMakeNewCall(IN const int _nFromAccountId, IN const char *_pDestUri, IN const void *_pMedia, OUT int *_pCallId)
+SipAnswerCode SipUnRegAccount(IN const int _nAccountId)
 {
-        /* Check that account is valid */
-        CHECK_RETURN(_nFromAccountId >=0 || _nFromAccountId < SipAppData.nMaxAccount,
-                     SIP_INVALID_ARG);
+        SipEvent *pEvent = (SipEvent *)malloc(sizeof(SipEvent));
+        if (!pEvent)
+                return SIP_MALLOC_FAILED;
 
-        /* Check arguments */
-        CHECK_RETURN(_pDestUri, SIP_INVALID_ARG);
-        RegisterToPjLib();
-        MUTEX_LOCK(SipAppData.pMutex);
-        /* Find free call id */
-        int nCallId = SipGetFreeCallId();
-        if (nCallId == -1) {
-                PJ_LOG(1, (THIS_FILE, "Too many calls"));
-                MUTEX_FREE(SipAppData.pMutex);
-                return SIP_TOO_MANY_CALLS_FOR_INSTANCE;
-        }
-        if (SipAppData.Accounts[_nFromAccountId].nOngoingCall >= SipAppData.Accounts[_nFromAccountId].nMaxOngoingCall) {
-                PJ_LOG(1, (THIS_FILE, "Too many call for this account"));
-                MUTEX_FREE(SipAppData.pMutex);
-                return SIP_TOO_MANY_CALLS_FOR_ACCOUNT;
-        }
-        SipAppData.Calls[nCallId].bValid = PJ_TRUE;
-        MUTEX_FREE(SipAppData.pMutex);
-        *_pCallId = nCallId;
+        memset(pEvent, 0, sizeof(SipEvent));
+        pEvent->Body.UnReg.nAccountId = _nAccountId;
 
+        pEvent->Type = SIP_UN_REG_ACCOUNT;
+
+        Message *pMessage = (Message *)malloc(sizeof(Message));
+        if (!pMessage) {
+                free(pEvent);
+                pEvent = NULL;
+                return SIP_MALLOC_FAILED;
+        }
+        memset(pMessage, 0, sizeof(Message));
+        pMessage->nMessageID = SIP_UN_REG_ACCOUNT;
+        pMessage->pMessage = (void*)pEvent;
+        SendMessage(SipAppData.pMq, pMessage);
+        return SIP_SUCCESS;
+}
+
+SipAnswerCode SipMakeNewCall(IN const int _nFromAccountId, IN const char *_pDestUri, IN const void *_pMedia, IN const int _nCallId)
+{
         SipEvent *pEvent = (SipEvent *)malloc(sizeof(SipEvent));
         if (!pEvent) {
-                SipAppData.Calls[nCallId].bValid = PJ_FALSE;
                 return SIP_MALLOC_FAILED;
         }
 
@@ -417,12 +424,11 @@ SipAnswerCode SipMakeNewCall(IN const int _nFromAccountId, IN const char *_pDest
         pEvent->Body.MakeCall.pDestUri[strlen(_pDestUri)] = '\0';
 
         pEvent->Body.MakeCall.pMedia = (void *)_pMedia;
-        pEvent->Body.MakeCall.nCallId = nCallId;
+        pEvent->Body.MakeCall.nCallId = _nCallId;
         pEvent->Type = SIP_MAKE_CALL;
 
         Message *pMessage = (Message *)malloc(sizeof(Message));
         if (!pMessage) {
-                SipAppData.Calls[nCallId].bValid = PJ_FALSE;
                 free(pEvent);
                 pEvent = NULL;
                 return SIP_MALLOC_FAILED;
@@ -431,18 +437,12 @@ SipAnswerCode SipMakeNewCall(IN const int _nFromAccountId, IN const char *_pDest
         memset(pMessage, 0, sizeof(Message));
         pMessage->nMessageID = SIP_MAKE_CALL;
         pMessage->pMessage = (void*)pEvent;
-        SipAppData.nCallCount++;
-        SipAppData.Accounts[_nFromAccountId].nOngoingCall++;
         SendMessage(SipAppData.pMq, pMessage);
         return SIP_SUCCESS;
 }
 
 SipAnswerCode SipAnswerCall(IN const int _nCallId, IN const SipAnswerCode _StatusCode, IN const char *_pReason, IN const void *_pMedia)
 {
-        CHECK_RETURN(_nCallId >=0 || _nCallId < SipAppData.nMaxCall, SIP_INVALID_ARG);
-
-        CHECK_RETURN(SipAppData.Calls[_nCallId].pInviteSession || SipAppData.Calls[_nCallId].bValid, SIP_INVALID_ARG);
-
         SipEvent *pEvent = (SipEvent *)malloc(sizeof(SipEvent));
         if (!pEvent)
                 return SIP_MALLOC_FAILED;
@@ -553,7 +553,7 @@ int CreateTmpSDP(OUT void **_pSdp)
 
         CHECK_RETURN(_pPool && _pSdp, PJ_EINVAL);
 
-
+        MUTEX_LOCK(SipAppData.pMutex);
         /* Create and initialize basic SDP session */
         pSdp = pj_pool_zalloc(_pPool, sizeof(pjmedia_sdp_session));
 
@@ -629,7 +629,7 @@ int CreateTmpSDP(OUT void **_pSdp)
 
         /* Done */
         *_pSdp = (void *)pSdp;
-
+        MUTEX_FREE(SipAppData.pMutex);
         return PJ_SUCCESS;
 
 }

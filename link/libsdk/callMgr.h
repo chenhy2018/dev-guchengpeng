@@ -4,7 +4,7 @@
 #include "sdk_local.h"
 
 // make a call, user need to save call id
-Call* CALLMakeCall(AccountID _nAccountId, const char* id, const char* host, OUT int* callID,
+Call* CALLMakeCall(AccountID _nAccountId, const char* id, const char* host, IN const int nCallId,
                    CallConfig* _pConfig);
 
 void CALLMakeNewCall(Call* _pCall);

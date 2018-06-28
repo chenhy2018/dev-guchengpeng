@@ -11,7 +11,7 @@ UA* UARegister(const char* id, const char* password, const char* sigHost,
 
 ErrorID UAUnRegister(UA* _pUa);
 // make a call, user need to save call id
-ErrorID UAMakeCall(UA* _pUa, const char* id, const char* host, OUT int* callID);
+ErrorID UAMakeCall(UA* _pUa, const char* id, const char* host, IN int nCallId);
 ErrorID UAAnswerCall(UA* _pUa, int nCallId);
 ErrorID UARejectCall(UA* _pUa, int nCallId);
 // hangup a call

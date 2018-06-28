@@ -29,35 +29,76 @@ static pj_bool_t SipUpdateContactIfNat(IN SipAccount *_pAccount, IN struct pjsip
 static void SipScheduleReRegistration(SipAccount *_pAccount);
 static void SipReRegTimerCallBack(pj_timer_heap_t *_pTimerHeap, pj_timer_entry *_pTimerEntry);
 
+static SipAnswerCode Register(IN const int _nAccountId, int _bDeReg);
+static int SdkCallIdToInterCallId(int _SdkCallId);
 
-void RegisterToPjLib() {
-        pj_thread_desc threaddesc;
-        pj_thread_t *thread = 0;
-        if( !pj_thread_is_registered())
-                pj_thread_register(NULL, threaddesc, &thread);
+SipAnswerCode OnSipDestroyInstance(IN const SipEvent *_pEvent)
+{
+        if (SipAppData.pSipEndPoint) {
+                PJ_LOG(4, (THIS_FILE, "Destroy libSip instance ..."));
+        }
+
+        /* offline all account */
+        int i;
+        for (i = 0; i < SipAppData.nMaxAccount; ++i) {
+                if (SipAppData.Accounts[i].bValid) {
+                        SipEvent Event;
+                        Event.Body.UnReg.nAccountId = SipAppData.Accounts[i].nSdkAccountId;
+                        OnSipUnRegAccount(&Event);
+                }
+        }
+        /* Sleep sometime to wait de-register complete */
+        PJ_LOG(4, (THIS_FILE, "Destroying ...."));
+        pj_thread_sleep(5000);
+
+        /* Stop working thread */
+        SipAppData.bThreadQuit = PJ_TRUE;
+        pj_thread_join(SipAppData.pSipThread);
+        pj_thread_destroy(SipAppData.pSipThread);
+        SipAppData.pSipThread = NULL;
+        PJ_LOG(4, (THIS_FILE, "Working thread has destroyed"));
+        pjsip_endpt_destroy(SipAppData.pSipEndPoint);
+        SipAppData.pSipEndPoint = NULL;
+
+        /* Destroy mutex */
+        if (SipAppData.pMutex) {
+                pj_mutex_destroy(SipAppData.pMutex);
+                SipAppData.pMutex = NULL;
+        }
+        /* Destroy mem pool */
+        if (SipAppData.pPool) {
+                pj_pool_release(SipAppData.pPool);
+                SipAppData.pPool = NULL;
+                pj_caching_pool_destroy(&SipAppData.Cp);
+        }
+
+        PJ_LOG(4, (THIS_FILE, "LibSip destroyed..."));
+
+        pj_shutdown();
+
+        pj_bzero(&SipAppData, sizeof(SipAppData));
+        return SIP_SUCCESS;
 }
-int OnSipIsUserAlreadyExist(IN const SipAccountConfig *_pConfig) {
-        RegisterToPjLib();
+static int IsUserAlreadyExist(IN const SipAccountConfig *_pConfig) {
         int ret = 0;
-        MUTEX_LOCK(SipAppData.pMutex);
         /* Check User already exist */
-        for (int i = 0; i < SipAppData.nAccountCount; i++) {
-                if (strncmp(_pConfig->pUserName, SipAppData.Accounts[i].UserName.ptr, strlen(_pConfig->pUserName)) == 0 &&
-                    strncmp(_pConfig->pDomain, SipAppData.Accounts[i].SipDomain.ptr, strlen(_pConfig->pDomain)) == 0 &&
-                    SipAppData.Accounts[i].pRegc != NULL)
+        for (int i = 0; i < SipAppData.nMaxAccount; i++) {
+                if ( SipAppData.Accounts[i].bValid &&
+                    strncmp(_pConfig->pUserName, SipAppData.Accounts[i].UserName.ptr, strlen(_pConfig->pUserName)) == 0 &&
+                    strncmp(_pConfig->pDomain, SipAppData.Accounts[i].SipDomain.ptr, strlen(_pConfig->pDomain)) == 0)
                         ret = 1;
         }
-        MUTEX_FREE(SipAppData.pMutex);
         return ret;
 }
-SipAnswerCode OnSipAddNewAccount(IN const SipAccountConfig *_pConfig, OUT int *_pAccountId)
+SipAnswerCode OnSipRegAccount(IN const SipEvent *_pEvent)
 {
-        RegisterToPjLib();
-        /* Input check */
-        CHECK_RETURN(_pConfig->pUserName && _pConfig->pPassWord && _pConfig->pDomain, SIP_INVALID_ARG);
-
+        //IN const SipAccountConfig *_pConfig, IN const int _nAccountId
+        const SipAccountConfig *pConfig = &_pEvent->Body.Reg.AccConfig;
         /* Account amount check */
         CHECK_RETURN(SipAppData.nAccountCount < SipAppData.nMaxAccount, SIP_TOO_MANY_ACCOUNT);
+
+        if (IsUserAlreadyExist(pConfig))
+                return SIP_USR_ALREADY_EXIST;
 
         MUTEX_LOCK(SipAppData.pMutex);
         /* Find empty account id. */
@@ -90,18 +131,18 @@ SipAnswerCode OnSipAddNewAccount(IN const SipAccountConfig *_pConfig, OUT int *_
         char ID[80], Registrar[80];
         memset(ID, 0, 80);
         memset(Registrar, 0, 80);
-        snprintf(ID, 79, "sip:%s@%s", _pConfig->pUserName, _pConfig->pDomain);
-        snprintf(Registrar, 79, "sip:%s;transport=tcp", _pConfig->pDomain);
+        snprintf(ID, 79, "sip:%s@%s", pConfig->pUserName, pConfig->pDomain);
+        snprintf(Registrar, 79, "sip:%s;transport=tcp", pConfig->pDomain);
         pj_str_t PJID = pj_str(ID);
         pj_str_t PJReg = pj_str(Registrar);
-        pj_str_t PJUserName = pj_str((char *)_pConfig->pUserName);
-        pj_str_t PJPassword = pj_str((char *)_pConfig->pPassWord);
+        pj_str_t PJUserName = pj_str((char *)pConfig->pUserName);
+        pj_str_t PJPassword = pj_str((char *)pConfig->pPassWord);
         pj_str_t PJRealm = pj_str("*");
         pj_str_t PJScheme = pj_str("digest");
-        pj_str_t PJDomain = pj_str((char *)_pConfig->pDomain);
+        pj_str_t PJDomain = pj_str((char *)pConfig->pDomain);
         pj_str_t PJKeepAliveData = pj_str("\r\n");
 
-        pAccount->pUserData = _pConfig->pUserData;
+        pAccount->pUserData = pConfig->pUserData;
         pj_strdup_with_null(pAccount->pPool, &pAccount->RegUri, &PJReg);
         pj_strdup_with_null(pAccount->pPool, &pAccount->KaData, &PJKeepAliveData);
         pj_strdup_with_null(pAccount->pPool, &pAccount->Id, &PJID);
@@ -113,10 +154,16 @@ SipAnswerCode OnSipAddNewAccount(IN const SipAccountConfig *_pConfig, OUT int *_
         pj_strdup_with_null(pAccount->pPool, &pAccount->Cred[0].scheme, &PJScheme);
         pAccount->Cred[0].data_type = 0;
 
+        SipAnswerCode Ret = Register(id, 1);
+        if (Ret != SIP_SUCCESS) {
+                MUTEX_FREE(SipAppData.pMutex);
+                return Ret;
+        }
+
         SipAppData.nAccountCount++;
+        SipAppData.Accounts[id].nSdkAccountId = _pEvent->Body.Reg.nAccountId;
         SipAppData.Accounts[id].bValid = PJ_TRUE;
-        *_pAccountId = id;
-        SipAppData.Accounts[id].nMaxOngoingCall = _pConfig->nMaxOngoingCall;
+        SipAppData.Accounts[id].nMaxOngoingCall = pConfig->nMaxOngoingCall;
         SipAppData.Accounts[id].nOngoingCall = 0;
 
         MUTEX_FREE(SipAppData.pMutex);
@@ -124,22 +171,23 @@ SipAnswerCode OnSipAddNewAccount(IN const SipAccountConfig *_pConfig, OUT int *_
         return SIP_SUCCESS;
 }
 
-SipAnswerCode OnSipDeleteAccount(IN const int _nAccountId)
+SipAnswerCode OnSipUnRegAccount(IN const SipEvent *_pEvent)
 {
-        RegisterToPjLib();
-        CHECK_RETURN(_nAccountId >= 0 && _nAccountId < (int)SipAppData.nMaxAccount,
+        int nSdkAccountId = _pEvent->Body.UnReg.nAccountId;
+        int nAccountId = SdkAccToInterAcc(nSdkAccountId);
+        CHECK_RETURN(nAccountId >= 0 && nAccountId < (int)SipAppData.nMaxAccount,
                      SIP_INVALID_ARG);
-        CHECK_RETURN(SipAppData.Accounts[_nAccountId].bValid, SIP_INVALID_ARG);
+        CHECK_RETURN(SipAppData.Accounts[nAccountId].bValid, SIP_INVALID_ARG);
 
         SipAccount *pAccount;
-        PJ_LOG(4,(THIS_FILE, "Deleting account %d..", _nAccountId));
+        PJ_LOG(4,(THIS_FILE, "Deleting account SDK id = %d, innerId = %d.", nSdkAccountId, nAccountId));
         /* Hangup all calls */
         SipEvent pSipEvent;
-        pSipEvent.Body.HangUpByAcc.nAccount = _nAccountId;
+        pSipEvent.Body.HangUpByAcc.nAccount = nSdkAccountId;
         OnSipHangUpByAccountId(&pSipEvent);
 
         MUTEX_LOCK(SipAppData.pMutex);
-        pAccount = &SipAppData.Accounts[_nAccountId];
+        pAccount = &SipAppData.Accounts[nAccountId];
         /* Cancel keep alive timer */
         if (pAccount->KaTimer.id) {
                 pjsip_endpt_cancel_timer(SipAppData.pSipEndPoint, &pAccount->KaTimer);
@@ -156,10 +204,7 @@ SipAnswerCode OnSipDeleteAccount(IN const int _nAccountId)
         }
         /* Offline account */
         if (pAccount->pRegc) {
-                SipEvent pSipEvent;
-                pSipEvent.Body.Reg.nAccountId = _nAccountId;
-                pSipEvent.Body.Reg.Reg = 0;
-                OnSipRegAccount(&pSipEvent);
+                Register(nAccountId, 0);
                 pjsip_regc_destroy(pAccount->pRegc);
                 pAccount->pRegc = NULL;
         }
@@ -175,18 +220,14 @@ SipAnswerCode OnSipDeleteAccount(IN const int _nAccountId)
         return SIP_SUCCESS;
 }
 
-SipAnswerCode OnSipRegAccount(IN const SipEvent *_pEvent)
+static SipAnswerCode Register(IN const int _nAccountId, int _bDeReg)
 {
-        int _nAccountId = _pEvent->Body.Reg.nAccountId;
-        int _bDeReg = _pEvent->Body.Reg.Reg;
-
         SipAccount *pAccount;
         pj_status_t Status = 0;
         pjsip_tx_data *pTransData = 0;
 
         PJ_LOG(4,(THIS_FILE, "Acc %d: setting %sregistration..",
                   _nAccountId, (_bDeReg? "" : "un")));
-        MUTEX_LOCK(SipAppData.pMutex);
 
         pAccount = &SipAppData.Accounts[_nAccountId];
 
@@ -201,12 +242,10 @@ SipAnswerCode OnSipRegAccount(IN const SipEvent *_pEvent)
                         Status = SipRegcInit(_nAccountId);
                         if (Status != PJ_SUCCESS) {
                                 PrintErrorMsg(Status, "Unable to create registration, Status");
-                                MUTEX_FREE(SipAppData.pMutex);
                                 return SIP_CREATE_REG_FAILED;
                         }
                 }
                 if (!pAccount->pRegc) {
-                        MUTEX_FREE(SipAppData.pMutex);
                         return SIP_CREATE_REG_FAILED;
                 }
 
@@ -215,7 +254,6 @@ SipAnswerCode OnSipRegAccount(IN const SipEvent *_pEvent)
         } else {
                 if (pAccount->pRegc == NULL) {
                         PJ_LOG(4, (THIS_FILE, "Currently not registered"));
-                        MUTEX_FREE(SipAppData.pMutex);
                         return SIP_USR_NOT_REGISTERED;
                 }
                 Status = pjsip_regc_unregister(pAccount->pRegc, &pTransData);
@@ -226,14 +264,12 @@ SipAnswerCode OnSipRegAccount(IN const SipEvent *_pEvent)
 
         if (Status != PJ_SUCCESS) {
                 PrintErrorMsg(Status, "Unable to create/send register");
-                MUTEX_FREE(SipAppData.pMutex);
                 return SIP_SEND_REG_FAILED;
         }
         PJ_LOG(4,(THIS_FILE, "Acc %d: %s sent", _nAccountId,
                   (_bDeReg ? "Registration" : "Unregistration")));
 
         /* Invoke callback function */
-        MUTEX_FREE(SipAppData.pMutex);
         return SIP_SUCCESS;
 }
 
@@ -352,7 +388,7 @@ static void onSipRegc(IN struct pjsip_regc_cbparam *_pCbData)
         pAccount->nLastRegCode = _pCbData->code;
         MUTEX_FREE(SipAppData.pMutex);
         if (SipAppData.OnRegStateChange) {
-                (SipAppData.OnRegStateChange)(pAccount->nIndex, (SipAnswerCode)pAccount->nLastRegCode, pAccount->pUserData);
+                (SipAppData.OnRegStateChange)(pAccount->nSdkAccountId, (SipAnswerCode)pAccount->nLastRegCode, pAccount->pUserData);
         }
 
         /* hangup call if re-registration attempt failed */
@@ -409,7 +445,7 @@ static void SipReRegTimerCallBack(pj_timer_heap_t *_pTimerHeap, pj_timer_entry *
                 MUTEX_FREE(SipAppData.pMutex);
                 return;
         }
-        if (SipRegAccount(pAccount->nIndex, 1) != SIP_SUCCESS)
+        if (Register(pAccount->nIndex, 1) != SIP_SUCCESS)
                 SipScheduleReRegistration(pAccount);
         MUTEX_FREE(SipAppData.pMutex);
 }
@@ -605,7 +641,17 @@ static pj_bool_t SipUpdateContactIfNat(IN SipAccount *_pAccount, IN struct pjsip
         //        pjsip_regc_update_contact(_pAccount->pRegc, 1, &_pAccount->Contact);
         return PJ_TRUE;
 }
-
+int SdkAccToInterAcc(int _nSdkAccountId)
+{
+        int nAccountId = -1;
+        for (int i = 0; i < SipAppData.nMaxAccount; i++ ) {
+                if (_nSdkAccountId == SipAppData.Accounts[i].nSdkAccountId &&  SipAppData.Accounts[i].bValid) {
+                        nAccountId = SipAppData.Accounts[i].nIndex;
+                        break;
+                }
+        }
+        return nAccountId;
+}
 int SipGetFreeCallId(void)
 {
         int nCallId;
@@ -617,10 +663,10 @@ int SipGetFreeCallId(void)
 }
 SipAnswerCode OnSipMakeNewCall(IN const SipEvent *_pEvent)
 {
-        int _nFromAccountId = _pEvent->Body.MakeCall.nAccountId;
-        char *_pDestUri = _pEvent->Body.MakeCall.pDestUri;
-        void *_pMedia = _pEvent->Body.MakeCall.pMedia;
-        int nCallId = _pEvent->Body.MakeCall.nCallId;
+        int nSdkAccountId = _pEvent->Body.MakeCall.nAccountId;
+        char *pDestUri = _pEvent->Body.MakeCall.pDestUri;
+        void *pMedia = _pEvent->Body.MakeCall.pMedia;
+        int nSdkCallId = _pEvent->Body.MakeCall.nCallId;
 
         SipCall *pCall;
         pjsip_dialog *pDialog;
@@ -628,30 +674,42 @@ SipAnswerCode OnSipMakeNewCall(IN const SipEvent *_pEvent)
         pjsip_tx_data *pTransData;
         pj_status_t Status;
 
-        PJ_LOG(4, (THIS_FILE, "Making call with acc %d to %s", _nFromAccountId, _pDestUri));
+        PJ_LOG(4, (THIS_FILE, "Making call with acc %d to %s", nSdkAccountId, pDestUri));
+
+        int nAccountId = SdkAccToInterAcc(nSdkAccountId);
+        CHECK_RETURN(nAccountId != -1, SIP_INVALID_ARG);
 
         MUTEX_LOCK(SipAppData.pMutex);
+        /* Find free call id */
+        int nCallId = SipGetFreeCallId();
+        if (nCallId == -1) {
+                PJ_LOG(1, (THIS_FILE, "Too many calls"));
+                MUTEX_FREE(SipAppData.pMutex);
+                return SIP_TOO_MANY_CALLS_FOR_INSTANCE;
+        }
+        if (SipAppData.Accounts[nAccountId].nOngoingCall >= SipAppData.Accounts[nAccountId].nMaxOngoingCall) {
+                PJ_LOG(1, (THIS_FILE, "Too many call for this account"));
+                MUTEX_FREE(SipAppData.pMutex);
+                return SIP_TOO_MANY_CALLS_FOR_ACCOUNT;
+        }
 
         pCall = &SipAppData.Calls[nCallId];
-        pCall->nAccountId = _nFromAccountId;
-        pj_str_t Dest = pj_str((char *)_pDestUri);
+        pCall->nAccountId = nAccountId;
+        pj_str_t Dest = pj_str((char *)pDestUri);
         /* Create SIP dialog */
         char LocalUri[60];
         memset(LocalUri, 0, 60);
-        snprintf(LocalUri, 60, "<sip:%s@%s>", SipAppData.Accounts[_nFromAccountId].UserName.ptr, SipAppData.Accounts[_nFromAccountId].SipDomain.ptr);
+        snprintf(LocalUri, 60, "<sip:%s@%s>", SipAppData.Accounts[nAccountId].UserName.ptr, SipAppData.Accounts[nAccountId].SipDomain.ptr);
         pj_str_t Local = pj_str(LocalUri);
-        Status = pjsip_dlg_create_uac(pjsip_ua_instance(), &Local, &SipAppData.Accounts[_nFromAccountId].Contact, &Dest,  &Dest, &pDialog);
+        Status = pjsip_dlg_create_uac(pjsip_ua_instance(), &Local, &SipAppData.Accounts[nAccountId].Contact, &Dest,  &Dest, &pDialog);
         if (Status != PJ_SUCCESS) {
                 PrintErrorMsg(Status, "Create uac dialg failed");
                 MUTEX_FREE(SipAppData.pMutex);
-                pCall->bValid = PJ_FALSE;
-                SipAppData.nCallCount--;
-                SipAppData.Accounts[_nFromAccountId].nOngoingCall--;
                 return SIP_CREATE_DLG_FAILED;
         }
         /* TODO get Local SDP */
         //CreateTmpSDP(pDialog->pool, pCall, &pMediaSession);
-        pMediaSession = (pjmedia_sdp_session *)_pMedia;
+        pMediaSession = (pjmedia_sdp_session *)pMedia;
         /* Create invite session */
         unsigned nOptions = 0;
         nOptions |= PJSIP_INV_SUPPORT_100REL;
@@ -661,19 +719,13 @@ SipAnswerCode OnSipMakeNewCall(IN const SipEvent *_pEvent)
                 PrintErrorMsg(Status, "Create uac invite session");
                 pjsip_dlg_terminate(pDialog);
                 /* TODO destory media resouce */
-                pCall->bValid = PJ_FALSE;
-                SipAppData.nCallCount--;
-                SipAppData.Accounts[_nFromAccountId].nOngoingCall--;
                 MUTEX_FREE(SipAppData.pMutex);
                 return SIP_CREATE_INV_SESS_FAILED;
         }
-        Status = pjsip_timer_init_session(pCall->pInviteSession, &SipAppData.Accounts[_nFromAccountId].TimerSetting);
+        Status = pjsip_timer_init_session(pCall->pInviteSession, &SipAppData.Accounts[nAccountId].TimerSetting);
         if (Status != PJ_SUCCESS) {
                 PrintErrorMsg(Status, "Session Timer init failed");
                 pjsip_dlg_terminate(pDialog);
-                pCall->bValid = PJ_FALSE;
-                SipAppData.nCallCount--;
-                SipAppData.Accounts[_nFromAccountId].nOngoingCall--;
                 /* TODO destory media resouce */
                 MUTEX_FREE(SipAppData.pMutex);
                 return SIP_SESS_TIMER_INIT_FALIED;
@@ -681,27 +733,29 @@ SipAnswerCode OnSipMakeNewCall(IN const SipEvent *_pEvent)
         pCall->pInviteSession->mod_data[SipMod.id] = pCall;
 
         pj_gettimeofday(&pCall->StartTime);
-        pjsip_auth_clt_set_credentials(&pDialog->auth_sess, SipAppData.Accounts[_nFromAccountId].nCredCnt, SipAppData.Accounts[_nFromAccountId].Cred);
+        pjsip_auth_clt_set_credentials(&pDialog->auth_sess, SipAppData.Accounts[nAccountId].nCredCnt, SipAppData.Accounts[nAccountId].Cred);
         /* Create initialization Invite request */
         Status = pjsip_inv_invite(pCall->pInviteSession, &pTransData);
         if (Status != PJ_SUCCESS) {
                 PrintErrorMsg(Status, "Create invite request failed");
                 pjsip_dlg_terminate(pDialog);
                 /* TODO destory media resouce */
-                pCall->bValid = PJ_FALSE;
-                SipAppData.nCallCount--;
-                SipAppData.Accounts[_nFromAccountId].nOngoingCall--;
                 MUTEX_FREE(SipAppData.pMutex);
                 return SIP_CREATE_INV_REQ_FAILED;
         }
+        pCall->bValid = PJ_TRUE;
+        SipAppData.nCallCount++;
+        SipAppData.Accounts[nAccountId].nOngoingCall++;
+        SipAppData.Calls[nCallId].nSdkCallId = nSdkCallId;
+
         Status = pjsip_inv_send_msg(pCall->pInviteSession, pTransData);
         if (Status != PJ_SUCCESS) {
+                pCall->bValid = PJ_FALSE;
+                SipAppData.nCallCount--;
+                SipAppData.Accounts[nAccountId].nOngoingCall--;
                 PrintErrorMsg(Status, "Send invite request failed");
                 pjsip_dlg_terminate(pDialog);
                 /* TODO destory media resouce */
-                pCall->bValid = PJ_FALSE;
-                SipAppData.nCallCount--;
-                SipAppData.Accounts[_nFromAccountId].nOngoingCall--;
                 MUTEX_FREE(SipAppData.pMutex);
                 return SIP_SNED_INV_REQ_FAILED;
         }
@@ -712,13 +766,14 @@ SipAnswerCode OnSipMakeNewCall(IN const SipEvent *_pEvent)
 
 SipAnswerCode OnSipAnswerCall(IN const SipEvent *_pEvent)
 {
-        int _nCallId = _pEvent->Body.AnswerCall.nCallId;
+        int _nCallId = SdkCallIdToInterCallId(_pEvent->Body.AnswerCall.nCallId);
         int _StatusCode = _pEvent->Body.AnswerCall.StatusCode;
         char *_pReason = _pEvent->Body.AnswerCall.Reason;
         void *_pMedia = _pEvent->Body.AnswerCall.pMedia;
+        PJ_LOG(4, (THIS_FILE, "callId = %d answer code = %d, reason = %s, SdkCallid = %d, InnerCallId = %d\n", _nCallId, _StatusCode, _pReason, _pEvent->Body.AnswerCall.nCallId, _nCallId));
 
         /* Check that callId is valid */
-        PJ_LOG(4, (THIS_FILE, "callId = %d answer code = %d, reason = %s \n", _nCallId, _StatusCode, _pReason));
+        CHECK_RETURN(_nCallId != -1, SIP_INVALID_ARG);
         pj_str_t Reason = pj_str((char *)_pReason);
         pj_str_t *pReason;
         pj_status_t Status;
@@ -766,14 +821,27 @@ SipAnswerCode OnSipAnswerCall(IN const SipEvent *_pEvent)
         MUTEX_FREE(SipAppData.pMutex);
         return Status;
 }
+static int SdkCallIdToInterCallId(int _SdkCallId)
+{
+        int callId = -1;
+        for (int i = 0; i < SipAppData.nMaxCall; i++) {
+                if (SipAppData.Calls[i].nSdkCallId == _SdkCallId &&
+                    SipAppData.Calls[i].pInviteSession != NULL &&
+                    SipAppData.Calls[i].bValid != PJ_FALSE) {
+                        callId = i;
+                        break;
+                }
+        }
+        return callId;
+}
 SipAnswerCode OnSipHangUp(IN const SipEvent *_pEvent)
 {
         pjsip_tx_data *pTxData;
         pj_status_t Status;
-        int nCallId = _pEvent->Body.HangUp.nCallId;
-        if (SipAppData.Calls[nCallId].pInviteSession == NULL || SipAppData.Calls[nCallId].bValid == PJ_FALSE)
-                return SIP_SUCCESS;
-
+        int nCallId = SdkCallIdToInterCallId(_pEvent->Body.HangUp.nCallId);
+        CHECK_RETURN(nCallId != -1, SIP_INVALID_ARG);
+        int nAccountId = SipAppData.Calls[nCallId].nAccountId;
+        PJ_LOG(4, (THIS_FILE, "Disconnecting call of account #%d, callId = %d", nAccountId, nCallId));
         /* TODO release media resource */
         MUTEX_LOCK(SipAppData.pMutex);
         Status = pjsip_inv_end_session(SipAppData.Calls[nCallId].pInviteSession, 0, NULL, &pTxData);
@@ -790,7 +858,7 @@ SipAnswerCode OnSipHangUpAll(IN const SipEvent *_pEvent)
         for (i = 0; i < SipAppData.nMaxCall; ++i) {
                 if (SipAppData.Calls[i].bValid == PJ_TRUE && SipAppData.Calls[i].pInviteSession != NULL) {
                         SipEvent Event;
-                        Event.Body.HangUp.nCallId = SipAppData.Calls[i].nIndex;
+                        Event.Body.HangUp.nCallId = SipAppData.Calls[i].nSdkCallId;
                         OnSipHangUp(&Event);
                 }
         }
@@ -799,13 +867,12 @@ SipAnswerCode OnSipHangUpAll(IN const SipEvent *_pEvent)
 
 SipAnswerCode OnSipHangUpByAccountId(IN const SipEvent *_pEvent)
 {
-        int nAccountId = _pEvent->Body.HangUpByAcc.nAccount;
-        int i;
-        for (i = 0; i < SipAppData.nMaxCall; ++i) {
-                if ((SipAppData.Calls[i].bValid == PJ_TRUE) && (SipAppData.Calls[i].nAccountId == nAccountId)) {
-                        PJ_LOG(4, (THIS_FILE, "Disconnecting call of account #%d, callId = %d", nAccountId, SipAppData.Calls[i].nIndex));
+        int nAccountId = SdkAccToInterAcc(_pEvent->Body.HangUpByAcc.nAccount);
+
+        for (int i = 0; i < SipAppData.nMaxCall; ++i) {
+                if ((SipAppData.Calls[i].bValid == PJ_TRUE) && (SipAppData.Calls[i].nSdkCallId == nAccountId)) {
                         SipEvent Event;
-                        Event.Body.HangUp.nCallId = SipAppData.Calls[i].nIndex;
+                        Event.Body.HangUp.nCallId = SipAppData.Calls[i].nSdkCallId;
                         OnSipHangUp(&Event);
                 }
         }
@@ -868,6 +935,7 @@ pj_bool_t onRxRequest(IN pjsip_rx_data *_pRxData )
 
         /* Get account id with associated incoming call */
         nToAccountId = pCall->nAccountId = SipGetAccountIdFromRxData(_pRxData);
+
         if (nToAccountId == -1) {
                 PrintErrorMsg(Status, "Can't find correspond account Id");
                 pj_str_t Reason = pj_str("Sorry we can't find right account Id");
@@ -897,8 +965,6 @@ pj_bool_t onRxRequest(IN pjsip_rx_data *_pRxData )
                 return PJ_TRUE;
         }
 
-        /* Creat Invite Session */
-        //CreateTmpSDP(pDialog->pool, pCall, &pSdp);
         unsigned nOptions = 0;
         nOptions |= PJSIP_INV_SUPPORT_100REL;
         nOptions |= PJSIP_INV_SUPPORT_TIMER;
@@ -929,20 +995,6 @@ pj_bool_t onRxRequest(IN pjsip_rx_data *_pRxData )
         pj_gettimeofday(&pCall->StartTime);
         pCall->bValid = PJ_TRUE;
 
-        /* Create a 180 response */
-        Status = pjsip_inv_initial_answer(pCall->pInviteSession, _pRxData, PJSIP_SC_RINGING,
-                                          NULL, NULL, &pTxData);
-        if (Status != PJ_SUCCESS) {
-                PrintErrorMsg(Status, "Create 180 response error");
-                goto onError;
-        }
-        /* Send the 180 response. */
-        Status = pjsip_inv_send_msg(pCall->pInviteSession, pTxData);
-        if (Status != PJ_SUCCESS) {
-                PrintErrorMsg(Status, "Send 180 response error");
-                goto onError;
-        }
-
         /* Get from info */
         pjsip_uri *pFromUri;
         pjsip_sip_uri *pFromSipUri;
@@ -958,13 +1010,26 @@ pj_bool_t onRxRequest(IN pjsip_rx_data *_pRxData )
         }
         From[i] = 0;
 
-        /* TODO put remote SDP to mengke */
         const pjmedia_sdp_session *pRemoteSdp = NULL;
         pjsip_rdata_sdp_info *pSdpInfo = NULL;
         pSdpInfo = pjsip_rdata_get_sdp_info(_pRxData);
         if (pSdpInfo)
                 pRemoteSdp = pSdpInfo->sdp;
-        int Code =  SipAppData.OnIncomingCall(nToAccountId, nCallId,  From, SipAppData.Accounts[pCall->nAccountId].pUserData, (void *)pRemoteSdp);
+        int Code =  SipAppData.OnIncomingCall(SipAppData.Accounts[nToAccountId].nSdkAccountId, From, SipAppData.Accounts[pCall->nAccountId].pUserData, (void *)pRemoteSdp,  &pCall->nSdkCallId);
+
+        /* Create a 180 response */
+        Status = pjsip_inv_initial_answer(pCall->pInviteSession, _pRxData, PJSIP_SC_RINGING,
+                                          NULL, NULL, &pTxData);
+        if (Status != PJ_SUCCESS) {
+                PrintErrorMsg(Status, "Create 180 response error");
+                goto onError;
+        }
+        /* Send the 180 response. */
+        Status = pjsip_inv_send_msg(pCall->pInviteSession, pTxData);
+        if (Status != PJ_SUCCESS) {
+                PrintErrorMsg(Status, "Send 180 response error");
+                goto onError;
+        }
         /* Faild in callback function */
         if (Code != OK) {
                 pj_str_t Reason = pj_str("Faild in callback function");
@@ -1010,11 +1075,11 @@ static int SipGetAccountIdFromRxData(IN const pjsip_rx_data *_pRxData)
         pSipUri = (pjsip_sip_uri*)pjsip_uri_get_uri(pUri);
         int i;
         for (i = 0; i < SipAppData.nAccountCount; ++i) {
-                nAccountId = SipAppData.Accounts[i].nIndex;
+                int nAccountId = SipAppData.Accounts[i].nIndex;
                 SipAccount *pAccount = &SipAppData.Accounts[nAccountId];
                 if (pAccount->bValid && pj_stricmp(&pAccount->UserName, &pSipUri->user) == 0
                     && pj_stricmp(&pAccount->SipDomain, &pSipUri->host) == 0 ) {
-                        return nAccountId;
+                        return SipAppData.Accounts[i].nIndex;
                 }
         }
         return -1;
@@ -1074,7 +1139,12 @@ void onSipCallOnStateChanged(IN pjsip_inv_session *_pInviteSession,
                         pRemoteSdp = pSdpInfo->sdp;
         }
         MUTEX_FREE(SipAppData.pMutex);
-        SipAppData.OnCallStateChange(pCall->nIndex, pCall->nAccountId, (SipInviteState)_pInviteSession->state, (SipAnswerCode)_pInviteSession->cause, SipAppData.Accounts[pCall->nAccountId].pUserData, (void*)pRemoteSdp);
+        SipAppData.OnCallStateChange(pCall->nSdkCallId,
+                                     SipAppData.Accounts[pCall->nAccountId].nSdkAccountId,
+                                     (SipInviteState)_pInviteSession->state,
+                                     (SipAnswerCode)_pInviteSession->cause,
+                                     SipAppData.Accounts[pCall->nAccountId].pUserData,
+                                     (void*)pRemoteSdp);
 }
 
 /* Callback to be called when dialog has forked: */

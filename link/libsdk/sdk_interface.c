@@ -22,6 +22,7 @@
 
 UAManager gUAManager;
 UAManager *pUAManager = &gUAManager;
+static int nSdkCallId = 0;
 
 static UA* FindUA(UAManager* _pUAManager, AccountID _nAccountId, struct list_head **po)
 {
@@ -144,7 +145,7 @@ static void OnRxRtp(void *_pUserData, CallbackType _type, void *_pCbData)
                                          pthread_mutex_unlock(&pUAManager->mutex);
                                          DBG_LOG("=****=========>callback_ice: state: %d callStatus %d\n", pInfo->state, pCall->callStatus);
                                          pCall->pLocal = (pjmedia_sdp_session *)(pInfo->pData);
-                                         if (pCall->callStatus == INV_STATE_INCOMING) {
+                                         if (pCall->callStatus == INV_STATE_EARLY || pCall->callStatus == INV_STATE_INCOMING) {
                                                  OnIncomingCall(pCall->nAccountId,pCall->id, pCall->from);
                                          }
                                          else if (pCall->callStatus == INV_STATE_CALLING) {
@@ -432,9 +433,10 @@ ErrorID MakeCall(AccountID _nAccountId, const char* id, const char* _pDestUri, O
         return RET_PARAM_ERROR;
 
     pthread_mutex_lock(&pUAManager->mutex);
+    *_pCallId = nSdkCallId++;
     UA *pUA = FindUA(pUAManager, _nAccountId, &pos);
     if (pUA != NULL) {
-            res = UAMakeCall(pUA, id, _pDestUri, _pCallId);
+            res = UAMakeCall(pUA, id, _pDestUri, *_pCallId);
     }
     pthread_mutex_unlock(&pUAManager->mutex);
 
@@ -587,8 +589,7 @@ ErrorID Report(AccountID id, const char* message, int length)
     return error;
 }
 
-SipAnswerCode cbOnIncomingCall(const const int _nAccountId, const int _nCallId,
-                               const const char *_pFrom, const void *_pUser, IN const void *_pMedia)
+SipAnswerCode cbOnIncomingCall(const int _nAccountId, const const char *_pFrom, const void *_pUser, IN const void *_pMedia, OUT int *pCallId)
 {   
     pthread_mutex_lock(&pUAManager->mutex);
     const UA *_pUA = _pUser;
@@ -599,8 +600,9 @@ SipAnswerCode cbOnIncomingCall(const const int _nAccountId, const int _nCallId,
             return DOES_NOT_EXIST_ANYWHERE;
     }
     
-    DBG_LOG("incoming call From %s to %d %p call id %d\n", _pFrom, _nAccountId, _pMedia, _nCallId);
-    UAOnIncomingCall(pUA, _nCallId, _pFrom, _pMedia);
+    DBG_LOG("incoming call From %s to %d %p call id %d\n", _pFrom, _nAccountId, _pMedia, nSdkCallId);
+    UAOnIncomingCall(pUA, nSdkCallId, _pFrom, _pMedia);
+    *pCallId = nSdkCallId++;
     pthread_mutex_unlock(&pUAManager->mutex);
     return OK;
 }

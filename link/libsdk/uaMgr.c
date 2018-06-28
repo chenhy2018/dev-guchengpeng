@@ -10,12 +10,13 @@
 #include "callMgr.h"
 #include "qrtc.h"
 
+static int nSdkAccountId = 0;
 static Call* FindCall(UA* _pUa, int _nCallId, struct list_head **pos)
 {
         Call* pCall;
         struct list_head *q;
         struct list_head *po;
-        //DBG_LOG("Findcall in %p %p %p\n", &_pUa->callList.list, *pos, q);
+        //        DBG_LOG("Findcall in %p %p %p\n", &_pUa->callList.list, *pos, q);
         list_for_each_safe(po, q, &_pUa->callList.list) {
                 pCall = list_entry(po, Call, list);
                 if (pCall->id == _nCallId) {
@@ -27,21 +28,6 @@ static Call* FindCall(UA* _pUa, int _nCallId, struct list_head **pos)
         return NULL;
 }
 
-static Call* FindCallByActualId(UA* _pUa, int _nCallId, struct list_head **pos)
-{       
-        Call* pCall;
-        struct list_head *q;
-        struct list_head *po;
-        list_for_each_safe(po, q, &_pUa->callList.list) {
-                pCall = list_entry(po, Call, list);
-                if (pCall->nActualId == _nCallId) {
-                        *pos = po;
-                        DBG_LOG("Findcall out %p %p\n", pCall, *pos);
-                        return pCall;
-                }
-        }
-        return NULL;
-}
 // register a account
 // @return UA struct point. If return NULL, error.
 UA* UARegister(const char* _pId, const char* _pPassword, const char* _pSigHost,
@@ -64,32 +50,19 @@ UA* UARegister(const char* _pId, const char* _pPassword, const char* _pSigHost,
         sipConfig.pDomain = (char*)_pSigHost;
         sipConfig.pUserData = (void *)pUA;
         sipConfig.nMaxOngoingCall = 10;
-        int nAccountId = 0;
         DBG_LOG("UARegister %s %s %s %p ongoing call %d\n",
                 sipConfig.pUserName, sipConfig.pPassWord, sipConfig.pDomain, sipConfig.pUserData, sipConfig.nMaxOngoingCall);
-        if (SipIsUserAlreadyExist(&sipConfig)) {
-                DBG_ERROR("user Already Exist\n");
-                free(pUA);
-                return NULL;
-        }
-        SipAnswerCode Ret = SipAddNewAccount(&sipConfig, &nAccountId);
+        SipAnswerCode Ret = SipRegAccount(&sipConfig, nSdkAccountId);
         if (Ret != SIP_SUCCESS) {
-                DBG_ERROR("Add Account Error, Ret = %d\n", Ret);
-                free(pUA);
-                return NULL;
-        }
-        Ret = SipRegAccount(nAccountId, 1);
-        if (Ret != SIP_SUCCESS) {
-                SipDeleteAccount(nAccountId);
                 DBG_ERROR("Register Account Error, Ret = %d\n", Ret);
                 free(pUA);
                 return NULL;
         }
         pUA->regStatus == TRYING;
         //mqtt create instance.
-        _pOptions->nAccountId = nAccountId;
+        _pOptions->nAccountId = nSdkAccountId;
         pUA->pMqttInstance = MqttCreateInstance(_pOptions);
-        pUA->id = nAccountId;
+        pUA->id = nSdkAccountId;
         pUA->config.pVideoConfigs = &_pConfig->videoConfigs;
         pUA->config.pAudioConfigs = &_pConfig->audioConfigs;
         pUA->config.pCallback = &_pConfig->callback;
@@ -103,6 +76,7 @@ UA* UARegister(const char* _pId, const char* _pPassword, const char* _pSigHost,
                 strncpy(pUA->config.turnPassword, _pPassword, MAX_TURN_PWD_SIZE -1);
         }
 
+        nSdkAccountId++;
         INIT_LIST_HEAD(&pUA->callList.list);
         pUA->pQueue = CreateMessageQueue(MESSAGE_QUEUE_MAX);
         if (!pUA->pQueue) {
@@ -115,7 +89,7 @@ UA* UARegister(const char* _pId, const char* _pPassword, const char* _pSigHost,
 
 ErrorID UAUnRegister(UA* _pUa)
 {
-        SipAnswerCode code = SipRegAccount(_pUa->id, 0);
+        SipAnswerCode code = SipUnRegAccount(_pUa->id);
         MqttDestroy(_pUa->pMqttInstance);
         DestroyMessageQueue(&_pUa->pQueue);
         _pUa->pMqttInstance = NULL;
@@ -129,10 +103,10 @@ ErrorID UAUnRegister(UA* _pUa)
 }
 
 // make a call, user need to save call id
-ErrorID UAMakeCall(UA* _pUa, const char* id, const char* host, OUT int* callID)
+ErrorID UAMakeCall(UA* _pUa, const char* id, const char* host, IN int nCallId)
 {
         if (_pUa->regStatus == OK) {
-                Call* call = CALLMakeCall(_pUa->id, id, host, callID, &_pUa->config);
+                Call* call = CALLMakeCall(_pUa->id, id, host, nCallId, &_pUa->config);
                 if (call == NULL) {
                         return RET_MEM_ERROR;
                 }
@@ -154,11 +128,11 @@ ErrorID UAMakeCall(UA* _pUa, const char* id, const char* host, OUT int* callID)
         }
 }
 
-ErrorID UAAnswerCall(UA* _pUa, int nCallId)
+ErrorID UAAnswerCall(UA* _pUa, int _nCallId)
 {
         struct list_head *pos = NULL;
-        DBG_LOG("UAAnswerCall in call id %d ua %p\n",nCallId, _pUa);
-        Call* call = FindCall(_pUa, nCallId, &pos);
+        DBG_LOG("UAAnswerCall in call id %d ua %p\n",_nCallId, _pUa);
+        Call* call = FindCall(_pUa, _nCallId, &pos);
         if (call) {
                 return CALLAnswerCall(call);
         }
@@ -267,7 +241,7 @@ void UAOnCallStateChange(UA* _pUa, const int nCallId, const SipInviteState State
 {
         struct list_head *pos = NULL;
         DBG_LOG("UA call statue change \n");
-        Call* call = FindCallByActualId(_pUa, nCallId, &pos);
+        Call* call = FindCall(_pUa, nCallId, &pos);
         if (call) {
                 *pId = call->id;
                 DBG_LOG("call %p\n", call);
