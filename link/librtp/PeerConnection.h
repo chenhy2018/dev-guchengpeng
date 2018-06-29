@@ -20,17 +20,10 @@ typedef enum _IceRole{
 typedef struct _TransportIce
 {
         pjmedia_transport *pTransport;
-        pj_ioqueue_t      *pIoQueue;
-        pj_pool_t         *pIoqueuePool;
-        pj_timer_heap_t   *pTimerHeap;
-        pj_pool_t         *pTimerHeapPool;
-        pj_thread_t       *pPollThread;
-        pj_pool_t         *pThreadPool;
         pj_pool_t         *pNegotiationPool;
         IceState iceState;
         pj_ice_strans_cfg iceConfig;
         void *pPeerConnection;
-        int *pQuit;
 }TransportIce;
 
 typedef struct _PeerConnection
@@ -38,9 +31,6 @@ typedef struct _PeerConnection
         IceConfig         userIceConfig;
         TransportIce      transportIce[2]; //audio and video
         int               nAvIndex[2];
-        pj_caching_pool   cachingPool;
-        pj_pool_factory   *pPoolFactory;
-        pjmedia_endpt     *pMediaEndpt;
         MediaStream       mediaStream;
         pjmedia_sdp_session *pLocalSdp;
         pjmedia_sdp_session *pRemoteSdp;
@@ -53,11 +43,8 @@ typedef struct _PeerConnection
         int nNegSuccess;
         int nGatherCandidateSuccessCount;
         int nIsFailCallbackDone;
-        pj_mutex_t *pMutex;
-        pj_pool_t *pMutexPool;
         int bQuit;
         IceRole role;
-        pj_timestamp releaseTime;
 }PeerConnection;
 
 #endif
