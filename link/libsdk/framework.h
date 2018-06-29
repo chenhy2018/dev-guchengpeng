@@ -10,8 +10,8 @@
 #ifndef FRAMEWORK_H
 #define FRAMEWORK_H
 
-SipAnswerCode cbOnIncomingCall(IN const int _nAccountId, IN const int _nCallId,
-                               IN const char *pFrom, IN const void *pUser, IN const void *pMedia);
+SipAnswerCode cbOnIncomingCall(const int _nAccountId, const const char *_pFrom, const void *_pUser,
+                               IN const void *_pMedia, OUT int *pCallId);
 void cbOnRegStatusChange(IN const int nAccountId, IN const SipAnswerCode RegStatusCode, IN const void *pUser);
 void cbOnCallStateChange(IN const int nCallId, IN const int nAccountId, IN const SipInviteState State,
                          IN const SipAnswerCode StatusCode, IN const void *pUser, IN const void *pMedia);

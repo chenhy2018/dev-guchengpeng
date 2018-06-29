@@ -30,6 +30,7 @@ typedef struct _TransportIce
         IceState iceState;
         pj_ice_strans_cfg iceConfig;
         void *pPeerConnection;
+        int *pQuit;
 }TransportIce;
 
 typedef struct _PeerConnection
@@ -56,6 +57,7 @@ typedef struct _PeerConnection
         pj_pool_t *pMutexPool;
         int bQuit;
         IceRole role;
+        pj_timestamp releaseTime;
 }PeerConnection;
 
 #endif

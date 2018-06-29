@@ -59,6 +59,7 @@ typedef struct SipAccount {
         pj_str_t Contact;
         int nLastRegCode;
         int nOngoingCall;
+        int nSdkAccountId;
 
         struct {
                 pj_bool_t Active;
@@ -79,13 +80,15 @@ typedef struct SipAccount {
 /* Call info */
 typedef struct SipCall
 {
-        unsigned nIndex;
-        unsigned nAccountId;
+        int nIndex;
+        int nAccountId;
         pj_bool_t bValid;
         pjsip_inv_session *pInviteSession;
         pj_time_val StartTime;
         pj_time_val ResponseTime;
         pj_time_val ConnectTime;
+
+        int nSdkCallId;
 } SipCall;
 
 /**
@@ -102,7 +105,7 @@ struct SipData {
 
         pjsip_endpoint *pSipEndPoint;
         pj_bool_t bThreadQuit;
-        pj_thread_t* pSipThread[2];
+        pj_thread_t* pSipThread;
 
         /* Accounts: */
         unsigned nAccountCount;
@@ -114,9 +117,10 @@ struct SipData {
 
         /* Mq */
         MessageQueue *pMq;
+        pthread_t MqThread;
         void (*OnRegStateChange)(IN const int nAccountId, IN const SipAnswerCode Code, IN const void *pUser);
         void (*OnCallStateChange)(IN const int nCallId,IN const int nAccountId, IN const SipInviteState State, IN const SipAnswerCode StatusCode, IN const void *pUser, IN const void* pMedia);
-        SipAnswerCode (*OnIncomingCall)(IN const int nAccountId, IN const int nCallId, IN const char *From, IN const void *pUser, IN const void* pMedia);
+        SipAnswerCode (*OnIncomingCall)(IN const int nAccountId, IN const char *From, IN const void *pUser, IN const void* pMedia, OUT int *nCallId);
 
 };
 
@@ -126,11 +130,13 @@ struct SipData {
 typedef enum SipEventType {
 
         SIP_REG_ACCOUNT,
+        SIP_UN_REG_ACCOUNT,
         SIP_MAKE_CALL,
         SIP_HANGUP,
         SIP_HANGUP_BY_ACCOUNT,
         SIP_HANGUP_ALL,
         SIP_ANSWER_CALL,
+        SIP_DESTROY_INSTANCE,
 } SipEventType;
 
 struct SipInstanceConfig;
@@ -141,16 +147,17 @@ typedef struct SipEvent
 
         union
         {
-                /* Create Instance */
-                SipInstanceConfig *pInstanceConfig;
-                /* Add Account */
-                SipAccountConfig *pAccConfig;
-                int nAccountId;
                 /* Reg Account */
                 struct {
+                        SipAccountConfig AccConfig;
                         int nAccountId;
                         int Reg;
                 } Reg;
+
+                /* UnReg Account */
+                struct {
+                        int nAccountId;
+                } UnReg;
                 /* Make Call */
                 struct {
                         int nAccountId;
@@ -194,15 +201,15 @@ void onSipCallOnStateChanged( IN pjsip_inv_session *pInviteSession,
 /* Callback to be called when dialog has forked: */
 void onSipCallOnForked(IN pjsip_inv_session *pInviteSession, IN pjsip_event *pEvent);
 
-int SipGetFreeCallId();
-void RegisterToPjLib();
-SipAnswerCode OnSipAddNewAccount(IN const SipAccountConfig *_pConfig, OUT int *_pAccountId);
-SipAnswerCode OnSipDeleteAccount(IN const int _nAccountId);
+int SdkAccToInterAcc(int _nSdkAccountId);
+
+SipAnswerCode OnSipRegAccount(IN const SipEvent *pEvent);
+SipAnswerCode OnSipUnRegAccount(IN const SipEvent *pEvent);
 SipAnswerCode OnSipRegAccount(IN const SipEvent *pEvent);
 SipAnswerCode OnSipMakeNewCall(IN const SipEvent *pEvent);
 SipAnswerCode OnSipAnswerCall(IN const SipEvent *pEvent);
 SipAnswerCode OnSipHangUp(IN const SipEvent *pEvent);
 SipAnswerCode OnSipHangUpAll(IN const SipEvent *pEvent);
 SipAnswerCode OnSipHangUpByAccountId(IN const SipEvent *pEvent);
-int OnSipIsUserAlreadyExist(IN const SipAccountConfig *_pConfig);
+SipAnswerCode OnSipDestroyInstance(IN const SipEvent *pEvent);
 #endif

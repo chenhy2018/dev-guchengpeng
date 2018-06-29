@@ -6,9 +6,9 @@ static int createMediaSdpMLine(IN pjmedia_endpt *_pMediaEndpt, IN pjmedia_transp
 static int createSdpMline(IN OUT PeerConnection * _pPeerConnection, pj_pool_t *_pPool, pjmedia_sdp_session *pSdp);
 static int negotiationSettingAfterSuccess(IN PeerConnection * _pPeerConnection);
 int setLocalDescription(IN OUT PeerConnection * _pPeerConnection, IN void * _pSdp);
+int releasePeerConnectoin(IN OUT PeerConnection * _pPeerConnection);
 
 enum { RTCP_INTERVAL = 5000, RTCP_RAND = 2000 };
-
 
 #define  LIBRTP_REGISTER_THREAD() {\
         pj_thread_desc pc_desc; \
@@ -16,7 +16,139 @@ enum { RTCP_INTERVAL = 5000, RTCP_RAND = 2000 };
                 pj_thread_t *pThread; \
                 pj_thread_register("test", pc_desc, &pThread); \
         } \
-} \
+}
+
+#if 0
+static pj_status_t librtp_register_thread()
+{
+        static pj_thread_desc pc_desc;
+        if(!pj_thread_is_registered()){
+                pj_thread_t *pThread;
+                return pj_thread_register(NULL, pc_desc, &pThread);
+        }
+        return PJ_SUCCESS;
+}
+#endif
+
+typedef struct _ResourceMgr
+{
+        pj_caching_pool   cachingPool;
+        pj_thread_t       *pPollThread;
+        pj_pool_t         *pThreadPool;
+        pj_mutex_t *pMutex;
+        pj_pool_t *pMutexPool;
+        int nQuit;
+        heap pcHeep;
+        pj_timestamp hzPerSecond;
+}ResourceMgr;
+ResourceMgr manager;
+
+static int mgrThread(void * _pArg)
+{
+        static uint64_t releaseCount = 0;
+        pj_time_val timeout = { 2, 0};
+        while(!manager.nQuit) {
+                heap_entry *pEntry = NULL;
+                heap_min(&manager.pcHeep, &pEntry);
+
+                while (pEntry) {
+                        pj_timestamp now;
+                        pj_get_timestamp(&now);
+                        PeerConnection *pPc = (PeerConnection *)pEntry->value;
+
+                        pj_uint64_t diff = now.u64 - pPc->releaseTime.u64;
+                        if (diff * 1000 / manager.hzPerSecond.u64 > 5000) {
+                                releasePeerConnectoin(pPc);
+                                releaseCount++;
+                                MY_PJ_LOG(5, "releaseCount:%lld", releaseCount);
+                                heap_delmin(&manager.pcHeep, &pEntry);
+                                pEntry = NULL;
+                                heap_min(&manager.pcHeep, &pEntry);
+                        } else {
+                                break;
+                        }
+                }
+                pj_thread_sleep(PJ_TIME_VAL_MSEC(timeout));
+        }
+
+        return PJ_SUCCESS;
+}
+
+static int compare_time(register void* key1, register void* key2) {
+        // Cast them as int and read them in
+        register uint64_t key1_v = (uint64_t)key1;
+        register uint64_t key2_v = (uint64_t)key2;
+
+        // Perform the comparison
+        if (key1_v < key2_v)
+                return -1;
+        else if (key1_v == key2_v)
+                return 0;
+        else
+                return 1;
+}
+
+static void insert_peer_connection(PeerConnection *_pPeerConnection)
+{
+        pj_mutex_lock(manager.pMutex);
+        pj_get_timestamp(&_pPeerConnection->releaseTime);
+        heap_insert(&manager.pcHeep, _pPeerConnection->releaseTime.u64, _pPeerConnection);
+        pj_mutex_unlock(manager.pMutex);
+}
+
+int InitialiseRtp()
+{
+        pj_caching_pool_init(&manager.cachingPool, &pj_pool_factory_default_policy, 0);
+
+        pj_status_t status;
+
+        pj_get_timestamp_freq(&manager.hzPerSecond);
+
+        pj_thread_t * pThread;
+        pj_pool_t * pThreadPool = pj_pool_create(&manager.cachingPool.factory, NULL, 512, 512, NULL);
+        ASSERT_RETURN_CHECK(pThreadPool, pj_pool_create);
+        manager.pThreadPool = pThreadPool;
+        status = pj_thread_create(pThreadPool, "mgrThread", &mgrThread, NULL, 0, 0, &pThread);
+        STATUS_CHECK(pj_thread_create, status);
+        manager.pPollThread = pThread;
+
+        heap_create(&manager.pcHeep, 64, compare_time);
+
+        pj_pool_t *pPool = pj_pool_create(&manager.cachingPool.factory, NULL, 128, 128, NULL);
+        ASSERT_RETURN_CHECK(pPool, pj_pool_create);
+        manager.pMutexPool = pPool;
+        status = pj_mutex_create(pPool, NULL, PJ_MUTEX_DEFAULT, &manager.pMutex);
+        STATUS_CHECK(pj_mutex_create, status);
+
+        return PJ_SUCCESS;
+}
+
+void UninitialiseRtp()
+{
+        manager.nQuit = 1;
+        if (manager.pPollThread) {
+                pj_thread_join(manager.pPollThread);
+                pj_thread_destroy(manager.pPollThread);
+                manager.pPollThread = NULL;
+        }
+
+        if (manager.pThreadPool) {
+                pj_pool_release(manager.pThreadPool);
+                manager.pThreadPool = NULL;
+        }
+
+        if (manager.pMutexPool) {
+                pj_pool_release(manager.pMutexPool);
+                manager.pMutexPool = NULL;
+        }
+
+        if (manager.pMutex) {
+                pj_mutex_destroy(manager.pMutex);
+                manager.pMutex = NULL;
+        }
+
+        pj_caching_pool_destroy (&manager.cachingPool);
+}
 
 static void print_sdp(pjmedia_sdp_session * _pSdp, const char * _pLogPrefix)
 {
@@ -41,21 +173,6 @@ static inline int GetTransportIndex(IN PeerConnection * _pPeerConnection, IN Tra
         }
 
         return -1;
-}
-
-static void internal_write_sdp(pjmedia_sdp_session * pSdp, char * pFname)
-{
-        FILE * f = fopen(pFname, "wb");
-        assert(f != NULL);
-        
-        char sdpStr[2048];
-        memset(sdpStr, 0, 2048);
-        int nLen = pjmedia_sdp_print(pSdp, sdpStr, sizeof(sdpStr));
-        
-        int nWlen = fwrite(sdpStr, 1, nLen, f);
-        assert(nWlen == nLen);
-        
-        fclose(f);
 }
 
 static int addCandidate(TransportIce *_pTransportIce, pjmedia_sdp_session **_pSdp)
@@ -85,7 +202,6 @@ static int addCandidate(TransportIce *_pTransportIce, pjmedia_sdp_session **_pSd
                         }
                 }
                 setLocalDescription(pPeerConnection, pSdp);
-                internal_write_sdp(pSdp, "offer.sdp");
                 print_sdp(pSdp, "offer sdp add candidate");
         } else {
                 pSdp = pPeerConnection->pAnswerSdp;
@@ -106,7 +222,6 @@ static int addCandidate(TransportIce *_pTransportIce, pjmedia_sdp_session **_pSd
                         }
                 }
                 setLocalDescription(pPeerConnection, pSdp);
-                internal_write_sdp(pSdp, "answer.sdp");
                 print_sdp(pSdp, "answer sdp add candidate");
         }
 
@@ -116,15 +231,11 @@ static int addCandidate(TransportIce *_pTransportIce, pjmedia_sdp_session **_pSd
 
 static void doUserCallback(PeerConnection * _pPeerConnection, IceState _state, void *_pData)
 {
-        pj_mutex_lock(_pPeerConnection->pMutex);
         _pPeerConnection->iceNegInfo.state = _state;
         _pPeerConnection->iceNegInfo.pData = _pData;
         if (_pPeerConnection->userIceConfig.userCallback) {
-                pj_mutex_unlock(_pPeerConnection->pMutex);
                 _pPeerConnection->userIceConfig.userCallback(_pPeerConnection->userIceConfig.pCbUserData,
                                                             CALLBACK_ICE, &_pPeerConnection->iceNegInfo);
-        } else {
-                pj_mutex_unlock(_pPeerConnection->pMutex);
         }
         return;
 }
@@ -133,9 +244,11 @@ static void onIceComplete2(pjmedia_transport *pTransport, pj_ice_strans_op op,
                            pj_status_t status, void *pUserData) {
         TransportIce *pTransportIce = (TransportIce *)pUserData;
         PeerConnection * pPeerConnection = (PeerConnection *)pTransportIce->pPeerConnection;
+        pj_mutex_lock(pPeerConnection->pMutex);
 
         if (pPeerConnection->nIsFailCallbackDone) {
                 MY_PJ_LOG(1, "ice already fail and callback to user:state:%d status:%d",op, status);
+                pj_mutex_unlock(pPeerConnection->pMutex);
                 return;
         }
         if(status != PJ_SUCCESS){
@@ -145,6 +258,7 @@ static void onIceComplete2(pjmedia_transport *pTransport, pj_ice_strans_op op,
                         pTransportIce->iceState = ICE_STATE_FAIL;
                         doUserCallback(pPeerConnection, ICE_STATE_FAIL, NULL);
                 }
+                pj_mutex_unlock(pPeerConnection->pMutex);
                 return;
         }
 
@@ -154,7 +268,6 @@ static void onIceComplete2(pjmedia_transport *pTransport, pj_ice_strans_op op,
                         /** Initialization (candidate gathering) */
                 case PJ_ICE_STRANS_OP_INIT:
                         pTransportIce->iceState = ICE_STATE_GATHERING_OK;
-                        pj_mutex_lock(pPeerConnection->pMutex);
                         pPeerConnection->nGatherCandidateSuccessCount++;
                         MY_PJ_LOG(3, "--->gathering candidates finish. total:%d count:%d pPeerConnection %p", pPeerConnection->mediaStream.nCount,
                                   pPeerConnection->nGatherCandidateSuccessCount, pPeerConnection);
@@ -165,15 +278,16 @@ static void onIceComplete2(pjmedia_transport *pTransport, pj_ice_strans_op op,
                                 pj_mutex_unlock(pPeerConnection->pMutex);
                                 return;
                         }
-                        pj_mutex_unlock(pPeerConnection->pMutex);
+
                         if (status != PJ_SUCCESS) {
                                 MY_PJ_LOG(1, "--->gathering candidates finish. but addCandidate fail:%d", status);
                                 doUserCallback(pPeerConnection, ICE_STATE_GATHERING_FAIL, NULL);
+                                pj_mutex_unlock(pPeerConnection->pMutex);
                                 return;
                         }
                         MY_PJ_LOG(3, "--->gathering candidates finish. addCandidate ok");
                         doUserCallback(pPeerConnection, ICE_STATE_GATHERING_OK, pSdp);
-
+                        pj_mutex_unlock(pPeerConnection->pMutex);
                         break;
                         
                         /** Negotiation */
@@ -186,39 +300,45 @@ static void onIceComplete2(pjmedia_transport *pTransport, pj_ice_strans_op op,
                         if (pPeerConnection->nNegSuccess == pPeerConnection->mediaStream.nCount) {
                                 status = negotiationSettingAfterSuccess(pPeerConnection);
                         } else {
+                                pj_mutex_unlock(pPeerConnection->pMutex);
                                 return;
                         }
                         if (status != PJ_SUCCESS) {
                                 MY_PJ_LOG(1, "--->negotiation finish, but fail. status:%d", status);
                                 doUserCallback(pPeerConnection, ICE_STATE_NEGOTIATION_FAIL, NULL);
+                                pj_mutex_unlock(pPeerConnection->pMutex);
                                 return;
                         }
                         MY_PJ_LOG(3, "--->negotiation ok");
 
                         doUserCallback(pPeerConnection, ICE_STATE_NEGOTIATION_OK, NULL);
+                        pj_mutex_unlock(pPeerConnection->pMutex);
                         break;
                         
                         /** This operation is used to report failure in keep-alive operation.
                          *  Currently it is only used to report TURN Refresh failure.  */
                 case PJ_ICE_STRANS_OP_KEEP_ALIVE:
                         MY_PJ_LOG(3, "--->PJ_ICE_STRANS_OP_KEEP_ALIVE");
+                        pj_mutex_unlock(pPeerConnection->pMutex);
                         break;
                         
                         /** IP address change notification from STUN keep-alive operation.  */
                 case PJ_ICE_STRANS_OP_ADDR_CHANGE:
                         MY_PJ_LOG(3, "--->PJ_ICE_STRANS_OP_ADDR_CHANGE");
+                        pj_mutex_unlock(pPeerConnection->pMutex);
                         break;
         }
 }
 
 static int iceWorkerThread(void * _pArg)
 {
-        fprintf(stderr, "iceWorkerThread start");
+        MY_PJ_LOG(5,"iceWorkerThread start");
         TransportIce * pTransportIce = (TransportIce *)_pArg;
         pj_ice_strans_cfg * pIceCfg = &pTransportIce->iceConfig;
-        PeerConnection * pPeerConnection = (PeerConnection*)pTransportIce->pPeerConnection;
+        //PeerConnection * pPeerConnection = (PeerConnection*)pTransportIce->pPeerConnection;
+        int *pIsQuit = pTransportIce->pQuit;
         
-        while (!pPeerConnection->bQuit) {
+        while ((*pIsQuit) == 0) {
                 enum { MAX_NET_EVENTS = 1 };
                 pj_time_val maxTimeout = {0, 0};
                 pj_time_val timeout = { 0, 0};
@@ -273,6 +393,7 @@ static int iceWorkerThread(void * _pArg)
                 count += nNetEventCount;
         }
         
+        free(pIsQuit);
         return 0;
 }
 
@@ -405,6 +526,8 @@ static pj_status_t initTransportIce(IN PeerConnection * _pPeerConnectoin, OUT Tr
         pj_pool_t * pThreadPool = pj_pool_create(_pPeerConnectoin->pPoolFactory, NULL, 512, 512, NULL);
         ASSERT_RETURN_CHECK(pThreadPool, pj_pool_create);
         _pTransportIce->pThreadPool = pThreadPool;
+        _pTransportIce->pQuit = malloc(sizeof(int));
+        *(_pTransportIce->pQuit) = 0;
         status = pj_thread_create(pThreadPool, "iceWorkerThread", &iceWorkerThread, _pTransportIce, 0, 0, &pThread);
         STATUS_CHECK(pj_thread_create, status);
         _pTransportIce->pPollThread = pThread;
@@ -425,13 +548,13 @@ static pj_status_t initTransportIce(IN PeerConnection * _pPeerConnectoin, OUT Tr
 
 static void transportIceDestroy(IN OUT TransportIce * _pTransportIce)
 {
-        if (_pTransportIce->pPollThread) {
-                pj_thread_join(_pTransportIce->pPollThread);
+        *(_pTransportIce->pQuit) = 1;
+        if (_pTransportIce->pTransport) {
+                _pTransportIce->pTransport = NULL;
         }
 
-        if (_pTransportIce->pTransport) {
-                pjmedia_transport_media_stop(_pTransportIce->pTransport);
-                _pTransportIce->pTransport = NULL;
+        if (_pTransportIce->pPollThread) {
+                pj_thread_join(_pTransportIce->pPollThread);
         }
         
         if (_pTransportIce->pPollThread) {
@@ -566,6 +689,21 @@ int ReleasePeerConnectoin(IN OUT PeerConnection * _pPeerConnection)
         _pPeerConnection->bQuit = 1;
         for ( int i = 0; i < sizeof(_pPeerConnection->nAvIndex) / sizeof(int); i++) {
                 if (_pPeerConnection->nAvIndex[i] != -1) {
+                        if (_pPeerConnection->transportIce[i].pTransport) {
+                                pjmedia_transport_media_stop(_pPeerConnection->transportIce[i].pTransport);
+                                pjmedia_transport_close(_pPeerConnection->transportIce[i].pTransport);
+                        }
+                }
+        }
+
+        insert_peer_connection(_pPeerConnection);
+        return PJ_SUCCESS;
+}
+
+int releasePeerConnectoin(IN OUT PeerConnection * _pPeerConnection)
+{
+        for ( int i = 0; i < sizeof(_pPeerConnection->nAvIndex) / sizeof(int); i++) {
+                if (_pPeerConnection->nAvIndex[i] != -1) {
                         transportIceDestroy(&_pPeerConnection->transportIce[i]);
                 }
         }
@@ -596,11 +734,7 @@ int ReleasePeerConnectoin(IN OUT PeerConnection * _pPeerConnection)
         }
         
         for ( int i = 0 ; i < _pPeerConnection->mediaStream.nCount; i++) {
-                pj_pool_t *pTmp = _pPeerConnection->mediaStream.streamTracks[i].pPacketizerPool;
-                if (pTmp) {
-                        pj_pool_release(pTmp);
-                        _pPeerConnection->mediaStream.streamTracks[i].pPacketizerPool = NULL;
-                }
+                DestroyMediaStream(&_pPeerConnection->mediaStream);
         }
 
         pj_caching_pool_destroy (&_pPeerConnection->cachingPool);
@@ -884,7 +1018,7 @@ static void on_rx_rtp(void *pUserData, void *pPkt, pj_ssize_t size)
         JitterBufferPush(&pMediaTrack->jbuf, pPayload, nPayloadLen, pj_ntohs(pRtpHeader->seq),
                          nRtpTs, &nIsDiscard);
         if (nIsDiscard) {
-                MY_PJ_LOG(2, "rtp packet disacrded by jitter buffer");
+                MY_PJ_LOG(2, "rtp packet disacrded by jitter buffer: code:%d seq:%d", nIsDiscard, pj_ntohs(pRtpHeader->seq));
                 return;
         }
 
@@ -1114,6 +1248,7 @@ int setLocalDescription(IN OUT PeerConnection * _pPeerConnection, IN void * _pSd
         createSdpPool(_pPeerConnection);
         pjmedia_sdp_session *  pSdp = (pjmedia_sdp_session *) _pSdp;
         if (pSdp != _pPeerConnection->pOfferSdp && pSdp != _pPeerConnection->pAnswerSdp) {
+                pj_assert(0); //cannot be here
                 _pPeerConnection->pLocalSdp = pjmedia_sdp_session_clone(_pPeerConnection->pSdpPool, _pSdp);
                 if (_pPeerConnection->pLocalSdp == NULL) {
                         MY_PJ_LOG(1, "PJ_NO_MEMORY_EXCEPTION, clone sdp fail");
@@ -1211,7 +1346,6 @@ static inline uint64_t getMediaTrackElapseTime(IN MediaStreamTrack *_pMediaTrack
 // _nPktTimestampGap millisecond?
 static inline uint32_t calcRtpTimestampLen(uint64_t _nPktTimestampGap, int nRate)
 {
-        uint32_t rate = (uint32_t)nRate;
         return _nPktTimestampGap * nRate / 1000;
 }
 

@@ -99,6 +99,7 @@ typedef enum SipAnswerCode
         SIP_INIT_SESS_TIMER_FAILED,
         SIP_REG_INCOMING_FAILED,
         SIP_REG_LOG_FAILED,
+        SIP_CREATE_MQ_THREAD_FAILED,
 
         /* SipAddNewAccount Error Code */
         SIP_TOO_MANY_ACCOUNT,
@@ -152,9 +153,12 @@ typedef struct SipCallBack
          * @param nAccountid, the account id for incoming call
          * @param nCallId, call id for incoming call
          * @param pFrom
+         * @param pUser(user data add in add account)
+         * @param pMedia, sdp info
+         * @param sdk call Id 
          * @return answercode, refer SipAnswercode
          */
-        SipAnswerCode (*OnIncomingCall)(IN const int nAccountId, IN const int nCallId, IN const char *pFrom, IN const void *pUser, IN const void *pMedia);
+        SipAnswerCode (*OnIncomingCall)(IN const int nAccountId, IN const char *pFrom, IN const void *pUser, IN const void *pMedia, OUT int *pCallId);
 
         /**
          * Notify when registration status has changed
@@ -202,25 +206,6 @@ typedef struct SipAccountConfig
 SipAnswerCode SipCreateInstance(IN const SipInstanceConfig *pConfig);
 
 /**
- * Add new account
- *
- * @param pConfig, config about this account see #SipAccountConfig
- *
- * @return see #SipAnswerCode
- *
- */
-SipAnswerCode SipAddNewAccount(IN const SipAccountConfig *pConfig, OUT int *nAccountId);
-
-int SipIsUserAlreadyExist(IN const SipAccountConfig *_pConfig);
-/**
- * Delete Account
- *
- * @param account id
- *
- */
-void SipDeleteAccount(IN const int nAccountId);
-
-/**
  * Registar the user
  *
  * @param nAccountId, account id returned by add_account
@@ -229,7 +214,16 @@ void SipDeleteAccount(IN const int nAccountId);
  * @return see #SipAnswerCode
  */
 
-SipAnswerCode SipRegAccount(IN const int nAccountId, IN const int bDeReg);
+SipAnswerCode SipRegAccount(IN const SipAccountConfig *pConfig, IN const int nAccountId);
+
+/**
+ * UnReg Account
+ *
+ * @param account id
+ *
+ */
+SipAnswerCode SipUnRegAccount(IN const int nAccountId);
+
 
 /**
  * Make a new call
@@ -238,7 +232,7 @@ SipAnswerCode SipRegAccount(IN const int nAccountId, IN const int bDeReg);
  * @param pCallId
  * @return see #SipAnswerCode
  **/
-SipAnswerCode SipMakeNewCall(IN const int nFromAccountId, IN const char *pDestUri, IN const void *pMedia, OUT int *pCallId);
+SipAnswerCode SipMakeNewCall(IN const int nFromAccountId, IN const char *pDestUri, IN const void *pMedia, IN const int npCallId);
 
 /**
  * Hangup call
@@ -258,7 +252,7 @@ SipAnswerCode SipHangUpByAccountId(int nAccountId);
 /**
  * Destroy sip instance
  */
-void SipDestroyInstance();
+SipAnswerCode SipDestroyInstance();
 
 /**
  * Answer the call

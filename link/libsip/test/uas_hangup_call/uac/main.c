@@ -3,26 +3,24 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-int destroy = 0;
-SipAnswerCode cbOnIncomingCall(int _nAccountId, int _nCallId, const char *_pFrom, const void *_pUser, const void *_pMedia)
+SipAnswerCode cbOnIncomingCall(int _nAccountId, const char *_pFrom, const void *_pUser, const void *_pMedia, int *_pCallId)
 {
+        static int callid = 0;
+        *_pCallId = callid++;
         printf("----->incoming call From %s to %d--------------userdata = %d\n", _pFrom, _nAccountId, *(int*)_pUser);
-        PrintSdp(_pMedia);
-	return OK ;
+        return OK ;
 }
 
 void cbOnRegStatusChange(const int _nAccountId, const SipAnswerCode _StatusCode, const void *_pUser)
 {
-        printf("---->>reg status = %d------------------------>userdata = %d\n", _StatusCode,  *(int*)_pUser);
+        printf("_nAccountId = %d ---->>reg status = %d------------------------>userdata = %d\n", _nAccountId, _StatusCode,  *(int*)_pUser);
 }
 
 void cbOnCallStateChange(const int _nCallId, const int _nAccountId, const SipInviteState _State, const SipAnswerCode _StatusCode, const void *_pUser, const void *_pMedia)
 {
-        PrintSdp(_pMedia);
-        if (_State == INV_STATE_DISCONNECTED)
-                destroy = 1;
-        printf("----->state = %d, status code = %d------------>userdata = %d\n", _State, _StatusCode,  *(int*)_pUser);
+        printf("Callid = %d-- nAccountId = %d --->state = %d, status code = %d------------>userdata = %d\n", _nCallId, _nAccountId, _State, _StatusCode,  *(int*)_pUser);
 }
+
 int main()
 {
         SipInstanceConfig Config;
@@ -45,24 +43,18 @@ int main()
         AccountConfig.pUserData = (void *)user;
         AccountConfig.nMaxOngoingCall = 2;
 
-        int ret = SipAddNewAccount(&AccountConfig, &nid);
+        int ret = SipRegAccount(&AccountConfig,3);
         if (ret != SIP_SUCCESS)
                 printf("Add sip account failed");
-        SipRegAccount(nid, 1);
-
         sleep(5);
 
         void *pLocalSdp;
         CreateTmpSDP(&pLocalSdp);
-        int nCallId = -1;
-        SipMakeNewCall(nid, "<sip:1040@123.59.204.198;transport=tcp>", pLocalSdp, &nCallId);
+        SipMakeNewCall(3, "<sip:1040@123.59.204.198;transport=tcp>", pLocalSdp, 2);
         sleep(2);
         sleep(10);
-        while(1) {
-                if (destroy) {
-                        SipDestroyInstance();
-                        break;
-                }
-        }
+        SipUnRegAccount(3);
+        sleep(3);
+        SipDestroyInstance();
         return 0;
 }

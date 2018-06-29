@@ -7,29 +7,28 @@ int incommingcall = 0;
 int nCallid = 0;
 int destroy = 0;
 int confirmed = 0;
-SipAnswerCode cbOnIncomingCall(int _nAccountId, int _nCallId, const char *_pFrom, const void *_pUser, const void *_pMedia)
+
+SipAnswerCode cbOnIncomingCall(int _nAccountId, const char *_pFrom, const void *_pUser, const void *_pMedia, int *_pCallId)
 {
-        printf("----->incoming call From %s to %d--------------userdata = %d\n", _pFrom, _nAccountId, *(int*)_pUser);
-        PrintSdp(_pMedia);
+        static int callid = 0;
+        nCallid = callid;
+        *_pCallId = callid++;
         incommingcall = 1;
-        nCallid = _nCallId;
-	return OK ;
+
+        printf("----->incoming call From %s to %d--------------userdata = %d\n", _pFrom, _nAccountId, *(int*)_pUser);
+        return OK ;
 }
 
 void cbOnRegStatusChange(const int _nAccountId, const SipAnswerCode _StatusCode, const void *_pUser)
 {
-        printf("---->>reg status = %d------------------------>userdata = %d\n", _StatusCode,  *(int*)_pUser);
+        printf("_nAccountId = %d ---->>reg status = %d------------------------>userdata = %d\n", _nAccountId, _StatusCode,  *(int*)_pUser);
 }
 
 void cbOnCallStateChange(const int _nCallId, const int _nAccountId, const SipInviteState _State, const SipAnswerCode _StatusCode, const void *_pUser, const void *_pMedia)
 {
-        PrintSdp(_pMedia);
-        printf("----->state = %d, status code = %d------------>userdata = %d\n", _State, _StatusCode,  *(int*)_pUser);
-        if (_State == INV_STATE_DISCONNECTED)
-                destroy = 1;
-        if (_State == INV_STATE_CONFIRMED)
-                confirmed = 1;
+        printf("Callid = %d-- nAccountId = %d --->state = %d, status code = %d------------>userdata = %d\n", _nCallId, _nAccountId, _State, _StatusCode,  *(int*)_pUser);
 }
+
 int main()
 {
         SipInstanceConfig Config;
@@ -52,28 +51,14 @@ int main()
         AccountConfig.pUserData = (void *)user;
         AccountConfig.nMaxOngoingCall = 2;
 
-        int ret = SipAddNewAccount(&AccountConfig, &nid);
-        if (ret != SIP_SUCCESS)
-                printf("Add sip account failed");
-        int ret1 = SipRegAccount(nid, 1);
-
-        while(1) {
-                if (destroy) {
-                        sleep(10);
-                        SipDestroyInstance();
-                        break;
-                }
-                if (incommingcall) {
-                        void *pLocalSdp;
-                        CreateTmpSDP(&pLocalSdp);
-                        SipAnswerCall(nCallid, 200, NULL, pLocalSdp);
-                        incommingcall = 0;
-                }
-
-                if (confirmed) {
-                        SipHangUp(nCallid);
-                        confirmed = 0;
-                }
-        }
+        int ret = SipRegAccount(&AccountConfig, 2);
+        sleep(10);
+        void *pLocalSdp;
+        CreateTmpSDP(&pLocalSdp);
+        SipAnswerCall(nCallid, 200, NULL, pLocalSdp);
+        sleep(3);
+        SipHangUp(nCallid);
+        sleep(5);
+        SipDestroyInstance();
         return 0;
 }

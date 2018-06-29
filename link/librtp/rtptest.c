@@ -17,6 +17,7 @@ typedef struct _App{
 }App;
 App app;
 pj_oshandle_t gLogFd;
+int gRole;
 
 #define TESTCHECK(status, a) if(status != 0){\
 ReleasePeerConnectoin(a.pPeerConnection);\
@@ -265,6 +266,21 @@ static void print_sdp(const pjmedia_sdp_session *pSdp) {
         printf("\n------------sdp-----------\n");
         printf("%s", sdptxt);
         printf("\n------------sdp-----------\n");
+}
+
+static void internal_write_sdp(pjmedia_sdp_session * pSdp, char * pFname)
+{
+        FILE * f = fopen(pFname, "wb");
+        assert(f != NULL);
+        
+        char sdpStr[4096];
+        memset(sdpStr, 0, sizeof(sdpStr));
+        int nLen = pjmedia_sdp_print(pSdp, sdpStr, sizeof(sdpStr));
+        
+        int nWlen = fwrite(sdpStr, 1, nLen, f);
+        assert(nWlen == nLen);
+        
+        fclose(f);
 }
 
 static void sdp_from_file(pjmedia_sdp_session ** sdp, char * pFname, pj_pool_t * pSdpPool, char *pBuf, int nBufLen)
@@ -560,6 +576,13 @@ static void onRxRtp(void *_pUserData, CallbackType _type, void *_pCbData)
                 case CALLBACK_ICE:{
                         IceNegInfo *pInfo = (IceNegInfo *)_pCbData;
                         if (pInfo->state == ICE_STATE_GATHERING_OK) {
+                                pjmedia_sdp_session *offerOrAnswer = (pjmedia_sdp_session *)pInfo->pData;
+                                if(gRole == OFFER) {
+                                        internal_write_sdp(offerOrAnswer, OFFERFILE);
+                                } else {
+                                        internal_write_sdp(offerOrAnswer, ANSWERFILE);
+                                }
+
                                 gatherState = ICE_STATE_GATHERING_OK;
                                 break;
                         }
@@ -595,6 +618,7 @@ static void onRxRtp(void *_pUserData, CallbackType _type, void *_pCbData)
 
 static int receive_data_callback(void *pData, int nDataLen, int nFlag, int64_t timestamp)
 {
+        MY_PJ_LOG(3, "data------:%d", nDataLen);
         RtpPacket rtpPacket;
         pj_bzero(&rtpPacket, sizeof(rtpPacket));
         if (nFlag == THIS_IS_AUDIO) {
@@ -831,8 +855,8 @@ int main(int argc, char **argv)
                 printf("usage as:%s (1 for offer|2 for answer) [1for audio|2for video|3 audio and vido] [turnip] [tcp|udp]\n", argv[0]);
                 return -1;
         }
-        int role = atoi(argv[1]);
-        if(role != OFFER && role != ANSWER){
+        gRole = atoi(argv[1]);
+        if(gRole != OFFER && gRole != ANSWER){
                 printf("usage as:%s (1 for offer|2 for answer)  [1for audio|2for video|3 audio and vido] [turnip]  [tcp|udp]\n", argv[0]);
                 return -1;
         }
@@ -858,7 +882,7 @@ int main(int argc, char **argv)
 
         pj_caching_pool_init(&app.cachingPool, &pj_pool_factory_default_policy, 0);
 
-        set_log_to_file(role);
+        set_log_to_file(gRole);
         
         //test_jitter_buffer();
         //return 0;
@@ -866,8 +890,8 @@ int main(int argc, char **argv)
         test_sdp_neg();
         //---------------------start------------
 
-        //offer send to answer
-        if (role == ANSWER) {
+        //answer send to offer
+        if (gRole == OFFER) {
                 //test receive pcmu
                 pj_pool_t * apool = pj_pool_create(&app.cachingPool.factory, "rxrtpa", 2000, 2000, NULL);
                 status = pj_file_open(apool, "/Users/liuye/Documents/p2p/build/src/work/Debug/rxrtp.mulaw", PJ_O_WRONLY, &gPcmuFd);
@@ -886,8 +910,11 @@ int main(int argc, char **argv)
                 //end test recive h264
         }
         
+        status = InitialiseRtp();
+        pj_assert(status == 0);
+
         InitIceConfig(&app.userConfig);
-        app.userConfig.nForceStun = 1;
+        //app.userConfig.nForceStun = 1;
         strcpy(app.userConfig.turnHost, "123.59.204.198");
         strcpy(app.userConfig.turnUsername, "root");
         strcpy(app.userConfig.turnPassword, "root");
@@ -945,7 +972,7 @@ int main(int argc, char **argv)
         }
         
 
-        if (role == OFFER) {
+        if (gRole == OFFER) {
                 status = createOffer(app.pPeerConnection);
                 TESTCHECK(status, app);
                 waitState(ICE_STATE_INIT);
@@ -957,7 +984,7 @@ int main(int argc, char **argv)
                 setRemoteDescription(app.pPeerConnection, pAnswer);
         }
         
-        if (role == ANSWER) {
+        if (gRole == ANSWER) {
                 pjmedia_sdp_session *pOffer = NULL;
                 pRemoteSdpPool =pj_pool_create(&app.cachingPool.factory, "sdpremote", 2048, 1024, NULL);
                 sdp_from_file(&pOffer, OFFERFILE,  pRemoteSdpPool, textSdpBuf, sizeof(textSdpBuf));
@@ -975,7 +1002,7 @@ int main(int argc, char **argv)
         waitState(ICE_STATE_GATHERING_OK);
         pj_assert(gatherState == ICE_STATE_NEGOTIATION_OK);
 
-        if (role == ANSWER) {
+        if (gRole == OFFER) {
 #if 0
                 char packet[120];
                 while(1){
@@ -995,24 +1022,25 @@ int main(int argc, char **argv)
                 input_confirm("confirm to sendfile:");
                 if ((hasAudioVideo & HAS_AUDIO) && (hasAudioVideo & HAS_VIDEO)) {
                         start_file_test("/Users/liuye/Documents/p2p/build/src/mysiprtp/Debug/8000_1.mulaw",
-                                        "/Users/liuye/Documents/p2p/build/src/mysiprtp/Debug/hks.h264",
+                                        "/Users/liuye/Documents/qml/iceplayer/v.h264",
                                         receive_data_callback);
                 } else if (hasAudioVideo & HAS_AUDIO) {
                         start_file_test("/Users/liuye/Documents/p2p/build/src/mysiprtp/Debug/8000_1.mulaw",
                                         NULL, receive_data_callback);
                 } else {
-                        start_file_test(NULL, "/Users/liuye/Documents/p2p/build/src/mysiprtp/Debug/hks.h264",
+                        start_file_test(NULL, "/Users/liuye/Documents/qml/iceplayer/v.h264",
                                         receive_data_callback);
                 }
         }
         
         input_confirm("quit");
-        if (role == ANSWER) {
+        if (gRole == OFFER) {
                 pj_file_close(gPcmuFd);
 #ifdef HAS_VIDEO
                 pj_file_close(gH264Fd);
 #endif
         }
         ReleasePeerConnectoin(app.pPeerConnection);
+        UninitialiseRtp();
         return 0;
 }
