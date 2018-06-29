@@ -741,7 +741,7 @@ static int createBaseSdp(IN OUT PeerConnection * _pPeerConnection, IN pj_pool_t 
 {
         pj_assert(_pPeerConnection && _pOffer);
         
-        pj_str_t originStrAddr = pj_str("localhost");
+        pj_str_t originStrAddr = pj_str("127.0.0.1");
         pj_sockaddr originAddr;
         pj_status_t status;
         status = pj_sockaddr_parse(pj_AF_INET(), 0, &originStrAddr, &originAddr);
