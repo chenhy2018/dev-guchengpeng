@@ -40,6 +40,13 @@ var (
 
 // -------------------------------------------------------------------------------------------------
 
+func AllocTable() string {
+
+	return allocPool.printTable()
+}
+
+// -------------------------------------------------------------------------------------------------
+
 func (pool *tcpPool) get(addr *address) *net.TCPConn {
 
 	pool.lck.Lock()
@@ -233,7 +240,7 @@ func processStunMessage(req []byte, addr *address) []byte {
 		return nil
 	}
 
-	msg.print("request") // request
+//	msg.print("request") // request
 
 	msg, err = msg.process(addr)
 	if err != nil {
@@ -248,7 +255,7 @@ func processStunMessage(req []byte, addr *address) []byte {
 		return nil
 	}
 
-	msg.print("response") // response
+//	msg.print("response") // response
 
 	resp := msg.buffer()
 	return resp
@@ -261,7 +268,7 @@ func processChannelData(req []byte, addr *address) {
 		return
 	}
 
-	data.print("channel-data")
+//	data.print("channel-data")
 
 	data.transport(addr)
 }

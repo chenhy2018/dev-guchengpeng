@@ -23,6 +23,7 @@ type argument struct {
 	Port     *string
 	Realm    *string
 	Users    arrayflags
+	Http     *string
 }
 
 var (
