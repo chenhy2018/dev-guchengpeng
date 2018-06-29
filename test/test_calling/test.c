@@ -20,7 +20,7 @@
 #define HOST "123.59.204.198"
 #define INVALID_SERVER "192,.168.1.239"
 
-#define MAX_COUNT 9
+#define MAX_COUNT 16
 int RegisterTestSuitCallback( TestSuit *this );
 int RegisterTestSuitInit( TestSuit *this, TestSuitManager *_pManager );
 int RegisterTestSuitGetTestCase( TestSuit *this, TestCase **testCase );
@@ -54,39 +54,71 @@ RegisterTestCase gRegisterTestCases[] =
 {
     {
         { "valid_account1", CALL_STATUS_REGISTERED, UA1_EventLoopThread },
-        { "1011", "1011", HOST, HOST, HOST, 10, 1 }
+        { "2911", "2911", HOST, HOST, HOST, 10, 1 }
     },
     {
         { "valid_account2", CALL_STATUS_REGISTERED, UA2_EventLoopThread },
-        { "1012", "1012", HOST, HOST, HOST, 10, 0 }
+        { "2912", "2912", HOST, HOST, HOST, 10, 0 }
     },
     {
         { "invalid_account1", CALL_STATUS_REGISTER_FAIL, UA3_EventLoopThread },
-        { "1013", "1013", HOST, HOST, HOST, 10, 0 }
+        { "2913", "2913", HOST, HOST, HOST, 10, 0 }
     },
     {
         { "invalid_account2", CALL_STATUS_REGISTER_FAIL, UA4_EventLoopThread },
-        { "1014", "1014", HOST, HOST, HOST, 10, 0 }
+        { "2914", "2914", HOST, HOST, HOST, 10, 0 }
     },
     {
         { "invalid_sip_register_server", CALL_STATUS_REGISTER_FAIL, UA5_EventLoopThread },
-        { "1015", "1015", INVALID_SERVER, INVALID_SERVER, INVALID_SERVER, 10, 0 }
+        { "2915", "2915", HOST, HOST, HOST, 10, 0 }
     },
     {
         { "invalid_account", 0 },
-        { "1016", "1016", HOST, HOST, HOST, 100, 0 }
+        { "2916", "2916", HOST, HOST, HOST, 100, 0 }
     },
     {
         { "normal", 0 },
-        { "1017", "1017", HOST, HOST, HOST, 100, 1 }
+        { "2917", "2917", HOST, HOST, HOST, 100, 1 }
     },
     {
         { "invalid_account", 0 },
-        { "1018", "1018", HOST, HOST, HOST, 100, 0 }
+        { "2918", "2918", HOST, HOST, HOST, 100, 0 }
     },
     {
         { "normal", 0 },
-        { "1019", "1019", HOST, HOST, HOST, 100, 1 }
+        { "2919", "2919", HOST, HOST, HOST, 100, 1 }
+    },
+    {
+        { "normal", 0 },
+        { "2920", "2920", HOST, HOST, HOST, 100, 1 }
+    },
+    {
+        { "normal", 0 },
+        { "2921", "2921", HOST, HOST, HOST, 100, 1 }
+    },
+    {
+        { "normal", 0 },
+        { "2922", "2922", HOST, HOST, HOST, 100, 1 }
+    },
+    {
+        { "normal", 0 },
+        { "2923", "2923", HOST, HOST, HOST, 100, 1 }
+    },
+    {
+        { "normal", 0 },
+        { "2924", "2924", HOST, HOST, HOST, 100, 1 }
+    },
+    {
+        { "normal", 0 },
+        { "2925", "2925", HOST, HOST, HOST, 100, 1 }
+    },
+    {
+        { "normal", 0 },
+        { "2926", "2926", HOST, HOST, HOST, 100, 1 }
+    },
+    {
+        { "normal", 0 },
+        { "2927", "2927", HOST, HOST, HOST, 100, 1 }
     },
 };
 
@@ -169,7 +201,7 @@ void Mthread1(void* data)
     DBG_LOG("send pack *****%d call id %d\n", pData->accountid, pData->callid);
     while (1) {     
                     if (sendflag) {
-                            if (timecount > 500) {
+                            if (timecount > 50000) {
                                     DBG_LOG("hangcall ******************\n");
                                     HangupCall(pData->accountid, pData->callid);
                                     sendflag = 0;
@@ -182,7 +214,7 @@ void Mthread1(void* data)
                             usleep(10000);
                             continue;
                     }
-                    id = PollEvent(pData->accountid, &type, &event, 10);
+                    id = PollEvent(pData->accountid, &type, &event, 0);
                     if (id != RET_OK) {
                            continue;
                     }
@@ -199,7 +231,7 @@ void Mthread1(void* data)
                                   if (pCallEvent->status == CALL_STATUS_ERROR || pCallEvent->status == CALL_STATUS_HANGUP) {
                                         DBG_LOG("makecall *****************  ERROR ****************************8*\n");
                                         do {
-                                                id = MakeCall(pData->accountid, "1010", "123.59.204.198", &pData->callid);
+                                                //id = MakeCall(pData->accountid, "1010", "123.59.204.198", &pData->callid);
                                         } while (id != RET_OK);
                                   }
 
@@ -223,6 +255,7 @@ void Mthread1(void* data)
                                  DBG_LOG("Callid %d ncount %d type 1 %d type 2 %d\n", pMedia->callID, pMedia->nCount, pMedia->media[0].codecType, pMedia->media[1].codecType);
                                  if (pMedia->nCount == 2) {
                                          sendflag = 1;
+                                         pData->callid = pMedia->callID;
                                  }
                                  else {
                                          DBG_ERROR("pMedia->nCount %d, HangupCall %d", pMedia->nCount, pMedia->callID); 
@@ -292,12 +325,12 @@ int RegisterTestSuitCallback( TestSuit *this )
            pData->sendflag = 0;
            pData->timecount = 0;
            UT_LOG("MakeCall in accountid %d\n", pData->accountid);
-           pData->callid = 0;
-           id = MakeCall(pData->accountid, "1010", "123.59.204.198", &pData->callid);
-           if (RET_OK != id) {
-                    fprintf(stderr, "call error %d \n", id);
-                     continue;
-           }
+           //pData->callid = 0;
+           //id = MakeCall(pData->accountid, "1010", "123.59.204.198", &pData->callid);
+           //if (RET_OK != id) {
+           //         fprintf(stderr, "call error %d \n", id);
+           //          continue;
+           //}
            UT_LOG("MakeCall in callidid %d\n", pData->callid);
            pthread_create(&t_1, &attr_1, Mthread1, pData);
     }
