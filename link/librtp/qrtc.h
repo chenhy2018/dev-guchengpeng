@@ -118,6 +118,7 @@ typedef struct _IceNegInfo {
 }IceNegInfo;
 
 int InitialiseRtp();
+
 void InitMediaConfig(IN MediaConfigSet * pMediaConfig);
 void InitIceConfig(IN OUT IceConfig *pIceConfig);
 
@@ -135,5 +136,6 @@ int StartNegotiation(IN PeerConnection * pPeerConnection);
 int SendRtpPacket(IN PeerConnection *pPeerConnection, IN OUT RtpPacket * pPacket);
 
 int ReleasePeerConnectoin(IN OUT PeerConnection * _pPeerConnection);
+
 void UninitialiseRtp();
 #endif

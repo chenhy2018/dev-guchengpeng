@@ -6,19 +6,36 @@ static int createMediaSdpMLine(IN pjmedia_endpt *_pMediaEndpt, IN pjmedia_transp
 static int createSdpMline(IN OUT PeerConnection * _pPeerConnection, pj_pool_t *_pPool, pjmedia_sdp_session *pSdp);
 static int negotiationSettingAfterSuccess(IN PeerConnection * _pPeerConnection);
 int setLocalDescription(IN OUT PeerConnection * _pPeerConnection, IN void * _pSdp);
+static pj_status_t createMediaEndpt();
 
 enum { RTCP_INTERVAL = 5000, RTCP_RAND = 2000 };
 
-#if 1
 #define  LIBRTP_REGISTER_THREAD() {\
         pj_thread_desc pc_desc; \
         if(!pj_thread_is_registered()){ \
-fprintf(stderr, "descaddr:%p\n", &pc_desc);\
                 pj_thread_t *pThread; \
                 pj_thread_register("test", pc_desc, &pThread); \
         } \
 }
-#else
+
+typedef struct _ResoureMgr {
+        pj_caching_pool   cachingPool;
+        pj_pool_factory   *pPoolFactory;
+
+        pj_ioqueue_t      *pIoQueue;
+        pj_pool_t         *pIoqueuePool;
+        pj_timer_heap_t   *pTimerHeap;
+        pj_pool_t         *pTimerHeapPool;
+        pj_thread_t       *pPollThread;
+        pj_pool_t         *pThreadPool;
+        pj_mutex_t *pMutex;
+        pj_pool_t *pMutexPool;
+        int nQuit;
+        pjmedia_endpt     *pMediaEndpt;
+}ResoureMgr;
+ResoureMgr manager;
+
+#if 0
 static pj_status_t librtp_register_thread()
 {
         static pj_thread_desc pc_desc;
@@ -28,201 +45,7 @@ static pj_status_t librtp_register_thread()
         }
         return PJ_SUCCESS;
 }
-
-#define  LIBRTP_REGISTER_THREAD() librtp_register_thread()
 #endif
-
-typedef struct _ResourceMgr
-{
-        pj_caching_pool   cachingPool;
-        pj_thread_t       *pPollThread;
-        pj_pool_t         *pThreadPool;
-        pj_mutex_t *pMgrMutex;
-        pj_pool_t *pMgrMutexPool;
-        int nQuit;
-        pj_timestamp hzPerSecond;
-        pjmedia_endpt     *pMediaEndpt;
-        pj_ioqueue_t      *pIoQueue;
-        pj_pool_t         *pIoqueuePool;
-        pj_timer_heap_t   *pTimerHeap;
-        pj_pool_t         *pTimerHeapPool;
-        pj_grp_lock_t *pGrpLock;
-}ResourceMgr;
-ResourceMgr manager;
-
-static int mgrThread(void * _pArg)
-{
-        while (manager.nQuit == 0) {
-                enum { MAX_NET_EVENTS = 1 };
-                pj_time_val maxTimeout = {0, 0};
-                pj_time_val timeout = { 0, 0};
-                unsigned count = 0, nNetEventCount = 0;
-                int c;
-
-                maxTimeout.msec = 500;
-
-                /* Poll the timer to run it and also to retrieve the earliest entry. */
-                timeout.sec = timeout.msec = 0;
-                c = pj_timer_heap_poll(manager.pTimerHeap, &timeout );
-                if (c > 0)
-                        count += c;
-
-                /* timer_heap_poll should never ever returns negative value, or otherwise
-                 * ioqueue_poll() will block forever!
-                 */
-                pj_assert(timeout.sec >= 0 && timeout.msec >= 0);
-                if (timeout.msec >= 1000) timeout.msec = 999;
-
-                /* compare the value with the timeout to wait from timer, and use the
-                 * minimum value.
-                 */
-                if (PJ_TIME_VAL_GT(timeout, maxTimeout))
-                        timeout = maxTimeout;
-
-                /* Poll ioqueue.
-                 * Repeat polling the ioqueue while we have immediate events, because
-                 * timer heap may process more than one events, so if we only process
-                 * one network events at a time (such as when IOCP backend is used),
-                 * the ioqueue may have trouble keeping up with the request rate.
-                 *
-                 * For example, for each send() request, one network event will be
-                 *   reported by ioqueue for the send() completion. If we don't poll
-                 *   the ioqueue often enough, the send() completion will not be
-                 *   reported in timely manner.
-                 */
-                do {
-                        c = pj_ioqueue_poll(manager.pIoQueue, &timeout);
-                        if (c < 0) {
-                                pj_status_t err = pj_get_netos_error();
-                                pj_thread_sleep(PJ_TIME_VAL_MSEC(timeout));
-                                return err;
-                        } else if (c == 0) {
-                                break;
-                        } else {
-                                nNetEventCount += c;
-                                timeout.sec = timeout.msec = 0;
-                        }
-                } while (c > 0 && nNetEventCount < MAX_NET_EVENTS);
-
-                count += nNetEventCount;
-        }
-
-        return 0;
-}
-
-static pj_status_t createMediaEndpt()
-{
-        if (manager.pMediaEndpt != NULL) {
-                return PJ_SUCCESS;
-        }
-
-        pj_status_t status;
-
-        status = pjmedia_endpt_create(&manager.cachingPool.factory, NULL, 1, &manager.pMediaEndpt);
-        STATUS_CHECK(pjmedia_endpt_create, status);
-        int nNoTelephoneEvent = 0;
-        status = pjmedia_endpt_set_flag(manager.pMediaEndpt, PJMEDIA_ENDPT_HAS_TELEPHONE_EVENT_FLAG, (void *)&nNoTelephoneEvent);
-        STATUS_CHECK(pjmedia_endpt_set_flag, status);
-        return status;
-}
-
-int InitialiseRtp()
-{
-        LIBRTP_REGISTER_THREAD();
-
-        pj_caching_pool_init(&manager.cachingPool, &pj_pool_factory_default_policy, 0);
-
-        pj_status_t status;
-
-        pj_get_timestamp_freq(&manager.hzPerSecond);
-
-        pj_pool_t *pPool = pj_pool_create(&manager.cachingPool.factory, NULL, 128, 128, NULL);
-        ASSERT_RETURN_CHECK(pPool, pj_pool_create);
-        manager.pMgrMutexPool = pPool;
-        status = pj_mutex_create(pPool, NULL, PJ_MUTEX_DEFAULT, &manager.pMgrMutex);
-        STATUS_CHECK(pj_mutex_create, status);
-
-        pj_pool_t * pIoQueuePool = pj_pool_create(&manager.cachingPool.factory, NULL, 512, 512, NULL);
-        ASSERT_RETURN_CHECK(pIoQueuePool, pj_pool_create);
-        manager.pIoqueuePool = pIoQueuePool;
-        pj_ioqueue_t* pIoQueue;
-        status = pj_ioqueue_create(pIoQueuePool, PJ_IOQUEUE_MAX_HANDLES, &pIoQueue);
-        STATUS_CHECK(pj_ioqueue_create, status);
-        manager.pIoQueue = pIoQueue;
-
-        pj_pool_t * pTimerPool = pj_pool_create(&manager.cachingPool.factory, NULL, 512, 512, NULL);
-        ASSERT_RETURN_CHECK(pTimerPool, pj_pool_create);
-        manager.pTimerHeapPool = pTimerPool;
-        pj_timer_heap_t *pTimerHeap = NULL;
-        status = pj_timer_heap_create(pTimerPool, 64, &pTimerHeap);
-        STATUS_CHECK(pj_timer_heap_create, status);
-        manager.pTimerHeap = pTimerHeap;
-
-        pj_thread_t * pThread;
-        pj_pool_t * pThreadPool = pj_pool_create(&manager.cachingPool.factory, NULL, 512, 512, NULL);
-        ASSERT_RETURN_CHECK(pThreadPool, pj_pool_create);
-        manager.pThreadPool = pThreadPool;
-        status = pj_thread_create(pThreadPool, "mgrThread", &mgrThread, NULL, 0, 0, &pThread);
-        STATUS_CHECK(pj_thread_create, status);
-        manager.pPollThread = pThread;
-
-        return createMediaEndpt();
-}
-
-void UninitialiseRtp()
-{
-        LIBRTP_REGISTER_THREAD();
-
-        manager.nQuit = 1;
-
-        if (manager.pPollThread) {
-                pj_thread_join(manager.pPollThread);
-                pj_thread_destroy(manager.pPollThread);
-                manager.pPollThread = NULL;
-        }
-
-        if (manager.pThreadPool) {
-                pj_pool_release(manager.pThreadPool);
-                manager.pThreadPool = NULL;
-        }
-
-        if (manager.pIoQueue) {
-                pj_ioqueue_destroy(manager.pIoQueue);
-                manager.pIoQueue = NULL;
-        }
-
-        if (manager.pTimerHeap ) {
-                pj_timer_heap_destroy(manager.pTimerHeap);
-                manager.pTimerHeap = NULL;
-        }
-
-        if (manager.pIoqueuePool) {
-                pj_pool_release(manager.pIoqueuePool);
-                manager.pIoqueuePool = NULL;
-        }
-
-        if (manager.pTimerHeapPool) {
-                pj_pool_release(manager.pTimerHeapPool);
-                manager.pTimerHeapPool = NULL;
-        }
-
-        if (manager.pMgrMutex) {
-                pj_mutex_destroy(manager.pMgrMutex);
-                manager.pMgrMutex = NULL;
-        }
-
-        if (manager.pMgrMutexPool) {
-                pj_pool_release(manager.pMgrMutexPool);
-                manager.pMgrMutexPool = NULL;
-        }
-
-        if (manager.pMediaEndpt) {
-                pjmedia_endpt_destroy(manager.pMediaEndpt);
-                manager.pMediaEndpt = NULL;
-        }
-
-        pj_caching_pool_destroy (&manager.cachingPool);
-}
 
 static void print_sdp(pjmedia_sdp_session * _pSdp, const char * _pLogPrefix)
 {
@@ -238,7 +61,6 @@ static void print_sdp(pjmedia_sdp_session * _pSdp, const char * _pLogPrefix)
         }
 }
 
-#if 0
 static inline int GetTransportIndex(IN PeerConnection * _pPeerConnection, IN TransportIce *pTransportIce)
 {
         for (int i = 0; i < sizeof(_pPeerConnection->transportIce) / sizeof(TransportIce); i++) {
@@ -249,7 +71,6 @@ static inline int GetTransportIndex(IN PeerConnection * _pPeerConnection, IN Tra
 
         return -1;
 }
-#endif
 
 static int addCandidate(TransportIce *_pTransportIce, pjmedia_sdp_session **_pSdp)
 {
@@ -316,13 +137,21 @@ static void doUserCallback(PeerConnection * _pPeerConnection, IceState _state, v
         return;
 }
 
+static void onIceComplete(pjmedia_transport *pTransport, pj_ice_strans_op op,
+                           pj_status_t status) {
+        MY_PJ_LOG(5, "onIceComplete: op:%d status:%d", op, status);
+}
+
 static void onIceComplete2(pjmedia_transport *pTransport, pj_ice_strans_op op,
                            pj_status_t status, void *pUserData) {
         TransportIce *pTransportIce = (TransportIce *)pUserData;
         PeerConnection * pPeerConnection = (PeerConnection *)pTransportIce->pPeerConnection;
+        pj_mutex_lock(pPeerConnection->pMutex);
 
+        MY_PJ_LOG(5, "onIceComplete2: op:%d status:%d", op, status);
         if (pPeerConnection->nIsFailCallbackDone) {
                 MY_PJ_LOG(1, "ice already fail and callback to user:state:%d status:%d",op, status);
+                pj_mutex_unlock(pPeerConnection->pMutex);
                 return;
         }
         if(status != PJ_SUCCESS){
@@ -332,6 +161,7 @@ static void onIceComplete2(pjmedia_transport *pTransport, pj_ice_strans_op op,
                         pTransportIce->iceState = ICE_STATE_FAIL;
                         doUserCallback(pPeerConnection, ICE_STATE_FAIL, NULL);
                 }
+                pj_mutex_unlock(pPeerConnection->pMutex);
                 return;
         }
 
@@ -348,16 +178,19 @@ static void onIceComplete2(pjmedia_transport *pTransport, pj_ice_strans_op op,
                         if (pPeerConnection->nGatherCandidateSuccessCount == pPeerConnection->mediaStream.nCount) {
                                 status = addCandidate(pTransportIce, &pSdp);
                         } else {
+                                pj_mutex_unlock(pPeerConnection->pMutex);
                                 return;
                         }
 
                         if (status != PJ_SUCCESS) {
                                 MY_PJ_LOG(1, "--->gathering candidates finish. but addCandidate fail:%d", status);
                                 doUserCallback(pPeerConnection, ICE_STATE_GATHERING_FAIL, NULL);
+                                pj_mutex_unlock(pPeerConnection->pMutex);
                                 return;
                         }
                         MY_PJ_LOG(3, "--->gathering candidates finish. addCandidate ok");
                         doUserCallback(pPeerConnection, ICE_STATE_GATHERING_OK, pSdp);
+                        pj_mutex_unlock(pPeerConnection->pMutex);
                         break;
                         
                         /** Negotiation */
@@ -370,29 +203,179 @@ static void onIceComplete2(pjmedia_transport *pTransport, pj_ice_strans_op op,
                         if (pPeerConnection->nNegSuccess == pPeerConnection->mediaStream.nCount) {
                                 status = negotiationSettingAfterSuccess(pPeerConnection);
                         } else {
+                                pj_mutex_unlock(pPeerConnection->pMutex);
                                 return;
                         }
                         if (status != PJ_SUCCESS) {
                                 MY_PJ_LOG(1, "--->negotiation finish, but fail. status:%d", status);
                                 doUserCallback(pPeerConnection, ICE_STATE_NEGOTIATION_FAIL, NULL);
+                                pj_mutex_unlock(pPeerConnection->pMutex);
                                 return;
                         }
                         MY_PJ_LOG(3, "--->negotiation ok");
 
                         doUserCallback(pPeerConnection, ICE_STATE_NEGOTIATION_OK, NULL);
+                        pj_mutex_unlock(pPeerConnection->pMutex);
                         break;
                         
                         /** This operation is used to report failure in keep-alive operation.
                          *  Currently it is only used to report TURN Refresh failure.  */
                 case PJ_ICE_STRANS_OP_KEEP_ALIVE:
                         MY_PJ_LOG(3, "--->PJ_ICE_STRANS_OP_KEEP_ALIVE");
+                        pj_mutex_unlock(pPeerConnection->pMutex);
                         break;
                         
                         /** IP address change notification from STUN keep-alive operation.  */
                 case PJ_ICE_STRANS_OP_ADDR_CHANGE:
                         MY_PJ_LOG(3, "--->PJ_ICE_STRANS_OP_ADDR_CHANGE");
+                        pj_mutex_unlock(pPeerConnection->pMutex);
                         break;
         }
+}
+
+static int iceWorkerThread(void * _pArg)
+{
+        while (!manager.nQuit) {
+                enum { MAX_NET_EVENTS = 1 };
+                pj_time_val maxTimeout = {0, 0};
+                pj_time_val timeout = { 0, 0};
+                unsigned count = 0, nNetEventCount = 0;
+                int c;
+                
+                maxTimeout.msec = 500;
+                
+                /* Poll the timer to run it and also to retrieve the earliest entry. */
+                timeout.sec = timeout.msec = 0;
+                c = pj_timer_heap_poll( manager.pTimerHeap, &timeout );
+                if (c > 0)
+                        count += c;
+                
+                /* timer_heap_poll should never ever returns negative value, or otherwise
+                 * ioqueue_poll() will block forever!
+                 */
+                pj_assert(timeout.sec >= 0 && timeout.msec >= 0);
+                if (timeout.msec >= 1000) timeout.msec = 999;
+                
+                /* compare the value with the timeout to wait from timer, and use the
+                 * minimum value.
+                 */
+                if (PJ_TIME_VAL_GT(timeout, maxTimeout))
+                        timeout = maxTimeout;
+                
+                /* Poll ioqueue.
+                 * Repeat polling the ioqueue while we have immediate events, because
+                 * timer heap may process more than one events, so if we only process
+                 * one network events at a time (such as when IOCP backend is used),
+                 * the ioqueue may have trouble keeping up with the request rate.
+                 *
+                 * For example, for each send() request, one network event will be
+                 *   reported by ioqueue for the send() completion. If we don't poll
+                 *   the ioqueue often enough, the send() completion will not be
+                 *   reported in timely manner.
+                 */
+                do {
+                        c = pj_ioqueue_poll( manager.pIoQueue, &timeout);
+                        if (c < 0) {
+                                pj_status_t err = pj_get_netos_error();
+                                pj_thread_sleep(PJ_TIME_VAL_MSEC(timeout));
+                                return err;
+                        } else if (c == 0) {
+                                break;
+                        } else {
+                                nNetEventCount += c;
+                                timeout.sec = timeout.msec = 0;
+                        }
+                } while (c > 0 && nNetEventCount < MAX_NET_EVENTS);
+                
+                count += nNetEventCount;
+        }
+        
+        return 0;
+}
+
+int InitialiseRtp()
+{
+        if (manager.pPoolFactory) {
+                return -1;
+        }
+        pj_status_t status;
+
+        pj_caching_pool_init(&manager.cachingPool, &pj_pool_factory_default_policy, 0);
+        manager.pPoolFactory = &manager.cachingPool.factory;
+
+        pj_pool_t * pTimerPool = pj_pool_create(manager.pPoolFactory, "mgrheap", 512, 512, NULL);
+        ASSERT_RETURN_CHECK(pTimerPool, pj_pool_create);
+        manager.pTimerHeapPool = pTimerPool;
+        pj_timer_heap_t *pTimerHeap = NULL;
+        status = pj_timer_heap_create(pTimerPool, 64, &pTimerHeap);
+        STATUS_CHECK(pj_timer_heap_create, status);
+        manager.pTimerHeap = pTimerHeap;
+
+        pj_pool_t * pIoQueuePool = pj_pool_create(manager.pPoolFactory, "mgrioque", 512, 512, NULL);
+        ASSERT_RETURN_CHECK(pIoQueuePool, pj_pool_create);
+        manager.pIoqueuePool = pIoQueuePool;
+        pj_ioqueue_t* pIoQueue;
+        status = pj_ioqueue_create(pIoQueuePool, 128, &pIoQueue);
+        STATUS_CHECK(pj_ioqueue_create, status);
+        manager.pIoQueue = pIoQueue;
+
+        pj_thread_t * pThread;
+        pj_pool_t * pThreadPool = pj_pool_create(manager.pPoolFactory, NULL, 512, 512, NULL);
+        ASSERT_RETURN_CHECK(pThreadPool, pj_pool_create);
+        manager.pThreadPool = pThreadPool;
+        status = pj_thread_create(pThreadPool, "iceWorkerThread", &iceWorkerThread, NULL, 0, 0, &pThread);
+        STATUS_CHECK(pj_thread_create, status);
+        manager.pPollThread = pThread;
+
+        pj_pool_t *pPool = pj_pool_create(manager.pPoolFactory, NULL, 128, 128, NULL);
+        ASSERT_RETURN_CHECK(pPool, pj_pool_create);
+        manager.pMutexPool = pPool;
+        status = pj_mutex_create(pPool, NULL, PJ_MUTEX_DEFAULT, &manager.pMutex);
+        STATUS_CHECK(pj_mutex_create, status);
+
+        return createMediaEndpt();
+}
+
+void UninitialiseRtp()
+{
+        manager.nQuit = 1;
+        if (manager.pPollThread) {
+                pj_thread_join(manager.pPollThread);
+                pj_thread_destroy(manager.pPollThread);
+                manager.pPollThread = NULL;
+        }
+
+        if (manager.pThreadPool) {
+                pj_pool_release(manager.pThreadPool);
+                manager.pThreadPool = NULL;
+        }
+
+        if (manager.pIoQueue) {
+                pj_ioqueue_destroy(manager.pIoQueue);
+                manager.pIoQueue = NULL;
+        }
+
+        if (manager.pIoqueuePool) {
+                pj_pool_release(manager.pIoqueuePool);
+                manager.pIoqueuePool = NULL;
+        }
+
+        if (manager.pTimerHeap ) {
+                pj_timer_heap_destroy(manager.pTimerHeap);
+                manager.pTimerHeap = NULL;
+        }
+
+        if (manager.pTimerHeapPool) {
+                pj_pool_release(manager.pTimerHeapPool);
+                manager.pTimerHeapPool = NULL;
+        }
+
+        if (manager.pMediaEndpt) {
+                pjmedia_endpt_destroy(manager.pMediaEndpt);
+                manager.pMediaEndpt = NULL;
+        }
+
+        pj_caching_pool_destroy (&manager.cachingPool);
 }
 
 static pj_str_t parseIpAndPort(char *_pHosStr, pj_uint16_t *_pPort)
@@ -481,7 +464,7 @@ static int peerConnectInitIceConfig(IN OUT PeerConnection * _pPeerConnectoin)
                 pj_status_t status;
                 if (pUserIceConfig->nameserver[0] != '\0') {
                         pj_str_t nameserver = pj_str(pUserIceConfig->nameserver);
-                        status = pj_dns_resolver_create(&manager.cachingPool.factory, "resolver", 0,
+                        status = pj_dns_resolver_create(_pPeerConnectoin->pPoolFactory, "resolver", 0,
                                                         pIceCfg->stun_cfg.timer_heap,
                                                         pIceCfg->stun_cfg.ioqueue,
                                                         &pIceCfg->resolver);
@@ -496,8 +479,8 @@ static int peerConnectInitIceConfig(IN OUT PeerConnection * _pPeerConnectoin)
 static pj_status_t initTransportIce(IN PeerConnection * _pPeerConnectoin, OUT TransportIce * _pTransportIce)
 {
         pj_status_t status;
-        
-        pj_stun_config_init(&_pTransportIce->iceConfig.stun_cfg, &manager.cachingPool.factory, 0,
+
+        pj_stun_config_init(&_pTransportIce->iceConfig.stun_cfg, manager.pPoolFactory, 0,
                             manager.pIoQueue, manager.pTimerHeap);
         
         _pTransportIce->pPeerConnection = _pPeerConnectoin;
@@ -516,18 +499,35 @@ static pj_status_t initTransportIce(IN PeerConnection * _pPeerConnectoin, OUT Tr
         return PJ_SUCCESS;
 }
 
-static void transportIceDestroy(IN OUT TransportIce * _pTransportIce)
+static void transportIceDestroy(IN OUT TransportIce * _pTransportIce, void * _pUserData)
 {
+        if (_pTransportIce->pTransport) {
+                pjmedia_transport_detach(_pTransportIce->pTransport, _pUserData);
+                pjmedia_transport_media_stop(_pTransportIce->pTransport);
+                pjmedia_transport_close(_pTransportIce->pTransport);
+                _pTransportIce->pTransport = NULL;
+        }
         
         if (_pTransportIce->pNegotiationPool) {
                 pj_pool_release(_pTransportIce->pNegotiationPool);
                 _pTransportIce->pNegotiationPool = NULL;
         }
+}
 
-        if (_pTransportIce->pTransport) {
-                pjmedia_transport_media_stop(_pTransportIce->pTransport);
-                pjmedia_transport_close(_pTransportIce->pTransport);
+static pj_status_t createMediaEndpt()
+{
+        if (manager.pMediaEndpt != NULL) {
+                return PJ_SUCCESS;
         }
+        
+        pj_status_t status;
+
+        status = pjmedia_endpt_create(manager.pPoolFactory, NULL, 1, &manager.pMediaEndpt);
+        STATUS_CHECK(pjmedia_endpt_create, status);
+        int nNoTelephoneEvent = 0;
+        status = pjmedia_endpt_set_flag(manager.pMediaEndpt, PJMEDIA_ENDPT_HAS_TELEPHONE_EVENT_FLAG, (void *)&nNoTelephoneEvent);
+        STATUS_CHECK(pjmedia_endpt_set_flag, status);
+        return status;
 }
 
 static pj_status_t IceConfigIsValid(IN IceConfig *_pIceConfig)
@@ -553,9 +553,6 @@ static pj_status_t IceConfigIsValid(IN IceConfig *_pIceConfig)
 void InitIceConfig(IN OUT IceConfig *_pIceConfig)
 {
         pj_assert(_pIceConfig != NULL);
-
-        LIBRTP_REGISTER_THREAD();
-
         pj_bzero(_pIceConfig, sizeof(IceConfig));
         
         _pIceConfig->nComponents = 2;
@@ -580,8 +577,11 @@ int InitPeerConnectoin(OUT PeerConnection ** _pPeerConnection, IN IceConfig *_pI
         ASSERT_RETURN_CHECK(pPeerConnection, malloc);
         
         pj_bzero(pPeerConnection, sizeof(PeerConnection));
+        pj_caching_pool_init(&pPeerConnection->cachingPool, &pj_pool_factory_default_policy, 0);
         
         pPeerConnection->userIceConfig = *_pIceConfig;
+
+        pPeerConnection->pPoolFactory = &pPeerConnection->cachingPool.factory;
         
         peerConnectInitIceConfig(pPeerConnection);
         
@@ -589,9 +589,15 @@ int InitPeerConnectoin(OUT PeerConnection ** _pPeerConnection, IN IceConfig *_pI
                 pPeerConnection->nAvIndex[i] = -1;
         }
 
+        pj_pool_t *pPool = pj_pool_create(pPeerConnection->pPoolFactory, NULL, 128, 128, NULL);
+        ASSERT_RETURN_CHECK(pPool, pj_pool_create);
+        pPeerConnection->pMutexPool = pPool;
+        status = pj_mutex_create(pPool, NULL, PJ_MUTEX_DEFAULT, &pPeerConnection->pMutex);
+        STATUS_CHECK(pj_mutex_create, status);
+
         *_pPeerConnection = pPeerConnection;
         InitMediaStream(&pPeerConnection->mediaStream);
-
+        MY_PJ_LOG(5, "PeerConnection created:%p", pPeerConnection);
         return 0;
 }
 
@@ -602,12 +608,12 @@ int ReleasePeerConnectoin(IN OUT PeerConnection * _pPeerConnection)
                 return PJ_SUCCESS;
         }
         LIBRTP_REGISTER_THREAD();
+        MY_PJ_LOG(5, "PeerConnection releasing:%p", _pPeerConnection);
 
         _pPeerConnection->bQuit = 1;
-  
         for ( int i = 0; i < sizeof(_pPeerConnection->nAvIndex) / sizeof(int); i++) {
                 if (_pPeerConnection->nAvIndex[i] != -1) {
-                        transportIceDestroy(&_pPeerConnection->transportIce[i]);
+                        transportIceDestroy(&_pPeerConnection->transportIce[i], &_pPeerConnection->mediaStream.streamTracks[i]);
                 }
         }
         
@@ -620,10 +626,26 @@ int ReleasePeerConnectoin(IN OUT PeerConnection * _pPeerConnection)
                 pj_pool_release(_pPeerConnection->pSdpPool);
                 _pPeerConnection->pSdpPool = NULL;
         }
+
+        if (_pPeerConnection->pMutexPool) {
+                pj_pool_release(_pPeerConnection->pMutexPool);
+                _pPeerConnection->pMutexPool = NULL;
+        }
+
+        if (_pPeerConnection->pMutex) {
+                pj_mutex_destroy(_pPeerConnection->pMutex);
+                _pPeerConnection->pMutex = NULL;
+        }
         
         for ( int i = 0 ; i < _pPeerConnection->mediaStream.nCount; i++) {
-                DestroyMediaStream(&_pPeerConnection->mediaStream);
+                pj_pool_t *pTmp = _pPeerConnection->mediaStream.streamTracks[i].pPacketizerPool;
+                if (pTmp) {
+                        pj_pool_release(pTmp);
+                        _pPeerConnection->mediaStream.streamTracks[i].pPacketizerPool = NULL;
+                }
         }
+
+        pj_caching_pool_destroy (&_pPeerConnection->cachingPool);
 
         free(_pPeerConnection);
 
@@ -740,6 +762,7 @@ static int createSdpMline(IN OUT PeerConnection * _pPeerConnection, pj_pool_t *_
 static int createBaseSdp(IN OUT PeerConnection * _pPeerConnection, IN pj_pool_t * _pPool, OUT pjmedia_sdp_session **_pOffer)
 {
         pj_assert(_pPeerConnection && _pOffer);
+        pj_assert(manager.pMediaEndpt);
         
         pj_str_t originStrAddr = pj_str("127.0.0.1");
         pj_sockaddr originAddr;
@@ -761,7 +784,7 @@ static void createSdpPool(IN OUT PeerConnection * _pPeerConnection)
 {
         pj_pool_t *pPool = _pPeerConnection->pSdpPool;
         if(pPool == NULL) {
-                pPool = pj_pool_create(&manager.cachingPool.factory,
+                pPool = pj_pool_create(_pPeerConnection->pPoolFactory,
                                        NULL, 4096, 1024, NULL);
                 pj_assert(pPool != NULL);
                 _pPeerConnection->pSdpPool = pPool;
@@ -890,7 +913,7 @@ static void on_rx_rtp(void *pUserData, void *pPkt, pj_ssize_t size)
         JitterBufferPush(&pMediaTrack->jbuf, pPayload, nPayloadLen, pj_ntohs(pRtpHeader->seq),
                          nRtpTs, &nIsDiscard);
         if (nIsDiscard) {
-                MY_PJ_LOG(2, "rtp packet disacrded by jitter buffer: code:%d seq:%d", nIsDiscard, pj_ntohs(pRtpHeader->seq));
+                MY_PJ_LOG(2, "rtp packet disacrded by jitter buffer");
                 return;
         }
 
@@ -1004,7 +1027,7 @@ static int negotiationSettingAfterSuccess(IN PeerConnection * _pPeerConnection)
                                   //How do I set it if payload is video
                                   0);
                 
-                status = createJitterBuffer(pMediaTrack, &manager.cachingPool.factory);
+                status = createJitterBuffer(pMediaTrack, _pPeerConnection->pPoolFactory);
                 STATUS_CHECK(createJitterBuffer_pjmedia_jbuf_create, status);
         }
 
@@ -1025,7 +1048,7 @@ int StartNegotiation(IN PeerConnection * _pPeerConnection)
         for ( int i = 0; i < nMaxTracks; i++) {
                 if (_pPeerConnection->nAvIndex[i] != -1) {
                         TransportIce *pTransportIce = &_pPeerConnection->transportIce[i];
-                        pj_pool_t * pIceNegPool = pj_pool_create(&manager.cachingPool.factory, NULL, 512, 512, NULL);
+                        pj_pool_t * pIceNegPool = pj_pool_create(manager.pPoolFactory, NULL, 512, 512, NULL);
                         ASSERT_RETURN_CHECK(pIceNegPool, pj_pool_create);
                         pTransportIce->pNegotiationPool = pIceNegPool;
                         pj_status_t status = pjmedia_transport_media_start(pTransportIce->pTransport, pIceNegPool,
@@ -1042,7 +1065,7 @@ static int checkAndNeg(IN OUT PeerConnection * _pPeerConnection)
         pj_assert(_pPeerConnection->role != ICE_ROLE_NONE);
         
         if (_pPeerConnection->pNegPool == NULL) {
-                _pPeerConnection->pNegPool =  pj_pool_create(&manager.cachingPool.factory, NULL, 512, 512, NULL);
+                _pPeerConnection->pNegPool =  pj_pool_create(_pPeerConnection->pPoolFactory, NULL, 512, 512, NULL);
                 ASSERT_RETURN_CHECK(_pPeerConnection->pNegPool, pj_pool_create);
         }
         
@@ -1087,7 +1110,7 @@ static int checkAndNeg(IN OUT PeerConnection * _pPeerConnection)
                 int nIdx = pVideoTrack->mediaConfig.nUseIndex;
                 if (pVideoTrack->mediaConfig.configs[nIdx].codecType == MEDIA_FORMAT_H264){
 
-                        pVideoTrack->pPacketizerPool = pj_pool_create(&manager.cachingPool.factory, NULL, 200*1024, 200*1024, NULL);
+                        pVideoTrack->pPacketizerPool = pj_pool_create(_pPeerConnection->pPoolFactory, NULL, 200*1024, 200*1024, NULL);
                         status = CreatePacketizer("h264", 4, pVideoTrack->pPacketizerPool, &pVideoTrack->pMediaPacketier);
                         STATUS_CHECK(createPacketizer, status);
                 }
@@ -1099,7 +1122,7 @@ static int checkAndNeg(IN OUT PeerConnection * _pPeerConnection)
                 if (pAudioTrack->mediaConfig.configs[nIdx].codecType == MEDIA_FORMAT_PCMU ||
                     pAudioTrack->mediaConfig.configs[nIdx].codecType == MEDIA_FORMAT_PCMA){
 
-                        pAudioTrack->pPacketizerPool = pj_pool_create(&manager.cachingPool.factory, NULL, 512, 512, NULL);
+                        pAudioTrack->pPacketizerPool = pj_pool_create(_pPeerConnection->pPoolFactory, NULL, 512, 512, NULL);
                         status = CreatePacketizer("pcmu", 4, pAudioTrack->pPacketizerPool, &pAudioTrack->pMediaPacketier);
                         STATUS_CHECK(createPacketizer, status);
                 }
