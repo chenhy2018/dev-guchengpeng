@@ -7,16 +7,6 @@ typedef struct _JitterBufferFrame {
         void * pData;
 }JitterBufferFrame;
 
-void JitterBufferDestroy(OUT JitterBuffer *_pJbuf)
-{
-        if (_pJbuf->pJitterPool) {
-	        heap_destroy(&_pJbuf->heap);
-                pj_pool_release(_pJbuf->pJitterPool);
-                _pJbuf->pJitterPool = NULL;
-        }
-}
-
-
 pj_status_t JitterBufferInit(OUT JitterBuffer *_pJbuf, IN int _nMaxBufferCount, IN int _nInitCacheCount,
                       IN pj_pool_t *_pJitterPool, IN int _nMaxFrameSize)
 {
@@ -54,12 +44,13 @@ void JitterBufferPush(IN JitterBuffer *_pJbuf, IN const void *_pFrame, IN int _n
         *_pDiscarded = 0;
 
         //rtp sequence number restart
-        if (_nFrameSeq < 65536/2 && _pJbuf->nLastRecvRtpSeq > 65536/2) {
+        if (_nFrameSeq < _pJbuf->nMaxBufferCount+1 && _pJbuf->nLastRecvRtpSeq > 65000) {
                 _nFrameSeq += 65536;
         }
 
         //drop frame that is arrive too late
-        if (_nFrameSeq < _pJbuf->nLastRecvRtpSeq) {
+        if (_nFrameSeq < _pJbuf->nLastRecvRtpSeq || (_pJbuf->nLastRecvRtpSeq > _nFrameSeq &&
+                                                     (_pJbuf->nLastRecvRtpSeq - _nFrameSeq) > 10000 )) {
                 *_pDiscarded = 1;
                 return;
         }
@@ -72,7 +63,7 @@ void JitterBufferPush(IN JitterBuffer *_pJbuf, IN const void *_pFrame, IN int _n
                 
                 pFrame = (JitterBufferFrame*)(pEntry->immutable);
                 if (_nFrameSeq < pFrame->nSeq) {
-                        *_pDiscarded = 2;
+                        *_pDiscarded = 1;
                         return;
                 }
                 // drop oldest frame
@@ -155,6 +146,7 @@ void JitterBufferPop(IN JitterBuffer *_pJbuf, OUT void *_pFrame, IN OUT int *_pF
                 }
                 if (*_pFrameSeq < _pJbuf->nLastRecvRtpSeq || *_pFrameSeq == 0) {
                         _pJbuf->nLastRecvRtpSeq = *_pFrameSeq;
+                        //TOTO rebuild heap
                         heap_rebuild(&_pJbuf->heap);
                 }
 

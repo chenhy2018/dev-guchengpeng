@@ -910,9 +910,6 @@ int main(int argc, char **argv)
                 //end test recive h264
         }
         
-        status = InitialiseRtp();
-        pj_assert(status == 0);
-
         InitIceConfig(&app.userConfig);
         //app.userConfig.nForceStun = 1;
         strcpy(app.userConfig.turnHost, "123.59.204.198");
@@ -1041,6 +1038,5 @@ int main(int argc, char **argv)
 #endif
         }
         ReleasePeerConnectoin(app.pPeerConnection);
-        UninitialiseRtp();
         return 0;
 }

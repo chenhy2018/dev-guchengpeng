@@ -93,5 +93,4 @@ pj_status_t MediaUnPacketize(IN OUT MediaPacketier *pKtz, IN const pj_uint8_t *p
                            OUT pj_uint8_t **pBitstream, OUT unsigned *pBitstreamPos, IN int nRtpMarker, IN pj_bool_t *pTryAgain);
 pj_status_t createJitterBuffer(IN MediaStreamTrack *pMediaStreamTrack, IN pj_pool_factory *pPoolFactory);
 pj_status_t MediaConfigSetIsValid(MediaConfigSet *pConfig);
-void DestroyMediaStream(IN MediaStream *pMediaStraem);
 #endif
