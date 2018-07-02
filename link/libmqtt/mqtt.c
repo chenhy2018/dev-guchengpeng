@@ -111,8 +111,11 @@ static void ClearNode(Node* PHead)
 void OnEventCallback(struct MqttInstance* _pInstance, int rc, const char* _pStr)
 {
         if (_pInstance->options.callbacks.OnEvent != NULL) {
-                _pInstance->options.callbacks.OnEvent(_pInstance, _pInstance->options.nAccountId, rc, _pStr);
+                if (_pInstance->lastStatus < MQTT_ERR_NOMEM || rc < MQTT_ERR_NOMEM) { 
+                        _pInstance->options.callbacks.OnEvent(_pInstance, _pInstance->options.nAccountId, rc, _pStr);
+                }
         }
+        _pInstance->lastStatus = rc;
 }
 
 void OnLogCallback(struct mosquitto* _pMosq, void* _pObj, int level, const char* _pStr)
@@ -131,14 +134,11 @@ void OnMessageCallback(struct mosquitto* _pMosq, void* _pObj, const struct mosqu
 
 void OnConnectCallback(struct mosquitto* _pMosq, void* _pObj, int result)
 {
-        fprintf(stderr, "OnConnectCallback %d\n", result);
         int rc = MOSQ_ERR_SUCCESS;
         struct MqttInstance* pInstance = (struct MqttInstance*)(_pObj);
-        if (pInstance->status != STATUS_CONNECT_ERROR || result == 0) {
-                OnEventCallback(pInstance,
+        OnEventCallback(pInstance,
                         (result == 0) ? MQTT_CONNECT_SUCCESS : MqttErrorStatusChange(result),
                         (result == 0) ? "on connect success" : mosquitto_connack_string(result));
-        }
         if (result) {
                 pInstance->connected = false;
                 pInstance->status = STATUS_CONNECT_ERROR;
@@ -160,11 +160,9 @@ void OnConnectCallback(struct mosquitto* _pMosq, void* _pObj, int result)
 void OnDisconnectCallback(struct mosquitto* _pMosq, void* _pObj, int rc)
 {
         struct MqttInstance* pInstance = (struct MqttInstance*)(_pObj);
-        if (pInstance->status != STATUS_CONNECT_ERROR || rc == 0) {
-               OnEventCallback(pInstance,
-                       (rc == 0) ? MQTT_DISCONNECT_SUCCESS : MqttErrorStatusChange(rc),
-                       (rc == 0) ? "on disconnect success" : mosquitto_connack_string(rc));
-        }
+        OnEventCallback(pInstance,
+               (rc == 0) ? MQTT_DISCONNECT_SUCCESS : MqttErrorStatusChange(rc),
+               (rc == 0) ? "on disconnect success" : mosquitto_connack_string(rc));
         pInstance->connected = false;
         if (!rc) {
                 pInstance->status = STATUS_IDLE;
@@ -265,12 +263,15 @@ void * Mqttthread(void* _pData)
         mosquitto_message_callback_set(pInstance->mosq, OnMessageCallback);
         mosquitto_subscribe_callback_set(pInstance->mosq, OnSubscribeCallback);
         mosquitto_unsubscribe_callback_set(pInstance->mosq, OnUnsubscribeCallback);
-        
         do {
-                 if (!pInstance->connected) {
+                 if (!pInstance->connected && pInstance->status != STATUS_CONNECTING) {
+                         pInstance->status = STATUS_CONNECTING;
                          rc = ClientOptSet(pInstance, pInstance->mosq, pInstance->options.primaryUserInfo);
                          if (rc == 0) {
                                  rc = mosquitto_connect(pInstance->mosq, pInstance->options.primaryUserInfo.pHostname, pInstance->options.primaryUserInfo.nPort, pInstance->options.nKeepalive);
+                         }
+                         if (rc) {
+                                 OnEventCallback(pInstance, rc, mosquitto_strerror(rc));
                          }
 #if 0
                          if (rc) {
@@ -288,7 +289,11 @@ void * Mqttthread(void* _pData)
                                          pInstance->status = STATUS_CONNECTING;
                                  }
                          }
-#endif
+#endif                   
+                         rc = mosquitto_loop(pInstance->mosq, -1, 1);
+                         sleep(1);
+                 }
+                 else if (pInstance->status == STATUS_CONNECTING) {
                          sleep(1);
                  }
                  rc = mosquitto_loop(pInstance->mosq, -1, 1);

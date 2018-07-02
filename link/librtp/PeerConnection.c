@@ -673,6 +673,9 @@ int InitPeerConnectoin(OUT PeerConnection ** _pPeerConnection, IN IceConfig *_pI
         for ( int i = 0; i < sizeof(pPeerConnection->nAvIndex) / sizeof(int); i++) {
                 pPeerConnection->nAvIndex[i] = -1;
         }
+        pPeerConnection->nLastSeq = 0;
+        pPeerConnection->nGetFrame = 0;
+        pPeerConnection->nReportFrame = 0;
         *_pPeerConnection = pPeerConnection;
         InitMediaStream(&pPeerConnection->mediaStream);
         return 0;
@@ -684,6 +687,8 @@ int ReleasePeerConnectoin(IN OUT PeerConnection * _pPeerConnection)
         {
                 return PJ_SUCCESS;
         }
+        MY_PJ_LOG(1, "ReleasePeerConnectoin : get frame %d, report frame %d", _pPeerConnection->nGetFrame, _pPeerConnection->nReportFrame);
+
         LIBRTP_REGISTER_THREAD();
 
         _pPeerConnection->bQuit = 1;
@@ -987,6 +992,7 @@ static void on_rx_rtp(void *pUserData, void *pPkt, pj_ssize_t size)
         unsigned nPayloadLen;
 
         MediaStreamTrack *pMediaTrack = (MediaStreamTrack *)pUserData;
+        PeerConnection * pPeerConnection = (PeerConnection *)pMediaTrack->pPeerConnection;
 
         /* Check for errors */
         if (size < 0) {
@@ -1005,7 +1011,7 @@ static void on_rx_rtp(void *pUserData, void *pPkt, pj_ssize_t size)
         
         uint32_t nRtpTs = pj_ntohl(pRtpHeader->ts);
         MY_PJ_LOG(5, "-->receiveSize:%d  rtp seq:%d ts=%d", size, pj_ntohs(pRtpHeader->seq), nRtpTs);
-
+        ++pPeerConnection->nGetFrame;
         //MY_PJ_LOG(4, "Rx seq=%d", pj_ntohs(hdr->seq));
         /* Update the RTCP session. */
         pjmedia_rtcp_rx_rtp(&pMediaTrack->rtcpSession, pj_ntohs(pRtpHeader->seq),
@@ -1060,7 +1066,9 @@ static void on_rx_rtp(void *pUserData, void *pPkt, pj_ssize_t size)
                 }
 
                 MY_PJ_LOG(4, "%d-->get_frame:%d  rtp seq:%d, ts=%d", ++nTestCnt, nPayloadLen, nSeq, nTs);
-
+                PeerConnection * pPeerConnection = (PeerConnection *)pMediaTrack->pPeerConnection;
+                ++pPeerConnection->nReportFrame;
+                pPeerConnection->nLastSeq = nSeq;
                 //deal with payload
                 pj_bool_t bTryAgain = PJ_FALSE;
                 do{
@@ -1085,7 +1093,6 @@ static void on_rx_rtp(void *pUserData, void *pPkt, pj_ssize_t size)
                         rtpPacket.nTimestamp = nTs64 * 1000 / pAvParam->nSampleOrClockRate;
 
                         //MY_PJ_LOG(5, "rtp data receive:%ld, payLen:%d", size, nPayloadLen);
-                        PeerConnection * pPeerConnection = (PeerConnection *)pMediaTrack->pPeerConnection;
                         pPeerConnection->userIceConfig.userCallback(pPeerConnection->userIceConfig.pCbUserData,
                                                                     CALLBACK_RTP,
                                                                     &rtpPacket);

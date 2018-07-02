@@ -53,6 +53,9 @@ typedef struct _PeerConnection
         int nNegSuccess;
         int nGatherCandidateSuccessCount;
         int nIsFailCallbackDone;
+        int nLastSeq;
+        int nGetFrame;
+        int nReportFrame;
         pj_mutex_t *pMutex;
         pj_pool_t *pMutexPool;
         int bQuit;

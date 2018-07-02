@@ -47,12 +47,12 @@ typedef struct {
     RegisterData data;
 } RegisterTestCase;
 #define MAX_COUNT 1
-#define HOST "123.59.204.198"
+#define HOST "39.107.247.14"
 RegisterTestCase gRegisterTestCases[] =
 {
     {
         { "normal", 0 },
-        { "2910", "2910", HOST, HOST, HOST, 100, 1 }
+        { "2030", "KR0BGS8L", HOST, HOST, HOST, 100, 1 }
     },
     {
         { "invalid_account", 0 },
@@ -112,23 +112,23 @@ void Mthread1(void* data)
     EventType type;
     sleep(10);
     for (int n = 0; n < MAX_COUNT; n++) {
-            MakeCall(pData->accountid, "2911", "123.59.204.198", &pData->callid);
-#if 0
-            MakeCall(pData->accountid, "2912", "123.59.204.198", &pData->callid);
-            MakeCall(pData->accountid, "2913", "123.59.204.198", &pData->callid);
-            MakeCall(pData->accountid, "2914", "123.59.204.198", &pData->callid);
-            MakeCall(pData->accountid, "2915", "123.59.204.198", &pData->callid);
-            MakeCall(pData->accountid, "2916", "123.59.204.198", &pData->callid);
-            MakeCall(pData->accountid, "2917", "123.59.204.198", &pData->callid);
-            MakeCall(pData->accountid, "2918", "123.59.204.198", &pData->callid);
-            MakeCall(pData->accountid, "2919", "123.59.204.198", &pData->callid);
-            MakeCall(pData->accountid, "2920", "123.59.204.198", &pData->callid);
-            MakeCall(pData->accountid, "2921", "123.59.204.198", &pData->callid);
-            MakeCall(pData->accountid, "2922", "123.59.204.198", &pData->callid);
-            MakeCall(pData->accountid, "2923", "123.59.204.198", &pData->callid);
-            MakeCall(pData->accountid, "2924", "123.59.204.198", &pData->callid);
-            MakeCall(pData->accountid, "2925", "123.59.204.198", &pData->callid);
-            MakeCall(pData->accountid, "2926", "123.59.204.198", &pData->callid);
+            MakeCall(pData->accountid, "2031", HOST, &pData->callid);
+#if 1
+            MakeCall(pData->accountid, "2032", HOST, &pData->callid);
+            MakeCall(pData->accountid, "2033", HOST, &pData->callid);
+            MakeCall(pData->accountid, "2034", HOST, &pData->callid);
+            MakeCall(pData->accountid, "2035", HOST, &pData->callid);
+            MakeCall(pData->accountid, "2036", HOST, &pData->callid);
+            MakeCall(pData->accountid, "2037", HOST, &pData->callid);
+            MakeCall(pData->accountid, "2038", HOST, &pData->callid);
+            MakeCall(pData->accountid, "2039", HOST, &pData->callid);
+            MakeCall(pData->accountid, "2040", HOST, &pData->callid);
+            MakeCall(pData->accountid, "2041", HOST, &pData->callid);
+            MakeCall(pData->accountid, "2042", HOST, &pData->callid);
+            MakeCall(pData->accountid, "2043", HOST, &pData->callid);
+            MakeCall(pData->accountid, "2044", HOST, &pData->callid);
+            MakeCall(pData->accountid, "2045", HOST, &pData->callid);
+            MakeCall(pData->accountid, "2046", HOST, &pData->callid);
 #endif
     }
     while (1) {
@@ -149,14 +149,11 @@ void Mthread1(void* data)
                                       else {
                                               AnswerCall(pData->accountid, pCallEvent->callID);
                                       }
-                                      if (pCallEvent->status == CALL_STATUS_ERROR || pCallEvent->status == CALL_STATUS_HANGUP) {
-                                              DBG_LOG("makecall *****************  ERROR ****************************8*\n");
-                                              //do {
-                                              //     id = MakeCall(pData->accountid, "1010", "123.59.204.198", &pData->callid);
-                                              //} while (id != RET_OK);
-                                      }
 
                                   }
+                                      if (pCallEvent->status == CALL_STATUS_ERROR || pCallEvent->status == CALL_STATUS_HANGUP) {
+                                              DBG_LOG("makecall *****************  ERROR ****************************8*\n");
+                                      }
                                   break;
                             }
                             case EVENT_DATA:
@@ -226,7 +223,7 @@ int RegisterTestSuitCallback( TestSuit *this )
             return TEST_FAIL;
         }
     }
- //   setPjLogLevel(5);
+    setPjLogLevel(2);
         pthread_t t_1;
         pthread_attr_t attr_1;
         pthread_attr_init(&attr_1);

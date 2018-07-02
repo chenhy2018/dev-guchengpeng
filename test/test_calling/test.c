@@ -17,7 +17,7 @@
 #include "dbg.h"
 
 #define ARRSZ(arr) (sizeof(arr)/sizeof(arr[0]))
-#define HOST "123.59.204.198"
+#define HOST "39.107.247.14"
 #define INVALID_SERVER "192,.168.1.239"
 
 #define MAX_COUNT 16
@@ -54,71 +54,71 @@ RegisterTestCase gRegisterTestCases[] =
 {
     {
         { "valid_account1", CALL_STATUS_REGISTERED, UA1_EventLoopThread },
-        { "2911", "2911", HOST, HOST, HOST, 10, 1 }
+        { "2031", "xILswFie", HOST, HOST, HOST, 10, 1 }
     },
     {
         { "valid_account2", CALL_STATUS_REGISTERED, UA2_EventLoopThread },
-        { "2912", "2912", HOST, HOST, HOST, 10, 0 }
+        { "2032", "Dkx59bGx", HOST, HOST, HOST, 10, 0 }
     },
     {
         { "invalid_account1", CALL_STATUS_REGISTER_FAIL, UA3_EventLoopThread },
-        { "2913", "2913", HOST, HOST, HOST, 10, 0 }
+        { "2033", "fMDXAsmr", HOST, HOST, HOST, 10, 0 }
     },
     {
         { "invalid_account2", CALL_STATUS_REGISTER_FAIL, UA4_EventLoopThread },
-        { "2914", "2914", HOST, HOST, HOST, 10, 0 }
+        { "2034", "o8nd63qd", HOST, HOST, HOST, 10, 0 }
     },
     {
         { "invalid_sip_register_server", CALL_STATUS_REGISTER_FAIL, UA5_EventLoopThread },
-        { "2915", "2915", HOST, HOST, HOST, 10, 0 }
+        { "2035", "vtWfEJLg", HOST, HOST, HOST, 10, 0 }
     },
     {
         { "invalid_account", 0 },
-        { "2916", "2916", HOST, HOST, HOST, 100, 0 }
+        { "2036", "OQwmWUiv", HOST, HOST, HOST, 100, 0 }
     },
     {
         { "normal", 0 },
-        { "2917", "2917", HOST, HOST, HOST, 100, 1 }
+        { "2037", "uJ8wikjq", HOST, HOST, HOST, 100, 1 }
     },
     {
         { "invalid_account", 0 },
-        { "2918", "2918", HOST, HOST, HOST, 100, 0 }
+        { "2038", "IDNidzRh", HOST, HOST, HOST, 100, 0 }
     },
     {
         { "normal", 0 },
-        { "2919", "2919", HOST, HOST, HOST, 100, 1 }
+        { "2039", "ZjTW0n8n", HOST, HOST, HOST, 100, 1 }
     },
     {
         { "normal", 0 },
-        { "2920", "2920", HOST, HOST, HOST, 100, 1 }
+        { "2040", "vGrMmyIs", HOST, HOST, HOST, 100, 1 }
     },
     {
         { "normal", 0 },
-        { "2921", "2921", HOST, HOST, HOST, 100, 1 }
+        { "2041", "LDb1wHu9", HOST, HOST, HOST, 100, 1 }
     },
     {
         { "normal", 0 },
-        { "2922", "2922", HOST, HOST, HOST, 100, 1 }
+        { "2042", "qIwCXfUp", HOST, HOST, HOST, 100, 1 }
     },
     {
         { "normal", 0 },
-        { "2923", "2923", HOST, HOST, HOST, 100, 1 }
+        { "2043", "IZYkxp5O", HOST, HOST, HOST, 100, 1 }
     },
     {
         { "normal", 0 },
-        { "2924", "2924", HOST, HOST, HOST, 100, 1 }
+        { "2044", "WZx6T3Er", HOST, HOST, HOST, 100, 1 }
     },
     {
         { "normal", 0 },
-        { "2925", "2925", HOST, HOST, HOST, 100, 1 }
+        { "2045", "vdK3TsK0", HOST, HOST, HOST, 100, 1 }
     },
     {
         { "normal", 0 },
-        { "2926", "2926", HOST, HOST, HOST, 100, 1 }
+        { "2046", "I1gj5Wef", HOST, HOST, HOST, 100, 1 }
     },
     {
         { "normal", 0 },
-        { "2927", "2927", HOST, HOST, HOST, 100, 1 }
+        { "2047", "rx7HOnDT", HOST, HOST, HOST, 100, 1 }
     },
 };
 
@@ -208,9 +208,30 @@ void Mthread1(void* data)
                                     timecount = 0;
                                     continue;
                             }
-                            id = SendPacket(pData->accountid, pData->callid, STREAM_AUDIO, data1, 100, timecount);
-                            if (id > 0) DBG_LOG("send pack *****%d\n", id);
-                            timecount += 1;
+#if 1
+                            if (pData->callid >= 15) {
+                                    DBG_LOG("hangcall ******!!!!!!!!************\n");
+                                    HangupCall(pData->accountid, pData->callid);
+                                    id = MakeCall(pData->accountid, "2030", HOST, &pData->callid);
+                                    sendflag = 0;
+                                    timecount = 0;
+                                    continue;
+                            }
+                            if (timecount % 3000 == 0) {
+                                 for (int i = 0 ; i < 200; ++i) {
+                                         id = SendPacket(pData->accountid, pData->callid, STREAM_AUDIO, data1, 100, timecount);
+                                         if (id > 0) DBG_LOG("send pack *****%d\n", id);
+                                         timecount ++;
+                                 }
+                            }
+                            else {
+#endif
+                                  id = SendPacket(pData->accountid, pData->callid, STREAM_AUDIO, data1, 100, timecount);
+                                  if (id > 0) DBG_LOG("send pack *****%d\n", id);
+                                  timecount += 1; 
+#if 1
+                            }
+#endif
                             usleep(10000);
                             continue;
                     }
@@ -231,7 +252,7 @@ void Mthread1(void* data)
                                   if (pCallEvent->status == CALL_STATUS_ERROR || pCallEvent->status == CALL_STATUS_HANGUP) {
                                         DBG_LOG("makecall *****************  ERROR ****************************8*\n");
                                         do {
-                                                //id = MakeCall(pData->accountid, "1010", "123.59.204.198", &pData->callid);
+                                               id = MakeCall(pData->accountid, "2030", HOST, &pData->callid);
                                         } while (id != RET_OK);
                                   }
 
@@ -300,7 +321,7 @@ int RegisterTestSuitCallback( TestSuit *this )
             return TEST_FAIL;
         }
     }
-
+    setPjLogLevel(2);
     UT_STR( pData->id );
     for (int count = 0; count < MAX_COUNT; ++ count) {
             pData = &pTestCases[count].data;
@@ -311,7 +332,7 @@ int RegisterTestSuitCallback( TestSuit *this )
             UT_LOG("Register out %x %x\n", pData->accountid, pTestCases->father.expact);
             int nCallId1 = -1;
     }
-    sleep(10);
+    sleep(2);
 
         pthread_t t_1;
         pthread_attr_t attr_1;
