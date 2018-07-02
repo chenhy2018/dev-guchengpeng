@@ -46,13 +46,13 @@ typedef struct {
     TestCase father;
     RegisterData data;
 } RegisterTestCase;
-#define MAX_COUNT 5
-#define HOST "123.59.204.198"
+#define MAX_COUNT 1
+#define HOST "39.107.247.14"
 RegisterTestCase gRegisterTestCases[] =
 {
     {
         { "normal", 0 },
-        { "1010", "1010", HOST, HOST, HOST, 100, 1 }
+        { "2030", "KR0BGS8L", HOST, HOST, HOST, 100, 1 }
     },
     {
         { "invalid_account", 0 },
@@ -110,6 +110,27 @@ void Mthread1(void* data)
     Event * event= (Event*) malloc(sizeof(Event));
     ErrorID id;
     EventType type;
+    sleep(10);
+    for (int n = 0; n < MAX_COUNT; n++) {
+            MakeCall(pData->accountid, "2031", HOST, &pData->callid);
+#if 1
+            MakeCall(pData->accountid, "2032", HOST, &pData->callid);
+            MakeCall(pData->accountid, "2033", HOST, &pData->callid);
+            MakeCall(pData->accountid, "2034", HOST, &pData->callid);
+            MakeCall(pData->accountid, "2035", HOST, &pData->callid);
+            MakeCall(pData->accountid, "2036", HOST, &pData->callid);
+            MakeCall(pData->accountid, "2037", HOST, &pData->callid);
+            MakeCall(pData->accountid, "2038", HOST, &pData->callid);
+            MakeCall(pData->accountid, "2039", HOST, &pData->callid);
+            MakeCall(pData->accountid, "2040", HOST, &pData->callid);
+            MakeCall(pData->accountid, "2041", HOST, &pData->callid);
+            MakeCall(pData->accountid, "2042", HOST, &pData->callid);
+            MakeCall(pData->accountid, "2043", HOST, &pData->callid);
+            MakeCall(pData->accountid, "2044", HOST, &pData->callid);
+            MakeCall(pData->accountid, "2045", HOST, &pData->callid);
+            MakeCall(pData->accountid, "2046", HOST, &pData->callid);
+#endif
+    }
     while (1) {
                     id = PollEvent(pData->accountid, &type, &event, 0);
                     if (id != RET_OK) {
@@ -128,8 +149,11 @@ void Mthread1(void* data)
                                       else {
                                               AnswerCall(pData->accountid, pCallEvent->callID);
                                       }
-                                      DBG_LOG("AnswerCall end *****************\n");
+
                                   }
+                                      if (pCallEvent->status == CALL_STATUS_ERROR || pCallEvent->status == CALL_STATUS_HANGUP) {
+                                              DBG_LOG("makecall *****************  ERROR ****************************8*\n");
+                                      }
                                   break;
                             }
                             case EVENT_DATA:
@@ -142,7 +166,7 @@ void Mthread1(void* data)
                                   }
                                   else {
 
-                                         if (allcount %10 == 0) {
+                                         if (allcount %100 == 0) {
                                          //        pData->misscount += pDataEvent->pts - pData->timecount;
                                                  DBG_ERROR("***miss %d*****size %d****error timestamp %ld last timestamp %ld callid %d count %d \n",
                                                 pData->misscount, pDataEvent->size, pDataEvent->pts, pData->timecount, pDataEvent->callID, allcount);
@@ -199,6 +223,7 @@ int RegisterTestSuitCallback( TestSuit *this )
             return TEST_FAIL;
         }
     }
+    setPjLogLevel(2);
         pthread_t t_1;
         pthread_attr_t attr_1;
         pthread_attr_init(&attr_1);
@@ -221,63 +246,11 @@ int RegisterTestSuitCallback( TestSuit *this )
     ErrorID id;
     EventType type;
 
-    //sleep(10);
+    sleep(10);
+
+
     int count = 0;
     while (1) { sleep(100); }
-    Event* event= (Event*) malloc(sizeof(Event));
-    while (1) {
-            for (int count = 0; count < MAX_COUNT; ++count) {
-                    pData = &pTestCases[count].data;
-                    id = PollEvent(pData->accountid, &type, &event, 1);
-                    if (id != RET_OK) {
-                           continue;
-                    }
-                    switch (type) {
-                            case EVENT_CALL:
-                            {
-                                  CallEvent *pCallEvent = &(event->body.callEvent);
-                                  DBG_LOG("Call status %d call id %d call account id %d\n", pCallEvent->status, pCallEvent->callID, pData->accountid);
-                                  if (pCallEvent->status == CALL_STATUS_INCOMING) {
-                                      DBG_LOG("AnswerCall ******************\n");
-                                      AnswerCall(pData->accountid, pCallEvent->callID);
-                                      DBG_LOG("AnswerCall end *****************\n");
-                                  }
-                                  break;
-                            }
-                            case EVENT_DATA:
-                            {
-                                  DataEvent *pDataEvent = &(event->body.dataEvent);
-                                  allcount += 1;
-                                  //DBG_LOG("Data size %d call id %d call account id %d timestamp %lld \n", pDataEvent->size, pDataEvent->callID, pData->accountid, pDataEvent->pts);
-                                  if (pData->timecount == 0) {
-                                         pData->timecount = pDataEvent->pts;
-                                  }
-                                  else {
-
-                                         if (allcount %10 == 0) {
-                                         //        pData->misscount += pDataEvent->pts - pData->timecount;
-                                                 DBG_ERROR("***miss %d*****size %d****error timestamp %ld last timestamp %ld callid %d count %d \n",
-                                                pData->misscount, pDataEvent->size, pDataEvent->pts, pData->timecount, pDataEvent->callID, allcount);
-                                         }
-                                         pData->timecount = pDataEvent->pts;
-                                  }
-                                  break;
-                            } 
-                            case EVENT_MESSAGE:
-                            {
-                                  MessageEvent *pMessage = &(event->body.messageEvent);
-                                  DBG_LOG("Message %s status id %d account id %d\n", pMessage->message, pMessage->status, pData->accountid);
-                                  break;
-                            }
-                            case EVENT_MEDIA:
-                            {
-                                 MediaEvent *pMedia = &(event->body.mediaEvent);
-                                 DBG_LOG("Callid %d ncount %d type 1 %d type 2 %d\n", pMedia->callID, pMedia->nCount, pMedia->media[0].codecType, pMedia->media[1].codecType);
-                                 break;
-                            }
-                    }
-           }
-    }
 }
 
 int InitAllTestSuit()

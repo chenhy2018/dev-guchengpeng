@@ -20,3 +20,6 @@ cmake .
 make
 
 ./merge-lib.sh $1
+
+cd test/
+./test.sh $1

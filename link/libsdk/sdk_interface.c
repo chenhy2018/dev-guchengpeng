@@ -347,7 +347,7 @@ ErrorID InitSDK( Media* _pMediaConfigs, int _nSize)
         config.Cb.OnIncomingCall  = &cbOnIncomingCall;
         config.Cb.OnCallStateChange = &cbOnCallStateChange;
         config.Cb.OnRegStatusChange = &cbOnRegStatusChange;
-        config.nMaxCall = 16;
+        config.nMaxCall = 40;
         config.nMaxAccount = 40;
         pUAManager->config.callback.OnRxRtp = &OnRxRtp;
         // debug code.
