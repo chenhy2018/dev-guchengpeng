@@ -1,7 +1,9 @@
 ARCH:=x86
 HOST:=
+LIBPREFIX=arm-unknown-linux-gnueabihf
 ifeq ($(ARCH), x86)
 	CC=gcc
+	LIBPREFIX=x86_64-unknown-linux-gnu
 else ifeq ($(ARCH), mstar)
 	CC=arm-linux-gnueabihf-gcc
 	HOST=arm-linux-gnueabihf
@@ -16,12 +18,23 @@ CURRENT_DIR:=$(shell pwd)
 PROJECT_PATH=../../third_party
 PJSIP_PATH=$(PROJECT_PATH)/pjproject-2.7.2
 LDFLAGS=
-CFLAGS  = -g
+CFLAGS  = -g -std=gnu99
 
 INSTALL_DIR=$(CURRENT_DIR)/output/pjsip
 PJ_CONFIG=--disable-sdl --disable-ffmpeg --disable-v4l2 \
 		  --disable-openh264 --disable-libwebrtc --disable-sound \
-		  --disable-libyuv CFLAGS='-g' \
+		  --disable-oss \
+		  --disable-video \
+		  --disable-speex-aec \
+		  --disable-g711-code \
+		  --disable-l16-codec \
+		  --disable-gsm-codec \
+		  --disable-g722-codec \
+		  --disable-g7221-codec \
+		  --disable-speex-codec \
+		  --disable-ilbc-codec \
+		  --disable-bcg729 \
+		  --disable-libyuv \
 		  --prefix=$(INSTALL_DIR)
 INCLUDE_PATH=-I$(PJSIP_PATH)/pjlib/include \
 			 -I$(PJSIP_PATH)/pjlib-util/include \
@@ -31,7 +44,7 @@ INCLUDE_PATH=-I$(PJSIP_PATH)/pjlib/include \
 			 -I../libsip \
 			 -I ../libmqtt \
 			 -I ../librtp \
-			 -I $(PROJECT_PATH)/mosquitto-1.5/lib/ 
+			 -I $(PROJECT_PATH)/mosquitto-1.5/output/$(ARCH)/include 
 
 SIP_PATH=../libsip
 RTP_PATH=../librtp
@@ -46,12 +59,16 @@ LIBSDK=queue.o sdk_interface.o \
 LIBSIP=sip.o sip_internal.o
 LIBRTP=JitterBuffer.o MediaStream.o PeerConnection.o heap.o
 TARGET_LIBRARY=$(OUTPUT)/lib/$(ARCH)/libua.a
-LIBPJ=$(OUTPUT)/ori/$(ARCH)
+LIBPJ=$(OUTPUT)/pjsip/lib/libpjsip-$(LIBPREFIX).a
 LIBMQTT=$(MQTT_OUT_PATH)/mqtt.o
 LIBSIP_OBJS_PATH=$(OUTPUT)/libsip
 LIBRTP_OBJS_PATH=$(OUTPUT)/librtp
 LIBSIP_SOURCE_PATH=../libsip
 LIBRTP_SOURCE_PATH=../librtp
+MOSQUITTO_PATH=$(PROJECT_PATH)/mosquitto-1.5
+OPENSSL_PATH=$(PROJECT_PATH)/openssl-1.1.0h
+LIBMOSQUITTO=$(MOSQUITTO_PATH)/output/$(ARCH)/lib/libmosquitto.so
+LIBOPENSSL=$(OPENSSL_PATH)/output/$(ARCH)/lib/libcrypto.so
 
 all : $(TARGET_LIBRARY)
 
@@ -60,7 +77,6 @@ depclean:
 	find . -name "*.depend" -print -delete  
 
 pjclean :
-	rm -rvf $(OUTPUT)/pjsip
 	rm -rvf $(LIBPJ)
 
 pjsip $(LIBPJ) : #pjclean depclean
@@ -79,8 +95,29 @@ pjsip $(LIBPJ) : #pjclean depclean
 	&& make dep \
 	&& make clean \
 	&& make \
+	&& make install 
+
+mosquitto $(LIBMOSQUITTO):
+	cd $(MOSQUITTO_PATH); \
+	make clean; \
+	make ARCH=$(ARCH); \
+	make install
+
+openssl $(LIBOPENSSL):
+	cd $(OPENSSL_PATH); \
+	if [ "$(ARCH)" = "mstar" ];then \
+		export CROSS_COMPILE=arm-linux-gnueabihf-; \
+		./Configure --prefix=$(CURRENT_DIR)/../../third_party/openssl-1.1.0h/output/$(ARCH) my-gcc; \
+	else \
+		./Configure --prefix=$(CURRENT_DIR)/../../third_party/openssl-1.1.0h/output/$(ARCH) linux-x86_64; \
+	fi \
+	&& make clean \
+	&& make \
 	&& make install
 
+mosclean:
+	rm -rvf $(MOSQUITTO_PATH)/output/$(ARCH)
+	make -C $(MOSQUITTO_PATH) clean
 
 vpath %.o $(OUTPUT)
 vpath %.c $(LIBSIP_SOURCE_PATH)
@@ -100,12 +137,14 @@ $(LIBMQTT):$(MQTT_PATH)/mqtt.c
 
 # set .o file search path
 #vpath %.o $(SDK_OBJS_PATH)
-sdk $(TARGET_LIBRARY) : $(LIBPJ) $(LIBSIP) $(LIBSDK) $(LIBMQTT) $(LIBRTP)
+sdk $(TARGET_LIBRARY) : $(LIBPJ) $(LIBMOSQUITTO) $(LIBOPENSSL) $(LIBSIP) $(LIBSDK) $(LIBMQTT) $(LIBRTP) 
 	./merge-lib.sh $(ARCH)
 	make -C test clean
 	make -C test ARCH=$(ARCH)
-	make -C test/callee clean
-	make -C test/callee ARCH=$(ARCH)
+	make -C sdk_demo ARCH=$(ARCH) clean
+	make -C sdk_demo ARCH=$(ARCH)
+#	make -C test/callee clean
+#	make -C test/callee ARCH=$(ARCH)
 
 $(LIBSDK) : %.o : %.c
 	mkdir -p $(SDK_OBJS_PATH) 
@@ -118,5 +157,10 @@ clean:
 	rm -rvf output/libsdk
 	rm -rvf output/libsip
 	rm -rvf output/librtp
+	rm -rvf output/tmp
+	rm -rvf output/objs
+	rm -rvf output/lib/$(ARCH)/libua.a
+	rm -rvf output/ori
+	rm -rvf output/lib
 
 
