@@ -472,7 +472,7 @@ static pj_status_t createH264Packetizer(IN pj_pool_t *_pPktzPool, OUT MediaPacke
         
         pj_status_t status;
         status = pjmedia_h264_packetizer_create(_pPktzPool,
-                                                NULL, &pPktz->pH264Packetizer);
+                                                &cfg, &pPktz->pH264Packetizer);
         STATUS_CHECK(pjmedia_h264_packetizer_create, status);
         
         *_pPktz = (MediaPacketier *)pPktz;
