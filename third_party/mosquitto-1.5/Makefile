@@ -6,6 +6,9 @@ DISTDIRS=man
 
 .PHONY : all mosquitto api docs binary clean reallyclean test install uninstall dist sign copy
 
+CURRENT_DIR=$(shell pwd)
+
+
 all : $(MAKE_ALL)
 
 api :
@@ -23,7 +26,7 @@ ifeq ($(UNAME),Darwin)
 	$(error Please compile using CMake on Mac OS X)
 endif
 
-	set -e; for d in ${DIRS}; do $(MAKE) -C $${d}; done
+	set -e; for d in ${DIRS}; do $(MAKE) -C $${d} LDFLAGS=-L$(CURRENT_DIR)/../openssl-1.1.0h/output/$(ARCH)/lib; done
 
 clean :
 	set -e; for d in ${DIRS}; do $(MAKE) -C $${d} clean; done
@@ -43,7 +46,7 @@ test : mosquitto
 	$(MAKE) -C test test
 
 install : mosquitto
-	set -e; for d in ${DIRS}; do $(MAKE) -C $${d} install; done
+	set -e; for d in ${DIRS}; do $(MAKE) -C $${d} install prefix=$(CURRENT_DIR)/output/$(ARCH)/ ; done
 ifeq ($(WITH_DOCS),yes)
 	set -e; for d in ${DOCDIRS}; do $(MAKE) -C $${d} install; done
 endif

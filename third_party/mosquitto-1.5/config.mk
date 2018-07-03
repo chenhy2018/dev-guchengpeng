@@ -21,6 +21,22 @@
 # Disabling this will also mean that passwords must be stored in plain text. It
 # is strongly recommended that you only disable WITH_TLS if you are not using
 # password authentication at all.
+ARCH:=x86
+TOOLCHAIN_PREFIX:=
+CURRENT_DIR:=$(shell pwd)
+ifeq ($(ARCH), x86)
+	TOOLCHAIN_PREFIX=
+else ifeq ($(ARCH), mstar)
+	TOOLCHAIN_PREFIX=arm-linux-gnueabihf-
+	BROKER_CFLAGS += -I../../openssl-1.1.0h/output/$(ARCH)/include 
+endif
+CFLAGS += -I../../openssl-1.1.0h/output/$(ARCH)/include
+CC=${TOOLCHAIN_PREFIX}gcc
+CXX=${TOOLCHAIN_PREFIX}g++
+CPP=${TOOLCHAIN_PREFIX}g++
+AR=${TOOLCHAIN_PREFIX}ar
+LD=${TOOLCHAIN_PREFIX}ld
+
 WITH_TLS:=yes
 
 # Comment out to disable TLS/PSK support in the broker and client. Requires
@@ -66,7 +82,7 @@ WITH_SRV:=no
 
 # Build using libuuid for clientid generation (Linux only - please report if
 # supported on your platform).
-WITH_UUID:=yes
+WITH_UUID:=no
 
 # Build with websockets support on the broker.
 WITH_WEBSOCKETS:=no
@@ -84,7 +100,7 @@ WITH_SOCKS:=yes
 WITH_STRIP:=no
 
 # Build static libraries
-WITH_STATIC_LIBRARIES:=no
+WITH_STATIC_LIBRARIES:=yes
 
 # Build with async dns lookup support for bridges (temporary). Requires glibc.
 #WITH_ADNS:=yes
@@ -143,7 +159,7 @@ ifeq ($(UNAME),Linux)
 	LIB_LIBS:=$(LIB_LIBS) -lrt
 endif
 
-CLIENT_LDFLAGS:=$(LDFLAGS) -L../lib ../lib/libmosquitto.so.${SOVERSION}
+CLIENT_LDFLAGS:=$(LDFLAGS) -L../lib ../lib/libmosquitto.so.${SOVERSION} -Wl,-rpath=$(CURRENT_DIR)/../../openssl-1.1.0h/output/$(ARCH)/lib
 
 ifeq ($(UNAME),SunOS)
 	ifeq ($(CC),cc)
@@ -266,10 +282,10 @@ ifeq ($(WITH_DOCS),yes)
 endif
 
 INSTALL?=install
-prefix=/usr/local
+#prefix=/usr/local
 mandir=${prefix}/share/man
 localedir=${prefix}/share/locale
-STRIP?=strip
+STRIP?=${TOOLCHAIN_PREFIX}strip
 
 ifeq ($(WITH_STRIP),yes)
 	STRIP_OPTS:=-s --strip-program=${CROSS_COMPILE}${STRIP}
