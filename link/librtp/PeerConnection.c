@@ -534,11 +534,6 @@ static void transportIceDestroy(IN OUT TransportIce * _pTransportIce, void * _pU
                 pjmedia_transport_close(_pTransportIce->pTransport);
                 _pTransportIce->pTransport = NULL;
         }
-        
-        if (_pTransportIce->pNegotiationPool) {
-                pj_pool_release(_pTransportIce->pNegotiationPool);
-                _pTransportIce->pNegotiationPool = NULL;
-        }
 }
 
 static pj_status_t createMediaEndpt()
@@ -642,6 +637,13 @@ int ReleasePeerConnectoin(IN OUT PeerConnection * _pPeerConnection)
         for ( int i = 0; i < sizeof(_pPeerConnection->nAvIndex) / sizeof(int); i++) {
                 if (_pPeerConnection->nAvIndex[i] != -1) {
                         transportIceDestroy(&_pPeerConnection->transportIce[i], &_pPeerConnection->mediaStream.streamTracks[i]);
+                }
+        }
+
+        for ( int i = 0; i < sizeof(_pPeerConnection->nAvIndex) / sizeof(int); i++) {
+                if (_pPeerConnection->transportIce[i].pNegotiationPool) {
+                        pj_pool_release(_pPeerConnection->transportIce[i].pNegotiationPool);
+                        _pPeerConnection->transportIce[i].pNegotiationPool;
                 }
         }
         
