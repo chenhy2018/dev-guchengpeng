@@ -377,11 +377,12 @@ ErrorID UninitSDK()
         }
         pthread_mutex_unlock(&pUAManager->mutex);
         pthread_mutex_destroy(&pUAManager->mutex);
-        UninitialiseRtp();
+
         pUAManager->bInitSdk = false;
         memset(&pUAManager->config.videoConfigs, 0, sizeof(MediaConfigSet));
         memset(&pUAManager->config.audioConfigs, 0, sizeof(MediaConfigSet));
 
+        UninitialiseRtp();
         return RET_OK;
 }
 
