@@ -11,7 +11,6 @@ supported on your platform)." OFF)
 
 
 if (${WITH_TLS} STREQUAL ON)
-        find_package(OpenSSL REQUIRED)
         add_definitions("-DWITH_TLS")
 
         if (${WITH_TLS_PSK} STREQUAL ON)
@@ -36,7 +35,7 @@ endif (${WITH_UUID} STREQUAL ON)
 
 option(WITH_SRV "Include SRV lookup support?" OFF)
 
-SET(GCC_INCLUDE_PATH "-I../../third_party/mosquitto-1.5/lib/ -I../../third_party/mosquitto-1.5/")
+SET(GCC_INCLUDE_PATH "-I../../third_party/mosquitto-1.5/lib/ -I../../third_party/mosquitto-1.5/ -I ../../third_party/openssl-1.1.0h/prefix/include/")
 SET(CMAKE_C_FLAGS "${GCC_INCLUDE_PATH} ${GCC_COVERAGE_COMPILE_FLAGS}")
 
 aux_source_directory(. LIB_MOSQUITTO_SRC)
@@ -48,5 +47,6 @@ add_library(mqtt_dy SHARED ${LIB_MOSQUITTO_SRC} ${MOSQUITTO_SRC})
 set_target_properties(mqtt_dy PROPERTIES OUTPUT_NAME "mqtt")
 set_target_properties(mqtt_dy PROPERTIES VERSION 1.0  SOVERSION 1)
 
+link_directories(${CMAKE_CURRENT_SOURCE_DIR}/../../third_party/openssl-1.1.0h/prefix/lib)
 
 add_subdirectory(test)

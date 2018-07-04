@@ -17,11 +17,14 @@ else (${WITH_THREADING} STREQUAL ON)
         set (PTHREAD_INCLUDE_DIR "")
 endif (${WITH_THREADING} STREQUAL ON)
 
-set (OPENSSL_CRYPTO_LIBRARY /usr/lib/x86_64-linux-gnu/libcrypto.so)
-set (OPENSSL_SSL_LIBRARY /usr/lib/x86_64-linux-gnu/libssl.so)
+set (OPENSSL_CRYPTO_LIBRARY ../../../third_party/openssl-1.1.0h/libcrypto.so)
+set (OPENSSL_SSL_LIBRARY ../../../third_party/openssl-1.1.0h/libssl.so)
 set (LIBRARIES ${OPENSSL_CRYPTO_LIBRARY} ${OPENSSL_CRYPTO_LIBRARY})
+
+link_directories(${CMAKE_CURRENT_SOURCE_DIR}/../../../third_party/openssl-1.1.0h/prefix/lib)
+link_directories(${CMAKE_CURRENT_SOURCE_DIR}/..)
 
 aux_source_directory(. LIB_MOSQUITTO_TEST)
 add_executable(mos_test ${LIB_MOSQUITTO_TEST})
 
-target_link_libraries(mos_test mqtt pthread ${OPENSSL_CRYPTO_LIBRARY} ${OPENSSL_SSL_LIBRARY})
+target_link_libraries(mos_test mqtt pthread libcrypto.so libssl.so)

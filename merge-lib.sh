@@ -31,8 +31,9 @@ mkdir -p ./${OUTPUT}/ori/$1
 mkdir -p ./${OUTPUT}/lib/$1/
 
 # 1. copy all the .a file from pjproject to libs/ori directory
-cp -rf ${OUTPUT}/pjsip/lib/* ${OUTPUT}/ori/$1
+cp -rf third_party/pjproject-2.7.2/prefix/lib/* ${OUTPUT}/ori/$1
 rm -rf ${OUTPUT}/ori/$1/libpjsua2-x86_64-unknown-linux-gnu.a
+
 
 cp -rvf link/libsip/*.a ${OUTPUT}/ori/$1
 cp -rvf link/librtp/*.a ${OUTPUT}/ori/$1
