@@ -638,6 +638,10 @@ int ReleasePeerConnectoin(IN OUT PeerConnection * _pPeerConnection)
         }
         
         for ( int i = 0 ; i < _pPeerConnection->mediaStream.nCount; i++) {
+                DestroyMediaStream(&_pPeerConnection->mediaStream);
+        }
+
+        for ( int i = 0 ; i < _pPeerConnection->mediaStream.nCount; i++) {
                 pj_pool_t *pTmp = _pPeerConnection->mediaStream.streamTracks[i].pPacketizerPool;
                 if (pTmp) {
                         pj_pool_release(pTmp);

@@ -7,6 +7,16 @@ typedef struct _JitterBufferFrame {
         void * pData;
 }JitterBufferFrame;
 
+void JitterBufferDestroy(OUT JitterBuffer *_pJbuf)
+{
+        if (_pJbuf->pJitterPool) {
+	        heap_destroy(&_pJbuf->heap);
+                pj_pool_release(_pJbuf->pJitterPool);
+                _pJbuf->pJitterPool = NULL;
+        }
+}
+
+
 pj_status_t JitterBufferInit(OUT JitterBuffer *_pJbuf, IN int _nMaxBufferCount, IN int _nInitCacheCount,
                       IN pj_pool_t *_pJitterPool, IN int _nMaxFrameSize)
 {
@@ -145,7 +155,6 @@ void JitterBufferPop(IN JitterBuffer *_pJbuf, OUT void *_pFrame, IN OUT int *_pF
                 }
                 if (*_pFrameSeq < _pJbuf->nLastRecvRtpSeq || *_pFrameSeq == 0) {
                         _pJbuf->nLastRecvRtpSeq = *_pFrameSeq;
-                        //TOTO rebuild heap
                         heap_rebuild(&_pJbuf->heap);
                 }
 
