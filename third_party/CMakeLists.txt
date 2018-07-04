@@ -1,8 +1,10 @@
+SET(PJ_CONFIG, "--disable-sdl --disable-ffmpeg --disable-v4l2 --disable-openh264 --disable-libwebrtc --disable-sound --disable-libyuv CFLAGS='-g' --prefix=$(INSTALL_DIR)")
+
 include(ExternalProject)
 ExternalProject_Add(pjsip
         SOURCE_DIR pjproject-2.7.2
         BUILD_COMMAND make dep COMMAND make
-        CONFIGURE_COMMAND ./configure
+        CONFIGURE_COMMAND ./configure ${PJ_CONFIG}
         INSTALL_COMMAND ""
         BUILD_IN_SOURCE 1
 )
