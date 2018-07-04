@@ -2,7 +2,6 @@
 THIRD_PARTY_PATH=../../../third_party
 OPENSSL_PATH=$(THIRD_PARTY_PATH)/openssl-1.1.0h
 OPENSSL_LIB=${OPENSSL_PATH}/prefix/lib
-LIBUA=../output/lib/$(ARCH)/libua.a
 LDFLAGS=-L../../../output/lib/$(ARCH) -L$(OPENSSL_LIB) -lua -lpthread -lm -lcrypto -lssl
 
 CFLAGS=-g

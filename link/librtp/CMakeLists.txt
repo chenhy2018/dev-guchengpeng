@@ -21,6 +21,7 @@ link_directories(${CMAKE_CURRENT_SOURCE_DIR}/../../third_party/pjproject-2.7.2/p
 link_directories(${CMAKE_CURRENT_SOURCE_DIR}/../../third_party/pjproject-2.7.2/pjlib/lib/)
 link_directories(${CMAKE_CURRENT_SOURCE_DIR}/../../third_party/pjproject-2.7.2/pjsip/lib/)
 link_directories(${CMAKE_CURRENT_SOURCE_DIR}/../../third_party/pjproject-2.7.2/third_party/lib/)
+link_directories(${CMAKE_CURRENT_SOURCE_DIR}/../../third_party/openssl-1.1.0h/prefix/lib)
 
 add_library (rtp ${LIB_HEADER} ${LIB_SRC})
 add_executable(rtptest ${TEST_SRC})
