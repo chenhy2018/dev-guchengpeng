@@ -21,5 +21,5 @@ make
 
 ./merge-lib.sh $1
 
-cd test/
+cd link/libsdk/
 ./test.sh $1
