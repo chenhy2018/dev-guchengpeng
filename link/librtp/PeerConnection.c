@@ -422,10 +422,10 @@ static pj_str_t parseIpAndPort(char *_pHosStr, pj_uint16_t *_pPort)
         return ret;
 }
 
-static int peerConnectInitIceConfig(IN OUT PeerConnection * _pPeerConnectoin)
+static int peerConnectInitIceConfig(IN OUT PeerConnection * _pPeerConnection)
 {
-        for (int i = 0; i < sizeof(_pPeerConnectoin->transportIce) / sizeof(TransportIce); i++) {
-                pj_ice_strans_cfg * pIceCfg = &_pPeerConnectoin->transportIce[i].iceConfig;
+        for (int i = 0; i < sizeof(_pPeerConnection->transportIce) / sizeof(TransportIce); i++) {
+                pj_ice_strans_cfg * pIceCfg = &_pPeerConnection->transportIce[i].iceConfig;
                 pj_ice_strans_cfg_default(pIceCfg);
                 
                 //stun turn deprecated
@@ -434,7 +434,7 @@ static int peerConnectInitIceConfig(IN OUT PeerConnection * _pPeerConnectoin)
                 
                 pIceCfg->af = pj_AF_INET();
                 
-                IceConfig *pUserIceConfig = &_pPeerConnectoin->userIceConfig;
+                IceConfig *pUserIceConfig = &_pPeerConnection->userIceConfig;
                 if (pUserIceConfig->bRegular) {
                         pIceCfg->opt.aggressive = PJ_FALSE;
                 } else {
@@ -491,7 +491,7 @@ static int peerConnectInitIceConfig(IN OUT PeerConnection * _pPeerConnectoin)
                 pj_status_t status;
                 if (pUserIceConfig->nameserver[0] != '\0') {
                         pj_str_t nameserver = pj_str(pUserIceConfig->nameserver);
-                        status = pj_dns_resolver_create(_pPeerConnectoin->pPoolFactory, "resolver", 0,
+                        status = pj_dns_resolver_create(_pPeerConnection->pPoolFactory, "resolver", 0,
                                                         pIceCfg->stun_cfg.timer_heap,
                                                         pIceCfg->stun_cfg.ioqueue,
                                                         &pIceCfg->resolver);
@@ -503,22 +503,22 @@ static int peerConnectInitIceConfig(IN OUT PeerConnection * _pPeerConnectoin)
         return PJ_SUCCESS;
 }
 
-static pj_status_t initTransportIce(IN PeerConnection * _pPeerConnectoin, OUT TransportIce * _pTransportIce)
+static pj_status_t initTransportIce(IN PeerConnection * _pPeerConnection, OUT TransportIce * _pTransportIce)
 {
         pj_status_t status;
 
         pj_stun_config_init(&_pTransportIce->iceConfig.stun_cfg, manager.pPoolFactory, 0,
                             manager.pIoQueue, manager.pTimerHeap);
         
-        _pTransportIce->pPeerConnection = _pPeerConnectoin;
+        _pTransportIce->pPeerConnection = _pPeerConnection;
         
         pjmedia_ice_cb cb;
         cb.on_ice_complete = NULL;
         cb.on_ice_complete2 = onIceComplete2;
         
         pjmedia_transport *transport = NULL;
-        status = pjmedia_ice_create3(manager.pMediaEndpt, NULL, _pPeerConnectoin->userIceConfig.nComponents,
-                                     &_pTransportIce->iceConfig, &cb, 0, _pPeerConnectoin, &transport);
+        status = pjmedia_ice_create3(manager.pMediaEndpt, NULL, _pPeerConnection->userIceConfig.nComponents,
+                                     &_pTransportIce->iceConfig, &cb, 0, _pPeerConnection, &transport);
         STATUS_CHECK(pjmedia_ice_create3, status);
         pjmedia_ice_add_ice_cb(transport, &cb, _pTransportIce);
         _pTransportIce->pTransport = transport;
