@@ -7,6 +7,12 @@ static int createSdpMline(IN OUT PeerConnection * _pPeerConnection, pj_pool_t *_
 static int negotiationSettingAfterSuccess(IN PeerConnection * _pPeerConnection);
 int setLocalDescription(IN OUT PeerConnection * _pPeerConnection, IN void * _pSdp);
 static pj_status_t createMediaEndpt();
+void releasePeerConnectoin(IN void * pUserData);
+
+void releasePeerConnectoin2(IN void * pUserData)
+{
+        MY_PJ_LOG(1, "releasePeerConnectoin2:%p", pUserData);
+}
 
 enum { RTCP_INTERVAL = 5000, RTCP_RAND = 2000 };
 
@@ -515,7 +521,7 @@ static pj_status_t initTransportIce(IN PeerConnection * _pPeerConnection, OUT Tr
         pjmedia_ice_cb cb;
         cb.on_ice_complete = NULL;
         cb.on_ice_complete2 = onIceComplete2;
-        
+
         pjmedia_transport *transport = NULL;
         status = pjmedia_ice_create3(manager.pMediaEndpt, NULL, _pPeerConnection->userIceConfig.nComponents,
                                      &_pTransportIce->iceConfig, &cb, 0, _pPeerConnection, &transport);
@@ -523,6 +529,23 @@ static pj_status_t initTransportIce(IN PeerConnection * _pPeerConnection, OUT Tr
         pjmedia_ice_add_ice_cb(transport, &cb, _pTransportIce);
         _pTransportIce->pTransport = transport;
         
+        pj_grp_lock_t *pGrpLock = pjmedia_ice_get_grp_lock(transport);
+
+        pj_pool_t * pGrpPool = pj_pool_create(&manager.cachingPool.factory,
+                               NULL, 512, 512, NULL);
+        if (pGrpPool == NULL) {
+                MY_PJ_LOG(1, "pj_pool_create return NULL:%d", status);
+                return status;
+        }
+        _pPeerConnection->pGrpPool = pGrpPool;
+        MY_PJ_LOG(5, "pj_grp_lock_add_handler %p", _pPeerConnection);
+        status = pj_grp_lock_add_handler(pGrpLock, pGrpPool, _pPeerConnection,
+                                &releasePeerConnectoin);
+        STATUS_CHECK(pj_grp_lock_add_handler, status);
+        status = pj_grp_lock_add_handler(pGrpLock, pGrpPool, _pPeerConnection,
+                                         &releasePeerConnectoin2);
+        STATUS_CHECK(pj_grp_lock_add_handler, status);
+
         return PJ_SUCCESS;
 }
 
@@ -633,18 +656,45 @@ int ReleasePeerConnectoin(IN OUT PeerConnection * _pPeerConnection)
         LIBRTP_REGISTER_THREAD(_pPeerConnection);
         MY_PJ_LOG(5, "PeerConnection releasing:%p", _pPeerConnection);
 
-        _pPeerConnection->bQuit = 1;
+        _pPeerConnection->nQuitCnt = 1;
         for ( int i = 0; i < sizeof(_pPeerConnection->nAvIndex) / sizeof(int); i++) {
                 if (_pPeerConnection->nAvIndex[i] != -1) {
                         transportIceDestroy(&_pPeerConnection->transportIce[i], &_pPeerConnection->mediaStream.streamTracks[i]);
                 }
         }
 
+        MY_PJ_LOG(5, "releasePeerConnectoin %p destroy:%d", _pPeerConnection, _pPeerConnection->nDestroy);
+        if (_pPeerConnection->nDestroy == 0) {
+                releasePeerConnectoin(_pPeerConnection);
+        }
+
+        return PJ_SUCCESS;
+}
+
+void releasePeerConnectoin(IN void * pUserData)
+{
+        PeerConnection * _pPeerConnection = (PeerConnection * )pUserData;
+        pj_mutex_lock(_pPeerConnection->pMutex);
+        if (_pPeerConnection->nDestroy != 0) {
+                MY_PJ_LOG(5, "releasePeerConnectoin %p quit:%d total:%d destroy:%d", pUserData, _pPeerConnection->nQuitCnt,
+                          _pPeerConnection->mediaStream.nCount + 1, _pPeerConnection->nDestroy);
+                if (_pPeerConnection->nQuitCnt != _pPeerConnection->nDestroy + 1) {
+                        pj_mutex_unlock(_pPeerConnection->pMutex);
+                        return;
+                }
+        }
+        pj_mutex_unlock(_pPeerConnection->pMutex);
+
         for ( int i = 0; i < sizeof(_pPeerConnection->nAvIndex) / sizeof(int); i++) {
                 if (_pPeerConnection->transportIce[i].pNegotiationPool) {
                         pj_pool_release(_pPeerConnection->transportIce[i].pNegotiationPool);
                         _pPeerConnection->transportIce[i].pNegotiationPool;
                 }
+        }
+
+        if (_pPeerConnection->pGrpPool) {
+                pj_pool_release(_pPeerConnection->pGrpPool);
+                _pPeerConnection->pGrpPool = NULL;
         }
         
         if (_pPeerConnection->pNegPool) {
@@ -843,12 +893,25 @@ int createOffer(IN OUT PeerConnection * _pPeerConnection)
                 return PJ_SUCCESS;
         }
         int nMaxTracks = sizeof(_pPeerConnection->nAvIndex) / sizeof(int);
+        int nInitFailCnt = 0, nInitOkCnt = 0;
         for ( int i = 0; i < nMaxTracks; i++) {
                 if (_pPeerConnection->nAvIndex[i] != -1) {
                         status = initTransportIce(_pPeerConnection, &_pPeerConnection->transportIce[_pPeerConnection->nAvIndex[i]]);
-                        STATUS_CHECK(video initTransportIce, status);
+                        if (status != PJ_SUCCESS) {
+                                nInitFailCnt++;
+                                break;
+                        }
                 }
+                nInitOkCnt++;
         }
+        if (nInitOkCnt > 0) {
+                _pPeerConnection->nDestroy = nInitOkCnt;
+        }
+        if (nInitFailCnt) {
+                MY_PJ_LOG(1, "initTransportIce fail:%d", status);
+                return status;
+        }
+        _pPeerConnection->nDestroy = nInitOkCnt;
 
         _pPeerConnection->role = ICE_ROLE_OFFERER;
         pjmedia_sdp_session *pOffer = NULL;

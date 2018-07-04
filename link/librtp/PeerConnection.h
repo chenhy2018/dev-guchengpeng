@@ -47,10 +47,13 @@ typedef struct _PeerConnection
         int nIsFailCallbackDone;
         pj_mutex_t *pMutex;
         pj_pool_t *pMutexPool;
-        int bQuit;
+        int nQuitCnt;
         IceRole role;
         pj_thread_desc threadDesc[5];
         int threadFlag[5];
+        int nDestroy;
+        pj_grp_lock_t *gGrpLock;
+        pj_pool_t *pGrpPool;
 }PeerConnection;
 
 #endif
