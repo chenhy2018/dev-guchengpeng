@@ -17,8 +17,8 @@
 #include <pthread.h>
 
 #define ARRSZ(arr) (sizeof(arr)/sizeof(arr[0]))
-#define HOST "123.59.204.198"
-#define INVALID_SERVER "192,.168.1.239"
+#define HOST "39.107.247.14"
+#define INVALID_SERVER "192.168.1.239"
 
 #define MAX_COUNT 9
 int RegisterTestSuitCallback( TestSuit *this );
@@ -54,39 +54,39 @@ RegisterTestCase gRegisterTestCases[] =
 {
     {
         { "valid_account1", CALL_STATUS_REGISTERED, UA1_EventLoopThread },
-        { "1011", "1011", HOST, HOST, HOST, 10, 1 }
+        { "1711", "aUSEOnOy", HOST, HOST, HOST, 10, 1 }
     },
     {
         { "valid_account2", CALL_STATUS_REGISTERED, UA2_EventLoopThread },
-        { "1012", "1012", HOST, HOST, HOST, 10, 0 }
+        { "1712", "Q0EEBOEc", HOST, HOST, HOST, 10, 0 }
     },
     {
         { "invalid_account1", CALL_STATUS_REGISTER_FAIL, UA3_EventLoopThread },
-        { "1013", "1013", HOST, HOST, HOST, 10, 0 }
+        { "1713", "IeFxv0sP", HOST, HOST, HOST, 10, 0 }
     },
     {
         { "invalid_account2", CALL_STATUS_REGISTER_FAIL, UA4_EventLoopThread },
-        { "1014", "1014", HOST, HOST, HOST, 10, 0 }
+        { "1714", "9ZykZwsJ", HOST, HOST, HOST, 10, 0 }
     },
     {
         { "invalid_sip_register_server", CALL_STATUS_REGISTER_FAIL, UA5_EventLoopThread },
-        { "1015", "1015", INVALID_SERVER, INVALID_SERVER, INVALID_SERVER, 10, 0 }
+        { "1715", "AzkaVAo0", INVALID_SERVER, INVALID_SERVER, INVALID_SERVER, 10, 0 }
     },
     {
         { "invalid_account", 0 },
-        { "1016", "1016", HOST, HOST, HOST, 100, 0 }
+        { "1716", "5XPM9DUv", HOST, HOST, HOST, 100, 0 }
     },
     {
         { "normal", 0 },
-        { "1017", "1017", HOST, HOST, HOST, 100, 1 }
+        { "1717", "W9DaI77R", HOST, HOST, HOST, 100, 1 }
     },
     {
         { "invalid_account", 0 },
-        { "1018", "1018", HOST, HOST, HOST, 100, 0 }
+        { "1718", "4JoChsXl", HOST, HOST, HOST, 100, 0 }
     },
     {
         { "normal", 0 },
-        { "1019", "1019", HOST, HOST, HOST, 100, 1 }
+        { "1719", "NVWrpASp", HOST, HOST, HOST, 100, 1 }
     },
 };
 
@@ -199,7 +199,7 @@ void Mthread1(void* data)
                                   if (pCallEvent->status == CALL_STATUS_ERROR || pCallEvent->status == CALL_STATUS_HANGUP) {
                                         DBG_LOG("makecall *****************  ERROR ****************************8*\n");
                                         do {
-                                                id = MakeCall(pData->accountid, "1010", "123.59.204.198", &pData->callid);
+                                                id = MakeCall(pData->accountid, "1710", "123.59.204.198", &pData->callid);
                                         } while (id != RET_OK);
                                   }
 
@@ -293,7 +293,7 @@ int RegisterTestSuitCallback( TestSuit *this )
            pData->timecount = 0;
            UT_LOG("MakeCall in accountid %d\n", pData->accountid);
            pData->callid = 0;
-           id = MakeCall(pData->accountid, "1010", "123.59.204.198", &pData->callid);
+           id = MakeCall(pData->accountid, "1710", "123.59.204.198", &pData->callid);
            if (RET_OK != id) {
                     fprintf(stderr, "call error %d \n", id);
                      continue;
