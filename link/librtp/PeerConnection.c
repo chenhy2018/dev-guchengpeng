@@ -947,7 +947,8 @@ static void on_rx_rtp(void *pUserData, void *pPkt, pj_ssize_t size)
         JitterBufferPush(&pMediaTrack->jbuf, pPayload, nPayloadLen, pj_ntohs(pRtpHeader->seq),
                          nRtpTs, &nIsDiscard);
         if (nIsDiscard) {
-                MY_PJ_LOG(2, "rtp packet disacrded by jitter buffer");
+                MY_PJ_LOG(2, "packet(seq:%d ts:%lld) disacrded by jitter buffer:%d", pj_ntohs(pRtpHeader->seq),
+                          nRtpTs, nIsDiscard);
                 return;
         }
 
