@@ -19,6 +19,12 @@ void CmdHandleQuit( char *param );
 void CmdHanleHelp( char *param );
 void CmdHandleServer( char *param );
 void CmdHandleStartStream( char *param );
+void CmdHandleDump( char *param );
+void CmdHandleStopStream( char *param );
+void CmdHandleLogCloseTime( char *param );
+void CmdHandleLogOpenTime( char *param );
+void CmdHandleDbgReset( char *param );
+void CmdHandleVideoThreshold( char *param );
 
 static char *gLogFile = "/tmp/ipc-stream.log";
 static char *gAccountId = "1023";
@@ -43,17 +49,57 @@ static struct app {
     unsigned running;
 } app;
 
-DemoCmd gCmds[] =
+static DemoCmd gCmds[] =
 {
     { "quit", CmdHandleQuit },
     { "help", CmdHanleHelp },
     { "start-socket-server", CmdHandleServer },
-    { "start-stream", CmdHandleStartStream }
+    { "start-stream", CmdHandleStartStream },
+    { "dump", CmdHandleDump },
+    { "stop-stream", CmdHandleStopStream },
+    { "log-open-time", CmdHandleLogOpenTime },
+    { "log-close_time", CmdHandleLogCloseTime },
+    { "dbg-reset", CmdHandleDbgReset },
+    { "video-threshold", CmdHandleVideoThreshold },
 };
+
+void CmdHandleVideoThreshold( char *param )
+{
+}
+
+void CmdHandleDbgReset( char *param )
+{
+    DBG_LOG("frame amount reset\n");
+    DbgFrameAmountReset();
+}
+
+void CmdHandleLogCloseTime( char *param )
+{
+    LoggerSetPrintTime( 0 );
+    DBG_LOG("disable print time\n");
+}
+
+void CmdHandleLogOpenTime( char *param )
+{
+    LoggerSetPrintTime( 1 );
+    DBG_LOG("enable print time\n");
+}
+
+void CmdHandleStopStream( char *param )
+{
+    DBG_LOG("stop stream\n");
+    StopStream();
+    DbgFrameAmountReset();
+}
 
 void CmdHandleQuit( char *param )
 {
     app.running = 0;
+}
+
+void CmdHandleDump( char *param )
+{
+    DbgDumpStream();
 }
 
 void CmdHanleHelp( char *param )
@@ -61,6 +107,11 @@ void CmdHanleHelp( char *param )
     printf("\thelp - this usage\n"
            "\tquit - quit the app\n"
            "\tstart-stream - start the rtp stream\n"
+           "\tstop-stream - stop the rtp stream\n"
+           "\tdump - show how much frames has been sent\n"
+           "\tlog-open-time - log print time\n"
+           "\tlog-close-time - log disable time\n"
+           "\tdbg-reset - clear the frame total size and amount\n"
            "\tstart-socket-server - start socket server\n");
 }
 
@@ -71,6 +122,7 @@ void CmdHandleServer( char *param )
 
 void CmdHandleStartStream( char *param )
 {
+    DBG_LOG("start the rtp stream\n");
     StartStream();
 }
 
@@ -203,7 +255,7 @@ void StartIPC()
                 case CALL_STATUS_INCOMING:
                     DBG_LOG("CALL_STATUS_INCOMING\n");
                     if ( pCallEvent->pFromAccount ) {
-                        DBG_LOG("from account : %s\n", pCallEvent->pFromAccount );
+                        DBG_LOG("incoming call from account : %s\n", pCallEvent->pFromAccount );
                     }
                     ret = AnswerCall( app.accountId, pCallEvent->callID );
                     if ( ret >= RET_MEM_ERROR ) {
@@ -223,6 +275,8 @@ void StartIPC()
                 case CALL_STATUS_HANGUP:
                     DBG_LOG("CALL_STATUS_HANGUP\n");
                     StopStream();
+                    DbgDumpStream();
+                    DbgFrameAmountReset();
                     break;
                 case CALL_STATUS_ERROR:
                     DBG_LOG("CALL_STATUS_ERROR\n");
@@ -359,14 +413,17 @@ int main( int argc, char *argv[] )
         DBG_LOG("SDK init OK...\n");
     }
 
-    /*SetLogLevel( LOG_ERROR );*/
+    SetLogLevel( LOG_ERROR );
+    setPjLogLevel( 2 );
     if ( InitIPC() < 0 ) {
         DBG_ERROR("InitIPC() error\n");
         return 0;
     }
     DbgStreamFileOpen();
     pthread_create( &tid, NULL, UserInputHandleThread, NULL );
+
     StartIPC();
+
     DeInitIPC();
     LoggerUnInit();
 

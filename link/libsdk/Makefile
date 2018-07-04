@@ -119,7 +119,10 @@ mosclean:
 	rm -rvf $(MOSQUITTO_PATH)/output/$(ARCH)
 	make -C $(MOSQUITTO_PATH) clean
 
-vpath %.o $(OUTPUT)
+vpath %.o $(LIBSIP_OBJS_PATH)
+vpath %.o $(LIBRTP_OBJS_PATH)
+vpath %.o $(SDK_OBJS_PATH)
+vpath %.o $(OUTPUT)/libmqtt
 vpath %.c $(LIBSIP_SOURCE_PATH)
 $(LIBSIP) : %.o : %.c
 	mkdir -p $(LIBSIP_OBJS_PATH) 
