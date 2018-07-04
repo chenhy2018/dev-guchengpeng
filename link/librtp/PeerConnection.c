@@ -10,14 +10,6 @@ static pj_status_t createMediaEndpt();
 
 enum { RTCP_INTERVAL = 5000, RTCP_RAND = 2000 };
 
-#define  LIBRTP_REGISTER_THREAD() {\
-        pj_thread_desc pc_desc; \
-        if(!pj_thread_is_registered()){ \
-                pj_thread_t *pThread; \
-                pj_thread_register("test", pc_desc, &pThread); \
-        } \
-}
-
 typedef struct _ResoureMgr {
         pj_caching_pool   cachingPool;
         pj_pool_factory   *pPoolFactory;
@@ -35,17 +27,49 @@ typedef struct _ResoureMgr {
 }ResoureMgr;
 ResoureMgr manager;
 
-#if 0
-static pj_status_t librtp_register_thread()
+pj_thread_desc innerInitDesc;
+pj_thread_t *pInnerInitThread;
+pj_thread_desc innerUninitDesc;
+pj_thread_t *pInnerUninitThread;
+static int isLibrtpInited = 0;
+static inline pj_status_t librtp_inner_init_register_thread()
 {
-        static pj_thread_desc pc_desc;
-        if(!pj_thread_is_registered()){
-                pj_thread_t *pThread;
-                return pj_thread_register(NULL, pc_desc, &pThread);
-        }
-        return PJ_SUCCESS;
+        return pj_thread_register("initrtp", innerInitDesc, &pInnerInitThread);
 }
-#endif
+
+static inline pj_status_t librtp_inner_uninit_register_thread()
+{
+        return pj_thread_register("uninitrtp", innerUninitDesc, &pInnerUninitThread);
+}
+
+static pj_status_t librtp_register_thread(PeerConnection * _pPeerConnection)
+{
+        pj_status_t status = PJ_SUCCESS;
+        int isReg = pj_thread_is_registered();
+        if(isReg == 0){
+                int idx = -1;
+                for (int i = 0; i < sizeof(_pPeerConnection->threadFlag) / sizeof(int); i++) {
+                        if (_pPeerConnection->threadFlag[i] == 0) {
+                                idx = i;
+                                break;
+                        }
+                }
+                if (idx == -1) {
+                        MY_PJ_LOG(1, "too much thread");
+                        return PJ_ETOOBIG;
+                }
+
+                pj_thread_t *pThread;
+                char n[32] = {0};
+                sprintf(n, "pc%p", _pPeerConnection);
+                _pPeerConnection->threadFlag[idx] = 1;
+                status = pj_thread_register(n, _pPeerConnection->threadDesc[idx], &pThread);
+        }
+        return status;
+}
+
+#define  LIBRTP_REGISTER_THREAD(p) librtp_register_thread(p)
+
 
 static void print_sdp(pjmedia_sdp_session * _pSdp, const char * _pLogPrefix)
 {
@@ -298,6 +322,7 @@ int InitialiseRtp()
         if (manager.pPoolFactory) {
                 return -1;
         }
+        librtp_inner_init_register_thread();
         pj_status_t status;
 
         pj_caching_pool_init(&manager.cachingPool, &pj_pool_factory_default_policy, 0);
@@ -338,6 +363,8 @@ int InitialiseRtp()
 
 void UninitialiseRtp()
 {
+        librtp_inner_uninit_register_thread();
+
         manager.nQuit = 1;
         if (manager.pPollThread) {
                 pj_thread_join(manager.pPollThread);
@@ -566,7 +593,7 @@ int InitPeerConnectoin(OUT PeerConnection ** _pPeerConnection, IN IceConfig *_pI
         if (_pPeerConnection == NULL) {
                 return PJ_EINVAL;
         }
-        LIBRTP_REGISTER_THREAD();
+
         pj_status_t status = IceConfigIsValid(_pIceConfig);
         if (status != PJ_SUCCESS) {
                 MY_PJ_LOG(1, "invalid IceConfig");
@@ -588,6 +615,7 @@ int InitPeerConnectoin(OUT PeerConnection ** _pPeerConnection, IN IceConfig *_pI
         for ( int i = 0; i < sizeof(pPeerConnection->nAvIndex) / sizeof(int); i++) {
                 pPeerConnection->nAvIndex[i] = -1;
         }
+        LIBRTP_REGISTER_THREAD(pPeerConnection);
 
         pj_pool_t *pPool = pj_pool_create(pPeerConnection->pPoolFactory, NULL, 128, 128, NULL);
         ASSERT_RETURN_CHECK(pPool, pj_pool_create);
@@ -607,7 +635,7 @@ int ReleasePeerConnectoin(IN OUT PeerConnection * _pPeerConnection)
         {
                 return PJ_SUCCESS;
         }
-        LIBRTP_REGISTER_THREAD();
+        LIBRTP_REGISTER_THREAD(_pPeerConnection);
         MY_PJ_LOG(5, "PeerConnection releasing:%p", _pPeerConnection);
 
         _pPeerConnection->bQuit = 1;
@@ -662,7 +690,7 @@ int AddAudioTrack(IN OUT PeerConnection * _pPeerConnection, IN MediaConfigSet * 
                 return PJ_EINVAL;
         }
         pj_status_t status;
-        LIBRTP_REGISTER_THREAD();
+        LIBRTP_REGISTER_THREAD(_pPeerConnection);
         status = MediaConfigSetIsValid(_pAudioConfig);
         if (status != PJ_SUCCESS) {
                 MY_PJ_LOG(1, "invalid MediaConfigSet");
@@ -693,7 +721,7 @@ int AddVideoTrack(IN OUT PeerConnection * _pPeerConnection, IN MediaConfigSet * 
                 return PJ_EINVAL;
         }
         pj_status_t status;
-        LIBRTP_REGISTER_THREAD();
+        LIBRTP_REGISTER_THREAD(_pPeerConnection);
         status = MediaConfigSetIsValid(_pVideoConfig);
         if (status != PJ_SUCCESS) {
                 MY_PJ_LOG(1, "invalid MediaConfigSet");
@@ -803,7 +831,7 @@ int createOffer(IN OUT PeerConnection * _pPeerConnection)
         if (_pPeerConnection == NULL) {
                 return PJ_EINVAL;
         }
-        LIBRTP_REGISTER_THREAD();
+        LIBRTP_REGISTER_THREAD(_pPeerConnection);
 
         createSdpPool(_pPeerConnection);
         pj_pool_t *pPool = _pPeerConnection->pSdpPool;
@@ -836,7 +864,7 @@ int createAnswer(IN OUT PeerConnection * _pPeerConnection, IN void *_pOffer)
         if (_pPeerConnection == NULL) {
                 return PJ_EINVAL;
         }
-        LIBRTP_REGISTER_THREAD();
+        LIBRTP_REGISTER_THREAD(_pPeerConnection);
 
         createSdpPool(_pPeerConnection);
         pj_pool_t *pPool = _pPeerConnection->pSdpPool;
@@ -1046,7 +1074,7 @@ int StartNegotiation(IN PeerConnection * _pPeerConnection)
         if (_pPeerConnection == NULL) {
                 return PJ_EINVAL;
         }
-        LIBRTP_REGISTER_THREAD();
+        LIBRTP_REGISTER_THREAD(_pPeerConnection);
 
         int nMaxTracks = sizeof(_pPeerConnection->nAvIndex) / sizeof(int);
         for ( int i = 0; i < nMaxTracks; i++) {
@@ -1142,7 +1170,6 @@ int setLocalDescription(IN OUT PeerConnection * _pPeerConnection, IN void * _pSd
         if (_pPeerConnection == NULL || _pSdp == NULL) {
                 return PJ_EINVAL;
         }
-        LIBRTP_REGISTER_THREAD();
 
         createSdpPool(_pPeerConnection);
         pjmedia_sdp_session *  pSdp = (pjmedia_sdp_session *) _pSdp;
@@ -1168,7 +1195,7 @@ int setRemoteDescription(IN OUT PeerConnection * _pPeerConnection, IN void * _pS
         if (_pPeerConnection == NULL || _pSdp == NULL) {
                 return PJ_EINVAL;
         }
-        LIBRTP_REGISTER_THREAD();
+        LIBRTP_REGISTER_THREAD(_pPeerConnection);
 
         createSdpPool(_pPeerConnection);
         pjmedia_sdp_session *  pSdp = (pjmedia_sdp_session *) _pSdp;
@@ -1430,7 +1457,7 @@ int SendRtpPacket(IN PeerConnection *_pPeerConnection, IN OUT RtpPacket * _pPack
         if (_pPeerConnection == NULL || _pPacket == NULL) {
                 return PJ_EINVAL;
         }
-        LIBRTP_REGISTER_THREAD();
+        LIBRTP_REGISTER_THREAD(_pPeerConnection);
 
         if (_pPacket->type == RTP_STREAM_AUDIO) {
                 return SendAudioPacket(_pPeerConnection, _pPacket);

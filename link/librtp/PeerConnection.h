@@ -49,6 +49,8 @@ typedef struct _PeerConnection
         pj_pool_t *pMutexPool;
         int bQuit;
         IceRole role;
+        pj_thread_desc threadDesc[5];
+        int threadFlag[5];
 }PeerConnection;
 
 #endif
