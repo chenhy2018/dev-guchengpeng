@@ -17,3 +17,8 @@ cscope*
 *.a
 *.so
 test
+*.o
+*.tmp
+*.d.tmp
+os-auto.mak
+sdk-demo
