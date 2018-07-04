@@ -315,7 +315,7 @@ int InitialiseRtp()
         ASSERT_RETURN_CHECK(pIoQueuePool, pj_pool_create);
         manager.pIoqueuePool = pIoQueuePool;
         pj_ioqueue_t* pIoQueue;
-        status = pj_ioqueue_create(pIoQueuePool, 128, &pIoQueue);
+        status = pj_ioqueue_create(pIoQueuePool, PJ_IOQUEUE_MAX_HANDLES, &pIoQueue);
         STATUS_CHECK(pj_ioqueue_create, status);
         manager.pIoQueue = pIoQueue;
 
