@@ -1,4 +1,4 @@
-// Last Update:2018-06-29 20:19:13
+// Last Update:2018-07-04 10:11:43
 /**
  * @file stream.c
  * @brief push rtp strem  
@@ -20,10 +20,10 @@ int VideoGetFrameCb( char *_pFrame,
     ErrorID ret = 0;
     AccountID accountId = GetAccountId();
     int callId = GetCallId();
+    int64_t stamp = (int64_t)_dTimeStamp;
 
     if ( StreamStatus() ) {
-        DbgAddVideoFrameCount();
-        DbgWriteVideoFrame( _pFrame, _nLen );
+        DbgGetVideoFrame( _pFrame, _nLen );
         ret = SendPacket( accountId, callId, STREAM_VIDEO, _pFrame, _nLen, (int64_t)_dTimeStamp );
         CHECK_SDK_RETURN( SendPacket, ret );
     }
@@ -39,7 +39,6 @@ int AudioGetFrameCb( char *_pFrame, int _nLen, double _dTimeStamp,
     int callId = GetCallId();
 
     if ( StreamStatus() ) {
-        DbgAddAudioFrameCount();
         ret = SendPacket( accountId, callId, STREAM_AUDIO, _pFrame, _nLen, (int64_t)_dTimeStamp );
         CHECK_SDK_RETURN( SendPacket, ret );
     }

@@ -20,6 +20,7 @@ typedef enum
 	DEV_SDK_PROCESS_IPVS = 0,
 	DEV_SDK_PROCESS_P2P = 1,
 	DEV_SDK_PROCESS_APP = 2,
+	DEV_SDK_PROCESS_GB28181 = 3,
 }DevSdkServerType;
 
 typedef enum
@@ -32,6 +33,7 @@ typedef enum
 {
 	AJ_STREAM_INDEX_VSTREAM_MAIN=0,	//主码流
 	AJ_STREAM_INDEX_VSTREAM_AUX=1,	//子码流
+	AJ_STREAM_INDEX_VSTREAM_THIRD=2,	//三码流
 }AjStreamNo;
 
 typedef	enum
@@ -118,6 +120,7 @@ typedef void (*DEBUG_CALLBACK)(int level, const char* fmt, ...);
 //sdk general
 int dev_sdk_version(char *version, int size);
 int dev_sdk_init(DevSdkServerType type);
+int dev_sdk_init_common(int prockey, int prio, int readerid);//自己指定PROCESS KEY
 int dev_sdk_release(void);
 
 //sdk device infomation

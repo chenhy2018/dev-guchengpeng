@@ -1,4 +1,4 @@
-// Last Update:2018-07-03 10:46:23
+// Last Update:2018-07-03 10:46:30
 /**
  * @file main.h
  * @brief 
@@ -19,5 +19,6 @@ extern unsigned StreamStatus();
 extern int GetCallId();
 extern AccountID GetAccountId();
 void StartStream();
+void StopStream();
 
 #endif  /*MAIN_H*/

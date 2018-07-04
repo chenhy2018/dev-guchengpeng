@@ -21,3 +21,4 @@ test
 *.tmp
 *.d.tmp
 os-auto.mak
+sdk-demo

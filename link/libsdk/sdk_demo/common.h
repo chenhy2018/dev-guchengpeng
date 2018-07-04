@@ -1,4 +1,4 @@
-// Last Update:2018-06-29 20:24:16
+// Last Update:2018-07-03 17:17:04
 /**
  * @file common.h
  * @brief 
@@ -16,6 +16,9 @@
 #undef DBG_ERROR
 #define DBG_ERROR(...)
 #endif
+
+typedef unsigned char u_int8_t;
+typedef unsigned int u_int32_t;
 
 #define CHECK_SDK_RETURN( function, ret ) \
     if ( ret >= RET_MEM_ERROR ) {\

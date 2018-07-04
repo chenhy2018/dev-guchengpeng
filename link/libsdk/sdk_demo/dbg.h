@@ -1,4 +1,4 @@
-// Last Update:2018-06-29 20:26:46
+// Last Update:2018-07-04 11:28:30
 /**
  * @file dbg.h
  * @brief 
@@ -74,23 +74,39 @@ extern int LoggerUnInit();
 typedef struct {
     long long int videoFrameCount;
     long long int audioFrameCount;
+    unsigned long long int videoStreamTotalBytes;
+    unsigned long long int audioStreamTotalBytes;
     FILE *fp;
+    int videoThreshold;
+    int audioThreshold;
+    unsigned int startTime; // millisecond
+    unsigned int endTime;
 } StreamDebugInfo;
 #define STREAM_DEBUG 1
 #define DBG_STREAM_WRITE_FILE 1
 
 #if STREAM_DEBUG
 //#define FRAME_NUMBER (10*60*30)// 10min * 60s * 30frames
-#define FRAME_NUMBER (100)// 10min * 60s * 30frames
+#define FRAME_NUMBER (300)// 10min * 60s * 30frames
 void DbgAddAudioFrameCount();
 void DbgAddVideoFrameCount();
 void DbgStreamFileOpen();
-void DbgWriteVideoFrame( void *frame, int size );
+void DbgGetVideoFrame( void *frame, int size );
+void DbgGetFrameAmount( unsigned long long int *pVideoCount, unsigned long long int *pAudioCount );
+void DbgFrameAmountReset();
+void LoggerSetPrintTime( int enable );
+void DbgDumpStream();
+void DbgSetVideoFrameThreshod( int threshod );
 #else
 #define DbgAddAudioFrameCount()
 #define DbgAddVideoFrameCount()
 #define DbgStreamFileOpen()
-#define DbgWriteVideoFrame( frame, size )
+#define DbgGetVideoFrame( frame, size )
+#define DbgGetFrameAmount( video, audio )
+#define DbgFrameAmountReset()
+#define LoggerSetPrintTime( enable )
+#define DbgDumpStream()
+#define DbgSetVideoFrameThreshod( threshold )
 #endif
 
 #endif  /*DBG_H*/

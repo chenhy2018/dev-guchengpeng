@@ -358,6 +358,29 @@ typedef struct
 	int real_transparency; //透明度。0-100
 }VideoOverlay;
 
+
+typedef	struct
+{
+	int enable;
+	
+	int pos_xscale;//画面宽度比例位置0-100
+	int pos_yscale;//画面高度比例位置0-100
+
+	int	color_front;	//前景颜色
+	int color_back;		//背景颜色
+	
+	int transparency; //透明度。0-100
+	char title_utf8[TITLE_MAX_LEN];//当titleType=BMP时，这里存放BMP路径
+	Titletype titleType; 	
+}UserOSD;
+
+#define MAX_USER_OSD_NUM 5
+
+typedef	struct
+{
+	UserOSD data[MAX_USER_OSD_NUM];
+}VideoUserOverlay;
+
 #define RESOLUTION_NAME_MAX_LEN 32
 
 typedef struct
@@ -438,7 +461,8 @@ typedef struct
 
 typedef struct
 {
-	int shutter_mode;//0-1	//快门模式:自动/手动
+	short shutter_mode_day;//0-1	//快门模式:自动/手动
+	short shutter_mode_night;//0-1	//快门模式:自动/手动
 	short shutter_speed_day;//10-10000	//快门速度
 	short shutter_speed_night;//10-10000 //快门速度
 }VideoShutter;
@@ -462,10 +486,10 @@ typedef enum
 
 typedef enum
 {
-	ISP_NORMAL = 0,// 正常 
-	ISP_FACE_EXPOSURE_PREVENTION =1,//防人脸过曝 
-	ISP_CHEPAI_MODE=2,//: 照车牌模式
-}IspAdvMode;
+	LED_IMAGE_NORMAL = 0,// 正常 
+	LED_IMAGE_FACE_EXPOSURE_PREVENTION =1,//防人脸过曝 
+	LED_IMAGE_CHEPAI_MODE=2,//: 照车牌模式
+}LedImageMode;//补光图像模式
 
 typedef enum
 {
@@ -477,6 +501,12 @@ typedef enum
 	IRCUT_OPENLED_ON_ILLUMINATION_0_30 = 5,// 0.30 
 }IrcutOpenLedOnIllum;
 
+typedef enum
+{
+	VIDEO_ISP_MODE_NORMAL = 0,// 正常模式 
+	VIDEO_ISP_MODE_FORCE_FRAMERATE =1,//强制帧率模式 
+	VIDEO_ISP_MODE_SUPERSTAR=2,//超星光模式
+}VideoEncodeMode;
 
 typedef struct
 {
@@ -497,34 +527,41 @@ typedef struct
 	int HLC;	//强光抑制 //0-255
 	int tnf;	//2d降噪 //0-255
 	int snf;	//3D降噪 //0-255
-	
-	IRCutMode ircut_mode; 
-	unsigned char ircut_sensitivity; //0 to 100 //未用到
-	unsigned char ircut_openled_delay;//补光延时 //IrcutOpenLedOnIllum
-	short reserved;
-	DayTimeSpan ircut_nighttime;
-	int ircut_keepcolor; //20120419
-	
+
+	////增益配置////	
 	int bManualGain;//0: 自动增益 1: 手动增益
 	int gainValue;//手动增益值
 
+	////////宽动态////////
 	int wdr_mode; //0: disable, 1: always open, 2: open at work time
 	DayTimeSpan wdr_worktime;
-#if 1//PLATFORM_HI35XX| PLATFORM_HI3516A | PLATFORM_HI3518EV200|PLATFORM_MSTAR |PLATFORM_HI3516CV300
 	int wdr_value;
+
+	////////去雾////////
 	int dfrog_flag;
 	int dfrog_value;
-#endif
 
-#if 1//PLATFORM_HI3516A | PLATFORM_HI35XX|PLATFORM_HI3516CV300 |PLATFORM_AMBAR_S2L|PLATFORM_AMBAR_S2LM | PLATFORM_AMBAR_S2LM2
+	////////电子快门////////
 	VideoShutter shutterSetting;
-#endif	
 
+	//图像ISP效果选项
 	int isp_mode_color;	//ISP彩色模式 0-3
 	int isp_mode_night; //ISP夜间模式 0-3
-	
+
+	//图像模式
+	int videoEncodeMode; //VideoEncodeMode
+
+	////////IRCUT与补光相关////////	
+	IRCutMode ircut_mode; 
+	unsigned char ircut_sensitivity; //0 to 100 //未用到
+	unsigned char ircut_openled_delay;//补光延时 //IrcutOpenLedOnIllum
+	unsigned char led_brightness_mode;	//补光亮度控制:0自动 1手动
+	unsigned char led_brightness_value;//补光亮度:10%-100%
+	DayTimeSpan ircut_nighttime;
+	int ircut_keepcolor; //20120419
 	LedMode led_mode;
-	IspAdvMode ispadvmode;//0: 正常 1: 防人脸过曝 2: 照车牌模式
+	LedImageMode ispadvmode;//0: 正常 1: 防人脸过曝 2: 照车牌模式
+	////////IRCUT与补光相关////////	
 }VideoCapture;
 
 #define MAX_VIDEO_MASK_AREA 4
@@ -564,9 +601,9 @@ typedef struct
 	VideoEncode    videoEncode;
 	JpegEncodeCfg  jpegCfg;
 	VideoOverlay   overlay;
-	
 	VideoMaskConfig videoMask;
 	VideoROI		roiCfg;
+	VideoUserOverlay   useroverlay;	
 }VideoConfig;
 
 typedef struct
@@ -688,7 +725,8 @@ typedef struct
 typedef struct
 {
 	int enable;
-	int port;
+	short port;
+	short auth;
 }HikConfig;
 
 #define MAX_RTMP_APP_NAME_LEN 64
@@ -744,7 +782,8 @@ typedef struct
 	char username[ACCOUNT_NAME_MAX_LEN];
 	char password[ACCOUNT_PASSWORD_MAX_LEN];
 	unsigned short PlayTone;//启动播放声音
-	unsigned short reserved;
+	unsigned char InRingTimes;//来电振铃次数后自动接通
+	unsigned char reserved;
 }VmPlatformConfig;
 
 typedef struct
