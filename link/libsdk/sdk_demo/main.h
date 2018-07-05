@@ -1,4 +1,4 @@
-// Last Update:2018-07-03 10:46:30
+// Last Update:2018-07-05 11:38:35
 /**
  * @file main.h
  * @brief 
@@ -12,13 +12,13 @@
 
 #include "sdk_interface.h"
 
-//#define DBG_BASIC() printf("[%s %s() +%d] ", __FILE__, __FUNCTION__, __LINE__)
-//#define DBG_LOG(args...) DBG_BASIC();printf(args)
-//#define LINE() DBG_LOG("++++++++++++++++++++++++\n")
 extern unsigned StreamStatus();
 extern int GetCallId();
 extern AccountID GetAccountId();
-void StartStream();
-void StopStream();
+extern void StartStream();
+extern void StopStream();
+extern int AppStatus();
+extern void AppQuit();
+extern void EnableSocketServer();
 
 #endif  /*MAIN_H*/

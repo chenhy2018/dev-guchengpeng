@@ -12,29 +12,15 @@
 #include "dbg.h"
 #include "stream.h"
 #include "common.h"
+#include "command.h"
+#include "dev_core.h"
 
 #define POLL_EVENT_TIMEOUT 1000
-
-void CmdHandleQuit( char *param );
-void CmdHanleHelp( char *param );
-void CmdHandleServer( char *param );
-void CmdHandleStartStream( char *param );
-void CmdHandleDump( char *param );
-void CmdHandleStopStream( char *param );
-void CmdHandleLogCloseTime( char *param );
-void CmdHandleLogOpenTime( char *param );
-void CmdHandleDbgReset( char *param );
-void CmdHandleVideoThreshold( char *param );
 
 static char *gLogFile = "/tmp/ipc-stream.log";
 static char *gAccountId = "1023";
 static char *gPasswd = "6epJRKvx";
 static char *gHost = "39.107.247.14";
-
-typedef struct {
-    char *cmd;
-    void (*pCmdHandle)(char *param);
-} DemoCmd;
 
 static struct app {
     char *logfile;
@@ -49,82 +35,6 @@ static struct app {
     unsigned running;
 } app;
 
-static DemoCmd gCmds[] =
-{
-    { "quit", CmdHandleQuit },
-    { "help", CmdHanleHelp },
-    { "start-socket-server", CmdHandleServer },
-    { "start-stream", CmdHandleStartStream },
-    { "dump", CmdHandleDump },
-    { "stop-stream", CmdHandleStopStream },
-    { "log-open-time", CmdHandleLogOpenTime },
-    { "log-close_time", CmdHandleLogCloseTime },
-    { "dbg-reset", CmdHandleDbgReset },
-    { "video-threshold", CmdHandleVideoThreshold },
-};
-
-void CmdHandleVideoThreshold( char *param )
-{
-}
-
-void CmdHandleDbgReset( char *param )
-{
-    DBG_LOG("frame amount reset\n");
-    DbgFrameAmountReset();
-}
-
-void CmdHandleLogCloseTime( char *param )
-{
-    LoggerSetPrintTime( 0 );
-    DBG_LOG("disable print time\n");
-}
-
-void CmdHandleLogOpenTime( char *param )
-{
-    LoggerSetPrintTime( 1 );
-    DBG_LOG("enable print time\n");
-}
-
-void CmdHandleStopStream( char *param )
-{
-    DBG_LOG("stop stream\n");
-    StopStream();
-    DbgFrameAmountReset();
-}
-
-void CmdHandleQuit( char *param )
-{
-    app.running = 0;
-}
-
-void CmdHandleDump( char *param )
-{
-    DbgDumpStream();
-}
-
-void CmdHanleHelp( char *param )
-{
-    printf("\thelp - this usage\n"
-           "\tquit - quit the app\n"
-           "\tstart-stream - start the rtp stream\n"
-           "\tstop-stream - stop the rtp stream\n"
-           "\tdump - show how much frames has been sent\n"
-           "\tlog-open-time - log print time\n"
-           "\tlog-close-time - log disable time\n"
-           "\tdbg-reset - clear the frame total size and amount\n"
-           "\tstart-socket-server - start socket server\n");
-}
-
-void CmdHandleServer( char *param )
-{
-    app.socketServer = 1;
-}
-
-void CmdHandleStartStream( char *param )
-{
-    DBG_LOG("start the rtp stream\n");
-    StartStream();
-}
 
 static int init_options( int argc, char *argv[] )
 {
@@ -209,9 +119,24 @@ unsigned StreamStatus()
     return ( app.startStream );
 }
 
+void EnableSocketServer()
+{
+    app.socketServer = 1;
+}
+
+void AppQuit()
+{
+    app.running = 0;
+}
+
 int GetCallId()
 {
     return ( app.callId) ;
+}
+
+int AppStatus()
+{
+    return app.running;
 }
 
 AccountID GetAccountId()
@@ -276,7 +201,6 @@ void StartIPC()
                     DBG_LOG("CALL_STATUS_HANGUP\n");
                     StopStream();
                     DbgDumpStream();
-                    DbgFrameAmountReset();
                     break;
                 case CALL_STATUS_ERROR:
                     DBG_LOG("CALL_STATUS_ERROR\n");
@@ -306,7 +230,10 @@ void StartIPC()
                 DBG_LOG("media 1 codec type : %d\n", pMediaEvent->media[1].codecType );
                 DBG_LOG("media 1 sample reate : %d\n", pMediaEvent->media[1].sampleRate );
                 DBG_LOG("media 1 channels : %d\n", pMediaEvent->media[1].channels );
-                StartStream();
+                DbgFrameAmountReset();
+                if ( pMediaEvent->nCount ) { // count = 0, sdp negotiation fail 
+                    StartStream();
+                }
             }
             break;
         case EVENT_MESSAGE:
@@ -332,38 +259,6 @@ void InitMedia( Media *media )
 }
 
 
-void *UserInputHandleThread( void *arg )
-{
-    char buffer[1024] = { 0 };
-    char *ret = NULL;
-    int i = 0;
-
-    while( app.running ) {
-        printf("sdk_demo >");
-        ret = fgets( buffer, sizeof(buffer), stdin );
-        if ( NULL == ret ) {
-            DBG_ERROR("fgets error, errno = %d\n", errno);
-            continue;
-        }
-
-        if ( strcmp( buffer, "\n") == 0 ||
-             strcmp( buffer, "\r") == 0 ) {
-            continue;
-        }
-        for ( i=0; i<ARRSZ(gCmds); i++ ) {
-            ret = strstr( buffer, gCmds[i].cmd );
-            if ( ret ) {
-                gCmds[i].pCmdHandle( buffer );
-                break;
-            } 
-        }
-        if ( i == ARRSZ(gCmds) ) {
-            DBG_ERROR("unknow command %s", buffer );
-        }
-    }
-
-    return NULL;
-}
 
 int main( int argc, char *argv[] )
 {
@@ -371,6 +266,7 @@ int main( int argc, char *argv[] )
     Media media[2];
     int sts = 0;
     pthread_t tid = 0;
+    CoreDevice *pDev = NULL;
 
     DBG_LOG("enter main %s %s ...\n", __DATE__, __TIME__ );
     memset( &app, 0, sizeof(app) );
@@ -415,17 +311,24 @@ int main( int argc, char *argv[] )
 
     SetLogLevel( LOG_ERROR );
     setPjLogLevel( 2 );
-    if ( InitIPC() < 0 ) {
-        DBG_ERROR("InitIPC() error\n");
+    pDev = NewCoreDevice();
+    if ( !pDev ) {
+        DBG_ERROR("get core device error\n");
         return 0;
     }
+
+    if ( pDev->init() < 0 ) {
+        DBG_ERROR("init capture device error\n");
+        return 0;
+    }
+
     DbgStreamFileOpen();
     pthread_create( &tid, NULL, UserInputHandleThread, NULL );
 
     StartIPC();
 
-    DeInitIPC();
     LoggerUnInit();
+    pDev->deInit();
 
     return 0;
 }
