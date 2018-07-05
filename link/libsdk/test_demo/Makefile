@@ -1,4 +1,3 @@
-LIBUA=../output/lib/$(ARCH)/libua.a
 LDFLAGS=-L../output/lib/$(ARCH) -lua -lpthread -lm /usr/lib/x86_64-linux-gnu/libcrypto.so /usr/lib/x86_64-linux-gnu/libssl.so
 CFLAGS=-g
 TARGET_OBJS=test.o unit_test.o
