@@ -7,11 +7,11 @@ static int createSdpMline(IN OUT PeerConnection * _pPeerConnection, pj_pool_t *_
 static int negotiationSettingAfterSuccess(IN PeerConnection * _pPeerConnection);
 int setLocalDescription(IN OUT PeerConnection * _pPeerConnection, IN void * _pSdp);
 static pj_status_t createMediaEndpt();
-void releasePeerConnectoin(IN void * pUserData);
+void releasePeerConnection(IN void * pUserData);
 
-void releasePeerConnectoin2(IN void * pUserData)
+void releasePeerConnection2(IN void * pUserData)
 {
-        MY_PJ_LOG(1, "releasePeerConnectoin2:%p", pUserData);
+        MY_PJ_LOG(1, "releasePeerConnection2:%p", pUserData);
 }
 
 enum { RTCP_INTERVAL = 5000, RTCP_RAND = 2000 };
@@ -540,10 +540,10 @@ static pj_status_t initTransportIce(IN PeerConnection * _pPeerConnection, OUT Tr
         _pPeerConnection->pGrpPool = pGrpPool;
         MY_PJ_LOG(5, "pj_grp_lock_add_handler %p", _pPeerConnection);
         status = pj_grp_lock_add_handler(pGrpLock, pGrpPool, _pPeerConnection,
-                                &releasePeerConnectoin);
+                                &releasePeerConnection);
         STATUS_CHECK(pj_grp_lock_add_handler, status);
         status = pj_grp_lock_add_handler(pGrpLock, pGrpPool, _pPeerConnection,
-                                         &releasePeerConnectoin2);
+                                         &releasePeerConnection2);
         STATUS_CHECK(pj_grp_lock_add_handler, status);
 
         return PJ_SUCCESS;
@@ -663,20 +663,20 @@ int ReleasePeerConnectoin(IN OUT PeerConnection * _pPeerConnection)
                 }
         }
 
-        MY_PJ_LOG(5, "releasePeerConnectoin %p destroy:%d", _pPeerConnection, _pPeerConnection->nDestroy);
+        MY_PJ_LOG(5, "releasePeerConnection %p destroy:%d", _pPeerConnection, _pPeerConnection->nDestroy);
         if (_pPeerConnection->nDestroy == 0) {
-                releasePeerConnectoin(_pPeerConnection);
+                releasePeerConnection(_pPeerConnection);
         }
 
         return PJ_SUCCESS;
 }
 
-void releasePeerConnectoin(IN void * pUserData)
+void releasePeerConnection(IN void * pUserData)
 {
         PeerConnection * _pPeerConnection = (PeerConnection * )pUserData;
         pj_mutex_lock(_pPeerConnection->pMutex);
         if (_pPeerConnection->nDestroy != 0) {
-                MY_PJ_LOG(5, "releasePeerConnectoin %p quit:%d total:%d destroy:%d", pUserData, _pPeerConnection->nQuitCnt,
+                MY_PJ_LOG(5, "releasePeerConnection %p quit:%d total:%d destroy:%d", pUserData, _pPeerConnection->nQuitCnt,
                           _pPeerConnection->mediaStream.nCount + 1, _pPeerConnection->nDestroy);
                 if (_pPeerConnection->nQuitCnt != _pPeerConnection->nDestroy + 1) {
                         pj_mutex_unlock(_pPeerConnection->pMutex);
@@ -733,7 +733,7 @@ void releasePeerConnectoin(IN void * pUserData)
 
         free(_pPeerConnection);
 
-        return PJ_SUCCESS;
+        return;
 }
 
 int AddAudioTrack(IN OUT PeerConnection * _pPeerConnection, IN MediaConfigSet * _pAudioConfig)
