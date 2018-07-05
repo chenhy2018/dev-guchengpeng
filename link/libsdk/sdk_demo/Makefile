@@ -3,7 +3,7 @@ CC=arm-linux-gnueabihf-gcc
 ARCH:=mstar
 LDFLAGS=-L./lib -L../output/lib/$(ARCH) -lua -lpthread -lm -lssl -lcrypto  -lcurl -lrtmp_sdk -lev -ldevsdk -ltools -lstdc++ -lfdk-aac
 CFLAGS=-g -std=gnu99
-TARGET_OBJS= main.o dbg.o stream.o h264_parse.o
+TARGET_OBJS= main.o dbg.o stream.o h264_parse.o command.o dev_core.o aj_ipc.o
 OBJS_DIR=./objs
 INCLUDE_PATH=-I./inc
 TARGET=sdk-demo
