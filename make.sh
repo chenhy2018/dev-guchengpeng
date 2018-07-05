@@ -7,7 +7,7 @@ fi
 prefix=
 if [ "$1" = "mstar" ];then
     export CC=arm-linux-gnueabihf-gcc
-    export CXX=arm-linux-gnueabihfg++
+    export CXX=arm-linux-gnueabihf-g++
 elif [ "$1" = "a12" ];then
     export CC=gcc
     export CXX=g++

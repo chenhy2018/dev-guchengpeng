@@ -1,4 +1,3 @@
-ARCH:=x86
 THIRD_PARTY_PATH=../../../third_party
 OPENSSL_PATH=$(THIRD_PARTY_PATH)/openssl-1.1.0h
 OPENSSL_LIB=${OPENSSL_PATH}/prefix/lib

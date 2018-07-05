@@ -18,6 +18,7 @@ fi
 
 export ARCH=$1
 
+cp -rf ../../third_party/openssl-1.1.0h/prefix/lib ./lib
 cd test
 make clean
 make
