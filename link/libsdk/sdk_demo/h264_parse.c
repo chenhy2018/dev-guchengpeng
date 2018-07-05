@@ -1,4 +1,4 @@
-// Last Update:2018-07-03 19:08:11
+// Last Update:2018-07-05 10:07:20
 /**
  * @file h264_parse.c
  * @brief pase the raw h264 stream 
@@ -10,17 +10,36 @@
 #include <string.h>
 #include "common.h"
 
+/*
+ * the NAL start prefix code (it can also be 0x00000001, depends on the encoder implementation)
+ * */
+#define NALU_START_CODE_4BYTES (0x01000000)
+#define NALU_START_CODE_3BYTES (0x010000)
+
 #define MAX_NALU_NUM_PER_FRAME 8
 
-#define NALU_TYPE_NONIDR	1
+#define NALU_TYPE_NONIDR	1 // Coded slice of a non-IDR picture
+// Coded slice data partition A
 #define NALU_TYPE_SLICE_DPA 2 // P frame
 #define NALU_TYPE_SLICE_DPB 3
 #define NALU_TYPE_SLICE_DPC 4
 #define NALU_TYPE_IDR		5 // I frame
+// Supplemental enhancement information
 #define NALU_TYPE_SEI		6
 #define NALU_TYPE_SPS		7 // Sequence parameter set
 #define NALU_TYPE_PPS		8 // Picture parameter set
-#define NALU_TYPE_AUD		9
+// Access unit delimiter
+#define NALU_TYPE_AUD       9
+/*
+ *  access unit delimiter. Notice that it is immediately followed by another NAL unit defined by 0x67,
+ *  which is a NAL type of 7, which is the sequence parameter set
+ *
+ *  Access Unit Delimiter (AUD). An AUD is an optional NALU that can be use to delimit frames in an elementary stream.
+ *  It is not required (unless otherwise stated by the container/protocol, like TS),
+ *  and is often not included in order to save space, but it can be useful to finds the start of a frame without having to fully parse each NALU.
+ *
+ * */
+#define NALU_TYPE_AUD		9 // 
 
 typedef struct
 {
@@ -28,111 +47,76 @@ typedef struct
 	unsigned short don;
 	unsigned int size;
 	unsigned char * addr;
-	unsigned char nalu_type;
+	unsigned char naluType;
+    unsigned char forbidden;
+    unsigned char refRdc;
 } NALU;
 
-
-int H265GetNALUType(unsigned char *pBuffer)
-{
-    unsigned char data = pBuffer[0];
-    int nanutype = (data >> 1) & 0x3f;
-
-    return nanutype;
-}
-
-int H264GetNALUType(unsigned char *pBuffer)
-{
-    unsigned char data = pBuffer[0];
-    int nanutype = (data) & 0x1F;
-
-    return nanutype;
-}
-
-int H264Parse( int encodetype, unsigned char *bitstream, unsigned int streamSize )
-{
+typedef struct {
     NALU nalus[MAX_NALU_NUM_PER_FRAME];
-    int index = -1;
-    u_int8_t * bs = bitstream;
-    u_int32_t head;
-    u_int8_t nalu_type;
-    int count = 0;
-    u_int8_t *last_byte_bitstream = bitstream + streamSize - 1;
+    int nonNALUCount;
+    int NALUCount;
+} H264Info;
 
-    memset(nalus, 0, sizeof(nalus));
+static H264Info gH264Info;
 
-    while ( bs <= last_byte_bitstream ) {
+// RBSP - Raw Byte Sequence Payload 
+int RBSPParse( unsigned char *_pBitStream, int index )
+{
+    unsigned char *pBitStream = _pBitStream;
 
-        head = (bs[3] << 24) | (bs[2] << 16) | (bs[1] << 8) | bs[0];
+    gH264Info.nalus[index].naluType = (*pBitStream) & 0x1F;// 5 bit
+    gH264Info.nalus[index].forbidden = (*pBitStream) & 0x80; // 1 bit
+    gH264Info.nalus[index].refRdc = (*pBitStream) & 0x60;// 2 bit
 
-        if (head == 0x01000000) {	// little ending
-            index++;
-            // we find a nalu
-            bs += 4;		// jump to nalu type
+    return 0;
+}
 
-            if( encodetype == 264 )
-                nalu_type = H264GetNALUType(bs);
-            else
-                nalu_type = H265GetNALUType(bs);
-            nalus[index].nalu_type = nalu_type;
-            nalus[index].addr = bs;
+int H264Parse2( unsigned char *_pBitStream, unsigned int size )
+{
+    unsigned char *pBitStream = _pBitStream;
+    unsigned int *pStartCode = NULL;
+    int index = 0;
 
-            if (index  > 0) {	// Not the first NALU in this stream
-                nalus[index -1].size = nalus[index].addr - nalus[index -1].addr - 4; // cut off 4 bytes of delimiter
-            }
-            //			printf("	nalu type %d, index %d, previous size %d\n", nalus[index].nalu_type, index,  index > 0 ? nalus[index -1].size : 0);
-        }
-        else if (bs[3] != 0) {
-            bs += 4;
-        } else if (bs[2] != 0) {
-            bs += 3;
-        } else if (bs[1] != 0) {
-            bs += 2;
+    while( pBitStream <= _pBitStream ) {
+        pStartCode = (unsigned int *)pBitStream;
+        if ( *pStartCode == NALU_START_CODE_4BYTES ) {
+            gH264Info.NALUCount++;
+            pBitStream += 4;// skip start code
+            RBSPParse( pBitStream, index );
+        } else if ( *pStartCode == NALU_START_CODE_3BYTES ) {
+            gH264Info.NALUCount++;
+            pBitStream += 3;
+            RBSPParse( pBitStream, index );
+        } else if ( pBitStream[3] != 0x00 ) { 
+            /* 
+             *  ----------------------------------------------------------------
+             * | x1 | x2 | x3 | x4 ( not 0x00 & not 0x01 ) | x5 | x6 | x7 | ... |
+             *  ----------------------------------------------------------------
+             * 
+             * if the 4th byte is not 0x00 and not 0x01, so
+             * 1. x2 x3 x4 x5
+             * 2. x3 x4 x5 x6
+             * 3. x4 x5 x6 x7
+             * this 3 case can not be 00 00 00 01 or 00 00 01, it expect the x4 must been 0x00
+             * so we can skip them
+             */
+            pBitStream += 4;
+            gH264Info.nonNALUCount ++;
+        } else if ( pBitStream[2] != 0x00 ) {
+            pBitStream += 3;
+            gH264Info.nonNALUCount ++;
+        } else if ( pBitStream[1] != 0x00 ) {
+            pBitStream += 2;
+            gH264Info.nonNALUCount ++;
         } else {
-            bs += 1;
+            pBitStream += 1;
+            gH264Info.nonNALUCount ++;
         }
-    }
-
-    if( index >= 0)
-        nalus[index].size =  last_byte_bitstream - nalus[index].addr + 1;
-
-    count = index + 1;
-    if (count == 0)
-    {
-        if (streamSize == 0)
-        {
-//            debuglog(SLOG_LVL_TRACE, "stream ended.\n");
-        }
-        else
-        {
-//            debuglog(SLOG_LVL_TRACE, "No nalu found in the bitstream!\n");
-        }
-        return -1;
-    }
-
-
-    int j = 0;
-    for( j = 0; j< count; j++)
-    {
-        if( (NALU_TYPE_SPS == nalus[j].nalu_type && 264 == encodetype ) ||
-            (NALU_TYPE_PPS == nalus[j].nalu_type && 264 == encodetype ) ||
-            (32 == nalus[j].nalu_type && 265 == encodetype ) ||
-            (33 == nalus[j].nalu_type && 265 == encodetype ) ||
-            (34 == nalus[j].nalu_type && 265 == encodetype ) )
-        {
-//            debuglog(SLOG_LVL_TRACE, "index %d: type %d, offset %d, size %d.\n", j, nalus[j].nalu_type, nalus[j].addr - bitstream, nalus[j].size);
-//            deubug_show_data_hex((unsigned char *) nalus[j].addr-4, nalus[j].size+4, 0);
-        }
-
-
-        if( (NALU_TYPE_SEI == nalus[j].nalu_type && 264 == encodetype ) ||
-            (/*H265_NAL_UNIT_SEI*/39 == nalus[j].nalu_type && 265 == encodetype ) ||
-            (/*H265_NAL_UNIT_SEI_SUFFIX*/40 == nalus[j].nalu_type && 265 == encodetype ) )
-        {
-//            debuglog(SLOG_LVL_TRACE, "index %d: type %d, offset %d, size %d.\n", j, nalus[j].nalu_type, nalus[j].addr - bitstream, nalus[j].size);
-//            deubug_show_data_hex((unsigned char *) nalus[j].addr-4, nalus[j].size+4, 0);
-        }
+        index ++;
     }
 
     return 0;
 }
+
 
