@@ -1,4 +1,4 @@
-// Last Update:2018-07-04 11:43:24
+// Last Update:2018-07-04 14:56:50
 /**
  * @file dbg.c
  * @brief 
@@ -170,10 +170,10 @@ void DbgGetVideoFrame( void *frame, int size )
     duration = (gDebugInfo.endTime - gDebugInfo.startTime)/1000;
     if ( !(gDebugInfo.videoFrameCount%gDebugInfo.videoThreshold) ) {
         if ( duration ) {
-            DBG_LOG("already send %lld video frames, total size %lld bytes\n", 
-                    gDebugInfo.videoFrameCount, gDebugInfo.videoStreamTotalBytes );
-        } else {
             DBG_LOG("already send %lld video frames, total size %lld bytes, bit rate %d bytes/s\n",
+                    gDebugInfo.videoFrameCount, gDebugInfo.videoStreamTotalBytes, gDebugInfo.videoStreamTotalBytes/duration );
+        } else {
+            DBG_LOG("already send %lld video frames, total size %lld bytes\n", 
                     gDebugInfo.videoFrameCount, gDebugInfo.videoStreamTotalBytes );
         }
     }
