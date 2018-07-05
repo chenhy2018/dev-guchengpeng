@@ -16,8 +16,8 @@ set(LIB_HEADER
 set(TEST_SRC
 	rtptest.c)
 
-link_directories(${CMAKE_CURRENT_SOURCE_DIR}/../../third_party/pjproject-2.7.2/prefix/lib)
-link_directories(${CMAKE_CURRENT_SOURCE_DIR}/../../third_party/openssl-1.1.0h/prefix/lib)
+link_directories(${CMAKE_CURRENT_SOURCE_DIR}/../../third_party/pjproject-2.7.2/prefix/$ENV{ARCH}/lib)
+link_directories(${CMAKE_CURRENT_SOURCE_DIR}/../../third_party/openssl-1.1.0h/prefix/$ENV{ARCH}/lib)
 
 add_library (rtp-$ENV{LIBPREFIX} ${LIB_HEADER} ${LIB_SRC})
 add_executable(rtptest-$ENV{LIBPREFIX} ${TEST_SRC})
