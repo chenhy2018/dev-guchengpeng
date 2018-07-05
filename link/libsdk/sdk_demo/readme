@@ -25,4 +25,20 @@ log-close-file - 停止输出日志到文件，切换到控制台
 dbg-reset - 恢复一些调试信息到默认值，比如总共发送了多少帧数据，总共发送了多少字节等
 video-threshold - 日志会每隔多少个帧就会打印一下当前发送了多少帧数据，主要为了确定推流是否还在继续，这个参数用来具体设置每隔多少个帧打印一次
 
+文件说明：
+command.c - 运行时接受用户输入的命令，用户可以与demo交互
+h264_parse.c - h264码流解析
+stream.c - 将网络摄像机采集到的图像通过网络打包成rtp包发到主叫方
+dbg.c - 日志和一些调试函数
+aj_ipc.c - 安佳IPC的初始化，设置视音频捕获格式，注册回调等
+dev_core.c - 网络ipc抽象层，某一个具体的ipc厂商需要将自己的设备注册到core，才会使能
+dev_config.h - 具体的网络ipc厂商需要将自己的设备在这个头文件里面注册，core才会知道具体要用哪个ipc设备
+main.c - 设置控制台参数，初始化推流sdk，等待用户发起sip 呼叫
+common.h - 定义一些工具宏或者通用的类型，比如uint32_t
+
+新的网络摄像机的加入：
+1.新建一个.c,比如 xxx_dev.c
+2.定义一个CaptureDevice 结构体变量，比如xxx_device,填充它里面的成员，主要是init和DeInit
+3.将xxx_device加入到dev_config.h, DEV_CORE_CAPTURE_DEVICE_ENTRY( xxx_device )
+4.Makefile加入平台的工具链
 
