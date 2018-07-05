@@ -1,3 +1,4 @@
+if (ENV{ARCH} STREQUAL "x86") 
 include(ExternalProject)
 ExternalProject_Add(stun
         SOURCE_DIR stun
@@ -6,6 +7,7 @@ ExternalProject_Add(stun
         INSTALL_COMMAND ""
         BUILD_IN_SOURCE 1
 )
+endif()
 
 add_subdirectory(libsip)
 add_subdirectory(libice)

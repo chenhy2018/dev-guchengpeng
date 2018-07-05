@@ -12,9 +12,11 @@ if [ $# != 1 ];then
     exit 1;
 fi
 
+LIBPREFIX=x86_64-unknown-linux-gnu
 prefix=
 if [ "$1" = "mstar" ];then
     prefix=arm-linux-gnueabihf-
+    LIBPREFIX=arm-unknown-linux-gnueabihf
 elif [ "$1" = "a12" ];then
     prefix=arm-linux-gnueabi-
 fi
@@ -31,14 +33,19 @@ mkdir -p ./${OUTPUT}/ori/$1
 mkdir -p ./${OUTPUT}/lib/$1/
 
 # 1. copy all the .a file from pjproject to libs/ori directory
-cp -rf third_party/pjproject-2.7.2/prefix/lib/* ${OUTPUT}/ori/$1
-rm -rf ${OUTPUT}/ori/$1/libpjsua2-x86_64-unknown-linux-gnu.a
+cp -rvf third_party/pjproject-2.7.2/prefix/$1/lib/libpjsip*-${LIBPREFIX}.a ${OUTPUT}/ori/$1
+cp -rvf third_party/pjproject-2.7.2/prefix/$1/lib/libpjmedia-${LIBPREFIX}.a ${OUTPUT}/ori/$1
+cp -rvf third_party/pjproject-2.7.2/prefix/$1/lib/libpj-${LIBPREFIX}.a ${OUTPUT}/ori/$1
+cp -rvf third_party/pjproject-2.7.2/prefix/$1/lib/libpjnath-${LIBPREFIX}.a ${OUTPUT}/ori/$1
+cp -rvf third_party/pjproject-2.7.2/prefix/$1/lib/libpjlib-util-${LIBPREFIX}.a ${OUTPUT}/ori/$1
+cp -rvf third_party/pjproject-2.7.2/prefix/$1/lib/libsrtp-${LIBPREFIX}.a ${OUTPUT}/ori/$1
+cp -rvf third_party/pjproject-2.7.2/prefix/$1/lib/libpjmedia-audiodev-${LIBPREFIX}.a ${OUTPUT}/ori/$1
+cp -rvf third_party/pjproject-2.7.2/prefix/$1/lib/libpjmedia-codec-${LIBPREFIX}.a ${OUTPUT}/ori/$1
 
-
-cp -rvf link/libsip/*.a ${OUTPUT}/ori/$1
-cp -rvf link/librtp/*.a ${OUTPUT}/ori/$1
-cp -rvf link/libmqtt/*.a ${OUTPUT}/ori/$1
-cp -rvf link/libsdk/*.a ${OUTPUT}/ori/$1
+cp -rvf link/libsip/libsip-$ENV{LIBPREFIX}.a ${OUTPUT}/ori/$1
+cp -rvf link/librtp/librtp-$ENV{LIBPREFIX}.a ${OUTPUT}/ori/$1
+cp -rvf link/libmqtt/libmqtt-$ENV{LIBPREFIX}.a ${OUTPUT}/ori/$1
+cp -rvf link/libsdk/libsdk-$ENV{LIBPREFIX}.a ${OUTPUT}/ori/$1
 
 cd ${OUTPUT}/ori/$1
 for f in ./*

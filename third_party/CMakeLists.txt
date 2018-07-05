@@ -14,7 +14,7 @@ include(ExternalProject)
 ExternalProject_Add(pjsip
         DEPENDS openssl-1.1.0h
         SOURCE_DIR pjproject-2.7.2
-        CONFIGURE_COMMAND ./configure  --with-ssl=${OPENSSL_PREFIX_PATH} --prefix=${PJ_PREFIX_PATH} --disable-sdl --disable-ffmpeg --disable-v4l2 --disable-openh264 --disable-libwebrtc --disable-sound --disable-oss --disable-video --disable-speex-aec --disable-g711-code --disable-l16-codec --disable-gsm-codec --disable-g722-codec --disable-g7221-codec --disable-speex-codec --disable-ilbc-codec --disable-bcg729 --disable-libyuv
+        CONFIGURE_COMMAND ./configure  --host=$ENV{HOST}  --with-ssl=${OPENSSL_PREFIX_PATH} --prefix=${PJ_PREFIX_PATH} --disable-sdl --disable-ffmpeg --disable-v4l2 --disable-openh264 --disable-libwebrtc --disable-sound --disable-oss --disable-video --disable-speex-aec --disable-g711-code --disable-l16-codec --disable-gsm-codec --disable-g722-codec --disable-g7221-codec --disable-speex-codec --disable-ilbc-codec --disable-bcg729 --disable-libyuv
         BUILD_COMMAND make dep COMMAND make
         INSTALL_COMMAND make install
         BUILD_IN_SOURCE 1

@@ -4,12 +4,9 @@ SET(GCC_INCLUDE_PATH "-I../../../ -I../../../../../third_party/pjproject-2.7.2/p
 SET(CMAKE_C_FLAGS "${GCC_INCLUDE_PATH} ${GCC_COVERAGE_COMPILE_FLAGS}")
 
 link_directories(${CMAKE_CURRENT_SOURCE_DIR}/../../../)
-link_directories(${CMAKE_CURRENT_SOURCE_DIR}/../../../../../third_party/pjproject-2.7.2/pjsip/lib/)
-link_directories(${CMAKE_CURRENT_SOURCE_DIR}/../../../../../third_party/pjproject-2.7.2/pjmedia/lib/)
-link_directories(${CMAKE_CURRENT_SOURCE_DIR}/../../../../../third_party/pjproject-2.7.2/pjlib-util/lib/)
-link_directories(${CMAKE_CURRENT_SOURCE_DIR}/../../../../../third_party/pjproject-2.7.2/pjlib/lib/)
+link_directories(${CMAKE_CURRENT_SOURCE_DIR}/../../../../../third_party/pjproject-2.7.2/prefix/$ENV{ARCH}/lib)
 
 aux_source_directory(. LIB_SIP_TEST)
-add_executable(max_call_uac ${LIB_SIP_TEST})
+add_executable(max_call_uac-$ENV{LIBPREFIX} ${LIB_SIP_TEST})
 
-target_link_libraries(max_call_uac sip pjsip-ua-x86_64-unknown-linux-gnu.a pjsip-x86_64-unknown-linux-gnu pjmedia-x86_64-unknown-linux-gnu pjlib-util-x86_64-unknown-linux-gnu pj-x86_64-unknown-linux-gnu pthread m)
+target_link_libraries(max_call_uac-$ENV{LIBPREFIX} sip-$ENV{LIBPREFIX} pjsip-ua-$ENV{LIBPREFIX}.a pjsip-$ENV{LIBPREFIX} pjmedia-$ENV{LIBPREFIX} pjlib-util-$ENV{LIBPREFIX} pj-$ENV{LIBPREFIX} pthread m)

@@ -1,4 +1,4 @@
-SET(GCC_COVERAGE_COMPILE_FLAGS "-Wall -Wno-unused -g")
+SET(GCC_COVERAGE_COMPILE_FLAGS "-std=gnu99 -Wall -Wno-unused -g")
 SET(GCC_INCLUDE_PATH "-I../ ")
 SET(CMAKE_C_FLAGS "${GCC_INCLUDE_PATH} ${GCC_COVERAGE_COMPILE_FLAGS}")
 
@@ -21,10 +21,10 @@ set (OPENSSL_CRYPTO_LIBRARY ../../../third_party/openssl-1.1.0h/libcrypto.so)
 set (OPENSSL_SSL_LIBRARY ../../../third_party/openssl-1.1.0h/libssl.so)
 set (LIBRARIES ${OPENSSL_CRYPTO_LIBRARY} ${OPENSSL_CRYPTO_LIBRARY})
 
-link_directories(${CMAKE_CURRENT_SOURCE_DIR}/../../../third_party/openssl-1.1.0h/prefix/lib)
+link_directories(${CMAKE_CURRENT_SOURCE_DIR}/../../../third_party/openssl-1.1.0h/prefix/$ENV{ARCH}/lib)
 link_directories(${CMAKE_CURRENT_SOURCE_DIR}/..)
 
 aux_source_directory(. LIB_MOSQUITTO_TEST)
-add_executable(mos_test ${LIB_MOSQUITTO_TEST})
+add_executable(mos_test-$ENV{LIBPREFIX} ${LIB_MOSQUITTO_TEST})
 
-target_link_libraries(mos_test mqtt pthread libcrypto.so libssl.so)
+target_link_libraries(mos_test-$ENV{LIBPREFIX} mqtt pthread libcrypto.so libssl.so)

@@ -41,12 +41,10 @@ SET(CMAKE_C_FLAGS "${GCC_INCLUDE_PATH} ${GCC_COVERAGE_COMPILE_FLAGS}")
 aux_source_directory(. LIB_MOSQUITTO_SRC)
 aux_source_directory(../../third_party/mosquitto-1.5/lib/ MOSQUITTO_SRC)
 
-add_library (mqtt STATIC ${LIB_MOSQUITTO_SRC} ${MOSQUITTO_SRC})
+add_library (mqtt-$ENV{LIBPREFIX} STATIC ${LIB_MOSQUITTO_SRC} ${MOSQUITTO_SRC})
 
-add_library(mqtt_dy SHARED ${LIB_MOSQUITTO_SRC} ${MOSQUITTO_SRC})
-set_target_properties(mqtt_dy PROPERTIES OUTPUT_NAME "mqtt")
-set_target_properties(mqtt_dy PROPERTIES VERSION 1.0  SOVERSION 1)
-
-link_directories(${CMAKE_CURRENT_SOURCE_DIR}/../../third_party/openssl-1.1.0h/prefix/lib)
+add_library(mqtt_dy-$ENV{LIBPREFIX} SHARED ${LIB_MOSQUITTO_SRC} ${MOSQUITTO_SRC})
+set_target_properties(mqtt_dy-$ENV{LIBPREFIX} PROPERTIES OUTPUT_NAME "mqtt")
+set_target_properties(mqtt_dy-$ENV{LIBPREFIX} PROPERTIES VERSION 1.0  SOVERSION 1)
 
 add_subdirectory(test)

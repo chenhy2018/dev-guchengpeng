@@ -1,9 +1,9 @@
 
 THIRD_PARTY_PATH=../../../third_party
 OPENSSL_PATH=$(THIRD_PARTY_PATH)/openssl-1.1.0h
-OPENSSL_LIB=${OPENSSL_PATH}/prefix/lib
+OPENSSL_LIB=${OPENSSL_PATH}/prefix/$(ARCH)/lib
 LDFLAGS=-L../../../output/lib/$(ARCH) -L$(OPENSSL_LIB) -lua -lpthread -lm -lcrypto -lssl 
-CFLAGS=-g
+CFLAGS=-g -std=gnu99
 TARGET_OBJS=test.o unit_test.o call_test.o register_test.o send_pkt_test.o hangup_call_test.o answercall_test.o \
 			rejectcall_test.o
 TESTCASE_OBJS_DIR=./objs
