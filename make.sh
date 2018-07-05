@@ -17,12 +17,14 @@ elif [ "$1" = "a12" ];then
 elif [ "$1" = "x86" ];then
     export CC=gcc
     export CXX=g++
-    export CROSS_COMPILE=
     export LIBPREFIX=x86_64-unknown-linux-gnu
+elif [ "$1" = "clean" ];then
+    ./make_clean.sh
+    exit 1;
 fi
 
 cmake .
-make
+make VERBOSE=1
 
 ./merge-lib.sh $1
 
