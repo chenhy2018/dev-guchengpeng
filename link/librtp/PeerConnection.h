@@ -52,7 +52,6 @@ typedef struct _PeerConnection
         pj_thread_desc threadDesc[5];
         int threadFlag[5];
         int nDestroy;
-        pj_grp_lock_t *gGrpLock;
         pj_pool_t *pGrpPool;
 }PeerConnection;
 

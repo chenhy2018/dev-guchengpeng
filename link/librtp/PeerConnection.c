@@ -177,6 +177,10 @@ static void onIceComplete2(pjmedia_transport *pTransport, pj_ice_strans_op op,
         TransportIce *pTransportIce = (TransportIce *)pUserData;
         PeerConnection * pPeerConnection = (PeerConnection *)pTransportIce->pPeerConnection;
         pj_mutex_lock(pPeerConnection->pMutex);
+        if (pPeerConnection->nQuitCnt) {
+                MY_PJ_LOG(1, "PeerConnection already quit");
+                return;
+        }
 
         MY_PJ_LOG(5, "onIceComplete2: op:%d status:%d", op, status);
         if (pPeerConnection->nIsFailCallbackDone) {
@@ -542,6 +546,7 @@ static pj_status_t initTransportIce(IN PeerConnection * _pPeerConnection, OUT Tr
         status = pj_grp_lock_add_handler(pGrpLock, pGrpPool, _pPeerConnection,
                                 &releasePeerConnection);
         STATUS_CHECK(pj_grp_lock_add_handler, status);
+         _pPeerConnection->nDestroy++;
         status = pj_grp_lock_add_handler(pGrpLock, pGrpPool, _pPeerConnection,
                                          &releasePeerConnection2);
         STATUS_CHECK(pj_grp_lock_add_handler, status);
@@ -674,21 +679,24 @@ int ReleasePeerConnectoin(IN OUT PeerConnection * _pPeerConnection)
 void releasePeerConnection(IN void * pUserData)
 {
         PeerConnection * _pPeerConnection = (PeerConnection * )pUserData;
+        MY_PJ_LOG(1, "releasePeerConnection------------:%p", pUserData);
         pj_mutex_lock(_pPeerConnection->pMutex);
         if (_pPeerConnection->nDestroy != 0) {
                 MY_PJ_LOG(5, "releasePeerConnection %p quit:%d total:%d destroy:%d", pUserData, _pPeerConnection->nQuitCnt,
                           _pPeerConnection->mediaStream.nCount + 1, _pPeerConnection->nDestroy);
+                _pPeerConnection->nQuitCnt++;
                 if (_pPeerConnection->nQuitCnt != _pPeerConnection->nDestroy + 1) {
                         pj_mutex_unlock(_pPeerConnection->pMutex);
                         return;
                 }
         }
         pj_mutex_unlock(_pPeerConnection->pMutex);
+        MY_PJ_LOG(1, "releasePeerConnection==============:%p", pUserData);
 
         for ( int i = 0; i < sizeof(_pPeerConnection->nAvIndex) / sizeof(int); i++) {
                 if (_pPeerConnection->transportIce[i].pNegotiationPool) {
                         pj_pool_release(_pPeerConnection->transportIce[i].pNegotiationPool);
-                        _pPeerConnection->transportIce[i].pNegotiationPool;
+                        _pPeerConnection->transportIce[i].pNegotiationPool = NULL;
                 }
         }
 
@@ -893,25 +901,12 @@ int createOffer(IN OUT PeerConnection * _pPeerConnection)
                 return PJ_SUCCESS;
         }
         int nMaxTracks = sizeof(_pPeerConnection->nAvIndex) / sizeof(int);
-        int nInitFailCnt = 0, nInitOkCnt = 0;
         for ( int i = 0; i < nMaxTracks; i++) {
                 if (_pPeerConnection->nAvIndex[i] != -1) {
                         status = initTransportIce(_pPeerConnection, &_pPeerConnection->transportIce[_pPeerConnection->nAvIndex[i]]);
-                        if (status != PJ_SUCCESS) {
-                                nInitFailCnt++;
-                                break;
-                        }
+                        STATUS_CHECK("initTransportIce", status);
                 }
-                nInitOkCnt++;
         }
-        if (nInitOkCnt > 0) {
-                _pPeerConnection->nDestroy = nInitOkCnt;
-        }
-        if (nInitFailCnt) {
-                MY_PJ_LOG(1, "initTransportIce fail:%d", status);
-                return status;
-        }
-        _pPeerConnection->nDestroy = nInitOkCnt;
 
         _pPeerConnection->role = ICE_ROLE_OFFERER;
         pjmedia_sdp_session *pOffer = NULL;
