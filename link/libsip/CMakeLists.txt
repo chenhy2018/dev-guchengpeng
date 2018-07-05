@@ -5,5 +5,5 @@ SET(CMAKE_C_FLAGS "${GCC_INCLUDE_PATH} ${GCC_COVERAGE_COMPILE_FLAGS}")
 aux_source_directory(. LIB_SIP_SRC)
 aux_source_directory(../util/ UTIL)
 
-add_library (sip--$ENV{LIBPREFIX} ${LIB_SIP_SRC} ${UTIL})
+add_library (sip-$ENV{LIBPREFIX} ${LIB_SIP_SRC} ${UTIL})
 add_subdirectory(test/)

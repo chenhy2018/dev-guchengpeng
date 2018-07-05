@@ -42,10 +42,10 @@ cp -rvf third_party/pjproject-2.7.2/prefix/$1/lib/libsrtp-${LIBPREFIX}.a ${OUTPU
 cp -rvf third_party/pjproject-2.7.2/prefix/$1/lib/libpjmedia-audiodev-${LIBPREFIX}.a ${OUTPUT}/ori/$1
 cp -rvf third_party/pjproject-2.7.2/prefix/$1/lib/libpjmedia-codec-${LIBPREFIX}.a ${OUTPUT}/ori/$1
 
-cp -rvf link/libsip/libsip-$ENV{LIBPREFIX}.a ${OUTPUT}/ori/$1
-cp -rvf link/librtp/librtp-$ENV{LIBPREFIX}.a ${OUTPUT}/ori/$1
-cp -rvf link/libmqtt/libmqtt-$ENV{LIBPREFIX}.a ${OUTPUT}/ori/$1
-cp -rvf link/libsdk/libsdk-$ENV{LIBPREFIX}.a ${OUTPUT}/ori/$1
+cp -rvf link/libsip/libsip-${LIBPREFIX}.a ${OUTPUT}/ori/$1
+cp -rvf link/librtp/librtp-${LIBPREFIX}.a ${OUTPUT}/ori/$1
+cp -rvf link/libmqtt/libmqtt-${LIBPREFIX}.a ${OUTPUT}/ori/$1
+cp -rvf link/libsdk/libsdk-${LIBPREFIX}.a ${OUTPUT}/ori/$1
 
 cd ${OUTPUT}/ori/$1
 for f in ./*
