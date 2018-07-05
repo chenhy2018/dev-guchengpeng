@@ -1,4 +1,7 @@
-LDFLAGS=-L../output/lib/$(ARCH) -lua -lpthread -lm /usr/lib/x86_64-linux-gnu/libcrypto.so /usr/lib/x86_64-linux-gnu/libssl.so
+THIRD_PARTY_PATH=../../../third_party
+OPENSSL_PATH=$(THIRD_PARTY_PATH)/openssl-1.1.0h
+OPENSSL_LIB=${OPENSSL_PATH}/prefix/lib
+LDFLAGS=-L../../../output/lib/$(ARCH) -L$(OPENSSL_LIB) -lua -lpthread -lm  -lssl -lcrypto
 CFLAGS=-g
 TARGET_OBJS=test.o unit_test.o
 TESTCASE_OBJS_DIR=./objs

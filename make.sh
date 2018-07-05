@@ -8,12 +8,15 @@ prefix=
 if [ "$1" = "mstar" ];then
     export CC=arm-linux-gnueabihf-gcc
     export CXX=arm-linux-gnueabihf-g++
+    export CROSS_COMPILE=arm-linux-gnueabihf-
+
 elif [ "$1" = "a12" ];then
     export CC=gcc
     export CXX=g++
 elif [ "$1" = "x86" ];then
     export CC=gcc
     export CXX=g++
+    export CROSS_COMPILE=
 fi
 
 cmake .

@@ -1,14 +1,15 @@
-SET(OPENSSL_PREFIX_PATH "${CMAKE_CURRENT_SOURCE_DIR}/openssl-1.1.0h/prefix")
+SET(OPENSSL_PREFIX_PATH "${CMAKE_CURRENT_SOURCE_DIR}/openssl-1.1.0h/prefix/$ENV{ARCH}")
+
 include(ExternalProject)
 ExternalProject_Add(openssl-1.1.0h
         SOURCE_DIR openssl-1.1.0h
         BUILD_COMMAND make COMMAND make install
-        CONFIGURE_COMMAND ./config --prefix=${OPENSSL_PREFIX_PATH}
+        CONFIGURE_COMMAND ./Configure --prefix=${OPENSSL_PREFIX_PATH} my-gcc;
         INSTALL_COMMAND ""
         BUILD_IN_SOURCE 1
 )
 
-SET(PJ_PREFIX_PATH "${CMAKE_CURRENT_SOURCE_DIR}/pjproject-2.7.2/prefix")
+SET(PJ_PREFIX_PATH "${CMAKE_CURRENT_SOURCE_DIR}/pjproject-2.7.2/prefix/$ENV{ARCH}")
 include(ExternalProject)
 ExternalProject_Add(pjsip
         DEPENDS openssl-1.1.0h
