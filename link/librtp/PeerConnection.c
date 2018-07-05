@@ -535,19 +535,27 @@ static pj_status_t initTransportIce(IN PeerConnection * _pPeerConnection, OUT Tr
         
         pj_grp_lock_t *pGrpLock = pjmedia_ice_get_grp_lock(transport);
 
-        pj_pool_t * pGrpPool = pj_pool_create(&manager.cachingPool.factory,
-                               NULL, 512, 512, NULL);
-        if (pGrpPool == NULL) {
-                MY_PJ_LOG(1, "pj_pool_create return NULL:%d", status);
-                return status;
+        if (_pPeerConnection->pGrpPool == NULL) {
+                pj_pool_t * pGrpPool = pj_pool_create(&manager.cachingPool.factory,
+                                       NULL, 512, 512, NULL);
+                if (pGrpPool == NULL) {
+                        MY_PJ_LOG(1, "pj_pool_create return NULL:%d", status);
+                        return status;
+                }
+                _pPeerConnection->pGrpPool = pGrpPool;
         }
-        _pPeerConnection->pGrpPool = pGrpPool;
+        if (_pPeerConnection->pGrpLock1 == NULL){
+                _pPeerConnection->pGrpLock1 = pGrpLock;
+        } else {
+                _pPeerConnection->pGrpLock2 = pGrpLock;
+        }
+
         MY_PJ_LOG(5, "pj_grp_lock_add_handler %p", _pPeerConnection);
-        status = pj_grp_lock_add_handler(pGrpLock, pGrpPool, _pPeerConnection,
+        status = pj_grp_lock_add_handler(pGrpLock, _pPeerConnection->pGrpPool, _pPeerConnection,
                                 &releasePeerConnection);
         STATUS_CHECK(pj_grp_lock_add_handler, status);
          _pPeerConnection->nDestroy++;
-        status = pj_grp_lock_add_handler(pGrpLock, pGrpPool, _pPeerConnection,
+        status = pj_grp_lock_add_handler(pGrpLock, _pPeerConnection->pGrpPool, _pPeerConnection,
                                          &releasePeerConnection2);
         STATUS_CHECK(pj_grp_lock_add_handler, status);
 
@@ -679,7 +687,8 @@ int ReleasePeerConnectoin(IN OUT PeerConnection * _pPeerConnection)
 void releasePeerConnection(IN void * pUserData)
 {
         PeerConnection * _pPeerConnection = (PeerConnection * )pUserData;
-        MY_PJ_LOG(1, "releasePeerConnection------------:%p", pUserData);
+        MY_PJ_LOG(1, "releasePeerConnection------------:%p grplock:%p %p", pUserData,
+                 _pPeerConnection->pGrpLock1, _pPeerConnection->pGrpLock2);
         pj_mutex_lock(_pPeerConnection->pMutex);
         if (_pPeerConnection->nDestroy != 0) {
                 MY_PJ_LOG(5, "releasePeerConnection %p quit:%d total:%d destroy:%d", pUserData, _pPeerConnection->nQuitCnt,
