@@ -61,8 +61,6 @@ typedef enum _CallbackType{
         CALLBACK_ICE,
         CALLBACK_RTP,
         CALLBACK_RTCP,
-        CALLBACK_INIT_RESULT,
-        CALLBACK_SET_REMOTE_RESULT,
         CALLBACK_SEND_RESULT
 }CallbackType;
 

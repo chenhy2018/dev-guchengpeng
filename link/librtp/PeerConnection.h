@@ -27,6 +27,7 @@ typedef struct _TransportIce
         void *pPeerConnection;
 }TransportIce;
 
+#define PC_STATUS_ALLOC 0
 #define PC_STATUS_INIT_OK 1
 #define PC_STATUS_CREATE_OFFER_OK 2
 #define PC_STATUS_CREATE_ANSWER_OK 3
@@ -64,14 +65,14 @@ typedef struct _PeerConnection
         pj_pool_t *pGrpPool;
         pj_grp_lock_t *pGrpLock1;
         pj_grp_lock_t *pGrpLock2;
+        pj_str_t remoteSdpStr;
+        int sdpStrCap;
 }PeerConnection;
 
 #define MQ_TYPE_QUIT 1
 #define MQ_TYPE_SEND 2
 #define MQ_TYPE_CREATE_OFFER 3
 #define MQ_TYPE_CREATE_ANSWER 4
-#define QM_TYPE_SET_REMOTE 5
-#define MQ_TYPE_INIT 6
 #define MQ_TYPE_NEG 7
 #define MQ_TYPE_RELEASE 8
 
