@@ -67,11 +67,13 @@ static pj_status_t librtp_register_thread(PeerConnection * _pPeerConnection)
                         return PJ_ETOOBIG;
                 }
 
-                pj_thread_t *pThread;
+                pj_thread_t *pThread = NULL;
                 char n[32] = {0};
                 sprintf(n, "pc%p", _pPeerConnection);
                 _pPeerConnection->threadFlag[idx] = 1;
                 status = pj_thread_register(n, _pPeerConnection->threadDesc[idx], &pThread);
+                MY_PJ_LOG(1, "thread register on pc:%p slot:%d flag:%d t:%p", _pPeerConnection, idx,
+                           _pPeerConnection->threadFlag[idx], pThread);
         }
         return status;
 }
