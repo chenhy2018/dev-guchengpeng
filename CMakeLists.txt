@@ -4,5 +4,5 @@ project (linking)
 
 SET(GCC_COVERAGE_COMPILE_FLAGS "-Wall -Wno-unused -g")
 
-#add_subdirectory(third_party)
+add_subdirectory(third_party)
 add_subdirectory(link)

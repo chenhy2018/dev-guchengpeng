@@ -28,6 +28,7 @@ struct MqttInstance
         struct mosquitto *mosq;
         struct MqttOptions options;
         int status;
+        int lastStatus;
         bool connected;
         bool isDestroying;
         Node pSubsribeList;

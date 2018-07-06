@@ -1,0 +1,19 @@
+make clean
+cd ./third_party/openssl-1.1.0h
+make clean
+cd ../pjproject-2.7.2
+make clean
+cd ../../link/libsip/
+make clean
+cd ../librtp/
+make clean
+cd ../libice/
+make clean
+cd ../libmqtt/
+make clean
+cd ../libstun/
+make clean
+cd ../libsdk/
+make clean
+cd ../../
+rm -rf CMakeCache.txt  CMakeFiles

@@ -46,7 +46,7 @@ typedef struct {
     TestCase father;
     RegisterData data;
 } RegisterTestCase;
-#define MAX_COUNT 5
+#define MAX_COUNT 1
 #define HOST "123.59.204.198"
 RegisterTestCase gRegisterTestCases[] =
 {

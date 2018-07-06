@@ -49,7 +49,7 @@ UA* UARegister(const char* _pId, const char* _pPassword, const char* _pSigHost,
         sipConfig.pPassWord = (char*)_pPassword;
         sipConfig.pDomain = (char*)_pSigHost;
         sipConfig.pUserData = (void *)pUA;
-        sipConfig.nMaxOngoingCall = 10;
+        sipConfig.nMaxOngoingCall = 40;
         DBG_LOG("UARegister %s %s %s %p ongoing call %d\n",
                 sipConfig.pUserName, sipConfig.pPassWord, sipConfig.pDomain, sipConfig.pUserData, sipConfig.nMaxOngoingCall);
         SipAnswerCode Ret = SipRegAccount(&sipConfig, nSdkAccountId);
@@ -245,7 +245,6 @@ void UAOnCallStateChange(UA* _pUa, const int nCallId, const SipInviteState State
         if (call) {
                 *pId = call->id;
                 DBG_LOG("call %p\n", call);
-                //CALLOnCallStateChange(&call, State, StatusCode, pMedia);
                 if (State == INV_STATE_DISCONNECTED) {
                                 DBG_LOG("*******UAOnCallStateChange del %p \n", pos);
                                 list_del(pos);

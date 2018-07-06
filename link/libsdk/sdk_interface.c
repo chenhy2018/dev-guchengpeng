@@ -347,7 +347,7 @@ ErrorID InitSDK( Media* _pMediaConfigs, int _nSize)
         config.Cb.OnIncomingCall  = &cbOnIncomingCall;
         config.Cb.OnCallStateChange = &cbOnCallStateChange;
         config.Cb.OnRegStatusChange = &cbOnRegStatusChange;
-        config.nMaxCall = 16;
+        config.nMaxCall = 40;
         config.nMaxAccount = 40;
         pUAManager->config.callback.OnRxRtp = &OnRxRtp;
         // debug code.
@@ -667,7 +667,6 @@ void cbOnRegStatusChange(const int _nAccountId, const SipAnswerCode _regStatusCo
     //pthread_mutex_unlock(&pUAManager->mutex);
 }
 
-//This function may call by sync. Disable lock firstly.
 void cbOnCallStateChange(const int _nCallId, const int _nAccountId, const SipInviteState _State,
                          const SipAnswerCode _StatusCode, const void *pUser, const void *pMedia)
 {
@@ -714,7 +713,13 @@ void cbOnCallStateChange(const int _nCallId, const int _nAccountId, const SipInv
     if ( _State == INV_STATE_CONFIRMED ) {
             pCallEvent->status = CALL_STATUS_ESTABLISHED;
     } else if ( _State == INV_STATE_DISCONNECTED ) {
-            pCallEvent->status = CALL_STATUS_HANGUP;
+            if (_StatusCode == OK) {
+                    pCallEvent->status = CALL_STATUS_HANGUP;
+            }
+            else {
+                    DBG_ERROR("state = %d, status code = %d callid %d accountid %d\n", _State, _StatusCode, _nCallId, _nAccountId);
+                    pCallEvent->status = CALL_STATUS_ERROR;
+            }
     } else {
             pCallEvent->status = CALL_STATUS_REGISTERED;
     }
