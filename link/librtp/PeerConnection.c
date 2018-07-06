@@ -84,8 +84,8 @@ static pj_status_t librtp_register_thread(PeerConnection * _pPeerConnection)
 static void print_sdp(pjmedia_sdp_session * _pSdp, const char * _pLogPrefix)
 {
         if (5 <= pj_log_get_level()) {
-                char sdpStr[2048];
-                memset(sdpStr, 0, 2048);
+                char sdpStr[4096];
+                memset(sdpStr, 0, sizeof(sdpStr));
                 pjmedia_sdp_print(_pSdp, sdpStr, sizeof(sdpStr));
                 if (_pLogPrefix != NULL) {
                         MY_PJ_LOG(5, "%s:%s", _pLogPrefix, sdpStr);
