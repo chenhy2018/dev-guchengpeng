@@ -26,6 +26,8 @@ typedef struct _ResoureMgr {
         pj_pool_t         *pTimerHeapPool;
         pj_thread_t       *pPollThread;
         pj_pool_t         *pThreadPool;
+        pj_lock_t *pTimerLock;
+        pj_lock_t *pIoqueueLock;
         pj_mutex_t *pMutex;
         pj_pool_t *pMutexPool;
         int nQuit;
@@ -338,6 +340,12 @@ int InitialiseRtp()
         pj_caching_pool_init(&manager.cachingPool, &pj_pool_factory_default_policy, 0);
         manager.pPoolFactory = &manager.cachingPool.factory;
 
+        pj_pool_t *pPool = pj_pool_create(manager.pPoolFactory, NULL, 128, 128, NULL);
+        ASSERT_RETURN_CHECK(pPool, pj_pool_create);
+        manager.pMutexPool = pPool;
+        status = pj_mutex_create(pPool, NULL, PJ_MUTEX_DEFAULT, &manager.pMutex);
+        STATUS_CHECK(pj_mutex_create, status);
+
         pj_pool_t * pTimerPool = pj_pool_create(manager.pPoolFactory, "mgrheap", 512, 512, NULL);
         ASSERT_RETURN_CHECK(pTimerPool, pj_pool_create);
         manager.pTimerHeapPool = pTimerPool;
@@ -345,6 +353,10 @@ int InitialiseRtp()
         status = pj_timer_heap_create(pTimerPool, 64, &pTimerHeap);
         STATUS_CHECK(pj_timer_heap_create, status);
         manager.pTimerHeap = pTimerHeap;
+
+        status = pj_lock_create_recursive_mutex(manager.pMutexPool , "mgrtl%p", &manager.pTimerLock);
+        STATUS_CHECK(pj_lock_create_recursive_mutex, status);
+        pj_timer_heap_set_lock(manager.pTimerHeap, manager.pTimerLock, PJ_TRUE);
 
         pj_pool_t * pIoQueuePool = pj_pool_create(manager.pPoolFactory, "mgrioque", 512, 512, NULL);
         ASSERT_RETURN_CHECK(pIoQueuePool, pj_pool_create);
@@ -354,6 +366,11 @@ int InitialiseRtp()
         STATUS_CHECK(pj_ioqueue_create, status);
         manager.pIoQueue = pIoQueue;
 
+        status = pj_lock_create_recursive_mutex(manager.pMutexPool , "mgrtl%p", &manager.pIoqueueLock);
+        STATUS_CHECK(pj_lock_create_recursive_mutex, status);
+        pj_ioqueue_set_lock(manager.pIoQueue, manager.pIoqueueLock, PJ_TRUE);
+        pj_ioqueue_set_default_concurrency(manager.pIoQueue, PJ_TRUE);
+
         pj_thread_t * pThread;
         pj_pool_t * pThreadPool = pj_pool_create(manager.pPoolFactory, NULL, 512, 512, NULL);
         ASSERT_RETURN_CHECK(pThreadPool, pj_pool_create);
@@ -361,12 +378,6 @@ int InitialiseRtp()
         status = pj_thread_create(pThreadPool, "iceWorkerThread", &iceWorkerThread, NULL, 0, 0, &pThread);
         STATUS_CHECK(pj_thread_create, status);
         manager.pPollThread = pThread;
-
-        pj_pool_t *pPool = pj_pool_create(manager.pPoolFactory, NULL, 128, 128, NULL);
-        ASSERT_RETURN_CHECK(pPool, pj_pool_create);
-        manager.pMutexPool = pPool;
-        status = pj_mutex_create(pPool, NULL, PJ_MUTEX_DEFAULT, &manager.pMutex);
-        STATUS_CHECK(pj_mutex_create, status);
 
         return createMediaEndpt();
 }
@@ -550,7 +561,8 @@ static pj_status_t initTransportIce(IN PeerConnection * _pPeerConnection, OUT Tr
                 _pPeerConnection->pGrpLock2 = pGrpLock;
         }
 
-        MY_PJ_LOG(5, "pj_grp_lock_add_handler %p", _pPeerConnection);
+        MY_PJ_LOG(1, "pj_grp_lock_add_handler %p. grplock:%p %p", _pPeerConnection, _pPeerConnection->pGrpLock1,
+                  _pPeerConnection->pGrpLock2);
         status = pj_grp_lock_add_handler(pGrpLock, _pPeerConnection->pGrpPool, _pPeerConnection,
                                 &releasePeerConnection);
         STATUS_CHECK(pj_grp_lock_add_handler, status);
