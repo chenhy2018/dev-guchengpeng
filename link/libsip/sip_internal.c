@@ -297,16 +297,20 @@ static pj_status_t SipRegcInit(IN const int _nAccountId)
         char tmpContact[64];
         /* Get local IP address for the default IP address */
         {
-                static char LocalIp[PJ_INET_ADDRSTRLEN];
+                char LocalIp[PJ_INET_ADDRSTRLEN];
+                pj_sockaddr HostAddr;
                 const pj_str_t *pHostName;
                 pj_sockaddr_in tmpAddr;
 
-                pHostName = pj_gethostname();
-                pj_sockaddr_in_init(&tmpAddr, pHostName, 0);
-                pj_inet_ntop(pj_AF_INET(), &tmpAddr.sin_addr, LocalIp,
-                             sizeof(LocalIp));
+                Status = pj_gethostip(pj_AF_INET(), &HostAddr);
+                if (Status != PJ_SUCCESS) {
+                        PrintErrorMsg(Status, "Unable to retrieve local host IP");
+                        return Status;
+                }
+                pj_sockaddr_print(&HostAddr, LocalIp, sizeof(LocalIp), 2);
+
                 SipAppData.LocalIp = pj_str(LocalIp);
-                pj_ansi_sprintf(tmpContact, "<sip:%s@%s:%d>", pAccount->UserName.ptr, LocalIp, SipAppData.LocalPort);
+                pj_ansi_sprintf(tmpContact, "<sip:%s@%s>", pAccount->UserName.ptr, LocalIp);
         }
         pj_str_t Contact = pj_str(tmpContact);
         pj_strdup_with_null(pAccount->pPool, &pAccount->Contact, &Contact);
@@ -624,7 +628,8 @@ static pj_bool_t SipUpdateContactIfNat(IN SipAccount *_pAccount, IN struct pjsip
                 nRport = pVia->rport_param;
                 pViaAddr = &pVia->recvd_param;
         }
-        if (pj_strcmp(&_pAccount->ViaAddr.host, pViaAddr) == 0)
+        if (pj_strcmp(&_pAccount->ViaAddr.host, pViaAddr) == 0 &&
+            _pAccount->ViaAddr.port == nRport)
                 return PJ_FALSE;
 
         pj_strdup_with_null(_pAccount->pPool, &_pAccount->ViaAddr.host, pViaAddr);
