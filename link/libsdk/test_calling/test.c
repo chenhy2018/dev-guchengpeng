@@ -199,7 +199,7 @@ void Mthread1(void* data)
                                   if (pCallEvent->status == CALL_STATUS_ERROR || pCallEvent->status == CALL_STATUS_HANGUP) {
                                         DBG_LOG("makecall *****************  ERROR ****************************8*\n");
                                         do {
-                                                id = MakeCall(pData->accountid, "1710", "123.59.204.198", &pData->callid);
+                                                id = MakeCall(pData->accountid, "1710", HOST, &pData->callid);
                                         } while (id != RET_OK);
                                   }
 
@@ -293,7 +293,7 @@ int RegisterTestSuitCallback( TestSuit *this )
            pData->timecount = 0;
            UT_LOG("MakeCall in accountid %d\n", pData->accountid);
            pData->callid = 0;
-           id = MakeCall(pData->accountid, "1710", "123.59.204.198", &pData->callid);
+           id = MakeCall(pData->accountid, "1710", HOST, &pData->callid);
            if (RET_OK != id) {
                     fprintf(stderr, "call error %d \n", id);
                      continue;
