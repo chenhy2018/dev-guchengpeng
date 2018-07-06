@@ -8,6 +8,13 @@ static int negotiationSettingAfterSuccess(IN PeerConnection * _pPeerConnection);
 int setLocalDescription(IN OUT PeerConnection * _pPeerConnection, IN void * _pSdp);
 static pj_status_t createMediaEndpt();
 void releasePeerConnection(IN void * pUserData);
+void notifyReleasePeerConnectoin(IN PeerConnection * _pPeerConnection);
+int initPeerConnectoin(OUT PeerConnection * _pPeerConnection);
+int createOffer_(IN OUT PeerConnection * _pPeerConnection);
+int createAnswer_(IN OUT PeerConnection * _pPeerConnection, IN void *_pOffer);
+int setRemoteDescription_(IN OUT PeerConnection * _pPeerConnection, IN void * _pSdp);
+int startNegotiation(IN PeerConnection * _pPeerConnection);
+int sendRtpPacket(IN PeerConnection *_pPeerConnection, IN OUT RtpPacket * _pPacket);
 
 void releasePeerConnection2(IN void * pUserData)
 {
@@ -18,7 +25,8 @@ enum { RTCP_INTERVAL = 5000, RTCP_RAND = 2000 };
 
 typedef struct _ResoureMgr {
         pj_caching_pool   cachingPool;
-
+        MessageQueue *pMsgQ;
+        pj_thread_t       *pMqThread;
         pj_ioqueue_t      *pIoQueue;
         pj_pool_t         *pIoqueuePool;
         pj_timer_heap_t   *pTimerHeap;
@@ -49,35 +57,79 @@ static inline pj_status_t librtp_inner_uninit_register_thread()
         return pj_thread_register("uninitrtp", innerUninitDesc, &pInnerUninitThread);
 }
 
-static pj_status_t librtp_register_thread(PeerConnection * _pPeerConnection)
+Message * create_msg_just_with_peer_connection(PeerConnection *_pPeerConnection, int _nType)
 {
-        pj_status_t status = PJ_SUCCESS;
-        int isReg = pj_thread_is_registered();
-        if(isReg == 0){
-                int idx = -1;
-                for (int i = 0; i < sizeof(_pPeerConnection->threadFlag) / sizeof(int); i++) {
-                        if (_pPeerConnection->threadFlag[i] == 0) {
-                                idx = i;
-                                break;
-                        }
-                }
-                if (idx == -1) {
-                        MY_PJ_LOG(1, "too much thread");
-                        return PJ_ETOOBIG;
-                }
-
-                pj_thread_t *pThread = NULL;
-                char n[32] = {0};
-                sprintf(n, "pc%p", _pPeerConnection);
-                _pPeerConnection->threadFlag[idx] = 1;
-                status = pj_thread_register(n, _pPeerConnection->threadDesc[idx], &pThread);
-                MY_PJ_LOG(1, "thread register on pc:%p slot:%d flag:%d t:%p", _pPeerConnection, idx,
-                           _pPeerConnection->threadFlag[idx], pThread);
+        pj_pool_t * pPool = pj_pool_create(&manager.cachingPool.factory, NULL, sizeof(RtpMqMsg), sizeof(RtpMqMsg), NULL);
+        if (pPool == NULL) {
+                return NULL;
         }
-        return status;
+        RtpMqMsg *pRtpMqMsg = (RtpMqMsg *)pj_pool_alloc(pPool, sizeof(RtpMqMsg));
+        pRtpMqMsg->pPool = pPool;
+        pRtpMqMsg->nType = _nType;
+        pRtpMqMsg->pPeerConnection = _pPeerConnection;
+
+        return (Message *)pRtpMqMsg;
 }
 
-#define  LIBRTP_REGISTER_THREAD(p) librtp_register_thread(p)
+Message* create_msg_send(PeerConnection *_pPeerConnection, RtpPacket * pPkt)
+{
+        Message * pMsg = create_msg_just_with_peer_connection(_pPeerConnection, MQ_TYPE_SEND);
+        if (pMsg == NULL) {
+                return NULL;
+        }
+        RtpMqMsg *pRtpMqMsg = (RtpMqMsg *)pMsg;
+        pRtpMqMsg->pkt = *pPkt;
+        char * pTmp = (char *)pj_pool_alloc(pRtpMqMsg->pPool, pPkt->nDataLen);
+        if (pTmp == NULL) {
+                pj_pool_release(pRtpMqMsg->pPool);
+                return NULL;
+        }
+        memcpy(pTmp, pRtpMqMsg->pkt.pData, pPkt->nDataLen);
+        pRtpMqMsg->pkt.pData = (uint8_t *)pTmp;
+        return pMsg;
+}
+
+Message * create_msg_set_remote(PeerConnection *_pPeerConnection, void *_pArg)
+{
+        Message * pMsg = create_msg_just_with_peer_connection(_pPeerConnection, QM_TYPE_SET_REMOTE);
+        if (pMsg == NULL) {
+                return NULL;
+        }
+        RtpMqMsg *pRtpMqMsg = (RtpMqMsg *)pMsg;
+        pRtpMqMsg->pArg = _pArg;
+        return pMsg;
+}
+
+Message * create_msg_create_offer(PeerConnection *_pPeerConnection)
+{
+        return create_msg_just_with_peer_connection(_pPeerConnection, MQ_TYPE_CREATE_OFFER);
+}
+
+Message * create_msg_create_answer(PeerConnection *_pPeerConnection, void *_pArg)
+{
+        Message * pMsg = create_msg_just_with_peer_connection(_pPeerConnection, MQ_TYPE_CREATE_ANSWER);
+        if (pMsg == NULL) {
+                return NULL;
+        }
+        RtpMqMsg *pRtpMqMsg = (RtpMqMsg *)pMsg;
+        pRtpMqMsg->pArg = _pArg;
+        return pMsg;
+}
+
+Message * create_msg_init(PeerConnection *_pPeerConnection)
+{
+        return create_msg_just_with_peer_connection(_pPeerConnection, MQ_TYPE_INIT);
+}
+
+Message * create_msg_start_neg(PeerConnection *_pPeerConnection)
+{
+        return create_msg_just_with_peer_connection(_pPeerConnection, MQ_TYPE_NEG);
+}
+
+Message * create_msg_release(PeerConnection *_pPeerConnection)
+{
+        return create_msg_just_with_peer_connection(_pPeerConnection, MQ_TYPE_RELEASE);
+}
 
 
 static void print_sdp(pjmedia_sdp_session * _pSdp, const char * _pLogPrefix)
@@ -226,11 +278,21 @@ static void onIceComplete2(pjmedia_transport *pTransport, pj_ice_strans_op op,
                         if (status != PJ_SUCCESS) {
                                 MY_PJ_LOG(1, "--->gathering candidates finish. but addCandidate fail:%d", status);
                                 doUserCallback(pPeerConnection, ICE_STATE_GATHERING_FAIL, NULL);
+                                if (pPeerConnection->role == ICE_ROLE_OFFERER) {
+                                        pPeerConnection->nState = PC_STATUS_CREATE_OFFER_FAIL;
+                                } else {
+                                        pPeerConnection->nState = PC_STATUS_CREATE_ANSWER_FAIL;
+                                }
                                 pj_mutex_unlock(pPeerConnection->pMutex);
                                 return;
                         }
                         MY_PJ_LOG(3, "--->gathering candidates finish. addCandidate ok");
                         doUserCallback(pPeerConnection, ICE_STATE_GATHERING_OK, pSdp);
+                        if (pPeerConnection->role == ICE_ROLE_OFFERER) {
+                                pPeerConnection->nState = PC_STATUS_CREATE_OFFER_OK;
+                        } else {
+                                pPeerConnection->nState = PC_STATUS_CREATE_ANSWER_OK;
+                        }
                         pj_mutex_unlock(pPeerConnection->pMutex);
                         break;
                         
@@ -250,12 +312,14 @@ static void onIceComplete2(pjmedia_transport *pTransport, pj_ice_strans_op op,
                         if (status != PJ_SUCCESS) {
                                 MY_PJ_LOG(1, "--->negotiation finish, but fail. status:%d", status);
                                 doUserCallback(pPeerConnection, ICE_STATE_NEGOTIATION_FAIL, NULL);
+                                pPeerConnection->nState = PC_STATUS_NEG_FAIL;
                                 pj_mutex_unlock(pPeerConnection->pMutex);
                                 return;
                         }
                         MY_PJ_LOG(3, "--->negotiation ok");
 
                         doUserCallback(pPeerConnection, ICE_STATE_NEGOTIATION_OK, NULL);
+                        pPeerConnection->nState = PC_STATUS_NEG_OK;
                         pj_mutex_unlock(pPeerConnection->pMutex);
                         break;
                         
@@ -272,6 +336,70 @@ static void onIceComplete2(pjmedia_transport *pTransport, pj_ice_strans_op op,
                         pj_mutex_unlock(pPeerConnection->pMutex);
                         break;
         }
+}
+
+static int rtpMqThread(void * _pArg)
+{
+        while(!manager.nQuit) {
+                Message* pMsg = ReceiveMessage(manager.pMsgQ);
+                RtpMqMsg *pRtpMqMsg = (RtpMqMsg*)pMsg;
+                pj_status_t status;
+                switch (pRtpMqMsg->nType) {
+                        case MQ_TYPE_INIT:
+                                status = initPeerConnectoin(pRtpMqMsg->pPeerConnection);
+                                if (status == 0) {
+                                        pRtpMqMsg->pPeerConnection->nState = PC_STATUS_INIT_OK;
+                                } else {
+                                        pRtpMqMsg->pPeerConnection->nState = PC_STATUS_INIT_FAIL;
+                                }
+                                pRtpMqMsg->pPeerConnection->userIceConfig.userCallback(
+                                        pRtpMqMsg->pPeerConnection->userIceConfig.pCbUserData,
+                                        CALLBACK_INIT_RESULT,
+                                        (void *)status);
+                                break;
+                        case MQ_TYPE_QUIT:
+                                MY_PJ_LOG(3, "rtpMqThread receive quit msg");
+                                break;
+                        case MQ_TYPE_SEND:
+                                status = sendRtpPacket(pRtpMqMsg->pPeerConnection, &pRtpMqMsg->pkt);
+                                pRtpMqMsg->pPeerConnection->userIceConfig.userCallback(
+                                        pRtpMqMsg->pPeerConnection->userIceConfig.pCbUserData,
+                                        CALLBACK_SEND_RESULT,
+                                        (void *)status);
+                                break;
+                        case MQ_TYPE_CREATE_OFFER:
+                                createOffer_(pRtpMqMsg->pPeerConnection);
+                                break;
+                        case MQ_TYPE_CREATE_ANSWER:
+                                createAnswer_(pRtpMqMsg->pPeerConnection, pRtpMqMsg->pArg);
+                                break;
+                        case QM_TYPE_SET_REMOTE:
+                                status = setRemoteDescription_(pRtpMqMsg->pPeerConnection, pRtpMqMsg->pArg);
+                                if (status == 0) {
+                                        pRtpMqMsg->pPeerConnection->nState = PC_STATUS_SET_REMOTE_OK;
+                                } else {
+                                        pRtpMqMsg->pPeerConnection->nState = PC_STATUS_SET_REMOTE_FAIL;
+                                }
+                                pRtpMqMsg->pPeerConnection->userIceConfig.userCallback(
+                                        pRtpMqMsg->pPeerConnection->userIceConfig.pCbUserData,
+                                        CALLBACK_SET_REMOTE_RESULT,
+                                        (void *)status);
+                                break;
+                        case MQ_TYPE_NEG:
+                                startNegotiation(pRtpMqMsg->pPeerConnection);
+                                break;
+                        case MQ_TYPE_RELEASE:
+                                notifyReleasePeerConnectoin(pRtpMqMsg->pPeerConnection);
+                                break;
+                                
+                        default:
+                                MY_PJ_LOG(1, "unkown type:%d", pRtpMqMsg->nType);
+                                break;
+                }
+                if (pRtpMqMsg->pPool != NULL)
+                        pj_pool_release(pRtpMqMsg->pPool);
+        }
+        return 0;
 }
 
 static int iceWorkerThread(void * _pArg)
@@ -339,6 +467,13 @@ int InitialiseRtp()
         if (isLibrtpInited) {
                 return -1;
         }
+
+        manager.pMsgQ = CreateMessageQueue(16);
+        if (manager.pMsgQ == NULL) {
+                MY_PJ_LOG(1, "CreateMessageQueue fail");
+                return -2;
+        }
+        
         librtp_inner_init_register_thread();
         pj_status_t status;
 
@@ -382,6 +517,12 @@ int InitialiseRtp()
         status = pj_thread_create(pThreadPool, "iceWorkerThread", &iceWorkerThread, NULL, 0, 0, &pThread);
         STATUS_CHECK(pj_thread_create, status);
         manager.pPollThread = pThread;
+        
+        pThread = NULL;
+        status = pj_thread_create(pThreadPool, "rtpmqthread", &rtpMqThread, NULL, 0, 0, &pThread);
+        STATUS_CHECK(pj_thread_create, status);
+        manager.pMqThread = pThread;
+        
 
         status = createMediaEndpt();
         STATUS_CHECK(createMediaEndpt, status);
@@ -395,6 +536,9 @@ void UninitialiseRtp()
         librtp_inner_uninit_register_thread();
 
         manager.nQuit = 1;
+        if (manager.pMsgQ) {
+                DestroyMessageQueue(&manager.pMsgQ);
+        }
         if (manager.pPollThread) {
                 pj_thread_join(manager.pPollThread);
                 pj_thread_destroy(manager.pPollThread);
@@ -657,23 +801,35 @@ int InitPeerConnectoin(OUT PeerConnection ** _pPeerConnection, IN IceConfig *_pI
         pj_bzero(pPeerConnection, sizeof(PeerConnection));
         
         pPeerConnection->userIceConfig = *_pIceConfig;
+
         
-        peerConnectInitIceConfig(pPeerConnection);
-        
-        for ( int i = 0; i < sizeof(pPeerConnection->nAvIndex) / sizeof(int); i++) {
-                pPeerConnection->nAvIndex[i] = -1;
+        Message * pMsg = create_msg_init(pPeerConnection);
+        if (pMsg == NULL){
+                MY_PJ_LOG(1, "create_msg_init fail");
         }
-        LIBRTP_REGISTER_THREAD(pPeerConnection);
+        SendMessage(manager.pMsgQ, pMsg);
+
+        *_pPeerConnection = pPeerConnection;
+        return PJ_SUCCESS;
+}
+
+int initPeerConnectoin(OUT PeerConnection * _pPeerConnection)
+{
+        pj_status_t status;
+        peerConnectInitIceConfig(_pPeerConnection);
+        
+        for ( int i = 0; i < sizeof(_pPeerConnection->nAvIndex) / sizeof(int); i++) {
+                _pPeerConnection->nAvIndex[i] = -1;
+        }
 
         pj_pool_t *pPool = pj_pool_create(&manager.cachingPool.factory, NULL, 128, 128, NULL);
         ASSERT_RETURN_CHECK(pPool, pj_pool_create);
-        pPeerConnection->pMutexPool = pPool;
-        status = pj_mutex_create(pPool, NULL, PJ_MUTEX_DEFAULT, &pPeerConnection->pMutex);
+        _pPeerConnection->pMutexPool = pPool;
+        status = pj_mutex_create(pPool, NULL, PJ_MUTEX_DEFAULT, &_pPeerConnection->pMutex);
         STATUS_CHECK(pj_mutex_create, status);
 
-        *_pPeerConnection = pPeerConnection;
-        InitMediaStream(&pPeerConnection->mediaStream);
-        MY_PJ_LOG(5, "PeerConnection created:%p", pPeerConnection);
+        InitMediaStream(&_pPeerConnection->mediaStream);
+        MY_PJ_LOG(5, "PeerConnection created:%p", _pPeerConnection);
         return 0;
 }
 
@@ -683,9 +839,16 @@ int ReleasePeerConnectoin(IN OUT PeerConnection * _pPeerConnection)
         {
                 return PJ_SUCCESS;
         }
-        LIBRTP_REGISTER_THREAD(_pPeerConnection);
+
         MY_PJ_LOG(5, "PeerConnection releasing:%p", _pPeerConnection);
 
+        Message *pMsg = create_msg_release(_pPeerConnection);
+        SendMessage(manager.pMsgQ, pMsg);
+        return PJ_SUCCESS;
+}
+
+void notifyReleasePeerConnectoin(IN PeerConnection * _pPeerConnection)
+{
         _pPeerConnection->nQuitCnt = 1;
         for ( int i = 0; i < sizeof(_pPeerConnection->nAvIndex) / sizeof(int); i++) {
                 if (_pPeerConnection->nAvIndex[i] != -1) {
@@ -697,8 +860,6 @@ int ReleasePeerConnectoin(IN OUT PeerConnection * _pPeerConnection)
         if (_pPeerConnection->nDestroy == 0) {
                 releasePeerConnection(_pPeerConnection);
         }
-
-        return PJ_SUCCESS;
 }
 
 void releasePeerConnection(IN void * pUserData)
@@ -774,7 +935,7 @@ int AddAudioTrack(IN OUT PeerConnection * _pPeerConnection, IN MediaConfigSet * 
                 return PJ_EINVAL;
         }
         pj_status_t status;
-        LIBRTP_REGISTER_THREAD(_pPeerConnection);
+
         status = MediaConfigSetIsValid(_pAudioConfig);
         if (status != PJ_SUCCESS) {
                 MY_PJ_LOG(1, "invalid MediaConfigSet");
@@ -805,7 +966,7 @@ int AddVideoTrack(IN OUT PeerConnection * _pPeerConnection, IN MediaConfigSet * 
                 return PJ_EINVAL;
         }
         pj_status_t status;
-        LIBRTP_REGISTER_THREAD(_pPeerConnection);
+
         status = MediaConfigSetIsValid(_pVideoConfig);
         if (status != PJ_SUCCESS) {
                 MY_PJ_LOG(1, "invalid MediaConfigSet");
@@ -896,7 +1057,7 @@ static int createBaseSdp(IN OUT PeerConnection * _pPeerConnection, IN pj_pool_t 
         return PJ_SUCCESS;
 }
 
-static void createSdpPool(IN OUT PeerConnection * _pPeerConnection)
+static pj_pool_t * createSdpPool(IN OUT PeerConnection * _pPeerConnection)
 {
         pj_pool_t *pPool = _pPeerConnection->pSdpPool;
         if(pPool == NULL) {
@@ -905,25 +1066,36 @@ static void createSdpPool(IN OUT PeerConnection * _pPeerConnection)
                 pj_assert(pPool != NULL);
                 _pPeerConnection->pSdpPool = pPool;
         }
-        
-        return;
+
+        return pPool;
 }
 
 int createOffer(IN OUT PeerConnection * _pPeerConnection)
 {
-        pj_status_t  status;
         if (_pPeerConnection == NULL) {
                 return PJ_EINVAL;
         }
-        LIBRTP_REGISTER_THREAD(_pPeerConnection);
-
-        createSdpPool(_pPeerConnection);
-        pj_pool_t *pPool = _pPeerConnection->pSdpPool;
-
         if (_pPeerConnection->role != ICE_ROLE_NONE) {
                 MY_PJ_LOG(2, "already created offer");
                 return PJ_SUCCESS;
         }
+
+        Message *pMsg = create_msg_create_offer(_pPeerConnection);
+        SendMessage(manager.pMsgQ, pMsg);
+
+        return PJ_SUCCESS;
+}
+
+int createOffer_(IN OUT PeerConnection * _pPeerConnection)
+{
+        pj_status_t  status;
+
+        pj_pool_t *pPool = createSdpPool(_pPeerConnection);
+        if (pPool == NULL) {
+                MY_PJ_LOG(1, "createSdpPool is NULL");
+                return PJ_NO_MEMORY_EXCEPTION;
+        }
+        
         int nMaxTracks = sizeof(_pPeerConnection->nAvIndex) / sizeof(int);
         for ( int i = 0; i < nMaxTracks; i++) {
                 if (_pPeerConnection->nAvIndex[i] != -1) {
@@ -944,19 +1116,32 @@ int createOffer(IN OUT PeerConnection * _pPeerConnection)
 
 int createAnswer(IN OUT PeerConnection * _pPeerConnection, IN void *_pOffer)
 {
-        pj_status_t  status;
+        
         if (_pPeerConnection == NULL) {
                 return PJ_EINVAL;
         }
-        LIBRTP_REGISTER_THREAD(_pPeerConnection);
-
-        createSdpPool(_pPeerConnection);
-        pj_pool_t *pPool = _pPeerConnection->pSdpPool;
 
         if (_pPeerConnection->role != ICE_ROLE_NONE) {
                 MY_PJ_LOG(2, "already created answer");
                 return PJ_SUCCESS;
         }
+        
+        Message *pMsg = create_msg_create_answer(_pPeerConnection, _pOffer);
+        SendMessage(manager.pMsgQ, pMsg);
+
+        return PJ_SUCCESS;
+}
+
+int createAnswer_(IN OUT PeerConnection * _pPeerConnection, IN void *_pOffer)
+{
+        pj_status_t  status;
+
+        pj_pool_t *pPool = createSdpPool(_pPeerConnection);
+        if (pPool == NULL) {
+                MY_PJ_LOG(1, "createSdpPool is NULL");
+                return PJ_NO_MEMORY_EXCEPTION;
+        }
+
         int nMaxTracks = sizeof(_pPeerConnection->nAvIndex) / sizeof(int);
         for ( int i = 0; i < nMaxTracks; i++) {
                 if (_pPeerConnection->nAvIndex[i] != -1) {
@@ -1159,8 +1344,15 @@ int StartNegotiation(IN PeerConnection * _pPeerConnection)
         if (_pPeerConnection == NULL) {
                 return PJ_EINVAL;
         }
-        LIBRTP_REGISTER_THREAD(_pPeerConnection);
+        
+        Message *pMsg = create_msg_start_neg(_pPeerConnection);
+        SendMessage(manager.pMsgQ, pMsg);
 
+        return PJ_SUCCESS;
+}
+
+int startNegotiation(IN PeerConnection * _pPeerConnection)
+{
         int nMaxTracks = sizeof(_pPeerConnection->nAvIndex) / sizeof(int);
         for ( int i = 0; i < nMaxTracks; i++) {
                 if (_pPeerConnection->nAvIndex[i] != -1) {
@@ -1173,7 +1365,7 @@ int StartNegotiation(IN PeerConnection * _pPeerConnection)
                         STATUS_CHECK(pjmedia_transport_media_start, status);
                 }
         }
-        
+
         return PJ_SUCCESS;
 }
 
@@ -1280,9 +1472,19 @@ int setRemoteDescription(IN OUT PeerConnection * _pPeerConnection, IN void * _pS
         if (_pPeerConnection == NULL || _pSdp == NULL) {
                 return PJ_EINVAL;
         }
-        LIBRTP_REGISTER_THREAD(_pPeerConnection);
 
-        createSdpPool(_pPeerConnection);
+        if (_pPeerConnection->pSdpPool == NULL) {
+                MY_PJ_LOG(1, "pSdpPool should not be NULL");
+                return PJ_EBUG;
+        }
+
+        Message *pMsg = create_msg_set_remote(_pPeerConnection, _pSdp);
+        SendMessage(manager.pMsgQ, pMsg);
+
+        return PJ_SUCCESS;
+}
+
+int setRemoteDescription_(IN OUT PeerConnection * _pPeerConnection, IN void * _pSdp){
         pjmedia_sdp_session *  pSdp = (pjmedia_sdp_session *) _pSdp;
         if (pSdp != _pPeerConnection->pOfferSdp && pSdp != _pPeerConnection->pAnswerSdp) {
                 _pPeerConnection->pRemoteSdp = pjmedia_sdp_session_clone(_pPeerConnection->pSdpPool, _pSdp);
@@ -1542,7 +1744,18 @@ int SendRtpPacket(IN PeerConnection *_pPeerConnection, IN OUT RtpPacket * _pPack
         if (_pPeerConnection == NULL || _pPacket == NULL) {
                 return PJ_EINVAL;
         }
-        LIBRTP_REGISTER_THREAD(_pPeerConnection);
+
+        Message *pMsg = create_msg_send(_pPeerConnection, _pPacket);
+        SendMessage(manager.pMsgQ, pMsg);
+
+        return PJ_SUCCESS;
+}
+
+int sendRtpPacket(IN PeerConnection *_pPeerConnection, IN OUT RtpPacket * _pPacket)
+{
+        if (_pPeerConnection == NULL || _pPacket == NULL) {
+                return PJ_EINVAL;
+        }
 
         if (_pPacket->type == RTP_STREAM_AUDIO) {
                 return SendAudioPacket(_pPeerConnection, _pPacket);
