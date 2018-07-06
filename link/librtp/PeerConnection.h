@@ -31,8 +31,6 @@ typedef struct _PeerConnection
         IceConfig         userIceConfig;
         TransportIce      transportIce[2]; //audio and video
         int               nAvIndex[2];
-        pj_caching_pool   cachingPool;
-        pj_pool_factory   *pPoolFactory;
         MediaStream       mediaStream;
         pjmedia_sdp_session *pLocalSdp;
         pjmedia_sdp_session *pRemoteSdp;
