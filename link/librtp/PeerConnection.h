@@ -65,6 +65,8 @@ typedef struct _PeerConnection
         pj_pool_t *pGrpPool;
         pj_grp_lock_t *pGrpLock1;
         pj_grp_lock_t *pGrpLock2;
+        char * pRemoteSdpStr;
+        int nSdpStrLen;
 }PeerConnection;
 
 
@@ -78,7 +80,6 @@ typedef struct _RtpMqMsg{
         Message msg;
         int nType;
         PeerConnection *pPeerConnection;
-        pj_pool_t *pPool;
         RtpPacket pkt;
         void * pArg;
 }RtpMqMsg;

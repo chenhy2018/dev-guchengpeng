@@ -10,8 +10,8 @@ static pj_status_t createMediaEndpt();
 void releasePeerConnection(IN void * pUserData);
 void notifyReleasePeerConnectoin(IN PeerConnection * _pPeerConnection);
 int initPeerConnectoin(OUT PeerConnection * _pPeerConnection);
-int createOffer_(IN OUT PeerConnection * _pPeerConnection);
-int createAnswer_(IN OUT PeerConnection * _pPeerConnection, IN void *_pOffer);
+int createOffer(IN OUT PeerConnection * _pPeerConnection);
+int createAnswer(IN OUT PeerConnection * _pPeerConnection);
 int startNegotiation(IN PeerConnection * _pPeerConnection);
 int sendRtpPacket(IN PeerConnection *_pPeerConnection, IN OUT RtpPacket * _pPacket);
 static pj_pool_t * createSdpPool(IN OUT PeerConnection * _pPeerConnection);
@@ -57,31 +57,26 @@ static inline pj_status_t librtp_inner_uninit_register_thread()
         return pj_thread_register("uninitrtp", innerUninitDesc, &pInnerUninitThread);
 }
 
-Message * create_msg_just_with_peer_connection(PeerConnection *_pPeerConnection, int _nType)
+Message * createMsgJustWithPeerConnection(PeerConnection *_pPeerConnection, int _nType)
 {
-        pj_pool_t * pPool = pj_pool_create(&manager.cachingPool.factory, NULL, sizeof(RtpMqMsg), sizeof(RtpMqMsg), NULL);
-        if (pPool == NULL) {
-                return NULL;
-        }
-        RtpMqMsg *pRtpMqMsg = (RtpMqMsg *)pj_pool_alloc(pPool, sizeof(RtpMqMsg));
-        pRtpMqMsg->pPool = pPool;
+        RtpMqMsg *pRtpMqMsg = (RtpMqMsg *)malloc(sizeof(RtpMqMsg));
         pRtpMqMsg->nType = _nType;
         pRtpMqMsg->pPeerConnection = _pPeerConnection;
 
         return (Message *)pRtpMqMsg;
 }
 
-Message* create_msg_send(PeerConnection *_pPeerConnection, RtpPacket * pPkt)
+Message* createMsgSend(PeerConnection *_pPeerConnection, RtpPacket * pPkt)
 {
-        Message * pMsg = create_msg_just_with_peer_connection(_pPeerConnection, MQ_TYPE_SEND);
+        Message * pMsg = createMsgJustWithPeerConnection(_pPeerConnection, MQ_TYPE_SEND);
         if (pMsg == NULL) {
                 return NULL;
         }
         RtpMqMsg *pRtpMqMsg = (RtpMqMsg *)pMsg;
         pRtpMqMsg->pkt = *pPkt;
-        char * pTmp = (char *)pj_pool_alloc(pRtpMqMsg->pPool, pPkt->nDataLen);
+        char * pTmp = (char *)malloc(pPkt->nDataLen);
         if (pTmp == NULL) {
-                pj_pool_release(pRtpMqMsg->pPool);
+                free(pMsg);
                 return NULL;
         }
         memcpy(pTmp, pRtpMqMsg->pkt.pData, pPkt->nDataLen);
@@ -89,34 +84,28 @@ Message* create_msg_send(PeerConnection *_pPeerConnection, RtpPacket * pPkt)
         return pMsg;
 }
 
-Message * create_msg_create_offer(PeerConnection *_pPeerConnection)
+Message * createMsgCreateOffer(PeerConnection *_pPeerConnection)
 {
-        return create_msg_just_with_peer_connection(_pPeerConnection, MQ_TYPE_CREATE_OFFER);
+        return createMsgJustWithPeerConnection(_pPeerConnection, MQ_TYPE_CREATE_OFFER);
 }
 
-Message * create_msg_create_answer(PeerConnection *_pPeerConnection, void *_pArg)
+Message * createMsgCreateAnswer(PeerConnection *_pPeerConnection)
 {
-        Message * pMsg = create_msg_just_with_peer_connection(_pPeerConnection, MQ_TYPE_CREATE_ANSWER);
-        if (pMsg == NULL) {
-                return NULL;
-        }
-        RtpMqMsg *pRtpMqMsg = (RtpMqMsg *)pMsg;
-        pRtpMqMsg->pArg = _pArg;
-        return pMsg;
+        return createMsgJustWithPeerConnection(_pPeerConnection, MQ_TYPE_CREATE_ANSWER);
 }
 
-Message * create_msg_start_neg(PeerConnection *_pPeerConnection)
+Message * createMsgStartNeg(PeerConnection *_pPeerConnection)
 {
-        return create_msg_just_with_peer_connection(_pPeerConnection, MQ_TYPE_NEG);
+        return createMsgJustWithPeerConnection(_pPeerConnection, MQ_TYPE_NEG);
 }
 
-Message * create_msg_release(PeerConnection *_pPeerConnection)
+Message * createMsgRelease(PeerConnection *_pPeerConnection)
 {
-        return create_msg_just_with_peer_connection(_pPeerConnection, MQ_TYPE_RELEASE);
+        return createMsgJustWithPeerConnection(_pPeerConnection, MQ_TYPE_RELEASE);
 }
 
 
-static void print_sdp(pjmedia_sdp_session * _pSdp, const char * _pLogPrefix)
+static void printSdp(pjmedia_sdp_session * _pSdp, const char * _pLogPrefix)
 {
         if (5 <= pj_log_get_level()) {
                 char sdpStr[4096];
@@ -129,19 +118,6 @@ static void print_sdp(pjmedia_sdp_session * _pSdp, const char * _pLogPrefix)
                 }
         }
 }
-
-#if 0
-static inline int GetTransportIndex(IN PeerConnection * _pPeerConnection, IN TransportIce *pTransportIce)
-{
-        for (int i = 0; i < sizeof(_pPeerConnection->transportIce) / sizeof(TransportIce); i++) {
-                if (&_pPeerConnection->transportIce[i] == pTransportIce) {
-                        return i;
-                }
-        }
-
-        return -1;
-}
-#endif
 
 static int addCandidate(TransportIce *_pTransportIce, pjmedia_sdp_session **_pSdp)
 {
@@ -170,7 +146,7 @@ static int addCandidate(TransportIce *_pTransportIce, pjmedia_sdp_session **_pSd
                         }
                 }
                 setLocalDescription(pPeerConnection, pSdp);
-                print_sdp(pSdp, "offer sdp add candidate");
+                printSdp(pSdp, "offer sdp add candidate");
         } else {
                 pSdp = pPeerConnection->pAnswerSdp;
                 status = createSdpMline(pPeerConnection, pPeerConnection->pSdpPool, pSdp);
@@ -190,7 +166,7 @@ static int addCandidate(TransportIce *_pTransportIce, pjmedia_sdp_session **_pSd
                         }
                 }
                 setLocalDescription(pPeerConnection, pSdp);
-                print_sdp(pSdp, "answer sdp add candidate");
+                printSdp(pSdp, "answer sdp add candidate");
         }
 
         *_pSdp = pSdp;
@@ -207,13 +183,6 @@ static void doUserCallback(PeerConnection * _pPeerConnection, IceState _state, v
         }
         return;
 }
-
-#if 0
-static void onIceComplete(pjmedia_transport *pTransport, pj_ice_strans_op op,
-                           pj_status_t status) {
-        MY_PJ_LOG(5, "onIceComplete: op:%d status:%d", op, status);
-}
-#endif
 
 static void onIceComplete2(pjmedia_transport *pTransport, pj_ice_strans_op op,
                            pj_status_t status, void *pUserData) {
@@ -338,6 +307,7 @@ static int rtpMqThread(void * _pArg)
                                         pRtpMqMsg->pPeerConnection->userIceConfig.pCbUserData,
                                         CALLBACK_SEND_RESULT,
                                         (void *)status);
+                                free(pRtpMqMsg->pkt.pData);
                                 break;
                         case MQ_TYPE_CREATE_OFFER:
                         case MQ_TYPE_CREATE_ANSWER:
@@ -345,9 +315,9 @@ static int rtpMqThread(void * _pArg)
                                 if (status == 0) {
                                         pRtpMqMsg->pPeerConnection->nState = PC_STATUS_INIT_OK;
                                         if (MQ_TYPE_CREATE_OFFER == pRtpMqMsg->nType){
-                                                createOffer_(pRtpMqMsg->pPeerConnection);
+                                                createOffer(pRtpMqMsg->pPeerConnection);
                                         } else {
-                                                createAnswer_(pRtpMqMsg->pPeerConnection, pRtpMqMsg->pArg);
+                                                createAnswer(pRtpMqMsg->pPeerConnection);
                                         }
                                 } else {
                                         doUserCallback(pRtpMqMsg->pPeerConnection, ICE_STATE_FAIL, NULL);
@@ -364,8 +334,8 @@ static int rtpMqThread(void * _pArg)
                                 MY_PJ_LOG(1, "unkown type:%d", pRtpMqMsg->nType);
                                 break;
                 }
-                if (pRtpMqMsg->pPool != NULL)
-                        pj_pool_release(pRtpMqMsg->pPool);
+                if (pMsg != NULL)
+                        free(pMsg);
         }
         return 0;
 }
@@ -809,7 +779,7 @@ int ReleasePeerConnectoin(IN OUT PeerConnection * _pPeerConnection)
 
         MY_PJ_LOG(5, "PeerConnection releasing:%p", _pPeerConnection);
 
-        Message *pMsg = create_msg_release(_pPeerConnection);
+        Message *pMsg = createMsgRelease(_pPeerConnection);
         if (pMsg == NULL){
                 MY_PJ_LOG(1, "create_msg_release fail");
                 return PJ_NO_MEMORY_EXCEPTION;
@@ -836,7 +806,7 @@ void notifyReleasePeerConnectoin(IN PeerConnection * _pPeerConnection)
 void releasePeerConnection(IN void * pUserData)
 {
         PeerConnection * _pPeerConnection = (PeerConnection * )pUserData;
-        MY_PJ_LOG(1, "releasePeerConnection------------:%p grplock:%p %p", pUserData,
+        MY_PJ_LOG(1, "check releasePeerConnection:%p grplock:%p %p", pUserData,
                  _pPeerConnection->pGrpLock1, _pPeerConnection->pGrpLock2);
         if (_pPeerConnection->nDestroy != 0) {
                 pj_mutex_lock(_pPeerConnection->pMutex);
@@ -849,7 +819,7 @@ void releasePeerConnection(IN void * pUserData)
                 }
                 pj_mutex_unlock(_pPeerConnection->pMutex);
         }
-        MY_PJ_LOG(1, "releasePeerConnection==============:%p", pUserData);
+        MY_PJ_LOG(1, "releasePeerConnection:%p", pUserData);
 
         for ( int i = 0; i < sizeof(_pPeerConnection->nAvIndex) / sizeof(int); i++) {
                 if (_pPeerConnection->transportIce[i].pNegotiationPool) {
@@ -1011,7 +981,7 @@ static int createSdpMline(IN OUT PeerConnection * _pPeerConnection, pj_pool_t *_
         }
         
         
-        print_sdp(pSdp, "basesdp with mline");
+        printSdp(pSdp, "basesdp with mline");
         return PJ_SUCCESS;
 }
 
@@ -1029,7 +999,7 @@ static int createBaseSdp(IN OUT PeerConnection * _pPeerConnection, IN pj_pool_t 
         status = pjmedia_endpt_create_base_sdp(manager.pMediaEndpt, _pPool, NULL, &originAddr, _pOffer);
         STATUS_CHECK(pjmedia_endpt_create_base_sdp, status);
 
-        print_sdp(*_pOffer, "basesdp");
+        printSdp(*_pOffer, "basesdp");
 
         //createSdpMline(_pPeerConnection, _pPool, *_pOffer);
         
@@ -1049,7 +1019,7 @@ static pj_pool_t * createSdpPool(IN OUT PeerConnection * _pPeerConnection)
         return pPool;
 }
 
-int createOffer(IN OUT PeerConnection * _pPeerConnection)
+int CreateOffer(IN OUT PeerConnection * _pPeerConnection)
 {
         if (_pPeerConnection == NULL) {
                 return PJ_EINVAL;
@@ -1063,7 +1033,7 @@ int createOffer(IN OUT PeerConnection * _pPeerConnection)
                 return PJ_SUCCESS;
         }
 
-        Message *pMsg = create_msg_create_offer(_pPeerConnection);
+        Message *pMsg = createMsgCreateOffer(_pPeerConnection);
         if (pMsg == NULL){
                 MY_PJ_LOG(1, "create_msg_create_offer fail");
                 return PJ_NO_MEMORY_EXCEPTION;
@@ -1073,7 +1043,7 @@ int createOffer(IN OUT PeerConnection * _pPeerConnection)
         return PJ_SUCCESS;
 }
 
-int createOffer_(IN OUT PeerConnection * _pPeerConnection)
+int createOffer(IN OUT PeerConnection * _pPeerConnection)
 {
         pj_status_t  status;
         
@@ -1095,14 +1065,14 @@ int createOffer_(IN OUT PeerConnection * _pPeerConnection)
         return PJ_SUCCESS;
 }
 
-int createAnswer(IN OUT PeerConnection * _pPeerConnection, IN void *_pOffer)
+int CreateAnswer(IN OUT PeerConnection * _pPeerConnection, IN void *_pOffer)
 {
         
         if (_pPeerConnection == NULL) {
                 return PJ_EINVAL;
         }
-        if (_pPeerConnection->nState != PC_STATUS_INIT_OK) {
-                MY_PJ_LOG(1, "should in PC_STATUS_INIT_OK status. but is:%d", _pPeerConnection->nState);
+        if (_pPeerConnection->nState != PC_STATUS_INIT_OK && _pPeerConnection->nState != PC_STATUS_ALLOC) {
+                MY_PJ_LOG(1, "should in PC_STATUS_ALLOC/PC_STATUS_INIT_OK status. but is:%d", _pPeerConnection->nState);
                 return PJ_EINVAL;
         }
 
@@ -1111,7 +1081,37 @@ int createAnswer(IN OUT PeerConnection * _pPeerConnection, IN void *_pOffer)
                 return PJ_SUCCESS;
         }
         
-        Message *pMsg = create_msg_create_answer(_pPeerConnection, _pOffer);
+        if (_pPeerConnection->pRemoteSdp != NULL) {
+                MY_PJ_LOG(1, "already set createAnser");
+                return PJ_EINVAL;
+        }
+        if (_pPeerConnection->nSdpStrLen == 0) {
+                _pPeerConnection->nSdpStrLen = 2048;
+                _pPeerConnection->pRemoteSdpStr = malloc(_pPeerConnection->nSdpStrLen);
+                memset(_pPeerConnection->pRemoteSdpStr, 0, _pPeerConnection->nSdpStrLen);
+        }
+        int nFailCount = 0;
+        while (1) {
+                int ret = pjmedia_sdp_print(_pOffer, _pPeerConnection->pRemoteSdpStr, _pPeerConnection->nSdpStrLen);
+                if (ret == -1) {
+                        nFailCount++;
+                        free(_pPeerConnection->pRemoteSdpStr);
+                        if (nFailCount == 3) {
+                                _pPeerConnection->pRemoteSdpStr = NULL;
+                                _pPeerConnection->nSdpStrLen = 0;
+                                return PJ_NO_MEMORY_EXCEPTION;
+                        }
+                        _pPeerConnection->nSdpStrLen *= 2;
+                        _pPeerConnection->pRemoteSdpStr = malloc(_pPeerConnection->nSdpStrLen);
+                        memset(_pPeerConnection->pRemoteSdpStr, 0, _pPeerConnection->nSdpStrLen);
+                        MY_PJ_LOG(1, "buffer is too small:%d, realloc. %d", _pPeerConnection->nSdpStrLen, nFailCount);
+                } else {
+                        _pPeerConnection->nSdpStrLen = ret;
+                        break;
+                }
+        }
+        
+        Message *pMsg = createMsgCreateAnswer(_pPeerConnection);
         if (pMsg == NULL){
                 MY_PJ_LOG(1, "create_msg_create_answer fail");
                 return PJ_NO_MEMORY_EXCEPTION;
@@ -1121,9 +1121,13 @@ int createAnswer(IN OUT PeerConnection * _pPeerConnection, IN void *_pOffer)
         return PJ_SUCCESS;
 }
 
-int createAnswer_(IN OUT PeerConnection * _pPeerConnection, IN void *_pOffer)
+int createAnswer(IN OUT PeerConnection * _pPeerConnection)
 {
         pj_status_t  status;
+
+        status = pjmedia_sdp_parse(_pPeerConnection->pSdpPool, _pPeerConnection->pRemoteSdpStr,
+                                   _pPeerConnection->nSdpStrLen, &_pPeerConnection->pRemoteSdp);
+        STATUS_CHECK(pjmedia_sdp_parse, status);
 
         int nMaxTracks = sizeof(_pPeerConnection->nAvIndex) / sizeof(int);
         for ( int i = 0; i < nMaxTracks; i++) {
@@ -1139,7 +1143,7 @@ int createAnswer_(IN OUT PeerConnection * _pPeerConnection, IN void *_pOffer)
         STATUS_CHECK(createSdp, status);
 
         _pPeerConnection->pAnswerSdp = pAnswer;
-        
+
         return PJ_SUCCESS;
 }
 
@@ -1334,7 +1338,7 @@ int StartNegotiation(IN PeerConnection * _pPeerConnection)
                 return PJ_EINVAL;
         }
         
-        Message *pMsg = create_msg_start_neg(_pPeerConnection);
+        Message *pMsg = createMsgStartNeg(_pPeerConnection);
         if (pMsg == NULL){
                 MY_PJ_LOG(1, "create_msg_start_neg fail");
                 return PJ_NO_MEMORY_EXCEPTION;
@@ -1459,29 +1463,43 @@ int setLocalDescription(IN OUT PeerConnection * _pPeerConnection, IN void * _pSd
         return PJ_SUCCESS;
 }
 
-int setRemoteDescription(IN OUT PeerConnection * _pPeerConnection, IN void * _pSdp)
+int SetRemoteDescription(IN OUT PeerConnection * _pPeerConnection, IN void * _pSdp)
 {
         if (_pPeerConnection == NULL || _pSdp == NULL) {
                 return PJ_EINVAL;
         }
-        if (_pPeerConnection->nState != PC_STATUS_CREATE_OFFER_OK) {
-                MY_PJ_LOG(1, "should in PC_STATUS_CREATE_OFFER_OK status. but is:%d", _pPeerConnection->nState);
+        if (_pPeerConnection->nState >= PC_STATUS_INIT_FAIL) {
+                MY_PJ_LOG(1, "should not in FAIL status. but is:%d", _pPeerConnection->nState);
                 return PJ_EINVAL;
         }
-
-        if (_pPeerConnection->pSdpPool == NULL) {
-                MY_PJ_LOG(1, "pSdpPool should not be NULL");
-                return PJ_EBUG;
-        }
-        pjmedia_sdp_session *  pSdp = (pjmedia_sdp_session *) _pSdp;
-        if (pSdp != _pPeerConnection->pOfferSdp && pSdp != _pPeerConnection->pAnswerSdp) {
-                _pPeerConnection->pRemoteSdp = pjmedia_sdp_session_clone(_pPeerConnection->pSdpPool, _pSdp);
-                if (_pPeerConnection->pRemoteSdp == NULL) {
-                        MY_PJ_LOG(1, "PJ_NO_MEMORY_EXCEPTION, clone sdp fail");
-                        pj_assert(_pPeerConnection->pLocalSdp != NULL);
+        
+        if (_pPeerConnection->role == ICE_ROLE_OFFERER){
+                if (_pPeerConnection->pSdpPool == NULL) {
+                        MY_PJ_LOG(1, "pSdpPool should not be NULL");
+                        return PJ_EBUG;
                 }
-        } else {
-                _pPeerConnection->pRemoteSdp = pSdp;
+                pjmedia_sdp_session *  pSdp = (pjmedia_sdp_session *) _pSdp;
+                if (pSdp != _pPeerConnection->pOfferSdp && pSdp != _pPeerConnection->pAnswerSdp) {
+                        _pPeerConnection->pRemoteSdp = pjmedia_sdp_session_clone(_pPeerConnection->pSdpPool, _pSdp);
+                        if (_pPeerConnection->pRemoteSdp == NULL) {
+                                MY_PJ_LOG(1, "PJ_NO_MEMORY_EXCEPTION, clone sdp fail");
+                                pj_assert(_pPeerConnection->pLocalSdp != NULL);
+                        }
+                } else {
+                        _pPeerConnection->pRemoteSdp = pSdp;
+                }
+                _pPeerConnection->nState = PC_STATUS_SET_REMOTE_OK;
+                return PJ_SUCCESS;
+        }
+
+        // createAnswer will pass sdp, answerer is no need to invoke setRemoteDescription
+        if (_pPeerConnection->role == ICE_ROLE_ANSWERER){
+                return PJ_SUCCESS;
+        }
+        
+        if ( _pPeerConnection->role == ICE_ROLE_NONE) {
+                MY_PJ_LOG(2, "cannt to judge. maybe should not to invoke this method");
+                return PJ_SUCCESS;
         }
 
         return PJ_SUCCESS;
@@ -1734,7 +1752,7 @@ int SendRtpPacket(IN PeerConnection *_pPeerConnection, IN OUT RtpPacket * _pPack
                 return PJ_EINVAL;
         }
 
-        Message *pMsg = create_msg_send(_pPeerConnection, _pPacket);
+        Message *pMsg = createMsgSend(_pPeerConnection, _pPacket);
         if (pMsg == NULL){
                 MY_PJ_LOG(1, "create_msg_send fail");
                 return PJ_NO_MEMORY_EXCEPTION;

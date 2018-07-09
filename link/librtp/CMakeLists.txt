@@ -4,11 +4,13 @@ SET(CMAKE_C_FLAGS "${GCC_INCLUDE_PATH} ${GCC_COVERAGE_COMPILE_FLAGS}")
 
 set(LIB_SRC
 	heap.c
+        ../util/queue.c
 	JitterBuffer.c
 	MediaStream.c
 	PeerConnection.c)
 set(LIB_HEADER
 	MediaStream.h
+        ../util/queue.h
 	JitterBuffer.h
 	qrtc.h
 	heap.h
