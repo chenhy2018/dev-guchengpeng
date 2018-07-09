@@ -479,7 +479,7 @@ static pj_status_t createH264Packetizer(IN pj_pool_t *_pPktzPool, OUT MediaPacke
         
         pjmedia_h264_packetizer_cfg cfg;
         cfg.mode = PJMEDIA_H264_PACKETIZER_MODE_NON_INTERLEAVED;
-        cfg.mtu = PJMEDIA_MAX_MTU;
+        cfg.mtu = 1450;
         cfg.unpack_nal_start = 3;
         
         pj_status_t status;
