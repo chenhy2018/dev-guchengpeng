@@ -970,7 +970,7 @@ int main(int argc, char **argv)
         
 
         if (gRole == OFFER) {
-                status = createOffer(app.pPeerConnection);
+                status = CreateOffer(app.pPeerConnection);
                 TESTCHECK(status, app);
                 waitState(ICE_STATE_INIT);
                 pj_assert(gatherState == ICE_STATE_GATHERING_OK);
@@ -978,16 +978,16 @@ int main(int argc, char **argv)
                 pjmedia_sdp_session *pAnswer = NULL;
                 pRemoteSdpPool =pj_pool_create(&app.cachingPool.factory, "sdpremote", 2048, 1024, NULL);
                 sdp_from_file(&pAnswer, ANSWERFILE,  pRemoteSdpPool, textSdpBuf, sizeof(textSdpBuf));
-                setRemoteDescription(app.pPeerConnection, pAnswer);
+                SetRemoteDescription(app.pPeerConnection, pAnswer);
         }
         
         if (gRole == ANSWER) {
                 pjmedia_sdp_session *pOffer = NULL;
                 pRemoteSdpPool =pj_pool_create(&app.cachingPool.factory, "sdpremote", 2048, 1024, NULL);
                 sdp_from_file(&pOffer, OFFERFILE,  pRemoteSdpPool, textSdpBuf, sizeof(textSdpBuf));
-                setRemoteDescription(app.pPeerConnection, pOffer);
+                SetRemoteDescription(app.pPeerConnection, pOffer);
 
-                status = createAnswer(app.pPeerConnection, pOffer);
+                status = CreateAnswer(app.pPeerConnection, pOffer);
                 TESTCHECK(status, app);
                 waitState(ICE_STATE_INIT);
                 pj_assert(gatherState == ICE_STATE_GATHERING_OK);

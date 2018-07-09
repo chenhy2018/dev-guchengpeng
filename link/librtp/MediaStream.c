@@ -332,6 +332,17 @@ int SetActiveCodec(IN OUT MediaStream *_pMediaStream, IN const pjmedia_sdp_sessi
         return PJ_SUCCESS;
 }
 
+void DestroyMediaStream(IN MediaStream *_pMediaStraem)
+{
+        for ( int i = 0 ; i < _pMediaStraem->nCount; i++) {
+	        pj_pool_t *pTmp = _pMediaStraem->streamTracks[i].pPacketizerPool;
+                if (pTmp) {
+                        pj_pool_release(pTmp);
+                        _pMediaStraem->streamTracks[i].pPacketizerPool = NULL;
+                }
+                JitterBufferDestroy(&_pMediaStraem->streamTracks[i].jbuf);
+        }
+}
 
 //packetizer
 static pj_str_t pcmuPktzName = {"pcmu", 4};
@@ -340,7 +351,7 @@ static pj_str_t aacPktzName  = {"aac", 3};
 static pj_str_t h264PktzName = {"h264", 4};
 static pj_str_t h265PktzName = {"h265", 4};
 
-pj_status_t pcmu_packetize(IN MediaPacketier *_pKtz,
+pj_status_t pcmuPacketize(IN MediaPacketier *_pKtz,
                            IN pj_uint8_t *_pBitstream,
                            IN pj_size_t _nBitstreamLen,
                            IN unsigned *_pBitstreamPos,
@@ -360,7 +371,7 @@ pj_status_t pcmu_packetize(IN MediaPacketier *_pKtz,
         return PJ_SUCCESS;
 }
 
-pj_status_t pcmu_unpacketize(IN OUT MediaPacketier *_pKtz,
+pj_status_t pcmuUnpacketize(IN OUT MediaPacketier *_pKtz,
                              IN const pj_uint8_t *_pPayload,
                              IN pj_size_t   _nPlyloadLen,
                              OUT pj_uint8_t **_pBitstream,
@@ -372,7 +383,7 @@ pj_status_t pcmu_unpacketize(IN OUT MediaPacketier *_pKtz,
         return PJ_SUCCESS;
 }
 
-pj_status_t h264_packetize(IN MediaPacketier *_pKtz,
+pj_status_t h264Packetize(IN MediaPacketier *_pKtz,
                            IN pj_uint8_t *_pBitstream,
                            IN pj_size_t _nBitstreamLen,
                            IN unsigned *_pBitstreamPos,
@@ -387,7 +398,7 @@ pj_status_t h264_packetize(IN MediaPacketier *_pKtz,
         return status;
 }
 
-pj_status_t h264_unpacketize(IN OUT MediaPacketier *_pKtz,
+pj_status_t h264Unpacketize(IN OUT MediaPacketier *_pKtz,
                              IN const pj_uint8_t *_pPayload,
                              IN pj_size_t   _nPlyloadLen,
                              OUT pj_uint8_t **_pBitstream,
@@ -468,16 +479,17 @@ static pj_status_t createH264Packetizer(IN pj_pool_t *_pPktzPool, OUT MediaPacke
         
         pjmedia_h264_packetizer_cfg cfg;
         cfg.mode = PJMEDIA_H264_PACKETIZER_MODE_NON_INTERLEAVED;
-        cfg.mtu = PJMEDIA_MAX_MTU;
+        cfg.mtu = 1450;
+        cfg.unpack_nal_start = 3;
         
         pj_status_t status;
         status = pjmedia_h264_packetizer_create(_pPktzPool,
-                                                NULL, &pPktz->pH264Packetizer);
+                                                &cfg, &pPktz->pH264Packetizer);
         STATUS_CHECK(pjmedia_h264_packetizer_create, status);
         
         *_pPktz = (MediaPacketier *)pPktz;
-        (*_pPktz)->pOperation.packetize = h264_packetize;
-        (*_pPktz)->pOperation.unpacketize = h264_unpacketize;
+        (*_pPktz)->pOperation.packetize = h264Packetize;
+        (*_pPktz)->pOperation.unpacketize = h264Unpacketize;
         
         return PJ_SUCCESS;
 }
@@ -491,8 +503,8 @@ static pj_status_t createPcmuPacketizer(IN pj_pool_t *_pPktzPool, OUT MediaPacke
         
         *_pPktz = (MediaPacketier *)pPktz;
         
-        (*_pPktz)->pOperation.packetize = pcmu_packetize;
-        (*_pPktz)->pOperation.unpacketize = pcmu_unpacketize;
+        (*_pPktz)->pOperation.packetize = pcmuPacketize;
+        (*_pPktz)->pOperation.unpacketize = pcmuUnpacketize;
         
         return PJ_SUCCESS;
 }

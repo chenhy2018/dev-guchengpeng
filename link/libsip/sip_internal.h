@@ -11,11 +11,11 @@
 #define SIP_PORT 5060
 
 #define SIP_REG_INTERVAL 300 // 300 seconds
-#define SIP_REG_RETRY_INTERNAL 300 // 300 seconds
+#define SIP_REG_RETRY_INTERNAL 60 // 60 seconds
 #define SIP_REG_DELAY_BEFORE_REFRESH  5 // 5 seconds
 #define SIP_UNREG_TIMEOUT 4000 // 4 seconds
 #define SIP_KEEP_ALIVE_INTERVAL 15 // 15 seconds
-#define SIP_SESSION_EXPIRES 600 // 10 minutes
+#define SIP_SESSION_EXPIRES 120 // 2 minutes
 #define SIP_MIN_SE 90 //90 seconds
 
 #define MESSAGE_QUEUE_MAX 256

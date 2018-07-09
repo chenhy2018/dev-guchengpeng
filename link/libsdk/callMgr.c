@@ -144,9 +144,9 @@ Call* CALLMakeCall(AccountID _nAccountId, const char* id, const char* _pDestUri,
                 return NULL;
         }
         int res = 0;
-        res = createOffer(pCall->pPeerConnection);
+        res = CreateOffer(pCall->pPeerConnection);
         if (res != 0) {
-                DBG_ERROR("createOffer failed %d \n", res);
+                DBG_ERROR("CreateOffer failed %d \n", res);
                 ReleaseCall(pCall);
                 setPjLogLevel(6);
                 return NULL;
@@ -172,8 +172,8 @@ ErrorID CALLAnswerCall(Call* _pCall)
         InitPeerConnectoin(&pCall->pPeerConnection, &pCall->iceConfig);
         AddVideoTrack(pCall->pPeerConnection, &pCall->videoConfig);
         AddAudioTrack(pCall->pPeerConnection, &pCall->audioConfig);
-        setRemoteDescription(_pCall->pPeerConnection, _pCall->pOffer);
-        createAnswer(_pCall->pPeerConnection, _pCall->pOffer, &_pCall->pAnswer);
+        SetRemoteDescription(_pCall->pPeerConnection, _pCall->pOffer);
+        CreateAnswer(_pCall->pPeerConnection, _pCall->pOffer, &_pCall->pAnswer);
         setLocalDescription(pCall->pPeerConnection, pCall->pAnswer);
 #endif
         DBG_LOG("CALLAnswerCall  %p id %d \n", _pCall, _pCall->id);
@@ -254,14 +254,14 @@ SipAnswerCode CALLOnIncomingCall(Call** _pCall, const int _nAccountId, const int
         pCall->pRemote = (pjmedia_sdp_session*)pMedia;
         int res = 0;
         DBG_LOG("pPeerConnection pRemote %p %p\n", pCall->pPeerConnection, pCall->pRemote);
-        res = setRemoteDescription(pCall->pPeerConnection, pCall->pRemote);
+        res = SetRemoteDescription(pCall->pPeerConnection, pCall->pRemote);
         if (res != 0) {
-                DBG_ERROR("setRemoteDescription failed %d \n", res);
+                DBG_ERROR("SetRemoteDescription failed %d \n", res);
                 return INTERNAL_SERVER_ERROR;
         }
-        res = createAnswer(pCall->pPeerConnection, pCall->pRemote);
+        res = CreateAnswer(pCall->pPeerConnection, pCall->pRemote);
         if (res != 0) {
-                DBG_ERROR("createAnswer failed %d \n", res);
+                DBG_ERROR("CreateAnswer failed %d \n", res);
                 return INTERNAL_SERVER_ERROR;
         }
 
@@ -276,7 +276,7 @@ void CALLOnCallStateChange(Call** _pCall, const SipInviteState State, const SipA
                 (*_pCall)->error = false;
                 DBG_LOG("====================stats %d state %d call %p\n", State, StatusCode, *_pCall);
                 if (pMedia != NULL) {
-                        res = setRemoteDescription((*_pCall)->pPeerConnection, (pjmedia_sdp_session*)(pMedia));
+                        res = SetRemoteDescription((*_pCall)->pPeerConnection, (pjmedia_sdp_session*)(pMedia));
                         if (res != 0) {
                                 (*_pCall)->error = true;
                         }
