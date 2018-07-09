@@ -1472,6 +1472,25 @@ int SetRemoteDescription(IN OUT PeerConnection * _pPeerConnection, IN void * _pS
                 MY_PJ_LOG(1, "should not in FAIL status. but is:%d", _pPeerConnection->nState);
                 return PJ_EINVAL;
         }
+        
+        if (_pPeerConnection->role == ICE_ROLE_OFFERER){
+                if (_pPeerConnection->pSdpPool == NULL) {
+                        MY_PJ_LOG(1, "pSdpPool should not be NULL");
+                        return PJ_EBUG;
+                }
+                pjmedia_sdp_session *  pSdp = (pjmedia_sdp_session *) _pSdp;
+                if (pSdp != _pPeerConnection->pOfferSdp && pSdp != _pPeerConnection->pAnswerSdp) {
+                        _pPeerConnection->pRemoteSdp = pjmedia_sdp_session_clone(_pPeerConnection->pSdpPool, _pSdp);
+                        if (_pPeerConnection->pRemoteSdp == NULL) {
+                                MY_PJ_LOG(1, "PJ_NO_MEMORY_EXCEPTION, clone sdp fail");
+                                pj_assert(_pPeerConnection->pLocalSdp != NULL);
+                        }
+                } else {
+                        _pPeerConnection->pRemoteSdp = pSdp;
+                }
+                _pPeerConnection->nState = PC_STATUS_SET_REMOTE_OK;
+                return PJ_SUCCESS;
+        }
 
         // createAnswer will pass sdp, answerer is no need to invoke setRemoteDescription
         if (_pPeerConnection->role == ICE_ROLE_ANSWERER){
@@ -1482,22 +1501,6 @@ int SetRemoteDescription(IN OUT PeerConnection * _pPeerConnection, IN void * _pS
                 MY_PJ_LOG(2, "cannt to judge. maybe should not to invoke this method");
                 return PJ_SUCCESS;
         }
-
-        if (_pPeerConnection->pSdpPool == NULL) {
-                MY_PJ_LOG(1, "pSdpPool should not be NULL");
-                return PJ_EBUG;
-        }
-        pjmedia_sdp_session *  pSdp = (pjmedia_sdp_session *) _pSdp;
-        if (pSdp != _pPeerConnection->pOfferSdp && pSdp != _pPeerConnection->pAnswerSdp) {
-                _pPeerConnection->pRemoteSdp = pjmedia_sdp_session_clone(_pPeerConnection->pSdpPool, _pSdp);
-                if (_pPeerConnection->pRemoteSdp == NULL) {
-                        MY_PJ_LOG(1, "PJ_NO_MEMORY_EXCEPTION, clone sdp fail");
-                        pj_assert(_pPeerConnection->pLocalSdp != NULL);
-                }
-        } else {
-                _pPeerConnection->pRemoteSdp = pSdp;
-        }
-        _pPeerConnection->nState = PC_STATUS_SET_REMOTE_OK;
 
         return PJ_SUCCESS;
 }
