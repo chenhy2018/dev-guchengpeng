@@ -2,7 +2,6 @@
 #include "callMgr.h"
 #include "dbg.h"
 
-//to do change the CallStatus to INV_STATE
 ErrorID CheckCallStatus(Call* _pCall, CallStatus expectedState)
 {
        if (expectedState == CALL_STATUS_INCOMING || expectedState == CALL_STATUS_RING) {
@@ -166,16 +165,6 @@ ErrorID CALLAnswerCall(Call* _pCall)
         if (id != RET_OK) {
               return id;
         }
-        // rtp to do. ice config.media info. and check error)
-#if 0
-        InitIceConfig(&pCall->iceConfig);
-        InitPeerConnectoin(&pCall->pPeerConnection, &pCall->iceConfig);
-        AddVideoTrack(pCall->pPeerConnection, &pCall->videoConfig);
-        AddAudioTrack(pCall->pPeerConnection, &pCall->audioConfig);
-        setRemoteDescription(_pCall->pPeerConnection, _pCall->pOffer);
-        createAnswer(_pCall->pPeerConnection, _pCall->pOffer, &_pCall->pAnswer);
-        setLocalDescription(pCall->pPeerConnection, pCall->pAnswer);
-#endif
         DBG_LOG("CALLAnswerCall  %p id %d \n", _pCall, _pCall->id);
         return SipAnswerCall(_pCall->id, OK, "answser call", _pCall->pLocal);
 }

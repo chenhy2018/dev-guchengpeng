@@ -49,7 +49,7 @@ UA* UARegister(const char* _pId, const char* _pPassword, const char* _pSigHost,
         sipConfig.pPassWord = (char*)_pPassword;
         sipConfig.pDomain = (char*)_pSigHost;
         sipConfig.pUserData = (void *)pUA;
-        sipConfig.nMaxOngoingCall = 40;
+        sipConfig.nMaxOngoingCall = MAX_ONGOING_CALL_COUNT;
         DBG_LOG("UARegister %s %s %s %p ongoing call %d\n",
                 sipConfig.pUserName, sipConfig.pPassWord, sipConfig.pDomain, sipConfig.pUserData, sipConfig.nMaxOngoingCall);
         SipAnswerCode Ret = SipRegAccount(&sipConfig, nSdkAccountId);
@@ -212,6 +212,7 @@ ErrorID UAPollEvent(UA* _pUa, EventType* _pType, Event* _pEvent, int _pTimeOut)
 // mqtt report
 ErrorID UAReport(UA* _pUa,  const char* message, int length)
 {
+        //TO DO "topic name".
         return MqttPublish(_pUa->pMqttInstance, "/test/test", length, message);
 }
 

@@ -194,7 +194,7 @@ void pjLogFunc(int level, const char *data, int len)
          debugFunc(data);
 }
 
-void SetLogLevel(int level) {
+void SetDebugLogLevel(int level) {
         dbgLevel = level;
         pj_log_set_log_func(pjLogFunc);
         pj_log_set_level(level);

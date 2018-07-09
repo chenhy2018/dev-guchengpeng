@@ -38,7 +38,7 @@ typedef struct {
 } DbgStr;
 
 typedef void LogFunc(const char *data);
-
+void SetDebugLogLevel(int level);
 #if SDK_DBG
 void DumpUAList();
 void DbgBacktrace();

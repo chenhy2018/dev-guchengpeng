@@ -27,6 +27,10 @@
 #define INVALID_CALL_ID -1
 #define MAX_AUDIO_SIZE 160
 
+#define MAX_CALL_COUNT 32
+#define MAX_ACCOUNT 16
+#define MAX_ONGOING_CALL_COUNT 32
+
 typedef struct RtpCallback
 {
         void (*OnRxRtp)(void *_pUserData, CallbackType _type, void *_pCbData);

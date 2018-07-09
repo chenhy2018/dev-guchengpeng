@@ -347,8 +347,8 @@ ErrorID InitSDK( Media* _pMediaConfigs, int _nSize)
         config.Cb.OnIncomingCall  = &cbOnIncomingCall;
         config.Cb.OnCallStateChange = &cbOnCallStateChange;
         config.Cb.OnRegStatusChange = &cbOnRegStatusChange;
-        config.nMaxCall = 40;
-        config.nMaxAccount = 40;
+        config.nMaxCall = MAX_CALL_COUNT;
+        config.nMaxAccount = MAX_ACCOUNT;
         pUAManager->config.callback.OnRxRtp = &OnRxRtp;
         // debug code.
         SetLogLevel(6);
@@ -727,4 +727,13 @@ void cbOnCallStateChange(const int _nCallId, const int _nAccountId, const SipInv
     pMessage->pMessage  = (void *)pEvent;
     SendMessage(pUA->pQueue, pMessage);
     pthread_mutex_unlock(&pUAManager->mutex);
+}
+
+bool SetLogLevel(int level) {
+    if (pUAManager->bInitSdk) {
+          SetDebugLogLevel(level);   
+    }
+    else {
+          DBG_ERROR("SDK is not init");
+    }
 }
