@@ -332,6 +332,17 @@ int SetActiveCodec(IN OUT MediaStream *_pMediaStream, IN const pjmedia_sdp_sessi
         return PJ_SUCCESS;
 }
 
+void DestroyMediaStream(IN MediaStream *_pMediaStraem)
+{
+        for ( int i = 0 ; i < _pMediaStraem->nCount; i++) {
+	        pj_pool_t *pTmp = _pMediaStraem->streamTracks[i].pPacketizerPool;
+                if (pTmp) {
+                        pj_pool_release(pTmp);
+                        _pMediaStraem->streamTracks[i].pPacketizerPool = NULL;
+                }
+                JitterBufferDestroy(&_pMediaStraem->streamTracks[i].jbuf);
+        }
+}
 
 //packetizer
 static pj_str_t pcmuPktzName = {"pcmu", 4};
@@ -469,10 +480,11 @@ static pj_status_t createH264Packetizer(IN pj_pool_t *_pPktzPool, OUT MediaPacke
         pjmedia_h264_packetizer_cfg cfg;
         cfg.mode = PJMEDIA_H264_PACKETIZER_MODE_NON_INTERLEAVED;
         cfg.mtu = PJMEDIA_MAX_MTU;
+        cfg.unpack_nal_start = 3;
         
         pj_status_t status;
         status = pjmedia_h264_packetizer_create(_pPktzPool,
-                                                NULL, &pPktz->pH264Packetizer);
+                                                &cfg, &pPktz->pH264Packetizer);
         STATUS_CHECK(pjmedia_h264_packetizer_create, status);
         
         *_pPktz = (MediaPacketier *)pPktz;

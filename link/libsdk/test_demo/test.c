@@ -49,12 +49,12 @@ typedef struct {
     RegisterData data;
 } RegisterTestCase;
 #define MAX_COUNT 1
-#define HOST "123.59.204.198"
+#define HOST "39.107.247.14"
 RegisterTestCase gRegisterTestCases[] =
 {
     {
         { "normal", 0 },
-        { "1041", "1041", HOST, HOST, HOST, 100, 1 }
+        { "1741", "6fKzQXiH", HOST, HOST, HOST, 100, 1 }
     },
     {
         { "invalid_account", 0 },
@@ -395,9 +395,10 @@ void Mthread1(void* data)
                                  MediaEvent *pMedia = &(event->body.mediaEvent);
                                  DBG_LOG("Callid %d ncount %d type 1 %d type 2 %d\n", pMedia->callID, pMedia->nCount, pMedia->media[0].codecType, pMedia->media[1].codecType);
                                  if (pMedia->nCount ==2) {
-                                         start_file_test("/opt2/a.mulaw",
-                                        "/opt2/v.h264",
-                                        receive_data_callback, pData->accountid, pMedia->callID);
+                                         start_file_test(
+                                            "/opt2/a.mulaw", "/opt2/v.h264",
+                                            ////"/opt2/720p.mulaw", "/opt2/720p.h264",
+                                            receive_data_callback, pData->accountid, pMedia->callID);
                                  }
                                  break;
                             }

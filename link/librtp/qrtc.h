@@ -60,7 +60,8 @@ typedef struct _MediaConfigSet{
 typedef enum _CallbackType{
         CALLBACK_ICE,
         CALLBACK_RTP,
-        CALLBACK_RTCP
+        CALLBACK_RTCP,
+        CALLBACK_SEND_RESULT
 }CallbackType;
 
 typedef void(*UserCallback)(void *pUserData, CallbackType type, void *pCbData);

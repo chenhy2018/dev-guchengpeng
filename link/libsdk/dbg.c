@@ -144,9 +144,9 @@ void writeLog(int loglvl, const char* file, const char* function, const int line
         //output date
         va_list arg;
         char* date = getDateString();
-        char printf_buf[1024];
+        char printf_buf[512] = {0};
         //debug level
-        char debug[20] = {0};
+        char debug[256] = {0};
         switch (loglvl) {
               case  LOG_VERBOSE:
                       strcpy(debug, " [LOG_VERBOSE] ");
@@ -170,19 +170,18 @@ void writeLog(int loglvl, const char* file, const char* function, const int line
                       strcpy(debug, " [LOG_INFO] ");
                       break;
         }
-        char fun_buf[100];
-        sprintf(fun_buf, "%s %s [line +%d] ", file, function, line);
+        char fun_buf[128] = {0};
+        snprintf(fun_buf, sizeof(fun_buf), "%s %s [line +%d] ", file, function, line);
         va_start( arg, format );
-        vsprintf(printf_buf, format, arg);
+        vsnprintf(printf_buf, sizeof(printf_buf), format, arg);
         va_end(arg);
-        char *output = (char*)malloc(1024);
+        char output[1024] = {0};
         unsigned  long diff;
         gettimeofday(&end,NULL);
         diff = 1000000 * (end.tv_sec-start.tv_sec)+ end.tv_usec-start.tv_usec;
-        snprintf(output, 1024, "%s DIFF %ld %s %s [line +%d] %s [pid %ld]  %s", date, diff, file, function, line, debug, pthread_self(), printf_buf);
+        snprintf(output, sizeof(output), "%s DIFF %ld %s %s [line +%d] %s [pid %ld]  %s", date, diff, file, function, line, debug, pthread_self(), printf_buf);
         debugFunc(output);
         free(date);
-        free(output);
         gettimeofday(&start,NULL);
 }
 
