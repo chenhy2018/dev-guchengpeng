@@ -1101,8 +1101,8 @@ int createAnswer(IN OUT PeerConnection * _pPeerConnection, IN void *_pOffer)
         if (_pPeerConnection == NULL) {
                 return PJ_EINVAL;
         }
-        if (_pPeerConnection->nState != PC_STATUS_INIT_OK) {
-                MY_PJ_LOG(1, "should in PC_STATUS_INIT_OK status. but is:%d", _pPeerConnection->nState);
+        if (_pPeerConnection->nState != PC_STATUS_INIT_OK && _pPeerConnection->nState != PC_STATUS_ALLOC) {
+                MY_PJ_LOG(1, "should in PC_STATUS_ALLOC/PC_STATUS_INIT_OK status. but is:%d", _pPeerConnection->nState);
                 return PJ_EINVAL;
         }
 
@@ -1110,6 +1110,12 @@ int createAnswer(IN OUT PeerConnection * _pPeerConnection, IN void *_pOffer)
                 MY_PJ_LOG(2, "already created answer");
                 return PJ_SUCCESS;
         }
+        
+        if (_pPeerConnection->pRemoteSdp != NULL) {
+                MY_PJ_LOG(1, "already set createAnser");
+                return PJ_EINVAL;
+        }
+        _pPeerConnection->pRemoteSdp = pjmedia_sdp_session_clone(_pPeerConnection->pSdpPool, _pOffer);
         
         Message *pMsg = create_msg_create_answer(_pPeerConnection, _pOffer);
         if (pMsg == NULL){
@@ -1464,9 +1470,19 @@ int setRemoteDescription(IN OUT PeerConnection * _pPeerConnection, IN void * _pS
         if (_pPeerConnection == NULL || _pSdp == NULL) {
                 return PJ_EINVAL;
         }
-        if (_pPeerConnection->nState != PC_STATUS_CREATE_OFFER_OK) {
-                MY_PJ_LOG(1, "should in PC_STATUS_CREATE_OFFER_OK status. but is:%d", _pPeerConnection->nState);
+        if (_pPeerConnection->nState >= PC_STATUS_INIT_FAIL) {
+                MY_PJ_LOG(1, "should not in FAIL status. but is:%d", _pPeerConnection->nState);
                 return PJ_EINVAL;
+        }
+
+        // createAnswer will pass sdp, answerer is no need to invoke setRemoteDescription
+        if (_pPeerConnection->role == ICE_ROLE_ANSWERER){
+                return PJ_SUCCESS;
+        }
+        
+        if ( _pPeerConnection->role == ICE_ROLE_NONE) {
+                MY_PJ_LOG(2, "cannt to judge. maybe should not to invoke this method");
+                return PJ_SUCCESS;
         }
 
         if (_pPeerConnection->pSdpPool == NULL) {
@@ -1483,6 +1499,7 @@ int setRemoteDescription(IN OUT PeerConnection * _pPeerConnection, IN void * _pS
         } else {
                 _pPeerConnection->pRemoteSdp = pSdp;
         }
+        _pPeerConnection->nState = PC_STATUS_SET_REMOTE_OK;
 
         return PJ_SUCCESS;
 }
