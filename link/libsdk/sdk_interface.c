@@ -15,7 +15,6 @@
 #include "mqtt.h"
 #include "sdk_local.h"
 #include "list.h"
-#include "framework.h"
 #include "uaMgr.h"
 #include "callMgr.h"
 #include <sys/types.h>
@@ -429,8 +428,6 @@ ErrorID MakeCall(AccountID _nAccountId, const char* id, const char* _pDestUri, O
 {
     struct list_head *pos;
     ErrorID res = RET_ACCOUNT_NOT_EXIST;
-    pid_t tid = pthread_self();
-    DBG_ERROR("MakeCall pid %d\n", tid);
 
     if ( !_pDestUri || !_pCallId || !id )
         return RET_PARAM_ERROR;
@@ -677,8 +674,6 @@ void cbOnCallStateChange(const int _nCallId, const int _nAccountId, const SipInv
     struct list_head *pos;
 
     DBG_LOG("state = %d, status code = %d callid %d accountid %d\n", _State, _StatusCode, _nCallId, _nAccountId);
-    pid_t tid = pthread_self();
-    DBG_LOG("cbOnCallStateChange pid %d\n", tid);
     if ( !pMessage || !pEvent ) {
             DBG_ERROR("malloc error\n");
             return;
@@ -721,7 +716,15 @@ void cbOnCallStateChange(const int _nCallId, const int _nAccountId, const SipInv
                     pCallEvent->status = CALL_STATUS_ERROR;
             }
     } else {
-            pCallEvent->status = CALL_STATUS_REGISTERED;
+            if (pUA->regStatus == OK) {
+                    DBG_LOG("Already registered");
+                    free(pMessage);
+                    free(pEvent);
+                    return;
+            }
+            else {
+                    pCallEvent->status = CALL_STATUS_REGISTERED;
+            }
     }
     pCallEvent->pFromAccount = NULL;
     pMessage->pMessage  = (void *)pEvent;
@@ -729,7 +732,7 @@ void cbOnCallStateChange(const int _nCallId, const int _nAccountId, const SipInv
     pthread_mutex_unlock(&pUAManager->mutex);
 }
 
-bool SetLogLevel(int level) {
+void SetLogLevel(int level) {
     if (pUAManager->bInitSdk) {
           SetDebugLogLevel(level);   
     }

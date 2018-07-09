@@ -5,7 +5,6 @@
 #include "sdk_interface.h"
 #include "mqtt.h"
 #include "sdk_local.h"
-#include "framework.h"
 #include "list.h"
 #include "callMgr.h"
 #include "qrtc.h"

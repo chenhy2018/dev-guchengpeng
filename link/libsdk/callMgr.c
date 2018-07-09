@@ -2,6 +2,7 @@
 #include "callMgr.h"
 #include "dbg.h"
 
+//to do change the CallStatus to INV_STATE
 ErrorID CheckCallStatus(Call* _pCall, CallStatus expectedState)
 {
        if (expectedState == CALL_STATUS_INCOMING || expectedState == CALL_STATUS_RING) {
@@ -165,6 +166,16 @@ ErrorID CALLAnswerCall(Call* _pCall)
         if (id != RET_OK) {
               return id;
         }
+        // rtp to do. ice config.media info. and check error)
+#if 0
+        InitIceConfig(&pCall->iceConfig);
+        InitPeerConnectoin(&pCall->pPeerConnection, &pCall->iceConfig);
+        AddVideoTrack(pCall->pPeerConnection, &pCall->videoConfig);
+        AddAudioTrack(pCall->pPeerConnection, &pCall->audioConfig);
+        setRemoteDescription(_pCall->pPeerConnection, _pCall->pOffer);
+        createAnswer(_pCall->pPeerConnection, _pCall->pOffer, &_pCall->pAnswer);
+        setLocalDescription(pCall->pPeerConnection, pCall->pAnswer);
+#endif
         DBG_LOG("CALLAnswerCall  %p id %d \n", _pCall, _pCall->id);
         return SipAnswerCall(_pCall->id, OK, "answser call", _pCall->pLocal);
 }
@@ -173,7 +184,7 @@ ErrorID CALLRejectCall(Call* _pCall)
 {
         ErrorID id = CheckCallStatus(_pCall, CALL_STATUS_REJECT);
         if (id != RET_OK) {
-              return id;
+                return id;
         }
         id = SipAnswerCall(_pCall->id, BUSY_HERE, "reject call", _pCall->pLocal);
         return id;
@@ -184,7 +195,7 @@ ErrorID CALLHangupCall(Call* _pCall)
 {
         ErrorID id = CheckCallStatus(_pCall, CALL_STATUS_HANGUP);
         if (id != RET_OK) {
-              return id;
+                return id;
         }
         SipHangUp(_pCall->id);
         return id;
@@ -194,8 +205,20 @@ ErrorID CALLSendPacket(Call* _pCall, Stream streamID, const uint8_t* buffer, int
 {
         ErrorID id = CheckCallStatus(_pCall, CALL_STATUS_REGISTERED);
         if (id != RET_OK) {
-              return id;
+                return id;
         }
+        if (_pCall->mediaEvent.nCount <= 0) {
+                return RET_PARAM_ERROR;
+        }
+        else {
+                for (int i = 0; i < _pCall->mediaEvent.nCount; ++i) {
+                        if (_pCall->mediaEvent.media[i].streamType = streamID) {
+                              break;
+                        }
+                }
+                return RET_PARAM_ERROR;
+        }
+
         RtpStreamType type;
         if (streamID == STREAM_AUDIO) {
                 type = RTP_STREAM_AUDIO;

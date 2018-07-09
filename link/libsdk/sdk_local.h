@@ -45,6 +45,7 @@ typedef struct {
         char from[MAX_FROM_NAME_SIZE];
         char url[MAX_URL_SIZE];
         struct list_head list;
+        MediaEvent mediaEvent;
         SipInviteState callStatus;
         PeerConnection* pPeerConnection;
         pjmedia_sdp_session* pLocal;
@@ -87,5 +88,12 @@ typedef struct {
 }UAManager;
 
 extern UAManager *pUAManager;;
+
+//call back
+SipAnswerCode cbOnIncomingCall(const int _nAccountId, const const char *_pFrom, const void *_pUser,
+                               IN const void *_pMedia, OUT int *pCallId);
+void cbOnRegStatusChange(IN const int nAccountId, IN const SipAnswerCode RegStatusCode, IN const void *pUser);
+void cbOnCallStateChange(IN const int nCallId, IN const int nAccountId, IN const SipInviteState State,
+                         IN const SipAnswerCode StatusCode, IN const void *pUser, IN const void *pMedia);
 
 #endif  /*SDK_LOCAL_H*/
