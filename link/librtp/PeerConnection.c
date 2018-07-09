@@ -12,7 +12,6 @@ void notifyReleasePeerConnectoin(IN PeerConnection * _pPeerConnection);
 int initPeerConnectoin(OUT PeerConnection * _pPeerConnection);
 int createOffer_(IN OUT PeerConnection * _pPeerConnection);
 int createAnswer_(IN OUT PeerConnection * _pPeerConnection, IN void *_pOffer);
-int setRemoteDescription_(IN OUT PeerConnection * _pPeerConnection);
 int startNegotiation(IN PeerConnection * _pPeerConnection);
 int sendRtpPacket(IN PeerConnection *_pPeerConnection, IN OUT RtpPacket * _pPacket);
 static pj_pool_t * createSdpPool(IN OUT PeerConnection * _pPeerConnection);
@@ -327,12 +326,12 @@ static int rtpMqThread(void * _pArg)
 {
         while(!manager.nQuit) {
                 Message* pMsg = ReceiveMessage(manager.pMsgQ);
+                if (pMsg == NULL) {
+                        continue;
+                }
                 RtpMqMsg *pRtpMqMsg = (RtpMqMsg*)pMsg;
                 pj_status_t status;
                 switch (pRtpMqMsg->nType) {
-                        case MQ_TYPE_QUIT:
-                                MY_PJ_LOG(3, "rtpMqThread receive quit msg");
-                                break;
                         case MQ_TYPE_SEND:
                                 status = sendRtpPacket(pRtpMqMsg->pPeerConnection, &pRtpMqMsg->pkt);
                                 pRtpMqMsg->pPeerConnection->userIceConfig.userCallback(
@@ -356,16 +355,7 @@ static int rtpMqThread(void * _pArg)
                                 }
                                 break;
                         case MQ_TYPE_NEG:
-                                if (pRtpMqMsg->pPeerConnection->role == ICE_ROLE_OFFERER) {
-                                        status = setRemoteDescription_(pRtpMqMsg->pPeerConnection);
-                                        if (status == 0) {
-                                                pRtpMqMsg->pPeerConnection->nState = PC_STATUS_SET_REMOTE_OK;
-                                                startNegotiation(pRtpMqMsg->pPeerConnection);
-                                        } else {
-                                                pRtpMqMsg->pPeerConnection->nState = PC_STATUS_SET_REMOTE_FAIL;
-                                                doUserCallback(pRtpMqMsg->pPeerConnection, ICE_STATE_FAIL, NULL);
-                                        }
-                                }
+                                startNegotiation(pRtpMqMsg->pPeerConnection);
                                 break;
                         case MQ_TYPE_RELEASE:
                                 notifyReleasePeerConnectoin(pRtpMqMsg->pPeerConnection);
@@ -455,7 +445,7 @@ int InitialiseRtp()
         librtp_inner_init_register_thread();
         pj_status_t status;
 
-        pj_caching_pool_init(&manager.cachingPool, &pj_pool_factory_default_policy, 0);
+        pj_caching_pool_init(&manager.cachingPool, &pj_pool_factory_default_policy, 128);
 
         pj_pool_t *pPool = pj_pool_create(&manager.cachingPool.factory, NULL, 128, 128, NULL);
         ASSERT_RETURN_CHECK(pPool, pj_pool_create);
@@ -782,6 +772,12 @@ int InitPeerConnectoin(OUT PeerConnection ** _pPeerConnection, IN IceConfig *_pI
         pPeerConnection->nState = PC_STATUS_ALLOC;
 
         *_pPeerConnection = pPeerConnection;
+
+        InitMediaStream(&pPeerConnection->mediaStream);
+        for ( int i = 0; i < sizeof(pPeerConnection->nAvIndex) / sizeof(int); i++) {
+                pPeerConnection->nAvIndex[i] = -1;
+        }
+        MY_PJ_LOG(5, "PeerConnection created:%p", pPeerConnection);
         return PJ_SUCCESS;
 }
 
@@ -789,10 +785,6 @@ int initPeerConnectoin(OUT PeerConnection * _pPeerConnection)
 {
         pj_status_t status;
         peerConnectInitIceConfig(_pPeerConnection);
-        
-        for ( int i = 0; i < sizeof(_pPeerConnection->nAvIndex) / sizeof(int); i++) {
-                _pPeerConnection->nAvIndex[i] = -1;
-        }
 
         pj_pool_t *pPool = pj_pool_create(&manager.cachingPool.factory, NULL, 128, 128, NULL);
         ASSERT_RETURN_CHECK(pPool, pj_pool_create);
@@ -800,15 +792,10 @@ int initPeerConnectoin(OUT PeerConnection * _pPeerConnection)
         status = pj_mutex_create(pPool, NULL, PJ_MUTEX_DEFAULT, &_pPeerConnection->pMutex);
         STATUS_CHECK(pj_mutex_create, status);
 
-        InitMediaStream(&_pPeerConnection->mediaStream);
-        MY_PJ_LOG(5, "PeerConnection created:%p", _pPeerConnection);
-        
         pPool = createSdpPool(_pPeerConnection);
         if (pPool == NULL) {
                 return PJ_NO_MEMORY_EXCEPTION;
         }
-        _pPeerConnection->remoteSdpStr.ptr = pj_pool_zalloc(pPool, 4096);
-        _pPeerConnection->sdpStrCap = 4096;
         
         return 0;
 }
@@ -851,8 +838,8 @@ void releasePeerConnection(IN void * pUserData)
         PeerConnection * _pPeerConnection = (PeerConnection * )pUserData;
         MY_PJ_LOG(1, "releasePeerConnection------------:%p grplock:%p %p", pUserData,
                  _pPeerConnection->pGrpLock1, _pPeerConnection->pGrpLock2);
-        pj_mutex_lock(_pPeerConnection->pMutex);
         if (_pPeerConnection->nDestroy != 0) {
+                pj_mutex_lock(_pPeerConnection->pMutex);
                 MY_PJ_LOG(5, "releasePeerConnection %p quit:%d total:%d destroy:%d", pUserData, _pPeerConnection->nQuitCnt,
                           _pPeerConnection->mediaStream.nCount + 1, _pPeerConnection->nDestroy);
                 _pPeerConnection->nQuitCnt++;
@@ -860,8 +847,8 @@ void releasePeerConnection(IN void * pUserData)
                         pj_mutex_unlock(_pPeerConnection->pMutex);
                         return;
                 }
+                pj_mutex_unlock(_pPeerConnection->pMutex);
         }
-        pj_mutex_unlock(_pPeerConnection->pMutex);
         MY_PJ_LOG(1, "releasePeerConnection==============:%p", pUserData);
 
         for ( int i = 0; i < sizeof(_pPeerConnection->nAvIndex) / sizeof(int); i++) {
@@ -918,8 +905,8 @@ int AddAudioTrack(IN OUT PeerConnection * _pPeerConnection, IN MediaConfigSet * 
         if (_pPeerConnection == NULL || _pAudioConfig == NULL) {
                 return PJ_EINVAL;
         }
-        if (_pPeerConnection->nState != PC_STATUS_INIT_OK) {
-                MY_PJ_LOG(1, "should in PC_STATUS_INIT_OK status. but is:%d", _pPeerConnection->nState);
+        if ((_pPeerConnection->nState != PC_STATUS_ALLOC && _pPeerConnection->nState != PC_STATUS_INIT_OK)) {
+                MY_PJ_LOG(1, "should in PC_STATUS_ALLOC/PC_STATUS_INIT_OK status. but is:%d", _pPeerConnection->nState);
                 return PJ_EINVAL;
         }
         pj_status_t status;
@@ -953,8 +940,8 @@ int AddVideoTrack(IN OUT PeerConnection * _pPeerConnection, IN MediaConfigSet * 
         if (_pPeerConnection == NULL || _pVideoConfig == NULL) {
                 return PJ_EINVAL;
         }
-        if (_pPeerConnection->nState != PC_STATUS_INIT_OK) {
-                MY_PJ_LOG(1, "should in PC_STATUS_INIT_OK status. but is:%d", _pPeerConnection->nState);
+        if ((_pPeerConnection->nState != PC_STATUS_ALLOC && _pPeerConnection->nState != PC_STATUS_INIT_OK)) {
+                MY_PJ_LOG(1, "should in PC_STATUS_ALLOC/PC_STATUS_INIT_OK status. but is:%d", _pPeerConnection->nState);
                 return PJ_EINVAL;
         }
         pj_status_t status;
@@ -1486,26 +1473,17 @@ int setRemoteDescription(IN OUT PeerConnection * _pPeerConnection, IN void * _pS
                 MY_PJ_LOG(1, "pSdpPool should not be NULL");
                 return PJ_EBUG;
         }
-        
-        //_pSdp 生命周期问题 TODO, 传递字符串最好
-        pj_str_t *pStr = (pj_str_t *)_pSdp;
-        pj_ansi_strncpy(_pPeerConnection->remoteSdpStr.ptr, pStr->ptr, _pPeerConnection->sdpStrCap);
-        _pPeerConnection->remoteSdpStr.slen = pStr->slen;
-
-        return PJ_SUCCESS;
-}
-
-int setRemoteDescription_(IN OUT PeerConnection * _pPeerConnection){
-       
-        _pPeerConnection->pRemoteSdp = pjmedia_sdp_parse(_pPeerConnection->pSdpPool,
-                                                         _pPeerConnection->remoteSdpStr.ptr,
-                                                         _pPeerConnection->remoteSdpStr.slen,
-                                                         &_pPeerConnection->pRemoteSdp);
-
-
-        if(_pPeerConnection->pLocalSdp){
-                return checkAndNeg(_pPeerConnection);
+        pjmedia_sdp_session *  pSdp = (pjmedia_sdp_session *) _pSdp;
+        if (pSdp != _pPeerConnection->pOfferSdp && pSdp != _pPeerConnection->pAnswerSdp) {
+                _pPeerConnection->pRemoteSdp = pjmedia_sdp_session_clone(_pPeerConnection->pSdpPool, _pSdp);
+                if (_pPeerConnection->pRemoteSdp == NULL) {
+                        MY_PJ_LOG(1, "PJ_NO_MEMORY_EXCEPTION, clone sdp fail");
+                        pj_assert(_pPeerConnection->pLocalSdp != NULL);
+                }
+        } else {
+                _pPeerConnection->pRemoteSdp = pSdp;
         }
+
         return PJ_SUCCESS;
 }
 

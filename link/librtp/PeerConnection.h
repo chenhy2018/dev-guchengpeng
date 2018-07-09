@@ -65,11 +65,9 @@ typedef struct _PeerConnection
         pj_pool_t *pGrpPool;
         pj_grp_lock_t *pGrpLock1;
         pj_grp_lock_t *pGrpLock2;
-        pj_str_t remoteSdpStr;
-        int sdpStrCap;
 }PeerConnection;
 
-#define MQ_TYPE_QUIT 1
+
 #define MQ_TYPE_SEND 2
 #define MQ_TYPE_CREATE_OFFER 3
 #define MQ_TYPE_CREATE_ANSWER 4
