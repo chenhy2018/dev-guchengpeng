@@ -78,7 +78,6 @@ typedef struct _RtpMqMsg{
         Message msg;
         int nType;
         PeerConnection *pPeerConnection;
-        pj_pool_t *pPool;
         RtpPacket pkt;
         void * pArg;
 }RtpMqMsg;

@@ -59,12 +59,7 @@ static inline pj_status_t librtp_inner_uninit_register_thread()
 
 Message * createMsgJustWithPeerConnection(PeerConnection *_pPeerConnection, int _nType)
 {
-        pj_pool_t * pPool = pj_pool_create(&manager.cachingPool.factory, NULL, sizeof(RtpMqMsg), sizeof(RtpMqMsg), NULL);
-        if (pPool == NULL) {
-                return NULL;
-        }
-        RtpMqMsg *pRtpMqMsg = (RtpMqMsg *)pj_pool_alloc(pPool, sizeof(RtpMqMsg));
-        pRtpMqMsg->pPool = pPool;
+        RtpMqMsg *pRtpMqMsg = (RtpMqMsg *)malloc(sizeof(RtpMqMsg));
         pRtpMqMsg->nType = _nType;
         pRtpMqMsg->pPeerConnection = _pPeerConnection;
 
@@ -79,9 +74,9 @@ Message* createMsgSend(PeerConnection *_pPeerConnection, RtpPacket * pPkt)
         }
         RtpMqMsg *pRtpMqMsg = (RtpMqMsg *)pMsg;
         pRtpMqMsg->pkt = *pPkt;
-        char * pTmp = (char *)pj_pool_alloc(pRtpMqMsg->pPool, pPkt->nDataLen);
+        char * pTmp = (char *)malloc(pPkt->nDataLen);
         if (pTmp == NULL) {
-                pj_pool_release(pRtpMqMsg->pPool);
+                free(pMsg);
                 return NULL;
         }
         memcpy(pTmp, pRtpMqMsg->pkt.pData, pPkt->nDataLen);
@@ -318,6 +313,7 @@ static int rtpMqThread(void * _pArg)
                                         pRtpMqMsg->pPeerConnection->userIceConfig.pCbUserData,
                                         CALLBACK_SEND_RESULT,
                                         (void *)status);
+                                free(pRtpMqMsg->pkt.pData);
                                 break;
                         case MQ_TYPE_CREATE_OFFER:
                         case MQ_TYPE_CREATE_ANSWER:
@@ -344,8 +340,8 @@ static int rtpMqThread(void * _pArg)
                                 MY_PJ_LOG(1, "unkown type:%d", pRtpMqMsg->nType);
                                 break;
                 }
-                if (pRtpMqMsg->pPool != NULL)
-                        pj_pool_release(pRtpMqMsg->pPool);
+                if (pMsg != NULL)
+                        free(pMsg);
         }
         return 0;
 }
