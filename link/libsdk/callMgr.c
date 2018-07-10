@@ -83,8 +83,8 @@ ErrorID InitRtp(Call** _pCall, CallConfig* _pConfig)
                 return RET_INTERAL_FAIL;
         }
         MediaConfigSet *_pVideo = _pConfig->pVideoConfigs;
-        DBG_LOG("media config video count %d, streamType %x, codecType %x, nSampleOrClockRate %d \n",
-                _pVideo->nCount, _pVideo->configs[0].streamType, _pVideo->configs[0].codecType, _pVideo->configs[0].nSampleOrClockRate);
+        DBG_LOG("media config video count %d, streamType %x, codecType %x, nSampleOrClockRate %d PeerConnectoin %p \n",
+                _pVideo->nCount, _pVideo->configs[0].streamType, _pVideo->configs[0].codecType, _pVideo->configs[0].nSampleOrClockRate, pCall->pPeerConnection);
         res = AddVideoTrack(pCall->pPeerConnection, _pVideo);
         if (res != 0) {
                 DBG_ERROR("InitPeerConnectoin failed %d \n", res);
@@ -110,7 +110,7 @@ void CALLMakeNewCall(Call* _pCall)
                 DBG_ERROR("SipMakeNewCall failed %d \n", error);
                 return;
         }
-        DBG_LOG("CALLMakeCall end call id %d", _pCall->id);
+        DBG_LOG("CALLMakeCall end call id %d \n", _pCall->id);
 }
 
 // make a call, user need to save call id . add parameter for ice info and media info.
@@ -184,7 +184,7 @@ ErrorID CALLRejectCall(Call* _pCall)
 {
         ErrorID id = CheckCallStatus(_pCall, CALL_STATUS_REJECT);
         if (id != RET_OK) {
-              return id;
+                return id;
         }
         id = SipAnswerCall(_pCall->id, BUSY_HERE, "reject call", _pCall->pLocal);
         return id;
@@ -195,7 +195,7 @@ ErrorID CALLHangupCall(Call* _pCall)
 {
         ErrorID id = CheckCallStatus(_pCall, CALL_STATUS_HANGUP);
         if (id != RET_OK) {
-              return id;
+                return id;
         }
         SipHangUp(_pCall->id);
         return id;
@@ -205,8 +205,22 @@ ErrorID CALLSendPacket(Call* _pCall, Stream streamID, const uint8_t* buffer, int
 {
         ErrorID id = CheckCallStatus(_pCall, CALL_STATUS_REGISTERED);
         if (id != RET_OK) {
-              return id;
+                return id;
         }
+        if (_pCall->mediaEvent.nCount <= 0) {
+                return RET_PARAM_ERROR;
+        }
+        else {
+                for (int i = 0; i < _pCall->mediaEvent.nCount; ++i) {
+                        if (_pCall->mediaEvent.media[i].streamType == streamID) {
+                              break;
+                        }
+                        if (i == _pCall->mediaEvent.nCount) {
+                              return RET_PARAM_ERROR;
+                        }
+                }
+        }
+
         RtpStreamType type;
         if (streamID == STREAM_AUDIO) {
                 type = RTP_STREAM_AUDIO;
@@ -215,7 +229,14 @@ ErrorID CALLSendPacket(Call* _pCall, Stream streamID, const uint8_t* buffer, int
                 type = RTP_STREAM_VIDEO;
         }
         RtpPacket packet = {(uint8_t*)(buffer), size, nTimestamp, type};
-        return SendRtpPacket(_pCall->pPeerConnection, &packet);
+        int res = SendRtpPacket(_pCall->pPeerConnection, &packet);
+        if (res == PJ_SUCCESS) {
+                return RET_OK;
+        }
+        else {
+                DBG_ERROR("CALLSendPacket failed %d \n", res);
+                return RET_INTERAL_FAIL;
+        }
 }
 
 SipAnswerCode CALLOnIncomingCall(Call** _pCall, const int _nAccountId, const int _nCallId, const char *pFrom,

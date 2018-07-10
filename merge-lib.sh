@@ -78,3 +78,4 @@ cd ../../objs
 # 5. gen new library 
 echo "gen new lib"
 ${prefix}ar r ../../${target} *.o
+cp ../../link/libsdk/sdk_interface.h ../../${OUTPUT}/lib/$1/sdk_interface.h

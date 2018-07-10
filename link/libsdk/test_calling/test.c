@@ -21,15 +21,11 @@
 #define INVALID_SERVER "192.168.1.239"
 
 #define MAX_COUNT 9
+#define CHENGPENG 1
+//#define MENGKE 1
 int RegisterTestSuitCallback( TestSuit *this );
 int RegisterTestSuitInit( TestSuit *this, TestSuitManager *_pManager );
 int RegisterTestSuitGetTestCase( TestSuit *this, TestCase **testCase );
-int RegisterTestSuitCallback2( TestSuit *this );
-void *UA1_EventLoopThread( void *arg );
-void *UA2_EventLoopThread( void *arg );
-void *UA3_EventLoopThread( void *arg );
-void *UA4_EventLoopThread( void *arg );
-void *UA5_EventLoopThread( void *arg );
 
 typedef struct {
     char *id;
@@ -50,6 +46,49 @@ typedef struct {
     RegisterData data;
 } RegisterTestCase;
 
+#ifdef CHENGPENG
+RegisterTestCase gRegisterTestCases[] =
+{
+    {
+        { "valid_account1", CALL_STATUS_REGISTERED, NULL },
+        { "2041", "LDb1wHu9", HOST, HOST, HOST, 10, 1 }
+    },
+    {
+        { "valid_account2", CALL_STATUS_REGISTERED, NULL },
+        { "2042", "qIwCXfUp", HOST, HOST, HOST, 10, 0 }
+    },
+    {
+        { "invalid_account1", CALL_STATUS_REGISTERED, NULL },
+        { "2043", "IZYkxp5O", HOST, HOST, HOST, 10, 0 }
+    },
+    {
+        { "invalid_account2", CALL_STATUS_REGISTERED, NULL },
+        { "2044", "WZx6T3Er", HOST, HOST, HOST, 10, 0 }
+    },
+    {
+        { "invalid_sip_register_server", CALL_STATUS_REGISTERED, NULL},
+        { "2045", "vdK3TsK0", INVALID_SERVER, INVALID_SERVER, INVALID_SERVER, 10, 0 }
+    },
+    {
+        { "invalid_account", 0 },
+        { "2046", "I1gj5Wef", HOST, HOST, HOST, 100, 0 }
+    },
+    {
+        { "normal", 0 },
+        { "2047", "rx7HOnDT", HOST, HOST, HOST, 100, 1 }
+    },
+    {
+        { "invalid_account", 0 },
+        { "2048", "VidAZJIM", HOST, HOST, HOST, 100, 0 }
+    },
+    {
+        { "normal", 0 },
+        { "2049", "1NR6D190", HOST, HOST, HOST, 100, 1 }
+    },
+};
+#endif
+
+#ifdef MENGKE
 RegisterTestCase gRegisterTestCases[] =
 {
     {
@@ -89,45 +128,11 @@ RegisterTestCase gRegisterTestCases[] =
         { "1719", "NVWrpASp", HOST, HOST, HOST, 100, 1 }
     },
 };
-
-RegisterTestCase gCallTestCases[] =
-{   
-    {   
-        { "valid_account1", CALL_STATUS_REGISTERED, UA1_EventLoopThread },
-        { "1011", "1011", HOST, HOST, HOST, 10, 1 }
-    },
-    {   
-        { "valid_account2", CALL_STATUS_REGISTERED, UA2_EventLoopThread },
-        { "1012", "1012", HOST, HOST, HOST, 10, 0 }
-    },
-    {   
-        { "invalid_account1", CALL_STATUS_REGISTER_FAIL, UA3_EventLoopThread },
-        { "1013", "1013", HOST, HOST, HOST, 10, 0 }
-    },
-    {   
-        { "invalid_account2", CALL_STATUS_REGISTER_FAIL, UA4_EventLoopThread },
-        { "0014", "0014", HOST, HOST, HOST, 10, 0 }
-    },
-    {   
-        { "invalid_sip_register_server", CALL_STATUS_REGISTER_FAIL, UA5_EventLoopThread },
-        { "1015", "1015", INVALID_SERVER, INVALID_SERVER, INVALID_SERVER, 10, 0 }
-    }
-};
-
+#endif
 TestSuit gRegisterTestSuit =
 {
     "Register",
     RegisterTestSuitCallback,
-    RegisterTestSuitInit,
-    RegisterTestSuitGetTestCase,
-    (void*)&gRegisterTestCases,
-    1
-};
-
-TestSuit gRegisterTestSuit2 =
-{
-    "Register2",
-    RegisterTestSuitCallback2,
     RegisterTestSuitInit,
     RegisterTestSuitGetTestCase,
     (void*)&gRegisterTestCases,
@@ -169,7 +174,7 @@ void Mthread1(void* data)
     DBG_LOG("send pack *****%d call id %d\n", pData->accountid, pData->callid);
     while (1) {     
                     if (sendflag) {
-                            if (timecount > 500) {
+                            if (timecount > 5000) {
                                     DBG_LOG("hangcall ******************\n");
                                     HangupCall(pData->accountid, pData->callid);
                                     sendflag = 0;
@@ -197,9 +202,9 @@ void Mthread1(void* data)
                                       DBG_LOG("AnswerCall end *****************\n");
                                   }
                                   if (pCallEvent->status == CALL_STATUS_ERROR || pCallEvent->status == CALL_STATUS_HANGUP) {
-                                        DBG_LOG("makecall *****************  ERROR ****************************8*\n");
+                                        DBG_LOG("makecall *********************************************8*\n");
                                         do {
-                                                id = MakeCall(pData->accountid, "1710", HOST, &pData->callid);
+                                                id = MakeCall(pData->accountid, "2040", HOST, &pData->callid);
                                         } while (id != RET_OK);
                                   }
 
@@ -267,7 +272,7 @@ int RegisterTestSuitCallback( TestSuit *this )
             return TEST_FAIL;
         }
     }
-
+    setPjLogLevel(2);
     UT_STR( pData->id );
     for (int count = 0; count < MAX_COUNT; ++ count) {
             pData = &pTestCases[count].data;
@@ -293,7 +298,7 @@ int RegisterTestSuitCallback( TestSuit *this )
            pData->timecount = 0;
            UT_LOG("MakeCall in accountid %d\n", pData->accountid);
            pData->callid = 0;
-           id = MakeCall(pData->accountid, "1710", HOST, &pData->callid);
+           id = MakeCall(pData->accountid, "2040", HOST, &pData->callid);
            if (RET_OK != id) {
                     fprintf(stderr, "call error %d \n", id);
                      continue;
@@ -304,281 +309,9 @@ int RegisterTestSuitCallback( TestSuit *this )
     while(1) { sleep(10); }
 }
 
-int RegisterTestSuitCallback2( TestSuit *this )
-{
-    RegisterTestCase *pTestCases = NULL;
-    RegisterData *pData = NULL;
-    RegisterTestCase *pTestCase = NULL;
-    Media media;
-    int i = 0;
-    int ret = 0;
-    static ErrorID sts = 0;
-    EventManger *pEventManager = &this->pManager->eventManager;
-
-    UT_LINE();
-    if ( !this ) {
-        return -1;
-    }
-
-    pTestCases = (RegisterTestCase *) this->testCases;
-    UT_LOG("this->index = %d\n", this->index );
-    pTestCase = &pTestCases[this->index];
-    pData = &pTestCase->data;
-
-    if ( pData->init ) {
-        sts = InitSDK( &media, 1 );
-        if ( RET_OK != sts ) {
-            UT_ERROR("sdk init error\n");
-            return TEST_FAIL;
-        }
-    }
-
-    UT_STR( pData->id );
-    UT_STR( pData->password );
-    UT_STR( pData->sigHost );
-
-    sts = Register( pData->id, pData->password, pData->sigHost, pData->mediaHost, pData->imHost );
-    if ( sts >= RET_MEM_ERROR ) {
-        DBG_ERROR("sts = %d\n", sts );
-        return TEST_FAIL;
-    }
-    UT_VAL( sts );
-    this->pManager->AddPrivateData( &sts );
-    if ( pTestCase->father.threadEntry )
-        this->pManager->ThreadRegister( pTestCase->father.threadEntry );
-
-    if ( pEventManager->WaitForEvent ) {
-        UT_VAL( pTestCase->father.expact );
-        ret = pEventManager->WaitForEvent( pTestCase->father.expact, pData->timeOut );
-        if ( ret == ERROR_TIMEOUT ) {
-            UT_ERROR("ERROR_TIMEOUT\n");
-            return TEST_FAIL;
-        } else if ( ret == ERROR_INVAL ) {
-            UT_ERROR("ERROR_INVAL\n");
-            return TEST_FAIL;
-        }
-        UT_VAL( ret );
-        return TEST_PASS;
-    }
-
-    return TEST_FAIL;
-}
-
-void *UA1_EventLoopThread( void *arg )
-{
-    TestSuitManager *pManager = (TestSuitManager *)arg;
-    ErrorID ret = 0;
-    EventType type = 0;
-    AccountID id = 0;
-    Event event, *pEvent;
-    CallEvent *pCallEvent;
-    EventManger *pEventManager = &pManager->eventManager;
-
-    UT_LOG("EventLoopThread enter ...\n");
-    if ( !pManager ) {
-        UT_ERROR("check param error\n");
-        return NULL;
-    }
-
-    if ( !pManager->data ) {
-        UT_ERROR("check data error\n");
-        return NULL;
-    }
-
-    id = *(AccountID *)pManager->data;
-    UT_VAL( id );
-
-
-    for (;;) {
-        UT_LOG("call PollEvent\n");
-        ret = PollEvent( id, &type, &pEvent, 0 );
-        UT_VAL( type );
-        if ( type == EVENT_CALL ) {
-            UT_LINE();
-            pCallEvent = &pEvent->body.callEvent;
-            if ( pManager->NotifyAllEvent ) {
-                UT_VAL( pCallEvent->status );
-                pManager->NotifyAllEvent( pCallEvent->status );
-            }
-        }
-    }
-
-    return NULL;
-}
-
-void *UA2_EventLoopThread( void *arg )
-{
-    TestSuitManager *pManager = (TestSuitManager *)arg;
-    ErrorID ret = 0;
-    EventType type = 0;
-    AccountID id = 0;
-    Event event, *pEvent;
-    CallEvent *pCallEvent;
-    EventManger *pEventManager = &pManager->eventManager;
-
-    UT_LOG("EventLoopThread enter ...\n");
-    if ( !pManager ) {
-        UT_ERROR("check param error\n");
-        return NULL;
-    }
-
-    if ( !pManager->data ) {
-        UT_ERROR("check data error\n");
-        return NULL;
-    }
-
-    id = *(AccountID *)pManager->data;
-    UT_VAL( id );
-
-
-    for (;;) {
-        UT_LOG("call PollEvent\n");
-        ret = PollEvent( id, &type, &pEvent, 0 );
-        UT_VAL( type );
-        if ( type == EVENT_CALL ) {
-            UT_LINE();
-            pCallEvent = &pEvent->body.callEvent;
-            if ( pManager->NotifyAllEvent ) {
-                UT_VAL( pCallEvent->status );
-                pManager->NotifyAllEvent( pCallEvent->status );
-            }
-        }
-    }
-
-    return NULL;
-}
-
-void *UA3_EventLoopThread( void *arg )
-{
-    TestSuitManager *pManager = (TestSuitManager *)arg;
-    ErrorID ret = 0;
-    EventType type = 0;
-    AccountID id = 0;
-    Event event, *pEvent;
-    CallEvent *pCallEvent;
-    EventManger *pEventManager = &pManager->eventManager;
-
-    UT_LOG("EventLoopThread enter ...\n");
-    if ( !pManager ) {
-        UT_ERROR("check param error\n");
-        return NULL;
-    }
-
-    if ( !pManager->data ) {
-        UT_ERROR("check data error\n");
-        return NULL;
-    }
-
-    id = *(AccountID *)pManager->data;
-    UT_VAL( id );
-
-
-    for (;;) {
-        UT_LOG("call PollEvent\n");
-        ret = PollEvent( id, &type, &pEvent, 0 );
-        UT_VAL( type );
-        if ( type == EVENT_CALL ) {
-            UT_LINE();
-            pCallEvent = &pEvent->body.callEvent;
-            if ( pManager->NotifyAllEvent ) {
-                UT_VAL( pCallEvent->status );
-                pManager->NotifyAllEvent( pCallEvent->status );
-            }
-        }
-    }
-
-    return NULL;
-}
-
-void *UA4_EventLoopThread( void *arg )
-{
-    TestSuitManager *pManager = (TestSuitManager *)arg;
-    ErrorID ret = 0;
-    EventType type = 0;
-    AccountID id = 0;
-    Event event, *pEvent;
-    CallEvent *pCallEvent;
-    EventManger *pEventManager = &pManager->eventManager;
-
-    UT_LOG("EventLoopThread enter ...\n");
-    if ( !pManager ) {
-        UT_ERROR("check param error\n");
-        return NULL;
-    }
-
-    if ( !pManager->data ) {
-        UT_ERROR("check data error\n");
-        return NULL;
-    }
-
-    id = *(AccountID *)pManager->data;
-    UT_VAL( id );
-
-
-    for (;;) {
-        UT_LOG("call PollEvent\n");
-        ret = PollEvent( id, &type, &pEvent, 0 );
-        UT_VAL( type );
-        if ( type == EVENT_CALL ) {
-            UT_LINE();
-            pCallEvent = &pEvent->body.callEvent;
-            if ( pManager->NotifyAllEvent ) {
-                UT_VAL( pCallEvent->status );
-                pManager->NotifyAllEvent( pCallEvent->status );
-            }
-        }
-    }
-
-    return NULL;
-}
-
-void *UA5_EventLoopThread( void *arg )
-{
-    TestSuitManager *pManager = (TestSuitManager *)arg;
-    ErrorID ret = 0;
-    EventType type = 0;
-    AccountID id = 0;
-    Event event, *pEvent;
-    CallEvent *pCallEvent;
-    EventManger *pEventManager = &pManager->eventManager;
-
-    UT_LOG("EventLoopThread enter ...\n");
-    if ( !pManager ) {
-        UT_ERROR("check param error\n");
-        return NULL;
-    }
-
-    if ( !pManager->data ) {
-        UT_ERROR("check data error\n");
-        return NULL;
-    }
-
-    id = *(AccountID *)pManager->data;
-    UT_VAL( id );
-
-
-    for (;;) {
-        UT_LOG("call PollEvent\n");
-        ret = PollEvent( id, &type, &pEvent, 0 );
-        UT_VAL( type );
-        if ( type == EVENT_CALL ) {
-            UT_LINE();
-            pCallEvent = &pEvent->body.callEvent;
-            if ( pManager->NotifyAllEvent ) {
-                UT_VAL( pCallEvent->status );
-                pManager->NotifyAllEvent( pCallEvent->status );
-            }
-        }
-    }
-
-    return NULL;
-}
-
 int InitAllTestSuit()
 {
     AddTestSuit( &gRegisterTestSuit );
-    //AddTestSuit( &gRegisterTestSuit2 );
-
     return 0;
 }
 

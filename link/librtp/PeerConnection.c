@@ -1755,13 +1755,11 @@ int SendRtpPacket(IN PeerConnection *_pPeerConnection, IN OUT RtpPacket * _pPack
                 return PJ_EINVAL;
         }
         if (_pPeerConnection->nState != PC_STATUS_NEG_OK) {
-                MY_PJ_LOG(1, "should in PC_STATUS_NEG_OK status. but is:%d", _pPeerConnection->nState);
                 return PJ_EINVAL;
         }
 
         Message *pMsg = createMsgSend(_pPeerConnection, _pPacket);
         if (pMsg == NULL){
-                MY_PJ_LOG(1, "create_msg_send fail");
                 return PJ_NO_MEMORY_EXCEPTION;
         }
         SendMessage(manager.pMsgQ, pMsg);
