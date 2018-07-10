@@ -15,6 +15,7 @@ int createAnswer(IN OUT PeerConnection * _pPeerConnection);
 int startNegotiation(IN PeerConnection * _pPeerConnection);
 int sendRtpPacket(IN PeerConnection *_pPeerConnection, IN OUT RtpPacket * _pPacket);
 static pj_pool_t * createSdpPool(IN OUT PeerConnection * _pPeerConnection);
+static int checkAndNeg(IN OUT PeerConnection * _pPeerConnection);
 
 void releasePeerConnection2(IN void * pUserData)
 {
@@ -325,6 +326,15 @@ static int rtpMqThread(void * _pArg)
                                 }
                                 break;
                         case MQ_TYPE_NEG:
+                                if (pRtpMqMsg->pPeerConnection->pRemoteSdp && pRtpMqMsg->pPeerConnection->pLocalSdp) {
+                                        status = checkAndNeg(pRtpMqMsg->pPeerConnection);
+                                } else {
+                                        status = PJ_EINVAL;
+                                }
+                                if (status != PJ_SUCCESS) {
+                                        doUserCallback(pRtpMqMsg->pPeerConnection, ICE_STATE_NEGOTIATION_FAIL, NULL);
+                                        pRtpMqMsg->pPeerConnection->nState = PC_STATUS_NEG_FAIL;
+                                }
                                 startNegotiation(pRtpMqMsg->pPeerConnection);
                                 break;
                         case MQ_TYPE_RELEASE:
@@ -1252,7 +1262,7 @@ static void on_rx_rtp(void *pUserData, void *pPkt, pj_ssize_t size)
                         unsigned nBitstreamPos = 0;
                         status = MediaUnPacketize(pMediaTrack->pMediaPacketier, pPayload, nPayloadLen, &pBitstream, &nBitstreamPos, pRtpHeader->m, &bTryAgain);
                         if (nBitstreamPos == 0) {
-                                //MY_PJ_LOG(3, "MediaUnPacketize:%d, receiveSize:%d", status, size);
+                                MY_PJ_LOG(3, "MediaUnPacketize:%d, receiveSize:%d", status, nPayloadLen);
                                 break;
                         }
 
@@ -1457,9 +1467,6 @@ int setLocalDescription(IN OUT PeerConnection * _pPeerConnection, IN void * _pSd
                 _pPeerConnection->pLocalSdp = pSdp;
         }
 
-        if (_pPeerConnection->pRemoteSdp) {
-                return checkAndNeg(_pPeerConnection);
-        }
         return PJ_SUCCESS;
 }
 
