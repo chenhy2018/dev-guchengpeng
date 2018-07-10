@@ -171,6 +171,7 @@ static void OnRxRtp(void *_pUserData, CallbackType _type, void *_pCbData)
                                          }
                                          event->callID = pCall->id;
                                          event->nCount = pInfo->nCount;
+                                         memcpy(&pCall->mediaEvent, event, sizeof(MediaEvent));
                                          break;
                                  }
                                  default :
@@ -212,7 +213,16 @@ static void OnRxRtp(void *_pUserData, CallbackType _type, void *_pCbData)
                         break;
                 case CALLBACK_RTCP:
                         DBG_LOG("==========>callback_rtcp\n");
-                        break;
+                        free(pMessage);
+                        free(pEvent);
+                        pthread_mutex_unlock(&pUAManager->mutex);
+                        return;
+                case CALLBACK_SEND_RESULT:
+                        //DBG_LOG("==========>callback_send result\n");
+                        free(pMessage);
+                        free(pEvent);
+                        pthread_mutex_unlock(&pUAManager->mutex);
+                        return;
         }
         pMessage->pMessage  = (void *)pEvent;
         SendMessage(pUA->pQueue, pMessage);
@@ -244,6 +254,8 @@ void OnEvent(IN const void* _pInstance, IN int _nAccountId, IN int _nId,  IN con
         UA *pUA = FindUA(pUAManager, _nAccountId, &pos);
         if (pUA == NULL) {
                 DBG_ERROR("UA is NULL\n");
+                if (pMessage) free(pMessage);
+                if (pEvent) free(pEvent);
                 pthread_mutex_unlock(&pUAManager->mutex);
                 return;
         }
@@ -677,6 +689,8 @@ void cbOnCallStateChange(const int _nCallId, const int _nAccountId, const SipInv
     DBG_LOG("state = %d, status code = %d callid %d accountid %d\n", _State, _StatusCode, _nCallId, _nAccountId);
     if ( !pMessage || !pEvent ) {
             DBG_ERROR("malloc error\n");
+            if (pMessage) free(pMessage);
+            if (pEvent) free(pEvent);
             return;
     }
     pthread_mutex_lock(&pUAManager->mutex);
@@ -705,10 +719,9 @@ void cbOnCallStateChange(const int _nCallId, const int _nAccountId, const SipInv
             free(pEvent);
             return;
     }
-    //pCallEvent->callID = _nCallId;
-    if ( _State == INV_STATE_CONFIRMED ) {
+    if (_State == INV_STATE_CONFIRMED) {
             pCallEvent->status = CALL_STATUS_ESTABLISHED;
-    } else if ( _State == INV_STATE_DISCONNECTED ) {
+    } else if (_State == INV_STATE_DISCONNECTED) {
             if (_StatusCode == OK) {
                     pCallEvent->status = CALL_STATUS_HANGUP;
             }
@@ -716,16 +729,15 @@ void cbOnCallStateChange(const int _nCallId, const int _nAccountId, const SipInv
                     DBG_ERROR("state = %d, status code = %d callid %d accountid %d\n", _State, _StatusCode, _nCallId, _nAccountId);
                     pCallEvent->status = CALL_STATUS_ERROR;
             }
-    } else {
-            if (pUA->regStatus == OK) {
-                    DBG_LOG("Already registered");
-                    free(pMessage);
-                    free(pEvent);
-                    return;
-            }
-            else {
-                    pCallEvent->status = CALL_STATUS_REGISTERED;
-            }
+    } else if (_State == INV_STATE_CALLING) {
+            pCallEvent->status = CALL_STATUS_RING;
+    } 
+    else {
+            DBG_ERROR("Not handle state %d\n", _State);
+            free(pMessage);
+            free(pEvent);
+            pthread_mutex_unlock(&pUAManager->mutex);
+            return;     
     }
     pCallEvent->pFromAccount = NULL;
     pMessage->pMessage  = (void *)pEvent;
