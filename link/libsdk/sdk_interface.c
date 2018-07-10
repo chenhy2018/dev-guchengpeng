@@ -57,49 +57,49 @@ static Codec ConversionFormatToUser(CodecType _nCodec)
 
 void OnIncomingCall(const const int _nAccountId, const int _nCallId, const const char *_pFrom)
 {
-    pthread_mutex_lock(&pUAManager->mutex);
-    Message *pMessage = (Message *) malloc( sizeof(Message) );
-    Event *pEvent = (Event *) malloc( sizeof(Event) );
-    CallEvent *pCallEvent = NULL;
-    if ( !pMessage || !pEvent ) {
-        if (pMessage) free(pMessage);
-        if (pEvent) free(pEvent);
-        DBG_ERROR("malloc error\n");
+        pthread_mutex_lock(&pUAManager->mutex);
+        Message *pMessage = (Message *) malloc( sizeof(Message) );
+        Event *pEvent = (Event *) malloc( sizeof(Event) );
+        CallEvent *pCallEvent = NULL;
+        if ( !pMessage || !pEvent ) {
+                if (pMessage) free(pMessage);
+                if (pEvent) free(pEvent);
+                DBG_ERROR("malloc error\n");
+                pthread_mutex_unlock(&pUAManager->mutex);
+                return;
+        }
+        struct list_head *pos;
+        UA *pUA = FindUA(pUAManager, _nAccountId, &pos);
+        if (pUA == NULL) {
+                free(pMessage);
+                free(pEvent);
+                pthread_mutex_unlock(&pUAManager->mutex);
+                return;
+        }
+
+        DBG_LOG("incoming call From %s to %d  _nCallId %d\n", _pFrom, _nAccountId, _nCallId);
+
+        memset( pMessage, 0, sizeof(Message) );
+        memset( pEvent, 0, sizeof(Event) );
+        pMessage->nMessageID = EVENT_CALL;
+        pCallEvent = &pEvent->body.callEvent;
+        pCallEvent->callID = _nCallId;
+        pCallEvent->status = CALL_STATUS_INCOMING;
+        if (_pFrom && strlen(_pFrom) > 0) {
+                pCallEvent->pFromAccount = (char *) malloc ( strlen(_pFrom) + 1);
+                memset( pCallEvent->pFromAccount, 0, strlen(_pFrom) + 1 );
+                memcpy( pCallEvent->pFromAccount, _pFrom, strlen(_pFrom) );
+        }
+
+        pMessage->pMessage = pEvent;
+        if (pUA) {
+                SendMessage( pUA->pQueue, pMessage );
+        } else {
+                DBG_ERROR("pUA is NULL\n");
+        }
+        DBG_LOG("incoming call end\n");
         pthread_mutex_unlock(&pUAManager->mutex);
         return;
-    }
-    struct list_head *pos;
-    UA *pUA = FindUA(pUAManager, _nAccountId, &pos);
-    if (pUA == NULL) {
-            free(pMessage);
-            free(pEvent);
-            pthread_mutex_unlock(&pUAManager->mutex);
-            return;
-    }
-
-    DBG_LOG("incoming call From %s to %d  _nCallId %d\n", _pFrom, _nAccountId, _nCallId);
-
-    memset( pMessage, 0, sizeof(Message) );
-    memset( pEvent, 0, sizeof(Event) );
-    pMessage->nMessageID = EVENT_CALL;
-    pCallEvent = &pEvent->body.callEvent;
-    pCallEvent->callID = _nCallId;
-    pCallEvent->status = CALL_STATUS_INCOMING;
-    if ( _pFrom && strlen(_pFrom) > 0) {
-        pCallEvent->pFromAccount = (char *) malloc ( strlen(_pFrom) + 1);
-        memset( pCallEvent->pFromAccount, 0, strlen(_pFrom) + 1 );
-        memcpy( pCallEvent->pFromAccount, _pFrom, strlen(_pFrom) );
-    }
-
-    pMessage->pMessage = pEvent;
-    if ( pUA )
-        SendMessage( pUA->pQueue, pMessage );
-    else {
-        DBG_ERROR("pUA is NULL\n");
-    }
-    DBG_LOG("incoming call end\n");
-    pthread_mutex_unlock(&pUAManager->mutex);
-    return;
 }
 
 // Todo send to message queue.
@@ -116,7 +116,6 @@ static void OnRxRtp(void *_pUserData, CallbackType _type, void *_pCbData)
         Message *pMessage = (Message *) malloc (sizeof(Message));
         Event *pEvent = (Event *) malloc(sizeof(Event));
         if ( !pMessage || !pEvent ) {
-
                 if (pMessage) free(pMessage);
                 if (pEvent) free(pEvent);
                 DBG_ERROR("OnRxRtp malloc error***************\n");
@@ -158,7 +157,7 @@ static void OnRxRtp(void *_pUserData, CallbackType _type, void *_pCbData)
                                          DBG_LOG("==========>callback_ice: state: %d\n", pInfo->state);
                                          MediaEvent* event = &pEvent->body.mediaEvent;
                                          pMessage->nMessageID = EVENT_MEDIA;
-                                         for ( int i = 0; i < pInfo->nCount; i++) {
+                                         for (int i = 0; i < pInfo->nCount; i++) {
                                                  DBG_LOG(" codec type: %d\n", pInfo->configs[i]->codecType);
                                                  event->media[i].codecType = ConversionFormatToUser(pInfo->configs[i]->codecType);
                                                  if (pInfo->configs[i]->streamType == RTP_STREAM_VIDEO) {
@@ -185,7 +184,7 @@ static void OnRxRtp(void *_pUserData, CallbackType _type, void *_pCbData)
                                          DBG_ERROR("==========>callback_ice: state: %d\n", pInfo->state);
                                  }
                         }
-                 }
+                }
                         break;
                 case CALLBACK_RTP:{
                         pMessage->nMessageID = EVENT_DATA;
@@ -241,7 +240,7 @@ void OnEvent(IN const void* _pInstance, IN int _nAccountId, IN int _nId,  IN con
         Event *pEvent = (Event *) malloc( sizeof(Event) );
         MessageEvent *pMessageEvent = NULL;
         
-        if ( !pMessage || !pEvent ) {
+        if (!pMessage || !pEvent) {
                 DBG_ERROR("malloc error\n");
                 if (pMessage) free(pMessage);
                 if (pEvent) free(pEvent);
@@ -302,7 +301,6 @@ void InitMqtt(struct MqttOptions* options, const char* _pId, const char* _pPassw
         options->bRetain = false;
         options->callbacks.OnMessage = &OnMessage;
         options->callbacks.OnEvent = &OnEvent;
-
 }
 
 static CodecType ConversionFormat(Codec _nCodec)
@@ -342,8 +340,7 @@ ErrorID InitSDK( Media* _pMediaConfigs, int _nSize)
                        pUAManager->config.videoConfigs.configs[pUAManager->config.videoConfigs.nCount].nChannel
                          = _pMediaConfigs[count].channels;
                        ++pUAManager->config.videoConfigs.nCount;
-               }
-               else if (_pMediaConfigs[count].streamType == STREAM_AUDIO) {
+               } else if (_pMediaConfigs[count].streamType == STREAM_AUDIO) {
                        pUAManager->config.audioConfigs.configs[pUAManager->config.audioConfigs.nCount].streamType
                          = RTP_STREAM_AUDIO;
                        pUAManager->config.audioConfigs.configs[pUAManager->config.audioConfigs.nCount].codecType
@@ -400,356 +397,351 @@ ErrorID UninitSDK()
 AccountID Register(const char* _id, const char* _password, const char* _pSigHost,
                    const char* _pMediaHost, const char* _pImHost)
 {
-    int nAccountId = 0;
-    struct MqttOptions options;
-    if (!pUAManager->bInitSdk) {
-        DBG_ERROR("not init sdk\n");
-        return RET_INIT_ERROR;
-    }
-    InitMqtt(&options, _id, _password, _pImHost);
-    pthread_mutex_lock(&pUAManager->mutex);
-    UA *pUA = UARegister(_id, _password, _pSigHost, _pMediaHost, &options, &pUAManager->config);
-    int nReason = 0;
+        int nAccountId = 0;
+        struct MqttOptions options;
+        if (!pUAManager->bInitSdk) {
+                DBG_ERROR("not init sdk\n");
+                return RET_INIT_ERROR;
+        }
+        InitMqtt(&options, _id, _password, _pImHost);
+        pthread_mutex_lock(&pUAManager->mutex);
+        UA *pUA = UARegister(_id, _password, _pSigHost, _pMediaHost, &options, &pUAManager->config);
+        int nReason = 0;
     
-    if (pUA == NULL) {
-        DBG_ERROR("malloc error\n");
+        if (pUA == NULL) {
+                DBG_ERROR("malloc error\n");
+                pthread_mutex_unlock(&pUAManager->mutex);
+                return RET_MEM_ERROR;
+        }
+        list_add(&(pUA->list), &(pUAManager->UAList.list));
         pthread_mutex_unlock(&pUAManager->mutex);
-        return RET_MEM_ERROR;
-    }
-    list_add(&(pUA->list), &(pUAManager->UAList.list));
-    pthread_mutex_unlock(&pUAManager->mutex);
-    return pUA->id;
+        return pUA->id;
 }
 
 ErrorID UnRegister(AccountID _nAccountId)
 {
-    struct list_head *pos;
-    pthread_mutex_lock(&pUAManager->mutex);
-    DBG_LOG("UnRegister account id %d\n", _nAccountId);
-    UA *pUA = FindUA(pUAManager, _nAccountId, &pos);
-    if (pUA != NULL) {
-            list_del(pos);
-            pthread_mutex_unlock(&pUAManager->mutex);
-            UAUnRegister(pUA);
-            return RET_OK;
-    }
-    pthread_mutex_unlock(&pUAManager->mutex);
-    return RET_ACCOUNT_NOT_EXIST;
+        struct list_head *pos;
+        pthread_mutex_lock(&pUAManager->mutex);
+        DBG_LOG("UnRegister account id %d\n", _nAccountId);
+        UA *pUA = FindUA(pUAManager, _nAccountId, &pos);
+        if (pUA != NULL) {
+                list_del(pos);
+                pthread_mutex_unlock(&pUAManager->mutex);
+                UAUnRegister(pUA);
+                return RET_OK;
+        }
+        pthread_mutex_unlock(&pUAManager->mutex);
+        return RET_ACCOUNT_NOT_EXIST;
 }
 
 ErrorID MakeCall(AccountID _nAccountId, const char* id, const char* _pDestUri, OUT int* _pCallId)
 {
-    struct list_head *pos;
-    ErrorID res = RET_ACCOUNT_NOT_EXIST;
+        struct list_head *pos;
+        ErrorID res = RET_ACCOUNT_NOT_EXIST;
 
-    if ( !_pDestUri || !_pCallId || !id )
-        return RET_PARAM_ERROR;
+        if (!_pDestUri || !_pCallId || !id)
+            return RET_PARAM_ERROR;
 
-    pthread_mutex_lock(&pUAManager->mutex);
-    *_pCallId = nSdkCallId++;
-    UA *pUA = FindUA(pUAManager, _nAccountId, &pos);
-    if (pUA != NULL) {
-            res = UAMakeCall(pUA, id, _pDestUri, *_pCallId);
-    }
-    pthread_mutex_unlock(&pUAManager->mutex);
+        pthread_mutex_lock(&pUAManager->mutex);
+        *_pCallId = nSdkCallId++;
+        UA *pUA = FindUA(pUAManager, _nAccountId, &pos);
+        if (pUA != NULL) {
+                res = UAMakeCall(pUA, id, _pDestUri, *_pCallId);
+        }
+        pthread_mutex_unlock(&pUAManager->mutex);
 
-    return res;
+        return res;
 }
 
 ErrorID PollEvent(AccountID _nAccountID, EventType* _pType, Event** _pEvent, int _nTimeOut )
 {
-    Message *pMessage = NULL;
-    struct list_head *pos, *q;
-    UA *pUA = NULL;
+        Message *pMessage = NULL;
+        struct list_head *pos, *q;
+        UA *pUA = NULL;
 
-    if (!_pType || !_pEvent ) {
-        return RET_PARAM_ERROR;
-    }
+        if (!_pType || !_pEvent ) {
+                return RET_PARAM_ERROR;
+        }
 
-    pthread_mutex_lock(&pUAManager->mutex);
-    pUA = FindUA(pUAManager, _nAccountID, &pos);
-    if (pUA == NULL) {
-            DBG_ERROR( "RET_ACCOUNT_NOT_EXIST\n");
-            pthread_mutex_unlock(&pUAManager->mutex);
-            return RET_ACCOUNT_NOT_EXIST;
-    }
-    // pLastMessage use to free last message
-    if ( pUA->pLastMessage ) {
-        Event *pEvent = (Event *) pUA->pLastMessage->pMessage;
-        if (pUA->pLastMessage->nMessageID == EVENT_DATA) {
-                if (pEvent->body.dataEvent.data) {
-                        free( pEvent->body.dataEvent.data );
-                        pEvent->body.dataEvent.data = NULL;
+        pthread_mutex_lock(&pUAManager->mutex);
+        pUA = FindUA(pUAManager, _nAccountID, &pos);
+        if (pUA == NULL) {
+                DBG_ERROR( "RET_ACCOUNT_NOT_EXIST\n");
+                pthread_mutex_unlock(&pUAManager->mutex);
+                return RET_ACCOUNT_NOT_EXIST;
+        }
+        // pLastMessage use to free last message
+        if ( pUA->pLastMessage ) {
+                Event *pEvent = (Event *) pUA->pLastMessage->pMessage;
+                if (pUA->pLastMessage->nMessageID == EVENT_DATA) {
+                        if (pEvent->body.dataEvent.data) {
+                                free(pEvent->body.dataEvent.data);
+                                pEvent->body.dataEvent.data = NULL;
+                        }
                 }
-        }
-        if (pUA->pLastMessage->nMessageID == EVENT_MESSAGE) {
-                if (pEvent->body.messageEvent.message) {
-                        free(pEvent->body.messageEvent.message);
-                        pEvent->body.messageEvent.message = NULL;
+                if (pUA->pLastMessage->nMessageID == EVENT_MESSAGE) {
+                        if (pEvent->body.messageEvent.message) {
+                                free(pEvent->body.messageEvent.message);
+                                pEvent->body.messageEvent.message = NULL;
+                        }
                 }
+                if (pUA->pLastMessage->nMessageID == EVENT_CALL) {
+                        if (pEvent->body.callEvent.pFromAccount) {
+                                free(pEvent->body.callEvent.pFromAccount);
+                                pEvent->body.callEvent.pFromAccount = NULL;
+                        }
+                }
+                free( pEvent );
+                pEvent = NULL;
+                pUA->pLastMessage = NULL;
         }
-        if (pUA->pLastMessage->nMessageID == EVENT_CALL) {
-               if (pEvent->body.callEvent.pFromAccount) {
-                      free(pEvent->body.callEvent.pFromAccount);
-                      pEvent->body.callEvent.pFromAccount = NULL;
-               }
-        }
-        free( pEvent );
-        pEvent = NULL;
-        pUA->pLastMessage = NULL;
-    }
-    pthread_mutex_unlock(&pUAManager->mutex);
-    //DBG_LOG("wait for event, pUA = %p\n", pUA );
-
-    if (_nTimeOut) {
-        pMessage = ReceiveMessageTimeout( pUA->pQueue, _nTimeOut );
-    } else {
-        pMessage = ReceiveMessage( pUA->pQueue );
-    }
-
-    pthread_mutex_lock(&pUAManager->mutex);
-    pUA = FindUA(pUAManager, _nAccountID, &pos);
-    if (pUA == NULL) {
-            DBG_ERROR( "RET_ACCOUNT_NOT_EXIST\n");
-            pthread_mutex_unlock(&pUAManager->mutex);
-            return RET_ACCOUNT_NOT_EXIST;
-    }
-
-    //DBG_LOG("[ LIBSDK ]get one event\n");
-    if (!pMessage) {
         pthread_mutex_unlock(&pUAManager->mutex);
-        return RET_RETRY;
-    }
+        //DBG_LOG("wait for event, pUA = %p\n", pUA );
 
-    *_pType = pMessage->nMessageID;
-    if ( pMessage->pMessage ) {
-        // save the pointer of current message
-        // so next time we received message
-        // we can free the last one
-        pUA->pLastMessage = pMessage;
-    }
+        if (_nTimeOut) {
+                pMessage = ReceiveMessageTimeout( pUA->pQueue, _nTimeOut );
+        } else {
+                pMessage = ReceiveMessage( pUA->pQueue );
+        }
+
+        pthread_mutex_lock(&pUAManager->mutex);
+        pUA = FindUA(pUAManager, _nAccountID, &pos);
+        if (pUA == NULL) {
+                DBG_ERROR( "RET_ACCOUNT_NOT_EXIST\n");
+                pthread_mutex_unlock(&pUAManager->mutex);
+                return RET_ACCOUNT_NOT_EXIST;
+        }
+
+        //DBG_LOG("[ LIBSDK ]get one event\n");
+        if (!pMessage) {
+                pthread_mutex_unlock(&pUAManager->mutex);
+                return RET_RETRY;
+        }
+
+        *_pType = pMessage->nMessageID;
+        if ( pMessage->pMessage ) {
+                // save the pointer of current message
+                // so next time we received message
+                // we can free the last one
+                pUA->pLastMessage = pMessage;
+        }
     
-    *_pEvent = (Event *)pMessage->pMessage;
-    pthread_mutex_unlock(&pUAManager->mutex);
-    return RET_OK;
+        *_pEvent = (Event *)pMessage->pMessage;
+        pthread_mutex_unlock(&pUAManager->mutex);
+        return RET_OK;
 }
 
 ErrorID AnswerCall(AccountID id, int _nCallId)
 {
-    struct list_head *pos;
-    ErrorID error = RET_ACCOUNT_NOT_EXIST;
-    pthread_mutex_lock(&pUAManager->mutex);
-    UA *pUA = FindUA(pUAManager, id, &pos);
-    if (pUA != NULL) {
-            error = UAAnswerCall(pUA, _nCallId);
-    }
-    pthread_mutex_unlock(&pUAManager->mutex);
-    return error;
+        struct list_head *pos;
+        ErrorID error = RET_ACCOUNT_NOT_EXIST;
+        pthread_mutex_lock(&pUAManager->mutex);
+        UA *pUA = FindUA(pUAManager, id, &pos);
+        if (pUA != NULL) {
+                error = UAAnswerCall(pUA, _nCallId);
+        }
+        pthread_mutex_unlock(&pUAManager->mutex);
+        return error;
 }
 
 ErrorID RejectCall( AccountID id, int _nCallId )
 {
-    struct list_head *pos;
-    ErrorID error = RET_ACCOUNT_NOT_EXIST;
-    pthread_mutex_lock(&pUAManager->mutex);
-    UA *pUA = FindUA(pUAManager, id, &pos);
-    if (pUA != NULL) {
-            error = UAAnswerCall(pUA, _nCallId);
-    }
-    pthread_mutex_unlock(&pUAManager->mutex);
-    return error;
+        struct list_head *pos;
+        ErrorID error = RET_ACCOUNT_NOT_EXIST;
+        pthread_mutex_lock(&pUAManager->mutex);
+        UA *pUA = FindUA(pUAManager, id, &pos);
+        if (pUA != NULL) {
+                error = UAAnswerCall(pUA, _nCallId);
+        }
+        pthread_mutex_unlock(&pUAManager->mutex);
+        return error;
 }
 
 ErrorID HangupCall( AccountID id, int _nCallId )
 {
-    struct list_head *pos;
-    ErrorID error = RET_ACCOUNT_NOT_EXIST;
-    pthread_mutex_lock(&pUAManager->mutex);
-    UA *pUA = FindUA(pUAManager, id, &pos);
-    if (pUA != NULL) {
-            error = UAHangupCall(pUA, _nCallId);
-    }
-    pthread_mutex_unlock(&pUAManager->mutex);
-    return error;
+        struct list_head *pos;
+        ErrorID error = RET_ACCOUNT_NOT_EXIST;
+        pthread_mutex_lock(&pUAManager->mutex);
+        UA *pUA = FindUA(pUAManager, id, &pos);
+        if (pUA != NULL) {
+                error = UAHangupCall(pUA, _nCallId);
+        }
+        pthread_mutex_unlock(&pUAManager->mutex);
+        return error;
 }
 
 ErrorID SendPacket(AccountID id, int _nCallId, Stream streamID, const uint8_t* buffer, int size, int64_t nTimestamp)
 {
-    struct list_head *pos;
-    ErrorID error = RET_ACCOUNT_NOT_EXIST;
-    if (streamID == STREAM_AUDIO && size > MAX_AUDIO_SIZE) {
-            return RET_PARAM_ERROR;
-    }
-    pthread_mutex_lock(&pUAManager->mutex);
-    UA *pUA = FindUA(pUAManager, id, &pos);
-    if (pUA != NULL) {
-            error = UASendPacket(pUA, _nCallId, streamID, buffer, size, nTimestamp);
-    }
-    pthread_mutex_unlock(&pUAManager->mutex);
-    return error;
+        struct list_head *pos;
+        ErrorID error = RET_ACCOUNT_NOT_EXIST;
+        if (streamID == STREAM_AUDIO && size > MAX_AUDIO_SIZE) {
+                return RET_PARAM_ERROR;
+        }
+        pthread_mutex_lock(&pUAManager->mutex);
+        UA *pUA = FindUA(pUAManager, id, &pos);
+        if (pUA != NULL) {
+                error = UASendPacket(pUA, _nCallId, streamID, buffer, size, nTimestamp);
+        }
+        pthread_mutex_unlock(&pUAManager->mutex);
+        return error;
 }
 
 ErrorID Report(AccountID id, const char* message, int length)
 {
-    struct list_head *pos;
-    ErrorID error = RET_ACCOUNT_NOT_EXIST;
-    pthread_mutex_lock(&pUAManager->mutex);
-    UA *pUA = FindUA(pUAManager, id, &pos);
-    if (pUA != NULL) {
-            error = UAReport(pUA, message, length);
-    }
-    pthread_mutex_unlock(&pUAManager->mutex);
-    return error;
+        struct list_head *pos;
+        ErrorID error = RET_ACCOUNT_NOT_EXIST;
+        pthread_mutex_lock(&pUAManager->mutex);
+        UA *pUA = FindUA(pUAManager, id, &pos);
+        if (pUA != NULL) {
+                error = UAReport(pUA, message, length);
+        }
+        pthread_mutex_unlock(&pUAManager->mutex);
+        return error;
 }
 
 SipAnswerCode cbOnIncomingCall(const int _nAccountId, const const char *_pFrom, const void *_pUser, IN const void *_pMedia, OUT int *pCallId)
 {   
-    pthread_mutex_lock(&pUAManager->mutex);
-    const UA *_pUA = _pUser;
-    struct list_head *pos;
-    UA *pUA = FindUA(pUAManager, _nAccountId, &pos);
-    if (pUA == NULL) {
-            pthread_mutex_unlock(&pUAManager->mutex);
-            return DOES_NOT_EXIST_ANYWHERE;
-    }
+        pthread_mutex_lock(&pUAManager->mutex);
+        const UA *_pUA = _pUser;
+        struct list_head *pos;
+        UA *pUA = FindUA(pUAManager, _nAccountId, &pos);
+        if (pUA == NULL) {
+                pthread_mutex_unlock(&pUAManager->mutex);
+                return DOES_NOT_EXIST_ANYWHERE;
+        }
     
-    DBG_LOG("incoming call From %s to %d %p call id %d\n", _pFrom, _nAccountId, _pMedia, nSdkCallId);
-    UAOnIncomingCall(pUA, nSdkCallId, _pFrom, _pMedia);
-    *pCallId = nSdkCallId++;
-    pthread_mutex_unlock(&pUAManager->mutex);
-    return OK;
+        DBG_LOG("incoming call From %s to %d %p call id %d\n", _pFrom, _nAccountId, _pMedia, nSdkCallId);
+        UAOnIncomingCall(pUA, nSdkCallId, _pFrom, _pMedia);
+        *pCallId = nSdkCallId++;
+        pthread_mutex_unlock(&pUAManager->mutex);
+        return OK;
 }
 
 void cbOnRegStatusChange(const int _nAccountId, const SipAnswerCode _regStatusCode, const void *_pUser )
 {
-    DBG_LOG("pUA address is, _regStatusCode = %d\n", _regStatusCode );
-    Message *pMessage = (Message *) malloc( sizeof(Message) );
-    Event *pEvent = (Event *) malloc( sizeof(Event) );
-    if ( !pMessage || !pEvent ) {
-            DBG_ERROR("malloc error\n");
-            return;
-    }
-    CallEvent *pCallEvent = NULL;
-    UA *_pUA = ( UA *)_pUser;
-    struct list_head *pos;
-    //pthread_mutex_lock(&pUAManager->mutex);
-    UA *pUA = FindUA(pUAManager, _nAccountId, &pos);
-
-    if (pUA == NULL) {
-            DBG_ERROR("pUser is NULL %p\n", _pUA);
-            free(pMessage);
-            free(pEvent);
-            //pthread_mutex_unlock(&pUAManager->mutex);
-            return;
-    }
-    
-    DBG_VAL(_nAccountId);
-    memset( pMessage, 0, sizeof(Message) );
-    memset( pEvent, 0, sizeof(Event) );
-    pMessage->nMessageID = EVENT_CALL;
-    pCallEvent = &pEvent->body.callEvent;
-    pCallEvent->callID = 0;
-    if ( _regStatusCode == OK ) {
-        pCallEvent->status = CALL_STATUS_REGISTERED;
-    } else {
-        pCallEvent->status = CALL_STATUS_REGISTER_FAIL;
-    }
-    pCallEvent->pFromAccount = NULL;
-    pMessage->pMessage = pEvent;
-    if ( pUA ) {
-        DBG_LOG("[ LIBSDK ] SendMessage\n");
-        SendMessage( pUA->pQueue, pMessage );
-    } else {
-        DBG_ERROR("pUA is NULL\n");
-        //pthread_mutex_unlock(&pUAManager->mutex);
-        return;
-    }
-
-    DBG_LOG("reg status = %d\n", _regStatusCode);
-    UAOnRegStatusChange(pUA, _regStatusCode);
-    if ( pUA ) {
-        if ( _regStatusCode == OK ||
-             _regStatusCode == UNAUTHORIZED ||
-             _regStatusCode == REQUEST_TIMEOUT ) {
-            pUA->regStatus = _regStatusCode;
+        DBG_LOG("pUA address is, _regStatusCode = %d\n", _regStatusCode );
+        Message *pMessage = (Message *) malloc( sizeof(Message) );
+        Event *pEvent = (Event *) malloc( sizeof(Event) );
+        if ( !pMessage || !pEvent ) {
+                if (pMessage) free(pMessage);
+                if (pEvent) free(pEvent);
+                DBG_ERROR("malloc error\n");
+                return;
         }
-    }
-    //pthread_mutex_unlock(&pUAManager->mutex);
+        CallEvent *pCallEvent = NULL;
+        UA *_pUA = ( UA *)_pUser;
+        struct list_head *pos;
+        UA *pUA = FindUA(pUAManager, _nAccountId, &pos);
+
+        if (pUA == NULL) {
+                DBG_ERROR("pUser is NULL %p\n", _pUA);
+                free(pMessage);
+                free(pEvent);
+                return;
+        }
+    
+        DBG_VAL(_nAccountId);
+        memset( pMessage, 0, sizeof(Message) );
+        memset( pEvent, 0, sizeof(Event) );
+        pMessage->nMessageID = EVENT_CALL;
+        pCallEvent = &pEvent->body.callEvent;
+        pCallEvent->callID = 0;
+        if ( _regStatusCode == OK ) {
+                pCallEvent->status = CALL_STATUS_REGISTERED;
+        } else {
+                pCallEvent->status = CALL_STATUS_REGISTER_FAIL;
+        }
+        pCallEvent->pFromAccount = NULL;
+        pMessage->pMessage = pEvent;
+        if (pUA) {
+                DBG_LOG("[ LIBSDK ] SendMessage\n");
+                SendMessage( pUA->pQueue, pMessage );
+        } else {
+                DBG_ERROR("pUA is NULL\n");
+                return;
+        }
+
+        DBG_LOG("reg status = %d\n", _regStatusCode);
+        UAOnRegStatusChange(pUA, _regStatusCode);
+        if (pUA) {
+                if ( _regStatusCode == OK ||
+                     _regStatusCode == UNAUTHORIZED ||
+                     _regStatusCode == REQUEST_TIMEOUT ) {
+                        pUA->regStatus = _regStatusCode;
+                }
+        }
 }
 
 void cbOnCallStateChange(const int _nCallId, const int _nAccountId, const SipInviteState _State,
                          const SipAnswerCode _StatusCode, const void *pUser, const void *pMedia)
 {
-    Message *pMessage = (Message *) malloc ( sizeof(Message) );
-    Event *pEvent = (Event *) malloc( sizeof(Event) );
-    CallEvent *pCallEvent = NULL;
-    const UA *_pUA = pUser;
-    struct list_head *pos;
+        Message *pMessage = (Message *) malloc ( sizeof(Message) );
+        Event *pEvent = (Event *) malloc( sizeof(Event) );
+        CallEvent *pCallEvent = NULL;
+        const UA *_pUA = pUser;
+        struct list_head *pos;
 
-    DBG_LOG("state = %d, status code = %d callid %d accountid %d\n", _State, _StatusCode, _nCallId, _nAccountId);
-    if ( !pMessage || !pEvent ) {
-            DBG_ERROR("malloc error\n");
-            if (pMessage) free(pMessage);
-            if (pEvent) free(pEvent);
-            return;
-    }
-    pthread_mutex_lock(&pUAManager->mutex);
-    UA *pUA = FindUA(pUAManager, _nAccountId, &pos);
+        DBG_LOG("state = %d, status code = %d callid %d accountid %d\n", _State, _StatusCode, _nCallId, _nAccountId);
+        if ( !pMessage || !pEvent ) {
+                DBG_ERROR("malloc error\n");
+                if (pMessage) free(pMessage);
+                if (pEvent) free(pEvent);
+                return;
+        }
+        pthread_mutex_lock(&pUAManager->mutex);
+        UA *pUA = FindUA(pUAManager, _nAccountId, &pos);
 
-    if (pUA == NULL) {
-            pthread_mutex_unlock(&pUAManager->mutex);
-            DBG_ERROR("pUser is NULL\n");
-            free(pMessage);
-            free(pEvent);
-            return;
-    }
+        if (pUA == NULL) {
+                pthread_mutex_unlock(&pUAManager->mutex);
+                DBG_ERROR("pUser is NULL\n");
+                free(pMessage);
+                free(pEvent);
+                return;
+        }
 
-    memset( pMessage, 0, sizeof(Message) );
-    memset( pEvent, 0, sizeof(Event) );
-    pMessage->nMessageID = EVENT_CALL;
-    pCallEvent = &pEvent->body.callEvent;
-    UAOnCallStateChange(pUA, _nCallId, _State, _StatusCode, pMedia, &pCallEvent->callID);
+        memset( pMessage, 0, sizeof(Message) );
+        memset( pEvent, 0, sizeof(Event) );
+        pMessage->nMessageID = EVENT_CALL;
+        pCallEvent = &pEvent->body.callEvent;
+        UAOnCallStateChange(pUA, _nCallId, _State, _StatusCode, pMedia, &pCallEvent->callID);
 
-    pUA = FindUA(pUAManager, _nAccountId, &pos);
+        pUA = FindUA(pUAManager, _nAccountId, &pos);
 
-    if (pUA == NULL) {
-            pthread_mutex_unlock(&pUAManager->mutex);
-            DBG_ERROR("pUser is NULL\n");
-            free(pMessage);
-            free(pEvent);
-            return;
-    }
-    if (_State == INV_STATE_CONFIRMED) {
-            pCallEvent->status = CALL_STATUS_ESTABLISHED;
-    } else if (_State == INV_STATE_DISCONNECTED) {
-            if (_StatusCode == OK) {
-                    pCallEvent->status = CALL_STATUS_HANGUP;
-            }
-            else {
-                    DBG_ERROR("state = %d, status code = %d callid %d accountid %d\n", _State, _StatusCode, _nCallId, _nAccountId);
-                    pCallEvent->status = CALL_STATUS_ERROR;
-            }
-    } else if (_State == INV_STATE_CALLING) {
-            pCallEvent->status = CALL_STATUS_RING;
-    } 
-    else {
-            DBG_ERROR("Not handle state %d\n", _State);
-            free(pMessage);
-            free(pEvent);
-            pthread_mutex_unlock(&pUAManager->mutex);
-            return;     
-    }
-    pCallEvent->pFromAccount = NULL;
-    pMessage->pMessage  = (void *)pEvent;
-    SendMessage(pUA->pQueue, pMessage);
-    pthread_mutex_unlock(&pUAManager->mutex);
+        if (pUA == NULL) {
+                pthread_mutex_unlock(&pUAManager->mutex);
+                DBG_ERROR("pUser is NULL\n");
+                free(pMessage);
+                free(pEvent);
+                return;
+        }
+        if (_State == INV_STATE_CONFIRMED) {
+                pCallEvent->status = CALL_STATUS_ESTABLISHED;
+        } else if (_State == INV_STATE_DISCONNECTED) {
+                if (_StatusCode == OK) {
+                        pCallEvent->status = CALL_STATUS_HANGUP;
+                } else {
+                        DBG_ERROR("state = %d, status code = %d callid %d accountid %d\n", _State, _StatusCode, _nCallId, _nAccountId);
+                        pCallEvent->status = CALL_STATUS_ERROR;
+                }
+        } else if (_State == INV_STATE_CALLING) {
+                pCallEvent->status = CALL_STATUS_RING;
+        } else {
+                DBG_ERROR("Not handle state %d\n", _State);
+                free(pMessage);
+                free(pEvent);
+                pthread_mutex_unlock(&pUAManager->mutex);
+                return;     
+        }
+        pCallEvent->pFromAccount = NULL;
+        pMessage->pMessage  = (void *)pEvent;
+        SendMessage(pUA->pQueue, pMessage);
+        pthread_mutex_unlock(&pUAManager->mutex);
 }
 
 void SetLogLevel(int level) {
-    if (pUAManager->bInitSdk) {
-          SetDebugLogLevel(level);   
-    }
-    else {
-          DBG_ERROR("SDK is not init");
-    }
+        if (pUAManager->bInitSdk) {
+              SetDebugLogLevel(level);   
+        } else {
+              DBG_ERROR("SDK is not init");
+        }
 }
