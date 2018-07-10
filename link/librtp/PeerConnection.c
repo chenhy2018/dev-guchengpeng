@@ -1752,15 +1752,17 @@ static int SendVideoPacket(IN PeerConnection *_pPeerConnection, IN OUT RtpPacket
 int SendRtpPacket(IN PeerConnection *_pPeerConnection, IN OUT RtpPacket * _pPacket)
 {
         if (_pPeerConnection == NULL || _pPacket == NULL) {
+                MY_PJ_LOG(1, "SendRtpPacket params is NULL");
                 return PJ_EINVAL;
         }
         if (_pPeerConnection->nState != PC_STATUS_NEG_OK) {
-                return PJ_EINVAL;
+                MY_PJ_LOG(1, "SendRtpPacket in wrong state:%d", _pPeerConnection->nState);
+                return PJ_EINVALIDOP;
         }
 
         Message *pMsg = createMsgSend(_pPeerConnection, _pPacket);
         if (pMsg == NULL){
-                return PJ_NO_MEMORY_EXCEPTION;
+                return PJ_ENOMEM;
         }
         SendMessage(manager.pMsgQ, pMsg);
 
