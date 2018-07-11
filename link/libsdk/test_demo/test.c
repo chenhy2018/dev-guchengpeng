@@ -363,6 +363,15 @@ void Mthread1(void* data)
                                       }
                                       DBG_LOG("AnswerCall end *****************\n");
                                   }
+                                  if (pCallEvent->status == CALL_STATUS_ESTABLISHED) {
+                                        MediaInfo* info = (MediaInfo *)pCallEvent->context;
+                                        DBG_LOG("CALL_STATUS_ESTABLISHED call id %d account id %d mediacount %d, type 1 %d type 2 %d\n",
+                                                 pCallEvent->callID, pData->accountid, info->nCount, info->media[0].codecType, info->media[1].codecType);
+                                        start_file_test(
+                                            "/opt2/a.mulaw", "/opt2/v.h264",
+                                            ////"/opt2/720p.mulaw", "/opt2/720p.h264",
+                                            receive_data_callback, pData->accountid, pCallEvent->callID);
+                                  }
                                   break;
                             }
                             case EVENT_DATA:
@@ -389,18 +398,6 @@ void Mthread1(void* data)
                                   MessageEvent *pMessage = &(event->body.messageEvent);
                                   DBG_LOG("Message %s status id %d account id %d\n", pMessage->message, pMessage->status, pData->accountid);
                                   break;
-                            }
-                            case EVENT_MEDIA:
-                            {
-                                 MediaEvent *pMedia = &(event->body.mediaEvent);
-                                 DBG_LOG("Callid %d ncount %d type 1 %d type 2 %d\n", pMedia->callID, pMedia->nCount, pMedia->media[0].codecType, pMedia->media[1].codecType);
-                                 if (pMedia->nCount ==2) {
-                                         start_file_test(
-                                            "/opt2/a.mulaw", "/opt2/v.h264",
-                                            ////"/opt2/720p.mulaw", "/opt2/720p.h264",
-                                            receive_data_callback, pData->accountid, pMedia->callID);
-                                 }
-                                 break;
                             }
                     }
            }

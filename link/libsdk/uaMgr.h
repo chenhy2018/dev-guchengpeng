@@ -5,33 +5,33 @@
 
 // register a account
 // @return UA struct point. If return NULL, error.
-UA* UARegister(const char* id, const char* password, const char* sigHost,
-               const char* mediaHost, MqttOptions* options,
-               UAConfig* config);
+UA* UARegister(const char* _pId, const char* _pPassword, const char* _pSigHost,
+               const char* _pMediaHost, MqttOptions* _pOptions,
+               UAConfig* _pConfig);
 
 ErrorID UAUnRegister(UA* _pUa);
 // make a call, user need to save call id
-ErrorID UAMakeCall(UA* _pUa, const char* id, const char* host, IN int nCallId);
-ErrorID UAAnswerCall(UA* _pUa, int nCallId);
-ErrorID UARejectCall(UA* _pUa, int nCallId);
+ErrorID UAMakeCall(UA* _pUa, const char* _pId, const char* _pHost, IN int _nCallId);
+ErrorID UAAnswerCall(UA* _pUa, int _nCallId);
+ErrorID UARejectCall(UA* _pUa, int _nCallId);
 // hangup a call
-ErrorID UAHangupCall(UA* _pUa, int nCallId);
+ErrorID UAHangupCall(UA* _pUa, int _nCallId);
 // send a packet
-ErrorID UASendPacket(UA* _pUa, int callID, Stream streamID, const uint8_t* buffer, int size, int64_t nTimestamp);
+ErrorID UASendPacket(UA* _pUa, int _nCallID, Stream _nStreamID, const uint8_t* _pBuffer, int _nSize, int64_t _nTimestamp);
 // poll a event
 // if the EventData have video or audio data
 // the user shuould copy the the packet data as soon as possible
-ErrorID UAPollEvent(UA* _pUa, EventType* type, Event* event, int timeOut);
+ErrorID UAPollEvent(UA* _pUa, EventType* _pType, Event* _pEvent, int _nTimeOut);
 
 // mqtt report
-ErrorID UAReport(UA* _pUa, const char* message, int length);
+ErrorID UAReport(UA* _pUa, const char* _pMessage, int _nLength);
 
-void UADeleteCall(UA* _pUa, const int nCallId);
+void UADeleteCall(UA* _pUa, const int _nCallId);
 
-SipAnswerCode UAOnIncomingCall(UA* _pUa, const int _nCallId, const char *pFrom, const void *pMedia);
+SipAnswerCode UAOnIncomingCall(UA* _pUa, const int _nCallId, const char *_pFrom, const void *_pMedia);
 
-void UAOnRegStatusChange(UA* _pUa, const SipAnswerCode RegStatusCode);
+void UAOnRegStatusChange(UA* _pUa, const SipAnswerCode _nRegStatusCode);
 
-void UAOnCallStateChange(UA* _pUa, const int nCallId, const SipInviteState State, const SipAnswerCode StatusCode, const void *pMedia, int* nId);
+void UAOnCallStateChange(UA* _pUa, const int _nCallId, const SipInviteState _nState, const SipAnswerCode _nStatusCode, const void *_pMedia, int* _pId, ReasonCode *_pReason);
 
 #endif

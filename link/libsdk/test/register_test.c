@@ -45,11 +45,11 @@ RegisterTestCase gRegisterTestCases[] =
         { "1003", "1003", HOST, HOST, HOST, 10, 0 }
     },
     {
-        { "invalid account1", CALL_STATUS_REGISTER_FAIL },
+        { "invalid account1", CALL_STATUS_ERROR },
         { "1003", "1004", HOST, HOST, HOST, 10, 0 }
     },
     {
-        { "invalid account2", CALL_STATUS_REGISTER_FAIL },
+        { "invalid account2", CALL_STATUS_ERROR },
         { "0000", "0000", HOST, HOST, HOST, 10, 0 }
     },
     {
@@ -61,11 +61,11 @@ RegisterTestCase gRegisterTestCases[] =
         { "1003", "1003", HOST, HOST, HOST, 10, 0 }
     },
     {
-        { "invalid account1", CALL_STATUS_REGISTER_FAIL },
+        { "invalid account1", CALL_STATUS_ERROR },
         { "1003", "1004", HOST, HOST, HOST, 10, 0 }
     },
     {
-        { "invalid account2", CALL_STATUS_REGISTER_FAIL },
+        { "invalid account2", CALL_STATUS_ERROR },
         { "0000", "0000", HOST, HOST, HOST, 10, 0 }
     },
     {
@@ -77,11 +77,11 @@ RegisterTestCase gRegisterTestCases[] =
         { "1003", "1003", HOST, HOST, HOST, 10, 0 }
     },
     {
-        { "invalid account1", CALL_STATUS_REGISTER_FAIL },
+        { "invalid account1", CALL_STATUS_ERROR },
         { "1003", "1004", HOST, HOST, HOST, 10, 0 }
     },
     {
-        { "invalid account2", CALL_STATUS_REGISTER_FAIL },
+        { "invalid account2", CALL_STATUS_ERROR },
         { "0000", "0000", HOST, HOST, HOST, 10, 0 }
     },
     {
@@ -93,11 +93,11 @@ RegisterTestCase gRegisterTestCases[] =
         { "1003", "1003", HOST, HOST, HOST, 10, 0 }
     },
     {
-        { "invalid account1", CALL_STATUS_REGISTER_FAIL },
+        { "invalid account1", CALL_STATUS_ERROR },
         { "1003", "1004", HOST, HOST, HOST, 10, 0 }
     },
     {
-        { "invalid account2", CALL_STATUS_REGISTER_FAIL },
+        { "invalid account2", CALL_STATUS_ERROR },
         { "0000", "0000", HOST, HOST, HOST, 10, 0 }
     },
     {
@@ -109,11 +109,11 @@ RegisterTestCase gRegisterTestCases[] =
         { "1003", "1003", HOST, HOST, HOST, 10, 0 }
     },
     {
-        { "invalid account1", CALL_STATUS_REGISTER_FAIL },
+        { "invalid account1", CALL_STATUS_ERROR },
         { "1003", "1004", HOST, HOST, HOST, 10, 0 }
     },
     {
-        { "invalid account2", CALL_STATUS_REGISTER_FAIL },
+        { "invalid account2", CALL_STATUS_ERROR },
         { "0000", "0000", HOST, HOST, HOST, 10, 0 }
     },
     {
@@ -125,11 +125,11 @@ RegisterTestCase gRegisterTestCases[] =
         { "1003", "1003", HOST, HOST, HOST, 10, 0 }
     },
     {
-        { "invalid account1", CALL_STATUS_REGISTER_FAIL },
+        { "invalid account1", CALL_STATUS_ERROR },
         { "1003", "1004", HOST, HOST, HOST, 10, 0 }
     },
     {
-        { "invalid account2", CALL_STATUS_REGISTER_FAIL },
+        { "invalid account2", CALL_STATUS_ERROR },
         { "0000", "0000", HOST, HOST, HOST, 10, 0 }
     },
     {
@@ -141,11 +141,11 @@ RegisterTestCase gRegisterTestCases[] =
         { "1003", "1003", HOST, HOST, HOST, 10, 0 }
     },
     {
-        { "invalid account1", CALL_STATUS_REGISTER_FAIL },
+        { "invalid account1", CALL_STATUS_ERROR },
         { "1003", "1004", HOST, HOST, HOST, 10, 0 }
     },
     {
-        { "invalid account2", CALL_STATUS_REGISTER_FAIL },
+        { "invalid account2", CALL_STATUS_ERROR },
         { "0000", "0000", HOST, HOST, HOST, 10, 0 }
     },
     {
@@ -157,11 +157,11 @@ RegisterTestCase gRegisterTestCases[] =
         { "1003", "1003", HOST, HOST, HOST, 10, 0 }
     },
     {
-        { "invalid account1", CALL_STATUS_REGISTER_FAIL },
+        { "invalid account1", CALL_STATUS_ERROR },
         { "1003", "1004", HOST, HOST, HOST, 10, 0 }
     },
     {
-        { "invalid account2", CALL_STATUS_REGISTER_FAIL },
+        { "invalid account2", CALL_STATUS_ERROR },
         { "0000", "0000", HOST, HOST, HOST, 10, 0 }
     },
     {
@@ -173,11 +173,11 @@ RegisterTestCase gRegisterTestCases[] =
         { "1003", "1003", HOST, HOST, HOST, 10, 0 }
     },
     {
-        { "invalid account1", CALL_STATUS_REGISTER_FAIL },
+        { "invalid account1", CALL_STATUS_ERROR },
         { "1003", "1004", HOST, HOST, HOST, 10, 0 }
     },
     {
-        { "invalid account2", CALL_STATUS_REGISTER_FAIL },
+        { "invalid account2", CALL_STATUS_ERROR },
         { "0000", "0000", HOST, HOST, HOST, 10, 0 }
     }
 #if 0

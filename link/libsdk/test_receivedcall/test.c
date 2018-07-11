@@ -154,13 +154,19 @@ void Mthread1(void* data)
                                   DBG_LOG("Call status %d call id %d call account id %d\n", pCallEvent->status, pCallEvent->callID, pData->accountid);
                                   if (pCallEvent->status == CALL_STATUS_INCOMING) {
                                       DBG_LOG("AnswerCall ******************\n");
-                                      if (pCallEvent->callID == 6) {
+                                      if (pCallEvent->callID > 0) {
+                                              DBG_LOG("RejectCall ******************\n");
                                               RejectCall(pData->accountid, pCallEvent->callID);
                                       }
                                       else {
                                               AnswerCall(pData->accountid, pCallEvent->callID);
                                       }
                                       DBG_LOG("AnswerCall end *****************\n");
+                                  }
+                                  if (pCallEvent->status == CALL_STATUS_ESTABLISHED) {
+                                        MediaInfo* info = (MediaInfo *)pCallEvent->context;
+                                        DBG_LOG("CALL_STATUS_ESTABLISHED call id %d account id %d mediacount %d, type 1 %d type 2 %d\n",
+                                                 pCallEvent->callID, pData->accountid, info->nCount, info->media[0].codecType, info->media[1].codecType);
                                   }
                                   break;
                             }
@@ -186,12 +192,6 @@ void Mthread1(void* data)
                                   MessageEvent *pMessage = &(event->body.messageEvent);
                                   DBG_LOG("Message %s status id %d account id %d\n", pMessage->message, pMessage->status, pData->accountid);
                                   break;
-                            }
-                            case EVENT_MEDIA:
-                            {
-                                 MediaEvent *pMedia = &(event->body.mediaEvent);
-                                 DBG_LOG("Callid %d ncount %d type 1 %d type 2 %d\n", pMedia->callID, pMedia->nCount, pMedia->media[0].codecType, pMedia->media[1].codecType);
-                                 break;
                             }
                     }
            }

@@ -42,31 +42,31 @@ MakeCallTestCase gMakeCallTestCases[] =
         { "1002", "123.59.204.198", 1, 10, 1 }
     },
     {
-        { "invalid account1", CALL_STATUS_TIMEOUT },
+        { "invalid account1", CALL_STATUS_HANGUP },
         { "0000", "123.59.204.198", 1, 10, 1 }
     },
     {
-        { "invalid account2", CALL_STATUS_TIMEOUT },
+        { "invalid account2", CALL_STATUS_HANGUP },
         { "abcd", "123.59.204.198", 1, 10, 1 }
     },
     {
-        { "invalid sip server", CALL_STATUS_TIMEOUT },
+        { "invalid sip server", CALL_STATUS_HANGUP },
         { "0000", "123.59.204.198", 1, 10, 1 }
     },
     {
-        { "invalid sip server2", CALL_STATUS_TIMEOUT },
+        { "invalid sip server2", CALL_STATUS_HANGUP },
         { "0000", "www.google.com", 1, 10, 1 }
     },
     {
-        { "illegal_account_id", CALL_STATUS_TIMEOUT },
+        { "illegal_account_id", CALL_STATUS_HANGUP },
         { NULL, "123.59.204.198", 1, 10, 1 }
     },
     {
-        { "illegal_server_address", CALL_STATUS_TIMEOUT },
+        { "illegal_server_address", CALL_STATUS_HANGUP },
         { "1002", NULL, 1, 10, 1 }
     },
     {
-        { "illegal_account_id_and_server_address", CALL_STATUS_TIMEOUT },
+        { "illegal_account_id_and_server_address", CALL_STATUS_HANGUP },
         { NULL, NULL, 1, 10, 1 }
     },
 };
@@ -282,8 +282,9 @@ void *CalleeThread( void *arg )
                 UT_LOG("[ callee ] status : %s\n", callSts );
                 UT_VAL( pCallEvent->callID );
                 if ( pCallEvent->status == CALL_STATUS_INCOMING ) {
-                    if ( pCallEvent->pFromAccount ) {
-                        UT_STR( pCallEvent->pFromAccount );
+                    char * pFromAccount = (char*)pCallEvent->context;
+                    if (pFromAccount) {
+                        UT_STR(pFromAccount);
                     }
                     ErrorID ret = AnswerCall( accountID, pCallEvent->callID );
                     if ( ret >= RET_MEM_ERROR ) {
@@ -298,9 +299,6 @@ void *CalleeThread( void *arg )
             break;
         case EVENT_MESSAGE:
             UT_LOG("[ callee ] get event EVENT_MESSAGE\n");
-            break;
-        case EVENT_MEDIA:
-            UT_LOG("[ callee ] get event EVENT_MEDIA\n");
             break;
         default:
             UT_LOG("[ callee ] unknow event, type = %d\n", type );
