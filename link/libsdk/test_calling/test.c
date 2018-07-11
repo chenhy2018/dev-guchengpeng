@@ -67,7 +67,7 @@ RegisterTestCase gRegisterTestCases[] =
     },
     {
         { "invalid_sip_register_server", CALL_STATUS_REGISTERED, NULL},
-        { "2045", "vdK3TsK0", INVALID_SERVER, INVALID_SERVER, INVALID_SERVER, 10, 0 }
+        { "2045", "vdK3TsK0", HOST, HOST, HOST, 10, 0 }
     },
     {
         { "invalid_account", 0 },
@@ -174,7 +174,7 @@ void Mthread1(void* data)
     DBG_LOG("send pack *****%d call id %d\n", pData->accountid, pData->callid);
     while (1) {     
                     if (sendflag) {
-                            if (timecount > 5000) {
+                            if (timecount > 500) {
                                     DBG_LOG("hangcall ******************\n");
                                     HangupCall(pData->accountid, pData->callid);
                                     sendflag = 0;
@@ -202,10 +202,17 @@ void Mthread1(void* data)
                                       DBG_LOG("AnswerCall end *****************\n");
                                   }
                                   if (pCallEvent->status == CALL_STATUS_ERROR || pCallEvent->status == CALL_STATUS_HANGUP) {
-                                        DBG_LOG("makecall *********************************************8*\n");
+                                        DBG_LOG("makecall **************************** reason %d\n", pCallEvent->reasonCode);
                                         do {
+                                                sleep(1);
                                                 id = MakeCall(pData->accountid, "2040", HOST, &pData->callid);
                                         } while (id != RET_OK);
+                                  }
+                                  if (pCallEvent->status == CALL_STATUS_ESTABLISHED) {
+                                        MediaInfo* info = (MediaInfo *)pCallEvent->context;
+                                        DBG_LOG("CALL_STATUS_ESTABLISHED call id %d account id %d mediacount %d, type 1 %d type 2 %d\n",
+                                                 pCallEvent->callID, pData->accountid, info->nCount, info->media[0].codecType, info->media[1].codecType);
+                                        sendflag = 1;
                                   }
 
                                   break;
@@ -221,20 +228,6 @@ void Mthread1(void* data)
                                   MessageEvent *pMessage = &(event->body.messageEvent);
                                   DBG_LOG("Message %s status id %d account id %d\n", pMessage->message, pMessage->status, pData->accountid);
                                   break;
-                            }
-                            case EVENT_MEDIA:
-                            {
-                                 MediaEvent *pMedia = &(event->body.mediaEvent);
-                                 DBG_LOG("Callid %d ncount %d type 1 %d type 2 %d\n", pMedia->callID, pMedia->nCount, pMedia->media[0].codecType, pMedia->media[1].codecType);
-                                 if (pMedia->nCount == 2) {
-                                         sendflag = 1;
-                                 }
-                                 else {
-                                         DBG_ERROR("pMedia->nCount %d, HangupCall %d", pMedia->nCount, pMedia->callID); 
-                                         HangupCall(pData->accountid, pMedia->callID);
-                                         DBG_LOG("makecall ******************\n");
-                                 }
-                                 break;
                             }
                     }
            }

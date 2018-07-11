@@ -155,8 +155,9 @@ int SendPacketTestSuitCallback( TestSuit *this )
                 UT_VAL( pCallEvent->status );
                 char *callSts = DbgCallStatusGetStr( pCallEvent->status );
                 UT_LOG("status : %s\n", callSts );
-                if ( pCallEvent->pFromAccount )
-                    UT_STR( pCallEvent->pFromAccount );
+                char * pFromAccount = (char*) pCallEvent->context;
+                if ( pFromAccount )
+                    UT_STR( pFromAccount );
                 if ( CALL_STATUS_INCOMING == pCallEvent->status ) {
                     UT_VAL( pCallEvent->callID );
                     ret = AnswerCall( id, pCallEvent->callID );
@@ -227,9 +228,6 @@ int SendPacketTestSuitCallback( TestSuit *this )
             break;
         case EVENT_MESSAGE:
             UT_LOG("get event EVENT_MESSAGE\n");
-            break;
-        case EVENT_MEDIA:
-            UT_LOG("get event EVENT_MEDIA\n");
             break;
         default:
             UT_LOG("unknow event, type = %d\n", type );
@@ -333,8 +331,9 @@ int CallEventHnadle( AccountID nAccountId, Event *pEvent )
         char *callSts = DbgCallStatusGetStr( pCallEvent->status );
         UT_LOG("status : %s\n", callSts );
         if ( CALL_STATUS_INCOMING == pCallEvent->status ) {
-            if ( pCallEvent->pFromAccount )
-                UT_STR( pCallEvent->pFromAccount );
+            char* pFromAccount = (char*)pCallEvent->context;
+            if ( pFromAccount )
+                UT_STR( pFromAccount );
             UT_VAL( pCallEvent->callID );
             ret = AnswerCall( nAccountId, pCallEvent->callID );
             if ( ret != RET_OK ) {
@@ -491,9 +490,6 @@ void * SendPacketMultiCallTestEventLoop( void *arg )
             break;
         case EVENT_MESSAGE:
             UT_LOG("get event EVENT_MESSAGE\n");
-            break;
-        case EVENT_MEDIA:
-            UT_LOG("get event EVENT_MEDIA\n");
             break;
         default:
             UT_LOG("unknow event, type = %d\n", type );

@@ -41,11 +41,11 @@ typedef void LogFunc(const char *data);
 typedef struct {
         int id;
         int nAccountId;
-        bool error;
+        ReasonCode error;
         char from[MAX_FROM_NAME_SIZE];
         char url[MAX_URL_SIZE];
         struct list_head list;
-        MediaEvent mediaEvent;
+        MediaInfo mediaInfo;
         SipInviteState callStatus;
         PeerConnection* pPeerConnection;
         pjmedia_sdp_session* pLocal;
@@ -78,14 +78,14 @@ typedef struct {
         SipAnswerCode regStatus;
         CallConfig config;
         Call callList;
-}UA;
+} UA;
 
 typedef struct {
         UA UAList;
         bool bInitSdk;
         UAConfig config;
         pthread_mutex_t mutex;
-}UAManager;
+} UAManager;
 
 extern UAManager *pUAManager;;
 

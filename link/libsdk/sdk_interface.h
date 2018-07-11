@@ -13,50 +13,56 @@
 #include <stdint.h>
 
 typedef enum {
-    CALL_STATUS_IDLE,
-    CALL_STATUS_REGISTERED,
-    CALL_STATUS_REGISTER_FAIL,
-    CALL_STATUS_INCOMING,
-    CALL_STATUS_TIMEOUT,
-    CALL_STATUS_ESTABLISHED,
-    CALL_STATUS_RING,
-    CALL_STATUS_REJECT,
-    CALL_STATUS_HANGUP,
-    CALL_STATUS_ERROR
+        CALL_STATUS_REGISTERED,
+        CALL_STATUS_INCOMING,
+        CALL_STATUS_ESTABLISHED,
+        CALL_STATUS_RING,
+        CALL_STATUS_REJECT,
+        CALL_STATUS_HANGUP,
+        CALL_STATUS_ERROR
 } CallStatus;
 
 typedef enum {
-    EVENT_CALL,
-    EVENT_DATA,
-    EVENT_MESSAGE,
-    EVENT_MEDIA
+        EVENT_CALL,
+        EVENT_DATA,
+        EVENT_MESSAGE,
 } EventType;
 
 typedef enum {
-    RET_OK,
-    RET_FAIL,
-    RET_INTERAL_FAIL,
-    RET_REGISTERING,
-    RET_RETRY,
-    RET_MEM_ERROR = 1001,
-    RET_PARAM_ERROR,
-    RET_INIT_ERROR,
-    RET_ACCOUNT_NOT_EXIST,
-    RET_CALL_NOT_EXIST,
-    RET_REGISTER_TIMEOUT,
-    RET_TIMEOUT_FROM_SERVER,
-    RET_USER_UNAUTHORIZED,
-    RET_CALL_INVAILD_CONNECTION,
-    RET_CALL_INVAILD_SDP,
-    RET_CALL_INVAILD_OPERATING,
-    RET_SDK_ALREADY_INITED,
+        RET_OK,
+        RET_FAIL,
+        RET_INTERAL_FAIL,
+        RET_REGISTERING,
+        RET_RETRY,
+        RET_MEM_ERROR = 1001,
+        RET_PARAM_ERROR,
+        RET_INIT_ERROR,
+        RET_ACCOUNT_NOT_EXIST,
+        RET_CALL_NOT_EXIST,
+        RET_REGISTER_TIMEOUT,
+        RET_TIMEOUT_FROM_SERVER,
+        RET_USER_UNAUTHORIZED,
+        RET_CALL_INVAILD_CONNECTION,
+        RET_CALL_INVAILD_SDP,
+        RET_CALL_INVAILD_OPERATING,
+        RET_SDK_ALREADY_INITED,
 } ErrorID;
 
 typedef enum {
-    STREAM_NONE,
-    STREAM_AUDIO,
-    STREAM_VIDEO,
-    STREAM_DATA
+        REASON_OK = 0,
+        REASON_REGISTERING_FAIL = 1001,
+        REASON_TIMEOUT_FROM_SERVER,
+        REASON_CALL_INVAILD_SDP,
+        REASON_CALL_INVAILD_MEDIA_INFO,
+        REASON_CALL_NEGOTIATION_FAIL,
+        REASON_CALL_REMOTE_SDP_FAIL
+} ReasonCode;
+
+typedef enum {
+        STREAM_NONE,
+        STREAM_AUDIO,
+        STREAM_VIDEO,
+        STREAM_DATA
 } Stream;
 
 typedef enum {
@@ -67,12 +73,6 @@ typedef enum {
 } Codec;
 
 typedef int AccountID;
-
-#undef IN
-#define IN
-
-#undef OUT
-#define OUT
 
 #define URL_LEN_MAX (128)
 #define STREAM_PACKET_LEN (256)
@@ -110,7 +110,8 @@ typedef struct {
 typedef struct {
     int callID;
     CallStatus status;
-    char *pFromAccount;
+    ReasonCode reasonCode;
+    void *context;
 } CallEvent;
 
 typedef struct {
@@ -126,10 +127,9 @@ typedef struct {
 } Media;
 
 typedef struct {
-    int callID;
     Media media[2];
     int nCount;
-} MediaEvent;
+} MediaInfo;
 
 typedef struct {
     int eventID;
@@ -139,7 +139,6 @@ typedef struct {
         CallEvent callEvent;
         DataEvent dataEvent;
         MessageEvent messageEvent;
-        MediaEvent mediaEvent;
     } body;
 } Event;
 
@@ -152,7 +151,7 @@ AccountID Register(const char* id, const char* password, const char* sigHost,
                    const char* mediaHost, const char* imHost);
 ErrorID UnRegister( AccountID id );
 // make a call, user need to save call id
-ErrorID MakeCall(AccountID accountID, const char* id, const char* host, OUT int* callID);
+ErrorID MakeCall(AccountID accountID, const char* id, const char* host, int* callID);
 ErrorID AnswerCall( AccountID id, int nCallId );
 ErrorID RejectCall( AccountID id, int nCallId );
 // hangup a call

@@ -148,7 +148,8 @@ Call* CALLMakeCall(AccountID _nAccountId, const char* id, const char* _pDestUri,
         if (res != 0) {
                 DBG_ERROR("CreateOffer failed %d \n", res);
                 ReleaseCall(pCall);
-                setPjLogLevel(6);
+                // test code.
+                setPjLogLevel(LOG_VERBOSE);
                 return NULL;
         }
         strncpy(pCall->url, pUri, MAX_URL_SIZE);
@@ -186,6 +187,7 @@ ErrorID CALLRejectCall(Call* _pCall)
         if (id != RET_OK) {
                 return id;
         }
+        DBG_LOG("CALLAnswerCall  %p id %d \n", _pCall, _pCall->id);
         id = SipAnswerCall(_pCall->id, BUSY_HERE, "reject call", _pCall->pLocal);
         return id;
 }
@@ -207,15 +209,15 @@ ErrorID CALLSendPacket(Call* _pCall, Stream streamID, const uint8_t* buffer, int
         if (id != RET_OK) {
                 return id;
         }
-        if (_pCall->mediaEvent.nCount <= 0) {
+        if (_pCall->mediaInfo.nCount <= 0) {
                 return RET_PARAM_ERROR;
         }
         else {
-                for (int i = 0; i < _pCall->mediaEvent.nCount; ++i) {
-                        if (_pCall->mediaEvent.media[i].streamType == streamID) {
+                for (int i = 0; i < _pCall->mediaInfo.nCount; ++i) {
+                        if (_pCall->mediaInfo.media[i].streamType == streamID) {
                               break;
                         }
-                        if (i == _pCall->mediaEvent.nCount) {
+                        if (i == _pCall->mediaInfo.nCount) {
                               return RET_PARAM_ERROR;
                         }
                 }
@@ -287,7 +289,7 @@ void CALLOnCallStateChange(Call** _pCall, const SipInviteState State, const SipA
                 if (pMedia != NULL) {
                         res = SetRemoteDescription((*_pCall)->pPeerConnection, (pjmedia_sdp_session*)(pMedia));
                         if (res != 0) {
-                                (*_pCall)->error = true;
+                                (*_pCall)->error = REASON_CALL_REMOTE_SDP_FAIL;
                         }
                 }
         }
@@ -297,7 +299,7 @@ void CALLOnCallStateChange(Call** _pCall, const SipInviteState State, const SipA
                 }
                 if (res != 0 || (*_pCall)->error) {
                         DBG_ERROR("StartNegotiation failed %d %d todo\n", res, (*_pCall)->id);
-                        (*_pCall)->error = true;
+                        (*_pCall)->error = REASON_CALL_NEGOTIATION_FAIL;
                         SipHangUp((*_pCall)->id);
                         //SipAnswerCall((*_pCall)->id, INTERNAL_SERVER_ERROR, "StartNegotiation failed", NULL);
                 }
