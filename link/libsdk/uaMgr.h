@@ -24,7 +24,9 @@ ErrorID UASendPacket(UA* _pUa, int _nCallID, Stream _nStreamID, const uint8_t* _
 ErrorID UAPollEvent(UA* _pUa, EventType* _pType, Event* _pEvent, int _nTimeOut);
 
 // mqtt report
-ErrorID UAReport(UA* _pUa, const char* _pMessage, int _nLength);
+ErrorID UAReport(UA* _pUa, const char* topic, const char* _pMessage, int _nLength);
+ErrorID UASubscribe(UA* _pUa, const char* topic);
+ErrorID UAUnsubscribe(UA* _pUa, const char* topic);
 
 void UADeleteCall(UA* _pUa, const int _nCallId);
 

@@ -51,16 +51,20 @@ UA* UARegister(const char* _pId, const char* _pPassword, const char* _pSigHost,
         sipConfig.nMaxOngoingCall = MAX_ONGOING_CALL_COUNT;
         DBG_LOG("UARegister %s %s %s %p ongoing call %d\n",
                 sipConfig.pUserName, sipConfig.pPassWord, sipConfig.pDomain, sipConfig.pUserData, sipConfig.nMaxOngoingCall);
-        SipAnswerCode Ret = SipRegAccount(&sipConfig, nSdkAccountId);
-        if (Ret != SIP_SUCCESS) {
-                DBG_ERROR("Register Account Error, Ret = %d\n", Ret);
-                free(pUA);
-                return NULL;
+        if (sipConfig.pDomain) {
+                SipAnswerCode Ret = SipRegAccount(&sipConfig, nSdkAccountId);
+                if (Ret != SIP_SUCCESS) {
+                        DBG_ERROR("Register Account Error, Ret = %d\n", Ret);
+                        free(pUA);
+                        return NULL;
+                }
         }
         pUA->regStatus == TRYING;
         //mqtt create instance.
         _pOptions->nAccountId = nSdkAccountId;
-        pUA->pMqttInstance = MqttCreateInstance(_pOptions);
+        if (_pOptions->primaryUserInfo.pHostname) {
+                pUA->pMqttInstance = MqttCreateInstance(_pOptions);
+        }
         pUA->id = nSdkAccountId;
         pUA->config.pVideoConfigs = &_pConfig->videoConfigs;
         pUA->config.pAudioConfigs = &_pConfig->audioConfigs;
@@ -89,9 +93,11 @@ UA* UARegister(const char* _pId, const char* _pPassword, const char* _pSigHost,
 ErrorID UAUnRegister(UA* _pUa)
 {
         SipAnswerCode code = SipUnRegAccount(_pUa->id);
-        MqttDestroy(_pUa->pMqttInstance);
+        if (_pUa->pMqttInstance) {
+                MqttDestroy(_pUa->pMqttInstance);
+                _pUa->pMqttInstance = NULL;
+        }
         DestroyMessageQueue(&_pUa->pQueue);
-        _pUa->pMqttInstance = NULL;
         free(_pUa);
         if (code !=OK) {
                 return RET_OK;
@@ -209,10 +215,43 @@ ErrorID UAPollEvent(UA* _pUa, EventType* _pType, Event* _pEvent, int _pTimeOut)
 }
 
 // mqtt report
-ErrorID UAReport(UA* _pUa,  const char* message, int length)
+ErrorID UAReport(UA* _pUa, const char* topic, const char* message, int length)
 {
-        //TO DO "topic name".
-        return MqttPublish(_pUa->pMqttInstance, "/test/test", length, message);
+        if (_pUa->pMqttInstance == NULL) {
+                return RET_PARAM_ERROR;
+        }
+        MQTT_ERR_STATUS res = MqttPublish(_pUa->pMqttInstance, topic, length, message);
+        if (res == MQTT_SUCCESS) {
+                return RET_OK;
+        } else {
+                return res;
+        }
+}
+
+ErrorID UASubscribe(UA* _pUa, const char* topic)
+{
+        if (_pUa->pMqttInstance == NULL) {
+                return RET_PARAM_ERROR;
+        }
+        MQTT_ERR_STATUS res = MqttSubscribe(_pUa->pMqttInstance, topic);
+        if (res == MQTT_SUCCESS) {
+                return RET_OK;
+        } else {
+                return res;
+        }
+}
+
+ErrorID UAUnsubscribe(UA* _pUa, const char* topic)
+{
+        if (_pUa->pMqttInstance == NULL) {
+                return RET_PARAM_ERROR;
+        }
+        MQTT_ERR_STATUS res = MqttUnsubscribe(_pUa->pMqttInstance, topic);
+        if (res == MQTT_SUCCESS) {
+                return RET_OK;
+        } else {
+                return res;
+        }
 }
 
 SipAnswerCode UAOnIncomingCall(UA* _pUa, const int _nCallId, const char *_pFrom, const void *_pMedia)
@@ -231,8 +270,7 @@ void UAOnRegStatusChange(UA* _pUa, const SipAnswerCode _nRegStatusCode)
              _nRegStatusCode == UNAUTHORIZED || 
              _nRegStatusCode == REQUEST_TIMEOUT ) {
             _pUa->regStatus = _nRegStatusCode;
-        }
-        else {
+        } else {
             _pUa->regStatus = DECLINE;
         }
 }

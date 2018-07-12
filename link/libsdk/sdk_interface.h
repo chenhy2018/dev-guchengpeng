@@ -23,6 +23,13 @@ typedef enum {
 } CallStatus;
 
 typedef enum {
+        MESSAGE_STATUS_CONNECT,
+        MESSAGE_STATUS_DATA,
+        MESSAGE_STATUS_DISCONNECT,
+        MESSAGE_STATUS_ERROR
+} MessageStatus;
+
+typedef enum {
         EVENT_CALL,
         EVENT_DATA,
         EVENT_MESSAGE,
@@ -46,6 +53,24 @@ typedef enum {
         RET_CALL_INVAILD_SDP,
         RET_CALL_INVAILD_OPERATING,
         RET_SDK_ALREADY_INITED,
+        MESSAGE_ERR_NOMEM = 3003,
+        MESSAGE_ERR_PROTOCOL,
+        MESSAGE_ERR_INVAL,
+        MESSAGE_ERR_NO_CONN,
+        MESSAGE_ERR_CONN_REFUSED,
+        MESSAGE_ERR_NOT_FOUND,
+        MESSAGE_ERR_CONN_LOST,
+        MESSAGE_ERR_TLS,
+        MESSAGE_ERR_PAYLOAD_SIZE,
+        MESSAGE_ERR_NOT_SUPPORTED,
+        MESSAGE_ERR_AUTH,
+        MESSAGE_ERR_ACL_DENIED,
+        MESSAGE_ERR_UNKNOWN,
+        MESSAGE_ERR_ERRNO,
+        MESSAGE_ERR_EAI,
+        MESSAGE_ERR_PROXY,
+        MESSAGE_ERR_CONN_PENDING,
+        MESSAGE_ERR_OTHERS
 } ErrorID;
 
 typedef enum {
@@ -129,7 +154,8 @@ typedef struct {
 
 typedef struct {
     char *message;
-    int status;
+    MessageStatus status;
+    char *topic;
 } MessageEvent;
 
 typedef struct {
@@ -177,7 +203,9 @@ ErrorID SendPacket(AccountID id, int callID, Stream streamID, const uint8_t* buf
 ErrorID PollEvent(AccountID id, EventType* type, Event** event, int timeOut);
 
 // mqtt report
-ErrorID Report(AccountID id, const char* message, int length);
+ErrorID Report(AccountID id, const char* topic, const char* message, int length);
+ErrorID Subscribe(AccountID id, const char* topic);
+ErrorID Unsubscribe(AccountID id, const char* topic);
 
 #endif  /*SDK_INTERFACE_H*/
 
