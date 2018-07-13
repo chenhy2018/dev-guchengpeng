@@ -69,7 +69,7 @@ static void SafeFree(char* des)
       if (des) free(des);
 }
 
-static bool InsertNode(Node* pHead, char* val) {
+static bool InsertNode(Node* pHead, const char* val) {
         Node* p = pHead;
         while(p->pNext) {
                 p = p->pNext;
@@ -81,7 +81,7 @@ static bool InsertNode(Node* pHead, char* val) {
         return true;
 }
 
-static bool DeleteNode(Node* PHead, char * pval)
+static bool DeleteNode(Node* PHead, const char * pval)
 {
         int i = 0;
         Node* p = PHead;
@@ -162,7 +162,7 @@ void OnDisconnectCallback(struct mosquitto* _pMosq, void* _pObj, int rc)
         struct MqttInstance* pInstance = (struct MqttInstance*)(_pObj);
         OnEventCallback(pInstance,
                (rc == 0) ? MQTT_DISCONNECT_SUCCESS : MqttErrorStatusChange(rc),
-               (rc == 0) ? "on disconnect success" : mosquitto_connack_string(rc));
+               (rc == 0) ? "on disconnect success" : mosquitto_strerror(rc));
         pInstance->connected = false;
         if (!rc) {
                 pInstance->status = STATUS_IDLE;
@@ -174,17 +174,17 @@ void OnDisconnectCallback(struct mosquitto* _pMosq, void* _pObj, int rc)
 
 void OnSubscribeCallback(struct mosquitto* _pMosq, void* pObj, int mid, int qos_count, const int* pGranted_qos)
 {       
-        fprintf(stderr, "Subscribed (mid: %d): %d \n", mid, pGranted_qos[0]);
+        //fprintf(stderr, "Subscribed (mid: %d): %d \n", mid, pGranted_qos[0]);
 }
 
 void OnUnsubscribeCallback(struct mosquitto* _pMosq, void* _pObj, int mid)
 {
-        fprintf(stderr, "Unsubscribed (mid: %d) \n", mid);
+        //fprintf(stderr, "Unsubscribed (mid: %d) \n", mid);
 }
 
 void OnPublishCallback(struct mosquitto* _pMosq, void* _pObj, int mid)
 {
-        fprintf(stderr, " my_publish_callback \n ");
+        //fprintf(stderr, " my_publish_callback \n ");
         struct MqttInstance* pInstance = (struct MqttInstance*)(_pObj);
         int last_mid_sent = mid;
 }
@@ -350,7 +350,7 @@ void MqttDestroy(IN const void* _pInstance)
         pInstance->options.callbacks.OnEvent = NULL;
 }
 
-int MqttPublish(IN const void* _pInstance, IN char* _pTopic, IN int _nPayloadlen, IN const void* _pPayload)
+int MqttPublish(IN const void* _pInstance, IN const char* _pTopic, IN int _nPayloadlen, IN const void* _pPayload)
 {
        struct MqttInstance* pInstance = (struct MqttInstance*)(_pInstance);
        int rc = mosquitto_publish(pInstance->mosq, NULL, _pTopic, _nPayloadlen, _pPayload, pInstance->options.nQos, pInstance->options.bRetain);
@@ -376,7 +376,7 @@ int MqttPublish(IN const void* _pInstance, IN char* _pTopic, IN int _nPayloadlen
        return MqttErrorStatusChange(rc);
 }
 
-int MqttSubscribe(IN const void* _pInstance, IN char* _pTopic)
+int MqttSubscribe(IN const void* _pInstance, IN const char* _pTopic)
 {
         struct MqttInstance* pInstance = (struct MqttInstance*)(_pInstance);
         if (_pTopic == NULL) {
@@ -410,7 +410,7 @@ int MqttSubscribe(IN const void* _pInstance, IN char* _pTopic)
         return MqttErrorStatusChange(rc);
 }
 
-int MqttUnsubscribe(IN const void* _pInstance, IN char* _pTopic)
+int MqttUnsubscribe(IN const void* _pInstance, IN const char* _pTopic)
 {
         struct MqttInstance* pInstance = (struct MqttInstance*)(_pInstance);
         if (_pTopic == NULL) {

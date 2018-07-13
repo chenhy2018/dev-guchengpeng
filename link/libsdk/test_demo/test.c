@@ -8,7 +8,7 @@
  */
 #include <string.h>
 #include <stdio.h>
-#include "sdk_interface.h"
+#include "sdk_interface_p2p.h"
 #include "dbg.h"
 #include "unit_test.h"
 #include <unistd.h> 

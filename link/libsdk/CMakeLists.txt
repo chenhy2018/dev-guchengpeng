@@ -3,6 +3,10 @@ SET(GCC_INCLUDE_PATH "-I../util/ -I../libsip -I ../libmqtt -I ../librtp   -I../.
 SET(GCC_COVERAGE_COMPILE_FLAGS "-std=gnu99 -Wall -Wno-unused -g")
 SET(CMAKE_C_FLAGS "${GCC_INCLUDE_PATH} ${GCC_COVERAGE_COMPILE_FLAGS}")
 
+if ($ENV{WITH_P2P} STREQUAL "ON")
+        add_definitions("-DWITH_P2P")
+endif()
+
 aux_source_directory(. LIB_SDK_SRC)
 
 add_library (sdk-$ENV{LIBPREFIX} ${LIB_SDK_SRC})

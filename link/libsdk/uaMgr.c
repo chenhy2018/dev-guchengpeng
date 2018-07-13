@@ -2,7 +2,11 @@
 #include "sip.h"
 #include "dbg.h"
 #include "queue.h"
+#ifdef WITH_P2P
+#include "sdk_interface_p2p.h"
+#else
 #include "sdk_interface.h"
+#endif
 #include "mqtt.h"
 #include "sdk_local.h"
 #include "list.h"
@@ -29,9 +33,14 @@ static Call* FindCall(UA* _pUa, int _nCallId, struct list_head **pos)
 
 // register a account
 // @return UA struct point. If return NULL, error.
+#ifdef WITH_P2P
 UA* UARegister(const char* _pId, const char* _pPassword, const char* _pSigHost,
                const char* _pMediaHost, MqttOptions* _pOptions,
                UAConfig* _pConfig)
+#else
+UA* UARegister(const char* _pId, const char* _pPassword, const char* _pSigHost,
+               MqttOptions* _pOptions, UAConfig* _pConfig)
+#endif
 {
 
         UA *pUA = (UA *) malloc (sizeof(UA));
@@ -51,17 +60,24 @@ UA* UARegister(const char* _pId, const char* _pPassword, const char* _pSigHost,
         sipConfig.nMaxOngoingCall = MAX_ONGOING_CALL_COUNT;
         DBG_LOG("UARegister %s %s %s %p ongoing call %d\n",
                 sipConfig.pUserName, sipConfig.pPassWord, sipConfig.pDomain, sipConfig.pUserData, sipConfig.nMaxOngoingCall);
-        SipAnswerCode Ret = SipRegAccount(&sipConfig, nSdkAccountId);
-        if (Ret != SIP_SUCCESS) {
-                DBG_ERROR("Register Account Error, Ret = %d\n", Ret);
-                free(pUA);
-                return NULL;
+        if (_pSigHost != NULL) {        
+                SipAnswerCode Ret = SipRegAccount(&sipConfig, nSdkAccountId);
+                if (Ret != SIP_SUCCESS) {
+                        DBG_ERROR("Register Account Error, Ret = %d\n", Ret);
+                        free(pUA);
+                        return NULL;
+                }
+                pUA->regStatus = TRYING;
+        } else {
+                pUA->regStatus = NOT_FOUND;
         }
-        pUA->regStatus == TRYING;
         //mqtt create instance.
         _pOptions->nAccountId = nSdkAccountId;
-        pUA->pMqttInstance = MqttCreateInstance(_pOptions);
+        if (_pOptions->primaryUserInfo.pHostname) {
+                pUA->pMqttInstance = MqttCreateInstance(_pOptions);
+        }
         pUA->id = nSdkAccountId;
+#ifdef WITH_P2P
         pUA->config.pVideoConfigs = &_pConfig->videoConfigs;
         pUA->config.pAudioConfigs = &_pConfig->audioConfigs;
         pUA->config.pCallback = &_pConfig->callback;
@@ -74,7 +90,12 @@ UA* UARegister(const char* _pId, const char* _pPassword, const char* _pSigHost,
         if (_pPassword) {
                 strncpy(pUA->config.turnPassword, _pPassword, MAX_TURN_PWD_SIZE -1);
         }
-
+#else
+        if (_pSigHost != NULL) {
+                //It may cause crash because not call pj_thread_register
+                CreateTmpSDP(&pUA->config.pSdp);
+        }
+#endif
         nSdkAccountId++;
         INIT_LIST_HEAD(&pUA->callList.list);
         pUA->pQueue = CreateMessageQueue(MESSAGE_QUEUE_MAX);
@@ -88,10 +109,15 @@ UA* UARegister(const char* _pId, const char* _pPassword, const char* _pSigHost,
 
 ErrorID UAUnRegister(UA* _pUa)
 {
-        SipAnswerCode code = SipUnRegAccount(_pUa->id);
-        MqttDestroy(_pUa->pMqttInstance);
+        SipAnswerCode code = OK;
+        if (_pUa->regStatus != NOT_FOUND) {
+                code = SipUnRegAccount(_pUa->id);
+        }
+        if (_pUa->pMqttInstance) {
+                MqttDestroy(_pUa->pMqttInstance);
+                _pUa->pMqttInstance = NULL;
+        }
         DestroyMessageQueue(&_pUa->pQueue);
-        _pUa->pMqttInstance = NULL;
         free(_pUa);
         if (code !=OK) {
                 return RET_OK;
@@ -168,6 +194,7 @@ ErrorID UAHangupCall(UA* _pUa, int _nCallId)
         }
 }
 
+#ifdef WITH_P2P
 // send a packet
 ErrorID UASendPacket(UA* _pUa, int _nCallId, Stream _nStreamID, const uint8_t * _pBuffer, int _nSize, int64_t _nTimestamp)
 {
@@ -180,6 +207,8 @@ ErrorID UASendPacket(UA* _pUa, int _nCallId, Stream _nStreamID, const uint8_t * 
                 return RET_CALL_NOT_EXIST;
         }
 }
+#endif
+
 // poll a event
 // if the EventData have video or audio data
 // the user shuould copy the the packet data as soon as possible
@@ -190,10 +219,12 @@ ErrorID UAPollEvent(UA* _pUa, EventType* _pType, Event* _pEvent, int _pTimeOut)
                 CallEvent* event = (CallEvent*)(&_pEvent->body.callEvent);
                 nCallId = event->callID;
         }
+#ifdef WITH_P2P
         else if (_pEvent->type == EVENT_DATA) {
                 DataEvent* event = (DataEvent*)(&_pEvent->body.dataEvent);
                 nCallId = event->callID;
         }
+#endif
         else {
                 //To do error event and another event.
         }
@@ -209,10 +240,43 @@ ErrorID UAPollEvent(UA* _pUa, EventType* _pType, Event* _pEvent, int _pTimeOut)
 }
 
 // mqtt report
-ErrorID UAReport(UA* _pUa,  const char* message, int length)
+ErrorID UAReport(UA* _pUa, const char* topic, const char* message, int length)
 {
-        //TO DO "topic name".
-        return MqttPublish(_pUa->pMqttInstance, "/test/test", length, message);
+        if (_pUa->pMqttInstance == NULL) {
+                return RET_PARAM_ERROR;
+        }
+        MQTT_ERR_STATUS res = MqttPublish(_pUa->pMqttInstance, topic, length, message);
+        if (res == MQTT_SUCCESS) {
+                return RET_OK;
+        } else {
+                return res;
+        }
+}
+
+ErrorID UASubscribe(UA* _pUa, const char* topic)
+{
+        if (_pUa->pMqttInstance == NULL) {
+                return RET_PARAM_ERROR;
+        }
+        MQTT_ERR_STATUS res = MqttSubscribe(_pUa->pMqttInstance, topic);
+        if (res == MQTT_SUCCESS) {
+                return RET_OK;
+        } else {
+                return res;
+        }
+}
+
+ErrorID UAUnsubscribe(UA* _pUa, const char* topic)
+{
+        if (_pUa->pMqttInstance == NULL) {
+                return RET_PARAM_ERROR;
+        }
+        MQTT_ERR_STATUS res = MqttUnsubscribe(_pUa->pMqttInstance, topic);
+        if (res == MQTT_SUCCESS) {
+                return RET_OK;
+        } else {
+                return res;
+        }
 }
 
 SipAnswerCode UAOnIncomingCall(UA* _pUa, const int _nCallId, const char *_pFrom, const void *_pMedia)
@@ -231,8 +295,7 @@ void UAOnRegStatusChange(UA* _pUa, const SipAnswerCode _nRegStatusCode)
              _nRegStatusCode == UNAUTHORIZED || 
              _nRegStatusCode == REQUEST_TIMEOUT ) {
             _pUa->regStatus = _nRegStatusCode;
-        }
-        else {
+        } else {
             _pUa->regStatus = DECLINE;
         }
 }
@@ -263,7 +326,6 @@ void UADeleteCall(UA* _pUa, const int _nCallId)
         if (pCall) {
                 DBG_LOG("call %p\n", pCall);
                 list_del(pos);
-                //todo call releasecall
                 free(pCall);
                 DBG_LOG("call delete call end \n");
         }

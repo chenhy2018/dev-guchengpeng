@@ -8,10 +8,16 @@
  */
 
 #include <string.h>
-#include "dbg.h"
 #include "unit_test.h"
-#include "sdk_interface.h"
 #include "send_pkt_test.h"
+
+#ifdef WITH_P2P
+#include "sdk_interface_p2p.h"
+#else
+#include "sdk_interface.h"
+#endif
+
+//#include "dbg.h"
 
 typedef struct {
     char *pData;

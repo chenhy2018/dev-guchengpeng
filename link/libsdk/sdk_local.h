@@ -13,7 +13,11 @@
 #include <stdbool.h>
 #include <pthread.h>
 #include "list.h"
+#ifdef WITH_P2P
+#include "sdk_interface_p2p.h"
+#else
 #include "sdk_interface.h"
+#endif
 #include "queue.h"
 #include "sip.h"
 #include "../../third_party/pjproject-2.7.2/pjmedia/include/pjmedia/sdp.h"
@@ -60,12 +64,16 @@ typedef struct {
 } UAConfig;
 
 typedef struct {
+#ifdef WITH_P2P
         MediaConfigSet *pVideoConfigs;
         MediaConfigSet *pAudioConfigs;
         RtpCallback *pCallback;
         char turnHost[MAX_TURN_HOST_SIZE];
         char turnUsername[MAX_TURN_USR_SIZE];
         char turnPassword[MAX_TURN_PWD_SIZE];
+#else
+        void *pSdp;
+#endif
 } CallConfig;
 
 typedef struct {
@@ -74,6 +82,9 @@ typedef struct {
         MessageQueue *pQueue;
         Message *pLastMessage;
         void *pMqttInstance;
+#ifndef WITH_P2P
+        void *pSdp;
+#endif
         pthread_cond_t registerCond;
         SipAnswerCode regStatus;
         CallConfig config;

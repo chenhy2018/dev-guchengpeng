@@ -7,7 +7,7 @@
 #define IN
 #define OUT
 
-enum MQTT_ERR_STATUS {
+typedef enum MQTT_ERR_STATUS {
         MQTT_SUCCESS = 3000,
         MQTT_CONNECT_SUCCESS = 3001,
         MQTT_DISCONNECT_SUCCESS = 3002,
@@ -29,7 +29,7 @@ enum MQTT_ERR_STATUS {
         MQTT_ERR_PROXY,
         MQTT_ERR_CONN_PENDING,
         MQTT_ERR_OTHERS
-};
+} MQTT_ERR_STATUS;
 
 static const int MQTT_AUTHENTICATION_NULL = 0x0;
 static const int MQTT_AUTHENTICATION_USER = 0x1;
@@ -82,10 +82,10 @@ extern void MqttDestroy(IN const void* _pInstance);
 
 /* step 3 : mosquitto pub/sub */
 
-extern int MqttPublish(IN const void* _pInstance, IN char* _pTopic, IN int _nPayloadlen, IN const void* _pPayload);
+extern int MqttPublish(IN const void* _pInstance, IN const char* _pTopic, IN int _nPayloadlen, IN const void* _pPayload);
 
-extern int MqttSubscribe(IN const void* _pInstance, IN char* _pTopic);
+extern int MqttSubscribe(IN const void* _pInstance, IN const char* _pTopic);
 
-extern int MqttUnsubscribe(IN const void* _pInstance, IN char* _pTopic);
+extern int MqttUnsubscribe(IN const void* _pInstance, IN const char* _pTopic);
 
 #endif

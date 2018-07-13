@@ -11,7 +11,11 @@
 #include "sip.h"
 #include "dbg.h"
 #include "queue.h"
+#ifdef WITH_P2P
+#include "sdk_interface_p2p.h"
+#else
 #include "sdk_interface.h"
+#endif
 #include "mqtt.h"
 #include "sdk_local.h"
 #include "list.h"
@@ -102,7 +106,7 @@ void OnIncomingCall(const const int _nAccountId, const int _nCallId, const const
         pthread_mutex_unlock(&pUAManager->mutex);
         return;
 }
-
+#ifdef WITH_P2P
 // Todo send to message queue.
 static void OnRxRtp(void *_pUserData, CallbackType _type, void *_pCbData)
 {
@@ -251,15 +255,52 @@ static void OnRxRtp(void *_pUserData, CallbackType _type, void *_pCbData)
         SendMessage(pUA->pQueue, pMessage);
         pthread_mutex_unlock(&pUAManager->mutex);
 }
+#endif
 
-void OnMessage(IN const void* _pInstance, IN int _nAccountId, IN const char* _pTopic, IN const char* _pMessage, IN size_t nLength)
+void OnMessage(const void* _pInstance, int _nAccountId, const char* _pTopic, const char* _pMessage, size_t nLength)
 {
-        DBG_LOG("%p topic %s message %s nAccountId %d \n", _pInstance, _pTopic, _pMessage, _nAccountId);
+        //DBG_LOG("%p topic %s message %s nAccountId %d length %d\n", _pInstance, _pTopic, _pMessage, _nAccountId, nLength);
+        Message *pMessage = (Message *) malloc ( sizeof(Message) );
+        Event *pEvent = (Event *) malloc( sizeof(Event) );
+        MessageEvent *pMessageEvent = NULL;
+        if (!pMessage || !pEvent) {
+                DBG_ERROR("malloc error\n");
+                if (pMessage) free(pMessage);
+                if (pEvent) free(pEvent);
+                return;
+        }
+        struct list_head *pos;
+        pthread_mutex_lock(&pUAManager->mutex);
+        UA *pUA = FindUA(pUAManager, _nAccountId, &pos);
+        if (pUA == NULL) {
+                DBG_ERROR("UA is NULL\n");
+                if (pMessage) free(pMessage);
+                if (pEvent) free(pEvent);
+                pthread_mutex_unlock(&pUAManager->mutex);
+                return;
+        }
+        memset( pMessage, 0, sizeof(Message) );
+        memset( pEvent, 0, sizeof(Event) );
+        pMessage->nMessageID = EVENT_MESSAGE;
+        pMessageEvent = &pEvent->body.messageEvent;
+        pMessageEvent->status = MESSAGE_STATUS_DATA;
+        char *message = (char *) malloc (nLength) ;
+        strncpy(message, _pMessage, nLength);
+        message[nLength] = 0;
+        pMessageEvent->message = message;
+        char *topic = (char *) malloc (strlen(_pTopic) + 1);
+        strncpy(topic, _pTopic, strlen(_pTopic));
+        topic[strlen(_pTopic)] = 0;
+        pMessageEvent->topic = topic;
+        //DBG_LOG("message %p  %s\n", pMessageEvent->message, pMessageEvent->message);
+        pMessage->pMessage  = (void *)pEvent;
+        SendMessage(pUA->pQueue, pMessage);
+        pthread_mutex_unlock(&pUAManager->mutex);
 }
 
 void OnEvent(IN const void* _pInstance, IN int _nAccountId, IN int _nId,  IN const char* _pReason)
 {       
-        DBG_LOG("%p id %d, account id %d, reason  %s \n",_pInstance, _nAccountId, _nId, _pReason);
+        DBG_LOG("%p account id %d, id %d, reason  %s \n",_pInstance, _nAccountId, _nId, _pReason);
         Message *pMessage = (Message *) malloc ( sizeof(Message) );
         Event *pEvent = (Event *) malloc( sizeof(Event) );
         MessageEvent *pMessageEvent = NULL;
@@ -287,11 +328,20 @@ void OnEvent(IN const void* _pInstance, IN int _nAccountId, IN int _nId,  IN con
         memset( pEvent, 0, sizeof(Event) );
         pMessage->nMessageID = EVENT_MESSAGE;
         pMessageEvent = &pEvent->body.messageEvent;
-        pMessageEvent->status = _nId;
+
+        if (_nId == MQTT_CONNECT_SUCCESS) {
+                pMessageEvent->status = MESSAGE_STATUS_CONNECT;
+        } else if (_nId == MQTT_DISCONNECT_SUCCESS) {
+                pMessageEvent->status = MESSAGE_STATUS_DISCONNECT;
+        } else {
+                pMessageEvent->status = MESSAGE_STATUS_ERROR;
+        }
+
         char *message = (char *) malloc (strlen(_pReason) + 1) ;
         strncpy(message, _pReason, strlen(_pReason));
         message[strlen(_pReason)] = 0;
         pMessageEvent->message = message;//_pReason;
+        pMessageEvent->topic = NULL;
         DBG_LOG("message %p  %s\n", pMessageEvent->message, pMessageEvent->message);
         pMessage->pMessage  = (void *)pEvent;
         SendMessage(pUA->pQueue, pMessage);
@@ -342,7 +392,6 @@ static CodecType ConversionFormat(Codec _nCodec)
         return MEDIA_FORMAT_H264;
 }
 
-
 ErrorID InitSDK( Media* _pMediaConfigs, int _nSize)
 {
        SipInstanceConfig config;
@@ -381,15 +430,16 @@ ErrorID InitSDK( Media* _pMediaConfigs, int _nSize)
         config.Cb.OnRegStatusChange = &cbOnRegStatusChange;
         config.nMaxCall = MAX_CALL_COUNT;
         config.nMaxAccount = MAX_ACCOUNT;
-        pUAManager->config.callback.OnRxRtp = &OnRxRtp;
         // debug code.
         SetLogLevel(LOG_VERBOSE);
         SipCreateInstance(&config);
         INIT_LIST_HEAD(&pUAManager->UAList.list);
+#ifdef WITH_P2P
+        pUAManager->config.callback.OnRxRtp = &OnRxRtp;
+        InitialiseRtp();
+#endif
         pUAManager->bInitSdk = true;
         pthread_mutex_init(&pUAManager->mutex, NULL);
-
-        InitialiseRtp();
         return RET_OK;
 }
 
@@ -409,7 +459,9 @@ ErrorID UninitSDK()
         }
         pthread_mutex_unlock(&pUAManager->mutex);
         pthread_mutex_destroy(&pUAManager->mutex);
+#ifdef WITH_P2P
         UninitialiseRtp();
+#endif
         pUAManager->bInitSdk = false;
         memset(&pUAManager->config.videoConfigs, 0, sizeof(MediaConfigSet));
         memset(&pUAManager->config.audioConfigs, 0, sizeof(MediaConfigSet));
@@ -417,8 +469,13 @@ ErrorID UninitSDK()
         return RET_OK;
 }
 
+#ifdef WITH_P2P
 AccountID Register(const char* _id, const char* _password, const char* _pSigHost,
                    const char* _pMediaHost, const char* _pImHost)
+#else
+AccountID Register(const char* _id, const char* _password, const char* _pSigHost,
+                   const char* _pImHost)
+#endif
 {
         int nAccountId = 0;
         struct MqttOptions options;
@@ -428,7 +485,11 @@ AccountID Register(const char* _id, const char* _password, const char* _pSigHost
         }
         InitMqtt(&options, _id, _password, _pImHost);
         pthread_mutex_lock(&pUAManager->mutex);
+#ifdef WITH_P2P
         UA *pUA = UARegister(_id, _password, _pSigHost, _pMediaHost, &options, &pUAManager->config);
+#else
+        UA *pUA = UARegister(_id, _password, _pSigHost, &options, &pUAManager->config);
+#endif
         int nReason = 0;
     
         if (pUA == NULL) {
@@ -496,16 +557,22 @@ ErrorID PollEvent(AccountID _nAccountID, EventType* _pType, Event** _pEvent, int
         // pLastMessage use to free last message
         if ( pUA->pLastMessage ) {
                 Event *pEvent = (Event *) pUA->pLastMessage->pMessage;
+#ifdef WITH_P2P
                 if (pUA->pLastMessage->nMessageID == EVENT_DATA) {
                         if (pEvent->body.dataEvent.data) {
                                 free(pEvent->body.dataEvent.data);
                                 pEvent->body.dataEvent.data = NULL;
                         }
                 }
+#endif
                 if (pUA->pLastMessage->nMessageID == EVENT_MESSAGE) {
                         if (pEvent->body.messageEvent.message) {
                                 free(pEvent->body.messageEvent.message);
                                 pEvent->body.messageEvent.message = NULL;
+                        }
+                        if (pEvent->body.messageEvent.topic) {
+                                free(pEvent->body.messageEvent.topic);
+                                pEvent->body.messageEvent.topic = NULL;
                         }
                 }
                 if (pUA->pLastMessage->nMessageID == EVENT_CALL) {
@@ -514,7 +581,7 @@ ErrorID PollEvent(AccountID _nAccountID, EventType* _pType, Event** _pEvent, int
                                 pEvent->body.callEvent.context = NULL;
                         }
                 }
-                free( pEvent );
+                free(pEvent);
                 pEvent = NULL;
                 pUA->pLastMessage = NULL;
         }
@@ -593,6 +660,7 @@ ErrorID HangupCall( AccountID id, int _nCallId )
         return error;
 }
 
+#ifdef WITH_P2P
 ErrorID SendPacket(AccountID id, int _nCallId, Stream streamID, const uint8_t* buffer, int size, int64_t nTimestamp)
 {
         struct list_head *pos;
@@ -608,15 +676,42 @@ ErrorID SendPacket(AccountID id, int _nCallId, Stream streamID, const uint8_t* b
         pthread_mutex_unlock(&pUAManager->mutex);
         return error;
 }
+#endif
 
-ErrorID Report(AccountID id, const char* message, int length)
+ErrorID Report(AccountID id, const char* topic, const char* message, int length)
 {
         struct list_head *pos;
         ErrorID error = RET_ACCOUNT_NOT_EXIST;
         pthread_mutex_lock(&pUAManager->mutex);
         UA *pUA = FindUA(pUAManager, id, &pos);
         if (pUA != NULL) {
-                error = UAReport(pUA, message, length);
+                error = UAReport(pUA, topic, message, length);
+        }
+        pthread_mutex_unlock(&pUAManager->mutex);
+        return error;
+}
+
+ErrorID Subscribe(AccountID id, const char* topic)
+{
+        struct list_head *pos;
+        ErrorID error = RET_ACCOUNT_NOT_EXIST;
+        pthread_mutex_lock(&pUAManager->mutex);
+        UA *pUA = FindUA(pUAManager, id, &pos);
+        if (pUA != NULL) {
+                error = UASubscribe(pUA, topic);
+        }
+        pthread_mutex_unlock(&pUAManager->mutex);
+        return error;
+}
+
+ErrorID Unsubscribe(AccountID id, const char* topic)
+{
+        struct list_head *pos;
+        ErrorID error = RET_ACCOUNT_NOT_EXIST;
+        pthread_mutex_lock(&pUAManager->mutex);
+        UA *pUA = FindUA(pUAManager, id, &pos);
+        if (pUA != NULL) {
+                error = UAUnsubscribe(pUA, topic);
         }
         pthread_mutex_unlock(&pUAManager->mutex);
         return error;
@@ -636,7 +731,10 @@ SipAnswerCode cbOnIncomingCall(const int _nAccountId, const const char *_pFrom, 
         DBG_LOG("incoming call From %s to %d %p call id %d\n", _pFrom, _nAccountId, _pMedia, nSdkCallId);
         UAOnIncomingCall(pUA, nSdkCallId, _pFrom, _pMedia);
         *pCallId = nSdkCallId++;
-        pthread_mutex_unlock(&pUAManager->mutex);
+         pthread_mutex_unlock(&pUAManager->mutex);
+#ifndef WITH_P2P
+        OnIncomingCall(_nAccountId, *pCallId, _pFrom);
+#endif
         return OK;
 }
 
@@ -755,6 +853,10 @@ void cbOnCallStateChange(const int _nCallId, const int _nAccountId, const SipInv
                 }
         } else if (_State == INV_STATE_CALLING) {
                 pCallEvent->status = CALL_STATUS_RING;
+#ifndef WITH_P2P
+        } else if (_State == INV_STATE_CONFIRMED) {
+                pCallEvent->status = CALL_STATUS_ESTABLISHED;
+#endif
         } else {
                 DBG_ERROR("Not handle state %d\n", _State);
                 free(pMessage);

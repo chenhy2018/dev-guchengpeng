@@ -8,7 +8,6 @@
  */
 #include <string.h>
 #include <stdio.h>
-#include "sdk_interface.h"
 #include "dbg.h"
 #include "unit_test.h"
 #include <unistd.h> 
@@ -19,6 +18,11 @@
 #include <errno.h>
 #include <string.h>
 #include <unistd.h>
+#ifdef WITH_P2P
+#include "sdk_interface_p2p.h"
+#else
+#include "sdk_interface.h"
+#endif
 
 #define ARRSZ(arr) (sizeof(arr)/sizeof(arr[0]))
 
@@ -154,7 +158,7 @@ void Mthread1(void* data)
                                   DBG_LOG("Call status %d call id %d call account id %d\n", pCallEvent->status, pCallEvent->callID, pData->accountid);
                                   if (pCallEvent->status == CALL_STATUS_INCOMING) {
                                       DBG_LOG("AnswerCall ******************\n");
-                                      if (pCallEvent->callID > 0) {
+                                      if (pCallEvent->callID < 0) {
                                               DBG_LOG("RejectCall ******************\n");
                                               RejectCall(pData->accountid, pCallEvent->callID);
                                       }
@@ -164,12 +168,17 @@ void Mthread1(void* data)
                                       DBG_LOG("AnswerCall end *****************\n");
                                   }
                                   if (pCallEvent->status == CALL_STATUS_ESTABLISHED) {
+#ifdef WITH_P2P
                                         MediaInfo* info = (MediaInfo *)pCallEvent->context;
                                         DBG_LOG("CALL_STATUS_ESTABLISHED call id %d account id %d mediacount %d, type 1 %d type 2 %d\n",
                                                  pCallEvent->callID, pData->accountid, info->nCount, info->media[0].codecType, info->media[1].codecType);
+#else
+                                        DBG_LOG("CALL_STATUS_ESTABLISHED call id %d account id %d \n", pCallEvent->callID, pData->accountid);
+#endif
                                   }
                                   break;
                             }
+#ifdef WITH_P2P
                             case EVENT_DATA:
                             {
                                   DataEvent *pDataEvent = &(event->body.dataEvent);
@@ -187,6 +196,7 @@ void Mthread1(void* data)
                                   }
                                   break;
                             }
+#endif
                             case EVENT_MESSAGE:
                             {
                                   MessageEvent *pMessage = &(event->body.messageEvent);
@@ -196,6 +206,7 @@ void Mthread1(void* data)
                     }
            }
 }
+
 int RegisterTestSuitCallback( TestSuit *this )
 {
     RegisterTestCase *pTestCases = NULL;
@@ -244,7 +255,11 @@ int RegisterTestSuitCallback( TestSuit *this )
             DBG_STR( pData->password );
             DBG_STR( pData->sigHost );
             DBG_LOG("Register in\n");
+#ifdef WITH_P2P
             pData->accountid = Register( pData->id, pData->password, pData->sigHost, pData->mediaHost, pData->imHost);
+#else
+            pData->accountid = Register( pData->id, pData->password, pData->sigHost, pData->imHost);
+#endif
             DBG_LOG("Register out %x %x\n", pData->accountid, pTestCases->father.expact);
             pthread_create(&t_1, &attr_1, Mthread1, pData);
     }

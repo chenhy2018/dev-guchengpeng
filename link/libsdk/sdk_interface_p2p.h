@@ -31,6 +31,7 @@ typedef enum {
 
 typedef enum {
         EVENT_CALL,
+        EVENT_DATA,
         EVENT_MESSAGE,
 } EventType;
 
@@ -49,6 +50,7 @@ typedef enum {
         RET_TIMEOUT_FROM_SERVER,
         RET_USER_UNAUTHORIZED,
         RET_CALL_INVAILD_CONNECTION,
+        RET_CALL_INVAILD_SDP,
         RET_CALL_INVAILD_OPERATING,
         RET_SDK_ALREADY_INITED,
         MESSAGE_ERR_NOMEM = 3003,
@@ -74,6 +76,11 @@ typedef enum {
 typedef enum {
         REASON_OK = 0,
         REASON_REGISTERING_FAIL = 101,
+        REASON_TIMEOUT_FROM_SERVER,
+        REASON_CALL_INVAILD_SDP,
+        REASON_CALL_INVAILD_MEDIA_INFO,
+        REASON_CALL_NEGOTIATION_FAIL,
+        REASON_CALL_REMOTE_SDP_FAIL,
         REASON_CALL_BAD_REQUEST = 400,
         REASON_CALL_UNAUTHORIZED = 401,
         REASON_CALL_PAYMENT_REQUIRED = 402,
@@ -131,6 +138,15 @@ void setPjLogLevel(int level);
 
 typedef struct {
     int callID;
+    void *data;
+    int size;
+    int64_t pts;
+    Codec codec;
+    Stream stream;
+} DataEvent;
+
+typedef struct {
+    int callID;
     CallStatus status;
     ReasonCode reasonCode;
     void *context;
@@ -160,6 +176,7 @@ typedef struct {
     EventType type;
     union {
         CallEvent callEvent;
+        DataEvent dataEvent;
         MessageEvent messageEvent;
     } body;
 } Event;
@@ -169,8 +186,8 @@ ErrorID InitSDK( Media* mediaConfigs, int size);
 ErrorID UninitSDK();
 // register a account
 // @return if return value > 0, it is the account id, if < 0, it is the ErrorID
-AccountID Register(const char* id, const char* password, const char* sigHost, const char* imHost);
-
+AccountID Register(const char* id, const char* password, const char* sigHost,
+                   const char* mediaHost, const char* imHost);
 ErrorID UnRegister( AccountID id );
 // make a call, user need to save call id
 ErrorID MakeCall(AccountID accountID, const char* id, const char* host, int* callID);
@@ -178,6 +195,8 @@ ErrorID AnswerCall( AccountID id, int nCallId );
 ErrorID RejectCall( AccountID id, int nCallId );
 // hangup a call
 ErrorID HangupCall( AccountID id, int nCallId );
+// send a packet
+ErrorID SendPacket(AccountID id, int callID, Stream streamID, const uint8_t* buffer, int size, int64_t nTimestamp);
 // poll a event
 // if the EventData have video or audio data
 // the user shuould copy the the packet data as soon as possible

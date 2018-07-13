@@ -6,8 +6,12 @@
  * @version 0.1.00
  * @date 2018-05-31
  */
-
+#ifdef WITH_P2P
+#include "sdk_interface_p2p.h"
+#else
 #include "sdk_interface.h"
+#endif
+
 #include "list.h"
 #include "sdk_local.h"
 #include "dbg.h"
@@ -42,7 +46,9 @@ DbgStr sdkRetStr[] =
     DBG_STRING( RET_USER_UNAUTHORIZED ),
     DBG_STRING( RET_CALL_INVAILD_CONNECTION ),
     DBG_STRING( RET_TIMEOUT_FROM_SERVER ),
+#ifdef WITH_P2P
     DBG_STRING( RET_CALL_INVAILD_SDP ),
+#endif
     DBG_STRING( RET_INTERAL_FAIL ),
     DBG_STRING( RET_REGISTER_TIMEOUT ),
     DBG_STRING( RET_SDK_ALREADY_INITED ),

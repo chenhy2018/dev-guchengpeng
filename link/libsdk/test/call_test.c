@@ -9,7 +9,11 @@
 
 #include "dbg.h"
 #include "unit_test.h"
+#ifdef WITH_P2P
+#include "sdk_interface_p2p.h"
+#else
 #include "sdk_interface.h"
+#endif
 
 typedef struct {
     char *id;
@@ -162,8 +166,11 @@ int MakeCallTestSuitCallback( TestSuit *this )
     pTestCases = (MakeCallTestCase *) this->testCases;
     pTestCase = &pTestCases[this->index];
     pData = &pTestCase->data;
-
+#ifdef WITH_P2P
     sts = Register( "1003", "1003", "123.59.204.198", "123.59.204.198", "123.59.204.198" );
+#else
+    sts = Register( "1003", "1003", "123.59.204.198",  "123.59.204.198" );
+#endif
     if ( sts >= RET_MEM_ERROR ) {
         char *str = DbgSdkRetGetStr( sts );
         UT_ERROR("str = %s\n", str );
@@ -254,8 +261,11 @@ void *CalleeThread( void *arg )
 
     pTestCases = (MakeCallTestCase *) pTestSuit->testCases;
     pTestCase = &pTestCases[pTestSuit->index];
-
+#ifdef WITH_P2P
     sts = Register( "1005", "1005", "123.59.204.198", "123.59.204.198", "123.59.204.198" );
+#else
+    sts = Register( "1003", "1003", "123.59.204.198", "123.59.204.198" );
+#endif
     if ( sts >= RET_MEM_ERROR ) {
         UT_ERROR("[ callee ] Register error, sts = %d\n", sts );
         return NULL;
@@ -294,9 +304,11 @@ void *CalleeThread( void *arg )
                 }
             }
             break;
+#ifdef WITH_P2P
         case EVENT_DATA:
             UT_LOG("[ callee ] get event EVENT_DATA\n");
             break;
+#endif
         case EVENT_MESSAGE:
             UT_LOG("[ callee ] get event EVENT_MESSAGE\n");
             break;

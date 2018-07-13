@@ -23,8 +23,10 @@ int VideoGetFrameCb( char *_pFrame,
 
     if ( StreamStatus() ) {
         DbgGetVideoFrame( _pFrame, _nLen );
+#ifdef WITH_P2P
         ret = SendPacket( accountId, callId, STREAM_VIDEO, _pFrame, _nLen, (int64_t)_dTimeStamp );
         CHECK_SDK_RETURN( SendPacket, ret );
+#endif
     }
 
     return 0;
@@ -38,8 +40,10 @@ int AudioGetFrameCb( char *_pFrame, int _nLen, double _dTimeStamp,
     int callId = GetCallId();
 
     if ( StreamStatus() ) {
+#ifdef WITH_P2P
         ret = SendPacket( accountId, callId, STREAM_AUDIO, _pFrame, _nLen, (int64_t)_dTimeStamp );
         CHECK_SDK_RETURN( SendPacket, ret );
+#endif
     }
 
     return 0;
