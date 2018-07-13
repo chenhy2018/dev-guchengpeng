@@ -23,11 +23,6 @@ echo "******build test*******"
 cd test
 make clean
 make
-echo "*****build test_demo******"
-cd ..
-cd test_demo
-make clean
-make
 echo "*****build test_calling*****"
 cd ..
 cd test_calling
@@ -39,10 +34,18 @@ cd test_receivedcall
 make clean
 make
 
+if [ "${WITH_P2P}" = "ON" ]; then
+echo "*****build test_demo****"
 cd ..
+cd test_demo
+make clean
+make
 
 if [ "$1" = "mstar" ];then
+cd ..
 cd sdk_demo
 make clean
 make
+fi
+
 fi

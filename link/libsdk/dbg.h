@@ -10,7 +10,12 @@
 #ifndef DBG_H
 #define DBG_H
 
+#ifdef WITH_P2P
+#include "sdk_interface_p2p.h"
+#else
 #include "sdk_interface.h"
+#endif
+
 #define SDK_DBG 1
 
 #define DBG_STRING( v ) { v, #v }

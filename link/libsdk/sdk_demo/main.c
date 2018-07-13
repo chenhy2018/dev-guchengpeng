@@ -213,29 +213,6 @@ void StartIPC()
                 DBG_ERROR("get one event, but event data is NULL\n");
             }
             break;
-        case EVENT_DATA:
-            LOG("EVENT_DATA\n");
-            break;
-        case EVENT_MEDIA:
-            LOG("EVENT_MEDIA\n");
-            if ( pEvent ) {
-                pMediaEvent = &pEvent->body.mediaEvent;
-                DBG_LOG("midia channel count : %d \n", pMediaEvent->nCount );
-                DBG_LOG("callId = %d\n", pMediaEvent->callID );
-                DBG_LOG("media 0 stream type : %d\n", pMediaEvent->media[0].streamType );
-                DBG_LOG("media 0 codec type : %d\n", pMediaEvent->media[0].codecType );
-                DBG_LOG("media 0 sample reate : %d\n", pMediaEvent->media[0].sampleRate );
-                DBG_LOG("media 0 channels : %d\n", pMediaEvent->media[0].channels );
-                DBG_LOG("media 1 stream type : %d\n", pMediaEvent->media[1].streamType );
-                DBG_LOG("media 1 codec type : %d\n", pMediaEvent->media[1].codecType );
-                DBG_LOG("media 1 sample reate : %d\n", pMediaEvent->media[1].sampleRate );
-                DBG_LOG("media 1 channels : %d\n", pMediaEvent->media[1].channels );
-                DbgFrameAmountReset();
-                if ( pMediaEvent->nCount ) { // count = 0, sdp negotiation fail 
-                    StartStream();
-                }
-            }
-            break;
         case EVENT_MESSAGE:
             LOG("EVENT_MESSAGE\n");
             break;

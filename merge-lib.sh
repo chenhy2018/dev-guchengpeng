@@ -31,19 +31,26 @@ mkdir -p ./${OUTPUT}/ori
 mkdir -p ./${OUTPUT}/objs
 mkdir -p ./${OUTPUT}/ori/$1
 mkdir -p ./${OUTPUT}/lib/$1/
-
+#read WITH_P2P
 # 1. copy all the .a file from pjproject to libs/ori directory
 cp -rvf third_party/pjproject-2.7.2/prefix/$1/lib/libpjsip*-${LIBPREFIX}.a ${OUTPUT}/ori/$1
 cp -rvf third_party/pjproject-2.7.2/prefix/$1/lib/libpjmedia-${LIBPREFIX}.a ${OUTPUT}/ori/$1
 cp -rvf third_party/pjproject-2.7.2/prefix/$1/lib/libpj-${LIBPREFIX}.a ${OUTPUT}/ori/$1
-cp -rvf third_party/pjproject-2.7.2/prefix/$1/lib/libpjnath-${LIBPREFIX}.a ${OUTPUT}/ori/$1
 cp -rvf third_party/pjproject-2.7.2/prefix/$1/lib/libpjlib-util-${LIBPREFIX}.a ${OUTPUT}/ori/$1
+
+if [ "${WITH_P2P}" = "ON" ]; then
+cp -rvf third_party/pjproject-2.7.2/prefix/$1/lib/libpjnath-${LIBPREFIX}.a ${OUTPUT}/ori/$1
 cp -rvf third_party/pjproject-2.7.2/prefix/$1/lib/libsrtp-${LIBPREFIX}.a ${OUTPUT}/ori/$1
 cp -rvf third_party/pjproject-2.7.2/prefix/$1/lib/libpjmedia-audiodev-${LIBPREFIX}.a ${OUTPUT}/ori/$1
 cp -rvf third_party/pjproject-2.7.2/prefix/$1/lib/libpjmedia-codec-${LIBPREFIX}.a ${OUTPUT}/ori/$1
+fi
 
 cp -rvf link/libsip/libsip-${LIBPREFIX}.a ${OUTPUT}/ori/$1
+
+if [ "${WITH_P2P}" = "ON" ]; then 
 cp -rvf link/librtp/librtp-${LIBPREFIX}.a ${OUTPUT}/ori/$1
+fi
+
 cp -rvf link/libmqtt/libmqtt-${LIBPREFIX}.a ${OUTPUT}/ori/$1
 cp -rvf link/libsdk/libsdk-${LIBPREFIX}.a ${OUTPUT}/ori/$1
 

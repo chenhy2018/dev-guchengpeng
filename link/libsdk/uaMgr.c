@@ -2,7 +2,11 @@
 #include "sip.h"
 #include "dbg.h"
 #include "queue.h"
+#ifdef WITH_P2P
+#include "sdk_interface_p2p.h"
+#else
 #include "sdk_interface.h"
+#endif
 #include "mqtt.h"
 #include "sdk_local.h"
 #include "list.h"
@@ -29,9 +33,14 @@ static Call* FindCall(UA* _pUa, int _nCallId, struct list_head **pos)
 
 // register a account
 // @return UA struct point. If return NULL, error.
+#ifdef WITH_P2P
 UA* UARegister(const char* _pId, const char* _pPassword, const char* _pSigHost,
                const char* _pMediaHost, MqttOptions* _pOptions,
                UAConfig* _pConfig)
+#else
+UA* UARegister(const char* _pId, const char* _pPassword, const char* _pSigHost,
+               MqttOptions* _pOptions, UAConfig* _pConfig)
+#endif
 {
 
         UA *pUA = (UA *) malloc (sizeof(UA));
@@ -66,6 +75,7 @@ UA* UARegister(const char* _pId, const char* _pPassword, const char* _pSigHost,
                 pUA->pMqttInstance = MqttCreateInstance(_pOptions);
         }
         pUA->id = nSdkAccountId;
+#ifdef WITH_P2P
         pUA->config.pVideoConfigs = &_pConfig->videoConfigs;
         pUA->config.pAudioConfigs = &_pConfig->audioConfigs;
         pUA->config.pCallback = &_pConfig->callback;
@@ -78,7 +88,9 @@ UA* UARegister(const char* _pId, const char* _pPassword, const char* _pSigHost,
         if (_pPassword) {
                 strncpy(pUA->config.turnPassword, _pPassword, MAX_TURN_PWD_SIZE -1);
         }
-
+#else
+        CreateTmpSDP(&pUA->config.pSdp);
+#endif
         nSdkAccountId++;
         INIT_LIST_HEAD(&pUA->callList.list);
         pUA->pQueue = CreateMessageQueue(MESSAGE_QUEUE_MAX);
@@ -174,6 +186,7 @@ ErrorID UAHangupCall(UA* _pUa, int _nCallId)
         }
 }
 
+#ifdef WITH_P2P
 // send a packet
 ErrorID UASendPacket(UA* _pUa, int _nCallId, Stream _nStreamID, const uint8_t * _pBuffer, int _nSize, int64_t _nTimestamp)
 {
@@ -186,6 +199,8 @@ ErrorID UASendPacket(UA* _pUa, int _nCallId, Stream _nStreamID, const uint8_t * 
                 return RET_CALL_NOT_EXIST;
         }
 }
+#endif
+
 // poll a event
 // if the EventData have video or audio data
 // the user shuould copy the the packet data as soon as possible
@@ -196,10 +211,12 @@ ErrorID UAPollEvent(UA* _pUa, EventType* _pType, Event* _pEvent, int _pTimeOut)
                 CallEvent* event = (CallEvent*)(&_pEvent->body.callEvent);
                 nCallId = event->callID;
         }
+#ifdef WITH_P2P
         else if (_pEvent->type == EVENT_DATA) {
                 DataEvent* event = (DataEvent*)(&_pEvent->body.dataEvent);
                 nCallId = event->callID;
         }
+#endif
         else {
                 //To do error event and another event.
         }
@@ -301,7 +318,6 @@ void UADeleteCall(UA* _pUa, const int _nCallId)
         if (pCall) {
                 DBG_LOG("call %p\n", pCall);
                 list_del(pos);
-                //todo call releasecall
                 free(pCall);
                 DBG_LOG("call delete call end \n");
         }

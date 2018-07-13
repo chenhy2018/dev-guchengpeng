@@ -8,8 +8,14 @@
  */
 #include <string.h>
 #include <stdio.h>
-#include <unistd.h> 
+#include <unistd.h>
+
+#ifdef WITH_P2P
+#include "sdk_interface_p2p.h"
+#else
 #include "sdk_interface.h"
+#endif
+
 #include "dbg.h"
 #include "unit_test.h"
 #include "test.h"

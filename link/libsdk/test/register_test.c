@@ -6,10 +6,14 @@
  * @version 0.1.00
  * @date 2018-06-12
  */
-#include "sdk_interface.h"
 #include "dbg.h"
 #include "unit_test.h"
 #include <unistd.h>
+#ifdef WITH_P2P
+#include "sdk_interface_p2p.h"
+#else
+#include "sdk_interface.h"
+#endif
 
 #define HOST "123.59.204.198"
 #define INVALID_SERVER "192.168.1.239"
@@ -273,7 +277,12 @@ int RegisterTestSuitCallback( TestSuit *this )
         }
     }
 
+#ifdef WITH_P2P
     sts = Register( pData->id, pData->password, pData->sigHost, pData->mediaHost, pData->imHost );
+#else
+    sts = Register( pData->id, pData->password, pData->sigHost, pData->imHost );
+#endif
+
     if ( sts >= RET_MEM_ERROR ) {
         DBG_ERROR("sts = %d\n", sts );
         return TEST_FAIL;

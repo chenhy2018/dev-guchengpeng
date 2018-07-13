@@ -8,13 +8,17 @@
  */
 #include <string.h>
 #include <stdio.h>
-#include "sdk_interface.h"
 #include "dbg.h"
 #include "unit_test.h"
 #include "test.h"
 #include <unistd.h> 
 #include <stdlib.h>
 #include <pthread.h>
+#ifdef WITH_P2P
+#include "sdk_interface_p2p.h"
+#else
+#include "sdk_interface.h"
+#endif
 
 #define ARRSZ(arr) (sizeof(arr)/sizeof(arr[0]))
 #define HOST "39.107.247.14"
@@ -172,7 +176,8 @@ void Mthread1(void* data)
     int sendflag = 0;
     char data1[100] = {1};
     DBG_LOG("send pack *****%d call id %d\n", pData->accountid, pData->callid);
-    while (1) {     
+    while (1) {
+#ifdef WITH_P2P     
                     if (sendflag) {
                             if (timecount > 500) {
                                     DBG_LOG("hangcall ******************\n");
@@ -187,8 +192,19 @@ void Mthread1(void* data)
                             usleep(10000);
                             continue;
                     }
+#endif
                     id = PollEvent(pData->accountid, &type, &event, 10);
                     if (id != RET_OK) {
+#ifndef WITH_P2P
+                           ++ timecount;
+                           if (sendflag) {
+                                    if (timecount > 500) {
+                                           HangupCall(pData->accountid, pData->callid);
+                                           sendflag = 0;
+                                           timecount = 0;
+                                    }
+                           }
+#endif
                            continue;
                     }
                     switch (type) {
@@ -209,27 +225,34 @@ void Mthread1(void* data)
                                         } while (id != RET_OK);
                                   }
                                   if (pCallEvent->status == CALL_STATUS_ESTABLISHED) {
+#ifdef WITH_P2P
                                         MediaInfo* info = (MediaInfo *)pCallEvent->context;
                                         DBG_LOG("CALL_STATUS_ESTABLISHED call id %d account id %d mediacount %d, type 1 %d type 2 %d\n",
                                                  pCallEvent->callID, pData->accountid, info->nCount, info->media[0].codecType, info->media[1].codecType);
                                         sendflag = 1;
+#else
+                                        sendflag = 1;
+                                        DBG_LOG("CALL_STATUS_ESTABLISHED call id %d account id %d \n", pCallEvent->callID, pData->accountid);
+#endif
                                   }
 
                                   break;
                             }
+#ifdef WITH_P2P
                             case EVENT_DATA:
                             {     
                                   DataEvent *pDataEvent = &(event->body.dataEvent);
                                   //DBG_LOG("Data size %d call id %d call account id %d timestamp %lld \n", pDataEvent->size, pDataEvent->callID, pData->accountid, pDataEvent->pts);
                                   break;
                             }
+#endif
                             case EVENT_MESSAGE:
                             {
                                   MessageEvent *pMessage = &(event->body.messageEvent);
                                   DBG_LOG("Message %s status id %d account id %d\n", pMessage->message, pMessage->status, pData->accountid);
                                   break;
                             }
-                    }
+                   }
            }
 }
 
@@ -272,7 +295,11 @@ int RegisterTestSuitCallback( TestSuit *this )
             UT_STR(pData->password);
             UT_STR(pData->sigHost);
             UT_LOG("Register in\n");
+#ifdef WITH_P2P
             pData->accountid = Register(pData->id, pData->password, pData->sigHost, pData->mediaHost, pData->imHost);
+#else
+            pData->accountid = Register(pData->id, pData->password, pData->sigHost, pData->imHost);
+#endif
             UT_LOG("Register out %x %x\n", pData->accountid, pTestCases->father.expact);
             int nCallId1 = -1;
     }

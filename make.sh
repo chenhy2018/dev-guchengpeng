@@ -5,6 +5,7 @@ if [ $# != 1 ];then
 fi
 export ARCH=$1
 
+#export WITH_P2P="ON"
 prefix=
 if [ "$1" = "mstar" ];then
     export CC=arm-linux-gnueabihf-gcc

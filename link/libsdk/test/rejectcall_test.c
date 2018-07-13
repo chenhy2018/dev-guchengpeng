@@ -8,7 +8,11 @@
  */
 #include "dbg.h"
 #include "unit_test.h"
+#ifdef WITH_P2P
+#include "sdk_interface_p2p.h"
+#else
 #include "sdk_interface.h"
+#endif
 
 typedef struct {
     char *data;
@@ -103,8 +107,11 @@ int RejectCallTestSuitCallback( TestSuit *this )
     UT_LOG("this->index = %d\n", this->index );
     pTestCase = &pTestCases[this->index];
     pData = &pTestCase->data;
-
+#ifdef WITH_P2P
     id = Register( "1003", "1003", "123.59.204.198", "123.59.204.198", "123.59.204.198" );
+#else
+    id = Register( "1003", "1003", "123.59.204.198", "123.59.204.198" );
+#endif
     if ( sts >= RET_MEM_ERROR ) {
         DBG_ERROR("sts = %d\n", sts );
         return TEST_FAIL;
@@ -165,9 +172,11 @@ int RejectCallTestSuitCallback( TestSuit *this )
                 }
             }
             break;
+#ifdef WITH_P2P
         case EVENT_DATA:
             UT_LOG("get event EVENT_DATA\n");
             break;
+#endif
         case EVENT_MESSAGE:
             UT_LOG("get event EVENT_MESSAGE\n");
             break;

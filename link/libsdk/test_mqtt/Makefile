@@ -3,7 +3,11 @@ THIRD_PARTY_PATH=../../../third_party
 OPENSSL_PATH=$(THIRD_PARTY_PATH)/openssl-1.1.0h
 OPENSSL_LIB=${OPENSSL_PATH}/prefix/$(ARCH)/lib
 LDFLAGS=-L../../../output/lib/$(ARCH) -L$(OPENSSL_LIB) -lua -lpthread -lm  -lssl -lcrypto
+ifeq ($(WITH_P2P), ON)
+CFLAGS=-g -std=gnu99 -D WITH_P2P
+else
 CFLAGS=-g -std=gnu99
+endif
 TARGET_OBJS=test.o unit_test.o
 TESTCASE_OBJS_DIR=./objs
 INCLUDE_PATH=-I../
