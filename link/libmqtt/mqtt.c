@@ -69,7 +69,7 @@ static void SafeFree(char* des)
       if (des) free(des);
 }
 
-static bool InsertNode(Node* pHead, char* val) {
+static bool InsertNode(Node* pHead, const char* val) {
         Node* p = pHead;
         while(p->pNext) {
                 p = p->pNext;
@@ -81,7 +81,7 @@ static bool InsertNode(Node* pHead, char* val) {
         return true;
 }
 
-static bool DeleteNode(Node* PHead, char * pval)
+static bool DeleteNode(Node* PHead, const char * pval)
 {
         int i = 0;
         Node* p = PHead;
