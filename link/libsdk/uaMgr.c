@@ -60,15 +60,17 @@ UA* UARegister(const char* _pId, const char* _pPassword, const char* _pSigHost,
         sipConfig.nMaxOngoingCall = MAX_ONGOING_CALL_COUNT;
         DBG_LOG("UARegister %s %s %s %p ongoing call %d\n",
                 sipConfig.pUserName, sipConfig.pPassWord, sipConfig.pDomain, sipConfig.pUserData, sipConfig.nMaxOngoingCall);
-        if (sipConfig.pDomain) {
+        if (_pSigHost != NULL) {        
                 SipAnswerCode Ret = SipRegAccount(&sipConfig, nSdkAccountId);
                 if (Ret != SIP_SUCCESS) {
                         DBG_ERROR("Register Account Error, Ret = %d\n", Ret);
                         free(pUA);
                         return NULL;
                 }
+                pUA->regStatus = TRYING;
+        } else {
+                pUA->regStatus = NOT_FOUND;
         }
-        pUA->regStatus == TRYING;
         //mqtt create instance.
         _pOptions->nAccountId = nSdkAccountId;
         if (_pOptions->primaryUserInfo.pHostname) {
@@ -89,7 +91,10 @@ UA* UARegister(const char* _pId, const char* _pPassword, const char* _pSigHost,
                 strncpy(pUA->config.turnPassword, _pPassword, MAX_TURN_PWD_SIZE -1);
         }
 #else
-        CreateTmpSDP(&pUA->config.pSdp);
+        if (_pSigHost != NULL) {
+                //It may cause crash because not call pj_thread_register
+                CreateTmpSDP(&pUA->config.pSdp);
+        }
 #endif
         nSdkAccountId++;
         INIT_LIST_HEAD(&pUA->callList.list);
@@ -104,7 +109,10 @@ UA* UARegister(const char* _pId, const char* _pPassword, const char* _pSigHost,
 
 ErrorID UAUnRegister(UA* _pUa)
 {
-        SipAnswerCode code = SipUnRegAccount(_pUa->id);
+        SipAnswerCode code = OK;
+        if (_pUa->regStatus != NOT_FOUND) {
+                code = SipUnRegAccount(_pUa->id);
+        }
         if (_pUa->pMqttInstance) {
                 MqttDestroy(_pUa->pMqttInstance);
                 _pUa->pMqttInstance = NULL;

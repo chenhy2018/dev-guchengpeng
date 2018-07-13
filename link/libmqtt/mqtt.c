@@ -162,7 +162,7 @@ void OnDisconnectCallback(struct mosquitto* _pMosq, void* _pObj, int rc)
         struct MqttInstance* pInstance = (struct MqttInstance*)(_pObj);
         OnEventCallback(pInstance,
                (rc == 0) ? MQTT_DISCONNECT_SUCCESS : MqttErrorStatusChange(rc),
-               (rc == 0) ? "on disconnect success" : mosquitto_connack_string(rc));
+               (rc == 0) ? "on disconnect success" : mosquitto_strerror(rc));
         pInstance->connected = false;
         if (!rc) {
                 pInstance->status = STATUS_IDLE;
@@ -174,12 +174,12 @@ void OnDisconnectCallback(struct mosquitto* _pMosq, void* _pObj, int rc)
 
 void OnSubscribeCallback(struct mosquitto* _pMosq, void* pObj, int mid, int qos_count, const int* pGranted_qos)
 {       
-        fprintf(stderr, "Subscribed (mid: %d): %d \n", mid, pGranted_qos[0]);
+        //fprintf(stderr, "Subscribed (mid: %d): %d \n", mid, pGranted_qos[0]);
 }
 
 void OnUnsubscribeCallback(struct mosquitto* _pMosq, void* _pObj, int mid)
 {
-        fprintf(stderr, "Unsubscribed (mid: %d) \n", mid);
+        //fprintf(stderr, "Unsubscribed (mid: %d) \n", mid);
 }
 
 void OnPublishCallback(struct mosquitto* _pMosq, void* _pObj, int mid)

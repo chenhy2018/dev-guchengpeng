@@ -34,6 +34,12 @@ cd test_receivedcall
 make clean
 make
 
+echo "*****build test_mqtt****"
+cd ..
+cd test_mqtt
+make clean
+make
+
 if [ "${WITH_P2P}" = "ON" ]; then
 echo "*****build test_demo****"
 cd ..
