@@ -44,6 +44,22 @@ static UA* FindUA(UAManager* _pUAManager, AccountID _nAccountId, struct list_hea
         return NULL;
 }
 
+static UA* FindUAbyUserId(UAManager* _pUAManager, const char* _pId)
+{
+        UA* pUA;
+        struct list_head *q, *pos;
+        //DBG_LOG("FindUA in %p %p %p AccountID %d \n", &_pUAManager->UAList.list, pos, q, _nAccountId);
+
+        list_for_each_safe(pos, q, &_pUAManager->UAList.list) {
+                pUA = list_entry(pos, UA, list);
+                //DBG_LOG("FindUA pos %p id %d\n", pos, pUA->id);
+                if (strcmp(pUA->userId, _pId) == 0) {
+                        return pUA;
+                }
+        }
+        return NULL;
+}
+
 static Codec ConversionFormatToUser(CodecType _nCodec)
 {
         switch (_nCodec) {
@@ -483,8 +499,13 @@ AccountID Register(const char* _id, const char* _password, const char* _pSigHost
                 DBG_ERROR("not init sdk\n");
                 return RET_INIT_ERROR;
         }
-        InitMqtt(&options, _id, _password, _pImHost);
         pthread_mutex_lock(&pUAManager->mutex);
+        if (FindUAbyUserId(pUAManager, _id) != NULL) {
+                DBG_ERROR("***** already register id %s\n", _id);
+                pthread_mutex_unlock(&pUAManager->mutex);
+                return RET_PARAM_ERROR;
+        }
+        InitMqtt(&options, _id, _password, _pImHost);
 #ifdef WITH_P2P
         UA *pUA = UARegister(_id, _password, _pSigHost, _pMediaHost, &options, &pUAManager->config);
 #else
@@ -502,6 +523,40 @@ AccountID Register(const char* _id, const char* _password, const char* _pSigHost
         return pUA->id;
 }
 
+void ReleaseMessage(Message *_pMessage)
+{
+                if (_pMessage == NULL) {
+                        return;
+                }
+                Event *pEvent = (Event *) _pMessage->pMessage;
+#ifdef WITH_P2P
+                if (_pMessage->nMessageID == EVENT_DATA) {
+                        if (pEvent->body.dataEvent.data) {
+                                free(pEvent->body.dataEvent.data);
+                                pEvent->body.dataEvent.data = NULL;
+                        }
+                }
+#endif
+                if (_pMessage->nMessageID == EVENT_MESSAGE) {
+                        if (pEvent->body.messageEvent.message) {
+                                free(pEvent->body.messageEvent.message);
+                                pEvent->body.messageEvent.message = NULL;
+                        }
+                        if (pEvent->body.messageEvent.topic) {
+                                free(pEvent->body.messageEvent.topic);
+                                pEvent->body.messageEvent.topic = NULL;
+                        }
+                }
+                if (_pMessage->nMessageID == EVENT_CALL) {
+                        if (pEvent->body.callEvent.context) {
+                                free(pEvent->body.callEvent.context);
+                                pEvent->body.callEvent.context = NULL;
+                        }
+                }
+                free(pEvent);
+                free(_pMessage);
+}
+
 ErrorID UnRegister(AccountID _nAccountId)
 {
         struct list_head *pos;
@@ -510,6 +565,11 @@ ErrorID UnRegister(AccountID _nAccountId)
         UA *pUA = FindUA(pUAManager, _nAccountId, &pos);
         if (pUA != NULL) {
                 list_del(pos);
+                Message *pMessage = NULL;
+                do {
+                        pMessage = ReceiveMessageTimeout( pUA->pQueue, 1 );
+                        if (pMessage != NULL)  ReleaseMessage(pMessage);
+                } while(pMessage);
                 pthread_mutex_unlock(&pUAManager->mutex);
                 UAUnRegister(pUA);
                 return RET_OK;
@@ -555,34 +615,8 @@ ErrorID PollEvent(AccountID _nAccountID, EventType* _pType, Event** _pEvent, int
                 return RET_ACCOUNT_NOT_EXIST;
         }
         // pLastMessage use to free last message
-        if ( pUA->pLastMessage ) {
-                Event *pEvent = (Event *) pUA->pLastMessage->pMessage;
-#ifdef WITH_P2P
-                if (pUA->pLastMessage->nMessageID == EVENT_DATA) {
-                        if (pEvent->body.dataEvent.data) {
-                                free(pEvent->body.dataEvent.data);
-                                pEvent->body.dataEvent.data = NULL;
-                        }
-                }
-#endif
-                if (pUA->pLastMessage->nMessageID == EVENT_MESSAGE) {
-                        if (pEvent->body.messageEvent.message) {
-                                free(pEvent->body.messageEvent.message);
-                                pEvent->body.messageEvent.message = NULL;
-                        }
-                        if (pEvent->body.messageEvent.topic) {
-                                free(pEvent->body.messageEvent.topic);
-                                pEvent->body.messageEvent.topic = NULL;
-                        }
-                }
-                if (pUA->pLastMessage->nMessageID == EVENT_CALL) {
-                        if (pEvent->body.callEvent.context) {
-                                free(pEvent->body.callEvent.context);
-                                pEvent->body.callEvent.context = NULL;
-                        }
-                }
-                free(pEvent);
-                pEvent = NULL;
+        if (pUA->pLastMessage) {
+                ReleaseMessage(pUA->pLastMessage);
                 pUA->pLastMessage = NULL;
         }
         pthread_mutex_unlock(&pUAManager->mutex);

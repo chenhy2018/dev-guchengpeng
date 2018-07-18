@@ -30,7 +30,7 @@
 #define MAX_URL_SIZE (128)
 #define INVALID_CALL_ID -1
 #define MAX_AUDIO_SIZE 160
-
+#define MAX_USER_ID_SIZE 64
 #define MAX_CALL_COUNT 32
 #define MAX_ACCOUNT 16
 #define MAX_ONGOING_CALL_COUNT 32
@@ -82,6 +82,7 @@ typedef struct {
         MessageQueue *pQueue;
         Message *pLastMessage;
         void *pMqttInstance;
+        char userId[MAX_USER_ID_SIZE];
 #ifndef WITH_P2P
         void *pSdp;
 #endif

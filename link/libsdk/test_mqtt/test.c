@@ -21,7 +21,7 @@
 #include <pthread.h>
 
 #define ARRSZ(arr) (sizeof(arr)/sizeof(arr[0]))
-#define HOST "39.107.247.14"
+#define HOST "180.97.147.176"
 #define INVALID_SERVER "192.168.1.239"
 
 #define MAX_COUNT 145
@@ -59,7 +59,7 @@ RegisterTestCase gRegisterTestCases[] =
     },
     {
         { "valid_account2", CALL_STATUS_REGISTERED, NULL },
-        { "1901", "b7Ur3mVq", HOST, HOST, HOST, 10, 0 }
+        { "1900", "b7Ur3mVq", HOST, HOST, HOST, 10, 0 }
     },
     {
         { "invalid_account1", CALL_STATUS_REGISTERED, NULL },
