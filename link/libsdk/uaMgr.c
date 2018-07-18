@@ -77,6 +77,7 @@ UA* UARegister(const char* _pId, const char* _pPassword, const char* _pSigHost,
                 pUA->pMqttInstance = MqttCreateInstance(_pOptions);
         }
         pUA->id = nSdkAccountId;
+        strncpy(pUA->userId, _pId, MAX_USER_ID_SIZE - 1);
 #ifdef WITH_P2P
         pUA->config.pVideoConfigs = &_pConfig->videoConfigs;
         pUA->config.pAudioConfigs = &_pConfig->audioConfigs;
