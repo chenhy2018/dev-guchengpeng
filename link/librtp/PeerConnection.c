@@ -1,5 +1,6 @@
 #include "PeerConnection.h"
 #define THIS_FILE "PeerConnection.c"
+#include <pthread.h>
 
 static int createMediaSdpMLine(IN pjmedia_endpt *_pMediaEndpt, IN pjmedia_transport *_pTransport,
                                IN pj_pool_t *_pPool, IN MediaStreamTrack *_pMediaTrack, OUT pjmedia_sdp_media **_pSdp);
@@ -40,6 +41,9 @@ typedef struct _ResoureMgr {
         pj_pool_t *pMutexPool;
         int nQuit;
         pjmedia_endpt     *pMediaEndpt;
+        pthread_mutex_t countMutex;
+        int nPeerConnectionCount;
+        int nPeerConnectionLimit;
 }ResoureMgr;
 ResoureMgr manager;
 
@@ -433,6 +437,11 @@ int InitialiseRtp()
         status = pj_mutex_create(pPool, NULL, PJ_MUTEX_DEFAULT, &manager.pMutex);
         STATUS_CHECK(pj_mutex_create, status);
 
+        status = pthread_mutex_init(&manager.countMutex, NULL);
+        STATUS_CHECK(pthread_mutex_init, status);
+        manager.nPeerConnectionCount = 0;
+        manager.nPeerConnectionLimit = PJ_IOQUEUE_MAX_HANDLES/4 - 2;
+
         pj_pool_t * pTimerPool = pj_pool_create(&manager.cachingPool.factory, "mgrheap", 512, 512, NULL);
         ASSERT_RETURN_CHECK(pTimerPool, pj_pool_create);
         manager.pTimerHeapPool = pTimerPool;
@@ -524,6 +533,7 @@ void UninitialiseRtp()
         }
 
         pj_caching_pool_destroy (&manager.cachingPool);
+        pthread_mutex_destroy(&manager.countMutex);
 }
 
 static pj_str_t parseIpAndPort(char *_pHosStr, pj_uint16_t *_pPort)
@@ -742,6 +752,15 @@ int InitPeerConnectoin(OUT PeerConnection ** _pPeerConnection, IN IceConfig *_pI
                 MY_PJ_LOG(1, "invalid IceConfig");
                 return status;
         }
+	
+        pthread_mutex_lock(&manager.countMutex);
+        if (manager.nPeerConnectionCount < manager.nPeerConnectionLimit) {
+                manager.nPeerConnectionCount++;
+        } else {
+                pthread_mutex_unlock(&manager.countMutex);
+                return PJ_ETOOMANY;
+        }
+        pthread_mutex_unlock(&manager.countMutex);
 
         PeerConnection * pPeerConnection =  (PeerConnection *)malloc(sizeof(PeerConnection));
         ASSERT_RETURN_CHECK(pPeerConnection, malloc);
@@ -874,6 +893,10 @@ void releasePeerConnection(IN void * pUserData)
                         _pPeerConnection->mediaStream.streamTracks[i].pPacketizerPool = NULL;
                 }
         }
+
+        pthread_mutex_lock(&manager.countMutex);
+        manager.nPeerConnectionCount--;
+        pthread_mutex_unlock(&manager.countMutex);
 
         free(_pPeerConnection);
 
