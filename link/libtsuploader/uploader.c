@@ -139,7 +139,8 @@ static int pushData(TsUploader *pTsUploader, char * pData, int nDataLen)
 
 static void getStatInfo(TsUploader *pTsUploader, UploaderStatInfo *_pStatInfo)
 {
-        pTsUploader->GetStatInfo(pTsUploader, _pStatInfo);
+        KodoUploader * pKodoUploader = (KodoUploader *)pTsUploader;
+        pKodoUploader->pQueue_->GetStatInfo(pKodoUploader->pQueue_, _pStatInfo);
         return;
 }
 

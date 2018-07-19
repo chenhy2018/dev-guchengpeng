@@ -27,6 +27,7 @@ typedef struct _FFTsMuxUploader{
         FFTsMuxContext *pTsMuxCtx;
         
         int64_t nLastVideoTimestamp;
+        int64_t nLastUploadVideoTimestamp; //initial to -1
         int nKeyFrameCount;
 }FFTsMuxUploader;
 
@@ -66,7 +67,7 @@ static int push(FFTsMuxUploader *pFFTsMuxUploader, char * _pData, int _nDataLen,
         pkt.data = (uint8_t *)_pData;
         pkt.size = _nDataLen;
         
-        loginfo("push thread id:%d\n", (int)pthread_self());
+        //logtrace("push thread id:%d\n", (int)pthread_self());
         
         FFTsMuxContext *pTsMuxCtx = pFFTsMuxUploader->pTsMuxCtx;
         if (_nFlag == TK_STREAM_TYPE_AUDIO){
@@ -94,17 +95,20 @@ static int PushVideo(TsMuxUploader *_pTsMuxUploader, char * _pData, int _nDataLe
         FFTsMuxUploader *pFFTsMuxUploader = (FFTsMuxUploader *)_pTsMuxUploader;
 
         int ret = 0;
+        if (pFFTsMuxUploader->nLastUploadVideoTimestamp == -1) {
+                pFFTsMuxUploader->nLastUploadVideoTimestamp = _nTimestamp;
+        }
         if (nIsKeyFrame) {
-                pFFTsMuxUploader->nKeyFrameCount++;
-                if(pFFTsMuxUploader->nKeyFrameCount == 2 ) {//2个关键帧存一次
+                if(pFFTsMuxUploader->nKeyFrameCount >= 2 && //至少2个关键帧存一次
+                   (_nTimestamp - pFFTsMuxUploader->nLastUploadVideoTimestamp) > 4980) {//并且要在5s左右
                         pFFTsMuxUploader->nKeyFrameCount = 0;
                         pushRecycle(pFFTsMuxUploader);
-                        pFFTsMuxUploader->nKeyFrameCount = 0;
                         ret = TsMuxUploaderStart(_pTsMuxUploader);
                         if (ret != 0) {
                                 return ret;
                         }
                 }
+                pFFTsMuxUploader->nKeyFrameCount++;
         }
 
         pFFTsMuxUploader->nLastVideoTimestamp = _nTimestamp;
@@ -280,6 +284,7 @@ int NewTsMuxUploader(TsMuxUploader **_pTsMuxUploader)
                 return TK_NO_MEMORY;
         }
         memset(pFFTsMuxUploader, 0, sizeof(FFTsMuxUploader));
+        pFFTsMuxUploader->nLastUploadVideoTimestamp = -1;
         
         int ret = 0;
         ret = pthread_mutex_init(&pFFTsMuxUploader->mutex_, NULL);
