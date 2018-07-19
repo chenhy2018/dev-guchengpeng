@@ -95,6 +95,10 @@ static int PushVideo(TsMuxUploader *_pTsMuxUploader, char * _pData, int _nDataLe
         FFTsMuxUploader *pFFTsMuxUploader = (FFTsMuxUploader *)_pTsMuxUploader;
 
         int ret = 0;
+        if (pFFTsMuxUploader->nKeyFrameCount == 0 && !nIsKeyFrame) {
+                logwarn("first video frame not IDR. drop this frame\n");
+                return 0;
+        }
         if (pFFTsMuxUploader->nLastUploadVideoTimestamp == -1) {
                 pFFTsMuxUploader->nLastUploadVideoTimestamp = _nTimestamp;
         }
