@@ -2,6 +2,7 @@
 #define __CIRCLE_QUEUE_H__
 
 #include <pthread.h>
+#include <stdint.h>
 
 enum CircleQueuePolicy{
         TSQ_FIX_LENGTH,

@@ -7,6 +7,7 @@
 #include <sys/time.h>
 #include <errno.h>
 #include "log.h"
+#include <stdint.h>
 
 #define MKTAG(a,b,c,d) ((a) | ((b) << 8) | ((c) << 16) | ((unsigned)(d) << 24))
 #define MKERRTAG(a, b, c, d) (-(int)MKTAG(a, b, c, d))
