@@ -94,6 +94,8 @@ void * upload(void *_pOpaque)
         
         char key[128] = {0};
         sprintf(key, "test_stream_put_%ld.ts", time(NULL));
+        client.lowSpeedLimit = 30;
+        client.lowSpeedTime = 3;
         Qiniu_Error error = Qiniu_Io_PutStream(&client, &putRet, uptoken, key, pUploader, -1, getDataCallback, &putExtra);
         if (error.code != 200) {
                 logerror("upload file %s:%s error:%s", putPolicy.scope, key, Qiniu_Buffer_CStr(&client.b));
