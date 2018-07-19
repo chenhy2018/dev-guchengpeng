@@ -24,6 +24,7 @@ static int PushQueue(CircleQueue *_pQueue, char *pData_, int nDataLen)
         pthread_mutex_lock(&pQueueImp->mutex_);
         
         if (pQueueImp->nIsStopPush_) {
+                logwarn("queue is only readable now");
                 pthread_mutex_unlock(&pQueueImp->mutex_);
                 return TK_NO_PUSH;
         }

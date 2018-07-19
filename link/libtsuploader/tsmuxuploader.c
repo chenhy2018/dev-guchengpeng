@@ -36,7 +36,6 @@ static void pushRecycle(FFTsMuxUploader *_pFFTsMuxUploader)
         if (_pFFTsMuxUploader) {
                 
                 pthread_mutex_lock(&_pFFTsMuxUploader->mutex_);
-
                 if (_pFFTsMuxUploader->pTsMuxCtx) {
                         logerror("push to mgr:%p", _pFFTsMuxUploader->pTsMuxCtx);
                         PushFunction(_pFFTsMuxUploader->pTsMuxCtx);
@@ -102,6 +101,7 @@ static int PushVideo(TsMuxUploader *_pTsMuxUploader, char * _pData, int _nDataLe
                 if(pFFTsMuxUploader->nKeyFrameCount >= 2 && //至少2个关键帧存一次
                    (_nTimestamp - pFFTsMuxUploader->nLastUploadVideoTimestamp) > 4980) {//并且要在5s左右
                         pFFTsMuxUploader->nKeyFrameCount = 0;
+                        av_write_trailer(pFFTsMuxUploader->pTsMuxCtx->pFmtCtx_);
                         pushRecycle(pFFTsMuxUploader);
                         ret = TsMuxUploaderStart(_pTsMuxUploader);
                         if (ret != 0) {
@@ -129,8 +129,6 @@ static int waitToCompleUploadAndDestroyTsMuxContext(void *_pOpaque)
         
         if (pTsMuxCtx) {
                 if (pTsMuxCtx->pFmtCtx_) {
-                        av_write_trailer(pTsMuxCtx->pFmtCtx_);
-                        
                         if (pTsMuxCtx->pFmtCtx_ && !(pTsMuxCtx->pFmtCtx_->oformat->flags & AVFMT_NOFILE))
                                 avio_close(pTsMuxCtx->pFmtCtx_->pb);
                         avformat_free_context(pTsMuxCtx->pFmtCtx_);
