@@ -249,13 +249,15 @@ int main(int argc, char* argv[])
         int ret = 0;
         
         Qiniu_Global_Init(-1);
-        SetLogLevelToTrace();
+        SetLogLevelToDebug();
         
         ret = StartMgr();
         if (ret != 0) {
                 fprintf(stderr, "StartMgr fail\n");
                 return 0;
         }
+        loginfo("main thread id:%d\n", (int)pthread_self());
+        loginfo("main thread id:%d\n", (int)pthread_self());
         
         TsMuxUploader *pUploader = NULL;
         ret = NewTsMuxUploader(&pUploader);

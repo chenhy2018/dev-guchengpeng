@@ -16,6 +16,7 @@ typedef void (*CallbackUrlSetter)(TsUploader*, char *, int);
 typedef void (*DeleteAfterDaysSetter)(TsUploader*, int);
 typedef int (*StreamUploadStart)(TsUploader*);
 typedef void (*StreamUploadStop)(TsUploader*);
+
 typedef struct _TsUploader{
         AccessKeySetter SetAccessKey;
         SecretKeySetter SetSecretKey;
@@ -25,7 +26,7 @@ typedef struct _TsUploader{
         StreamUploadStart UploadStart;
         StreamUploadStop UploadStop;
         int(*Push)(TsUploader *pTsUploader, char * pData, int nDataLen);
-        void (*GetStatInfo)(TsUploader *pTsUploader, int *pPushCount, int *pPopCount); //debug
+        void (*GetStatInfo)(TsUploader *pTsUploader, UploaderStatInfo *pStatInfo);
 }TsUploader;
 
 int NewUploader(TsUploader ** pUploader, enum CircleQueuePolicy policy, int nMaxItemLen, int nInitItemCount);

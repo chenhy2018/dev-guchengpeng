@@ -17,9 +17,6 @@ typedef struct _KodoUploader{
         char bucketName_[256];
         int deleteAfterDays_;
         char callback_[512];
-        //statistics info
-        int nPushDataBytes;
-        int nPopDataBytes;
 }KodoUploader;
 
 
@@ -60,11 +57,7 @@ static void setDeleteAfterDays(TsUploader* _pUploader, int nDays)
 size_t getDataCallback(void* buffer, size_t size, size_t n, void* rptr)
 {
         KodoUploader * pUploader = (KodoUploader *) rptr;
-        int ret = pUploader->pQueue_->Pop(pUploader->pQueue_, buffer, size * n);
-        if (ret > 0) {
-                pUploader->nPopDataBytes += ret;
-        }
-        return ret;
+        return pUploader->pQueue_->Pop(pUploader->pQueue_, buffer, size * n);
 }
 
 void * upload(void *_pOpaque)
@@ -141,18 +134,12 @@ static void streamUploadStop(TsUploader * _pUploader)
 static int pushData(TsUploader *pTsUploader, char * pData, int nDataLen)
 {
         KodoUploader * pKodoUploader = (KodoUploader *)pTsUploader;
-        int ret = pKodoUploader->pQueue_->Push(pKodoUploader->pQueue_, (char *)pData, nDataLen);
-        if (ret > 0) {
-                pKodoUploader->nPushDataBytes += ret;
-        }
-        return ret;
+        return pKodoUploader->pQueue_->Push(pKodoUploader->pQueue_, (char *)pData, nDataLen);
 }
 
-static void getStatInfo(TsUploader *pTsUploader, int *pPushCount, int *pPopCount)
+static void getStatInfo(TsUploader *pTsUploader, UploaderStatInfo *_pStatInfo)
 {
-        KodoUploader * pKodoUploader = (KodoUploader *)pTsUploader;
-        *pPushCount = pKodoUploader->nPushDataBytes;
-        *pPopCount = pKodoUploader->nPopDataBytes;
+        pTsUploader->GetStatInfo(pTsUploader, _pStatInfo);
         return;
 }
 

@@ -16,11 +16,18 @@ typedef int(*CircleQueuePop)(CircleQueue *pQueue, char * pBuf, int nBufLen);
 typedef int(*CircleQueuePopWithTimeout)(CircleQueue *pQueue, char * pBuf, int nBufLen, int64_t nTimeoutAfterUsec);
 typedef void(*CircleQueueStopPush)(CircleQueue *pQueue);
 
+typedef struct _UploaderStatInfo {
+        int nPushDataBytes_;
+        int nPopDataBytes_;
+        int nLen_;
+}UploaderStatInfo;
+
 typedef struct _CircleQueue{
         CircleQueuePush Push;
         CircleQueuePop Pop;
         CircleQueuePopWithTimeout PopWithTimeout;
         CircleQueueStopPush StopPush;
+        void (*GetStatInfo)(CircleQueue *pQueue, UploaderStatInfo *pStatInfo);
 }CircleQueue;
 
 int NewCircleQueue(CircleQueue **pQueue, enum CircleQueuePolicy policy, int nMaxItemLen, int nInitItemCount);

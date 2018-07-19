@@ -55,7 +55,7 @@ static int ffWriteTsPacketToMem(void *opaque, uint8_t *buf, int buf_size)
         if (ret < 0){
                 logdebug("write ts to queue fail:%d", ret);
         } else {
-                logdebug("write_packet: should write:len:%d  actual:%d\n", buf_size, ret);
+                logtrace("write_packet: should write:len:%d  actual:%d\n", buf_size, ret);
         }
         return ret;
 }
@@ -65,6 +65,8 @@ static int push(FFTsMuxUploader *pFFTsMuxUploader, char * _pData, int _nDataLen,
         av_init_packet(&pkt);
         pkt.data = (uint8_t *)_pData;
         pkt.size = _nDataLen;
+        
+        loginfo("push thread id:%d\n", (int)pthread_self());
         
         FFTsMuxContext *pTsMuxCtx = pFFTsMuxUploader->pTsMuxCtx;
         if (_nFlag == TK_STREAM_TYPE_AUDIO){
@@ -131,9 +133,10 @@ static int waitToCompleUploadAndDestroyTsMuxContext(void *_pOpaque)
                 }
                 pTsMuxCtx->pTsUploader_->UploadStop(pTsMuxCtx->pTsUploader_);
 
-                int nPushCount = 0, nPopCount = 0;
-                pTsMuxCtx->pTsUploader_->GetStatInfo(pTsMuxCtx->pTsUploader_, &nPushCount, &nPopCount);
-                logdebug("uploader push:%d pop:%d", nPushCount, nPopCount);
+                UploaderStatInfo statInfo = {0};
+                pTsMuxCtx->pTsUploader_->GetStatInfo(pTsMuxCtx->pTsUploader_, &statInfo);
+                logdebug("uploader push:%d pop:%d remainItemCount:%d", statInfo.nPushDataBytes_,
+                         statInfo.nPopDataBytes_, statInfo.nLen_);
                 DestroyUploader(&pTsMuxCtx->pTsUploader_);
                 free(pTsMuxCtx);
         }

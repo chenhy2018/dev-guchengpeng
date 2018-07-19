@@ -13,6 +13,7 @@ typedef struct _CircleQueueImp{
         pthread_mutex_t mutex_;
         pthread_cond_t condition_;
         enum CircleQueuePolicy policy;
+        UploaderStatInfo statInfo;
 }CircleQueueImp;
 
 static int PushQueue(CircleQueue *_pQueue, char *pData_, int nDataLen)
@@ -39,6 +40,7 @@ static int PushQueue(CircleQueue *_pQueue, char *pData_, int nDataLen)
                 pQueueImp->nLen_++;
                 pthread_mutex_unlock(&pQueueImp->mutex_);
                 pthread_cond_signal(&pQueueImp->condition_);
+                pQueueImp->statInfo.nPushDataBytes_ += nDataLen;
                 return nDataLen;
         }
         
@@ -55,6 +57,8 @@ static int PushQueue(CircleQueue *_pQueue, char *pData_, int nDataLen)
                         memcpy(pQueueImp->pData_ + nPos * pQueueImp->nItemLen_  + sizeof(int), pData_, nDataLen);
                         pthread_mutex_unlock(&pQueueImp->mutex_);
                         pthread_cond_signal(&pQueueImp->condition_);
+
+                        pQueueImp->statInfo.nPushDataBytes_ += nDataLen;
                         return nDataLen;
                 } else{
                         char *pTmp = (char *)malloc(pQueueImp->nItemLen_ * pQueueImp->nCap_ * 2);
@@ -82,6 +86,8 @@ static int PushQueue(CircleQueue *_pQueue, char *pData_, int nDataLen)
                         pQueueImp->nLen_++;
                         pthread_mutex_unlock(&pQueueImp->mutex_);
                         pthread_cond_signal(&pQueueImp->condition_);
+
+                        pQueueImp->statInfo.nPushDataBytes_ += nDataLen;
                         return nDataLen;
                 }
         }
@@ -140,6 +146,7 @@ static int PopQueueWithTimeout(CircleQueue *_pQueue, char *pBuf_, int nBufLen, i
                 pQueueImp->nLen_--;
         }
         
+        pQueueImp->statInfo.nPopDataBytes_ += nDataLen;
         pthread_mutex_unlock(&pQueueImp->mutex_);
         return nDataLen;
 }
@@ -160,6 +167,16 @@ static void StopPush(CircleQueue *_pQueue)
         pthread_mutex_unlock(&pQueueImp->mutex_);
         
         pthread_cond_signal(&pQueueImp->condition_);
+        return;
+}
+
+static void getStatInfo(CircleQueue *_pQueue, UploaderStatInfo *_pStatInfo)
+{
+        CircleQueueImp *pQueueImp = (CircleQueueImp *)_pQueue;
+        
+        _pStatInfo->nPushDataBytes_ = pQueueImp->statInfo.nPushDataBytes_;
+        _pStatInfo->nPopDataBytes_ = pQueueImp->statInfo.nPopDataBytes_;
+        _pStatInfo->nLen_ = pQueueImp->statInfo.nLen_;
         return;
 }
 
@@ -191,6 +208,7 @@ int NewCircleQueue(CircleQueue **_pQueue, enum CircleQueuePolicy _policy, int _n
         pQueueImp->circleQueue.Push = PushQueue;
         pQueueImp->circleQueue.PopWithTimeout = PopQueueWithTimeout;
         pQueueImp->circleQueue.StopPush = StopPush;
+        pQueueImp->circleQueue.GetStatInfo = getStatInfo;
         
         *_pQueue = (CircleQueue*)pQueueImp;
         return 0;
