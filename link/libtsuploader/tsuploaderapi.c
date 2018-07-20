@@ -74,6 +74,7 @@ int InitUploader(char * _pUid, char *_pDeviceId, char *_pBucketName, char * _pTo
 
         ret = NewTsMuxUploader(&gpTsMuxUploader);
         if (ret != 0) {
+                StopMgr();
                 logerror("NewTsMuxUploader fail\n");
                 return ret;
         }
@@ -81,10 +82,12 @@ int InitUploader(char * _pUid, char *_pDeviceId, char *_pBucketName, char * _pTo
         gpTsMuxUploader->SetToken(gpTsMuxUploader, gToken);
         ret = TsMuxUploaderStart(gpTsMuxUploader);
         if (ret != 0){
+                StopMgr();
+                DestroyTsMuxUploader(&gpTsMuxUploader);
                 logerror("UploadStart fail:%d\n", ret);
                 return ret;
         }
-
+        nIsInited = 1;
         return 0;
 }
 
@@ -92,7 +95,7 @@ int PushVideo(char * _pData, int _nDataLen, int64_t _nTimestamp, int _nIsKeyFram
 {
         assert(gpTsMuxUploader != NULL);
         int ret = 0;
-        ret = gpTsMuxUploader->PushVideo(gpTsMuxUploader, _pData, _nDataLen, _nTimestamp, _nIsKeyFrame);//, _nIsSegStart);
+        ret = gpTsMuxUploader->PushVideo(gpTsMuxUploader, _pData, _nDataLen, _nTimestamp, _nIsKeyFrame, _nIsSegStart);
         return ret;
 }
 

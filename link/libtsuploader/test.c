@@ -231,13 +231,26 @@ int start_file_test(char * _pAudioFile, char * _pVideoFile, DataCallback callbac
         return 0;
 }
 
+static int64_t firstTimeStamp = -1;
+static int segStartCount = 0;
+static int nByteCount = 0;
+
 int dataCallback(void *opaque, void *pData, int nDataLen, int nFlag, int64_t timestamp, int nIsKeyFrame)
 {
         int ret = 0;
+        nByteCount += nDataLen;
         if (nFlag == THIS_IS_AUDIO){
                 ret = PushAudio(pData, nDataLen, timestamp);
         } else {
-                ret = PushVideo(pData, nDataLen, timestamp, nIsKeyFrame, 0);
+                if (firstTimeStamp == -1){
+                        firstTimeStamp = timestamp;
+                }
+                int nNewSegMent = 0;
+                if (nIsKeyFrame && timestamp - firstTimeStamp > 30000 && segStartCount == 0) {
+                        nNewSegMent = 1;
+                        segStartCount++;
+                }
+                ret = PushVideo(pData, nDataLen, timestamp, nIsKeyFrame, nNewSegMent);
         }
         return ret;
 }
@@ -277,6 +290,7 @@ int main(int argc, char* argv[])
         start_file_test("/Users/liuye/Documents/qml/a.mulaw", "/Users/liuye/Documents/qml/v.h264", dataCallback, NULL);
         
         UninitUploader();
+        loginfo("should total:%d\n", nByteCount);
 
         return 0;
 }

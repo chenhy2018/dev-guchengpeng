@@ -27,6 +27,7 @@ typedef struct _TsUploader{
         DeleteAfterDaysSetter SetDeleteAfterDays;
         StreamUploadStart UploadStart;
         StreamUploadStop UploadStop;
+        void (*SetSegmentId)(TsUploader *pTsUploader, int64_t nId);
         int(*Push)(TsUploader *pTsUploader, char * pData, int nDataLen);
         void (*GetStatInfo)(TsUploader *pTsUploader, UploaderStatInfo *pStatInfo);
 }TsUploader;

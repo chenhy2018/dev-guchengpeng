@@ -21,8 +21,14 @@ typedef struct _KodoUploader{
         char bucketName_[256];
         int deleteAfterDays_;
         char callback_[512];
+        int64_t nSegmentId;
 }KodoUploader;
 
+static void setSegmentId(TsUploader* _pUploader, int64_t _nId)
+{
+        KodoUploader * pKodoUploader = (KodoUploader *)_pUploader;
+        pKodoUploader->nSegmentId = _nId;
+}
 
 static void setAccessKey(TsUploader* _pUploader, char *_pAk, int _nAkLen)
 {
@@ -110,7 +116,7 @@ void * upload(void *_pOpaque)
         //putExtra.upHost="http://nbxs-gate-up.qiniu.com";
         
         char key[128] = {0};
-        sprintf(key, "%s_%s_%ld.ts", gUid, gDeviceId, time(NULL));
+        sprintf(key, "%s_%s_%lld_%ld.ts", gUid, gDeviceId, pUploader->nSegmentId, time(NULL));
         client.lowSpeedLimit = 30;
         client.lowSpeedTime = 3;
         Qiniu_Error error = Qiniu_Io_PutStream(&client, &putRet, uptoken, key, pUploader, -1, getDataCallback, &putExtra);
@@ -187,6 +193,7 @@ int NewUploader(TsUploader ** _pUploader, enum CircleQueuePolicy _policy, int _n
         pKodoUploader->uploader.UploadStop = streamUploadStop;
         pKodoUploader->uploader.Push = pushData;
         pKodoUploader->uploader.GetStatInfo = getStatInfo;
+        pKodoUploader->uploader.SetSegmentId = setSegmentId;
         
         *_pUploader = (TsUploader*)pKodoUploader;
         return 0;

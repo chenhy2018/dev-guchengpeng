@@ -30,6 +30,8 @@ typedef struct _FFTsMuxUploader{
         int64_t nLastVideoTimestamp;
         int64_t nLastUploadVideoTimestamp; //initial to -1
         int nKeyFrameCount;
+        int nFrameCount;
+        int nSegmentId;
 }FFTsMuxUploader;
 
 static void pushRecycle(FFTsMuxUploader *_pFFTsMuxUploader)
@@ -72,6 +74,11 @@ static int push(FFTsMuxUploader *pFFTsMuxUploader, char * _pData, int _nDataLen,
         pthread_mutex_lock(&pFFTsMuxUploader->mutex_);
         
         FFTsMuxContext *pTsMuxCtx = pFFTsMuxUploader->pTsMuxCtx;
+        if (pTsMuxCtx == NULL) {
+                logwarn("upload context is NULL");
+                return 0;
+        }
+
         int ret = 0;
         if (pTsMuxCtx != NULL) {
                 if (_nFlag == TK_STREAM_TYPE_AUDIO){
@@ -96,7 +103,7 @@ static int push(FFTsMuxUploader *pFFTsMuxUploader, char * _pData, int _nDataLen,
         return ret;
 }
 
-static int PushVideo(TsMuxUploader *_pTsMuxUploader, char * _pData, int _nDataLen, int64_t _nTimestamp, int nIsKeyFrame)
+static int PushVideo(TsMuxUploader *_pTsMuxUploader, char * _pData, int _nDataLen, int64_t _nTimestamp, int nIsKeyFrame, int _nIsSegStart)
 {
         FFTsMuxUploader *pFFTsMuxUploader = (FFTsMuxUploader *)_pTsMuxUploader;
 
@@ -109,11 +116,16 @@ static int PushVideo(TsMuxUploader *_pTsMuxUploader, char * _pData, int _nDataLe
                 pFFTsMuxUploader->nLastUploadVideoTimestamp = _nTimestamp;
         }
         if (nIsKeyFrame) {
-                if(pFFTsMuxUploader->nKeyFrameCount >= 2 && //至少2个关键帧存一次
-                   (_nTimestamp - pFFTsMuxUploader->nLastUploadVideoTimestamp) > 4980) {//并且要在5s左右
+                if( (pFFTsMuxUploader->nKeyFrameCount >= 2 && //至少2个关键帧存一次
+                   (_nTimestamp - pFFTsMuxUploader->nLastUploadVideoTimestamp) > 4980) //并且要在5s左右
+                   || (_nIsSegStart && pFFTsMuxUploader->nFrameCount != 0)){ //新的片段开始
                         pFFTsMuxUploader->nKeyFrameCount = 0;
+                        pFFTsMuxUploader->nFrameCount = 0;
                         pFFTsMuxUploader->nLastUploadVideoTimestamp = _nTimestamp;
                         pushRecycle(pFFTsMuxUploader);
+                        if (_nIsSegStart) {
+                                pFFTsMuxUploader->nSegmentId = (int64_t)time(NULL);
+                        }
                         ret = TsMuxUploaderStart(_pTsMuxUploader);
                         if (ret != 0) {
                                 return ret;
@@ -124,14 +136,21 @@ static int PushVideo(TsMuxUploader *_pTsMuxUploader, char * _pData, int _nDataLe
 
         pFFTsMuxUploader->nLastVideoTimestamp = _nTimestamp;
         
-        return push(pFFTsMuxUploader, _pData, _nDataLen, _nTimestamp, TK_STREAM_TYPE_VIDEO);
-        
+        ret = push(pFFTsMuxUploader, _pData, _nDataLen, _nTimestamp, TK_STREAM_TYPE_VIDEO);
+        if (ret == 0){
+                pFFTsMuxUploader->nFrameCount++;
+        }
+        return ret;
 }
 
 static int PushAudio(TsMuxUploader *_pTsMuxUploader, char * _pData, int _nDataLen, int64_t _nTimestamp)
 {
         FFTsMuxUploader *pFFTsMuxUploader = (FFTsMuxUploader *)_pTsMuxUploader;
-        return push(pFFTsMuxUploader, _pData, _nDataLen, _nTimestamp, TK_STREAM_TYPE_AUDIO);
+        int ret = push(pFFTsMuxUploader, _pData, _nDataLen, _nTimestamp, TK_STREAM_TYPE_AUDIO);
+        if (ret == 0){
+                pFFTsMuxUploader->nFrameCount++;
+        }
+        return ret;
 }
 
 static int waitToCompleUploadAndDestroyTsMuxContext(void *_pOpaque)
@@ -351,7 +370,12 @@ int TsMuxUploaderStart(TsMuxUploader *_pTsMuxUploader)
                 pFFTsMuxUploader->pTsMuxCtx->pTsUploader_->SetDeleteAfterDays(pFFTsMuxUploader->pTsMuxCtx->pTsUploader_,
                                                                               pFFTsMuxUploader->deleteAfterDays_);
         }
-        
+
+        if (pFFTsMuxUploader->nSegmentId == 0) {
+                pFFTsMuxUploader->nSegmentId = (int64_t)time(NULL);
+        }
+        pFFTsMuxUploader->pTsMuxCtx->pTsUploader_->SetSegmentId(
+                                                                pFFTsMuxUploader->pTsMuxCtx->pTsUploader_, pFFTsMuxUploader->nSegmentId );
         pFFTsMuxUploader->pTsMuxCtx->pTsUploader_->UploadStart(pFFTsMuxUploader->pTsMuxCtx->pTsUploader_);
         return 0;
 }

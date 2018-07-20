@@ -12,7 +12,7 @@ typedef struct _TsMuxUploader TsMuxUploader;
 
 
 typedef struct _TsMuxUploader{
-        int(*PushVideo)(TsMuxUploader *pTsMuxUploader, char * pData, int nDataLen, int64_t nTimestamp, int nIsKeyFrame);
+        int(*PushVideo)(TsMuxUploader *pTsMuxUploader, char * pData, int nDataLen, int64_t nTimestamp, int nIsKeyFrame, int nIsSegStart);
         int(*PushAudio)(TsMuxUploader *pTsMuxUploader, char * pData, int nDataLen, int64_t nTimestamp);
         void (*SetToken)(TsMuxUploader*, char *);
         void (*SetAccessKey)(TsMuxUploader* pTsMuxUploader, char *pAk, int nAkLen);
