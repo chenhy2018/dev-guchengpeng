@@ -7,6 +7,9 @@
 
 #define TS_DIVIDE_LEN 4096
 
+static char gUid[64];
+static char gDeviceId[64];
+
 typedef struct _KodoUploader{
         TsUploader uploader;
         CircleQueue * pQueue_;
@@ -107,7 +110,7 @@ void * upload(void *_pOpaque)
         //putExtra.upHost="http://nbxs-gate-up.qiniu.com";
         
         char key[128] = {0};
-        sprintf(key, "test_stream_put_%ld.ts", time(NULL));
+        sprintf(key, "%s_%s_%ld.ts", gUid, gDeviceId, time(NULL));
         client.lowSpeedLimit = 30;
         client.lowSpeedTime = 3;
         Qiniu_Error error = Qiniu_Io_PutStream(&client, &putRet, uptoken, key, pUploader, -1, getDataCallback, &putExtra);
@@ -200,4 +203,30 @@ void DestroyUploader(TsUploader ** _pUploader)
         free(pKodoUploader);
         * _pUploader = NULL;
         return;
+}
+
+int SetUid(char *_pUid)
+{
+        int ret = 0;
+        ret = snprintf(gUid, sizeof(gUid), "%s", _pUid);
+        assert(ret > 0);
+        if (ret == sizeof(gUid)) {
+                logerror("uid:%s is too long", _pUid);
+                return TK_ARG_ERROR;
+        }
+        
+        return 0;
+}
+
+int SetDeviceId(char *_pDeviceId)
+{
+        int ret = 0;
+        ret = snprintf(gDeviceId, sizeof(gDeviceId), "%s", _pDeviceId);
+        assert(ret > 0);
+        if (ret == sizeof(gDeviceId)) {
+                logerror("deviceid:%s is too long", _pDeviceId);
+                return TK_ARG_ERROR;
+        }
+        
+        return 0;
 }

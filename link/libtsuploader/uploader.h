@@ -34,4 +34,7 @@ typedef struct _TsUploader{
 int NewUploader(TsUploader ** pUploader, enum CircleQueuePolicy policy, int nMaxItemLen, int nInitItemCount);
 void DestroyUploader(TsUploader ** _pUploader);
 
+int SetUid(char *_pUid);
+int SetDeviceId(char *_pDeviceId);
+
 #endif

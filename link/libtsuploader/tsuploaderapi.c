@@ -6,8 +6,6 @@
 static char gAk[65] = {0};
 static char gSk[65] = {0};
 static char gBucket[65] = {0};
-static char gUid[129] = {0};
-static char gDeviceId[129] = {0};
 static char gToken[256] = {0};
 static int nIsInited = 0;
 static TsMuxUploader *gpTsMuxUploader = NULL;
@@ -17,7 +15,7 @@ int UpdateToken(char * pToken)
         int ret = 0;
         ret = snprintf(gToken, sizeof(gToken), "%s", pToken);
         assert(ret > 0);
-        if (ret == sizeof(gUid)) {
+        if (ret == sizeof(gToken)) {
                 logerror("token:%s is too long", pToken);
                 return TK_ARG_ERROR;
         }
@@ -56,18 +54,14 @@ int InitUploader(char * _pUid, char *_pDeviceId, char *_pBucketName, char * _pTo
                 return ret;
         }
 
-        ret = snprintf(gUid, sizeof(gUid), "%s", _pUid);
-        assert(ret > 0);
-        if (ret == sizeof(gUid)) {
-                logerror("uid:%s is too long", _pUid);
-                return TK_ARG_ERROR;
+        ret = SetUid(_pUid);
+        if (ret != 0) {
+                return ret;
         }
         
-        ret = snprintf(gDeviceId, sizeof(gDeviceId), "%s", _pDeviceId);
-        assert(ret > 0);
-        if (ret == sizeof(gDeviceId)) {
-                logerror("deviceid:%s is too long", _pDeviceId);
-                return TK_ARG_ERROR;
+        ret = SetDeviceId(_pDeviceId);
+        if (ret != 0) {
+                return ret;
         }
         
         ret = StartMgr();
