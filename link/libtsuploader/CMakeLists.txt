@@ -25,6 +25,8 @@ add_library(tsuploader STATIC
 	log.c
 	tsmuxuploader.c
 	tsmuxuploader.h
+	tsuploaderapi.c
+	tsuploaderapi.h
 )
 
 add_executable(testupload
