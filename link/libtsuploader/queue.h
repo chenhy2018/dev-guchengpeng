@@ -2,7 +2,9 @@
 #define __CIRCLE_QUEUE_H__
 
 #include <pthread.h>
+#ifndef __APPLE__
 #include <stdint.h>
+#endif
 
 enum CircleQueuePolicy{
         TSQ_FIX_LENGTH,

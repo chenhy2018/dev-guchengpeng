@@ -14,12 +14,15 @@ typedef struct _TsMuxUploader TsMuxUploader;
 typedef struct _TsMuxUploader{
         int(*PushVideo)(TsMuxUploader *pTsMuxUploader, char * pData, int nDataLen, int64_t nTimestamp, int nIsKeyFrame);
         int(*PushAudio)(TsMuxUploader *pTsMuxUploader, char * pData, int nDataLen, int64_t nTimestamp);
+        void (*SetToken)(TsMuxUploader*, char *);
         void (*SetAccessKey)(TsMuxUploader* pTsMuxUploader, char *pAk, int nAkLen);
         void (*SetSecretKey)(TsMuxUploader*pTsMuxUploader, char * pSk, int nSkLe);
         void (*SetBucket)(TsMuxUploader*pTsMuxUploader, char * pBucketName, int nBucketNameLen);
         void (*SetCallbackUrl)(TsMuxUploader*pTsMuxUploader, char * pCallbackUrl, int nCallbackUrlLen);
         void (*SetDeleteAfterDays)(TsMuxUploader*pTsMuxUploader, int nAfterDays);
 }TsMuxUploader;
+
+
 
 int NewTsMuxUploader(TsMuxUploader **pTsMuxUploader);
 int TsMuxUploaderStart(TsMuxUploader *pTsMuxUploader);

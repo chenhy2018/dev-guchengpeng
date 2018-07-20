@@ -12,6 +12,7 @@ typedef struct _KodoUploader{
         CircleQueue * pQueue_;
         pthread_t workerId_;
         int isThreadStarted_;
+        char token_[256];
         char ak_[64];
         char sk_[64];
         char bucketName_[256];
@@ -54,6 +55,13 @@ static void setDeleteAfterDays(TsUploader* _pUploader, int nDays)
         pKodoUploader->deleteAfterDays_ = nDays;
 }
 
+static void setToken(TsUploader* _pUploader, char *pToken)
+{
+        KodoUploader * pKodoUploader = (KodoUploader *)_pUploader;
+        assert(strlen(pToken) < sizeof(pKodoUploader->token_));
+        strcpy(pKodoUploader->token_, pToken);
+}
+
 size_t getDataCallback(void* buffer, size_t size, size_t n, void* rptr)
 {
         KodoUploader * pUploader = (KodoUploader *) rptr;
@@ -64,16 +72,30 @@ void * upload(void *_pOpaque)
 {
         KodoUploader * pUploader = (KodoUploader *)_pOpaque;
         
-        Qiniu_Mac mac;
-        mac.accessKey = pUploader->ak_;
-        mac.secretKey = pUploader->sk_;
+        char *uptoken = NULL;
+        Qiniu_Client client;
+        if (pUploader->token_[0] == 0) {
+                Qiniu_Mac mac;
+                mac.accessKey = pUploader->ak_;
+                mac.secretKey = pUploader->sk_;
+                
+                Qiniu_RS_PutPolicy putPolicy;
+                Qiniu_Zero(putPolicy);
+                putPolicy.scope = pUploader->bucketName_;
+                putPolicy.deleteAfterDays = pUploader->deleteAfterDays_;
+                uptoken = Qiniu_RS_PutPolicy_Token(&putPolicy, &mac);
+
+                //init
+                Qiniu_Client_InitMacAuth(&client, 1024, &mac);
+        } else {
+                logdebug("client upload");
+                uptoken = pUploader->token_;
+                Qiniu_Client_InitNoAuth(&client, 1024);
+        }
         
-        Qiniu_RS_PutPolicy putPolicy;
-        Qiniu_Zero(putPolicy);
-        putPolicy.scope = pUploader->bucketName_;
-        putPolicy.deleteAfterDays = pUploader->deleteAfterDays_;
-        char *uptoken = Qiniu_RS_PutPolicy_Token(&putPolicy, &mac);
-        
+        Qiniu_Io_PutRet putRet;
+        Qiniu_Io_PutExtra putExtra;
+        Qiniu_Zero(putExtra);
         //设置机房域名
         //Qiniu_Use_Zone_Beimei(Qiniu_False);
         //Qiniu_Use_Zone_Huabei(Qiniu_True);
@@ -84,27 +106,21 @@ void * upload(void *_pOpaque)
         //put extra
         //putExtra.upHost="http://nbxs-gate-up.qiniu.com";
         
-        //init
-        Qiniu_Client client;
-        Qiniu_Client_InitMacAuth(&client, 1024, &mac);
-        
-        Qiniu_Io_PutRet putRet;
-        Qiniu_Io_PutExtra putExtra;
-        Qiniu_Zero(putExtra);
-        
         char key[128] = {0};
         sprintf(key, "test_stream_put_%ld.ts", time(NULL));
         client.lowSpeedLimit = 30;
         client.lowSpeedTime = 3;
         Qiniu_Error error = Qiniu_Io_PutStream(&client, &putRet, uptoken, key, pUploader, -1, getDataCallback, &putExtra);
         if (error.code != 200) {
-                logerror("upload file %s:%s error:%s", putPolicy.scope, key, Qiniu_Buffer_CStr(&client.b));
+                logerror("upload file %s:%s error:%s", pUploader->bucketName_, key, Qiniu_Buffer_CStr(&client.b));
                 //debug_log(&client, error);
         } else {
-                logdebug("upload file %s: key:%s success", putPolicy.scope, key);
+                logdebug("upload file %s: key:%s success", pUploader->bucketName_, key);
         }
         
-        Qiniu_Free(uptoken);
+        if (pUploader->token_[0] == 0) {
+                Qiniu_Free(uptoken);
+        }
         Qiniu_Client_Cleanup(&client);
 
         return 0;
@@ -158,7 +174,7 @@ int NewUploader(TsUploader ** _pUploader, enum CircleQueuePolicy _policy, int _n
                 free(pKodoUploader);
                 return ret;
         }
-        
+        pKodoUploader->uploader.SetToken = setToken;
         pKodoUploader->uploader.SetAccessKey = setAccessKey;
         pKodoUploader->uploader.SetSecretKey = setSecretKey;
         pKodoUploader->uploader.SetBucket = setBucket;

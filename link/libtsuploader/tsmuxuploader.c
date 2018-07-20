@@ -19,6 +19,7 @@ typedef struct _FFTsMuxContext{
 typedef struct _FFTsMuxUploader{
         TsMuxUploader tsMuxUploader_;
         pthread_mutex_t mutex_;
+        char token_[256];
         char ak_[64];
         char sk_[64];
         char bucketName_[256];
@@ -68,25 +69,30 @@ static int push(FFTsMuxUploader *pFFTsMuxUploader, char * _pData, int _nDataLen,
         pkt.size = _nDataLen;
         
         //logtrace("push thread id:%d\n", (int)pthread_self());
+        pthread_mutex_lock(&pFFTsMuxUploader->mutex_);
         
         FFTsMuxContext *pTsMuxCtx = pFFTsMuxUploader->pTsMuxCtx;
-        if (_nFlag == TK_STREAM_TYPE_AUDIO){
-                //printf("audio frame: len:%d pts:%lld\n", nDataLen, timestamp);
-                pkt.pts = 8 * nTimestamp;
-                pkt.stream_index = pTsMuxCtx->nOutAudioindex_;
-                pkt.dts = pkt.pts;
-        }else{
-                //printf("video frame: len:%d pts:%lld\n", nDataLen, timestamp);
-                pkt.pts = 90 * nTimestamp;
-                pkt.stream_index = pTsMuxCtx->nOutVideoindex_;
-                pkt.dts = pkt.pts;
+        int ret = 0;
+        if (pTsMuxCtx != NULL) {
+                if (_nFlag == TK_STREAM_TYPE_AUDIO){
+                        //printf("audio frame: len:%d pts:%lld\n", nDataLen, timestamp);
+                        pkt.pts = 8 * nTimestamp;
+                        pkt.stream_index = pTsMuxCtx->nOutAudioindex_;
+                        pkt.dts = pkt.pts;
+                }else{
+                        //printf("video frame: len:%d pts:%lld\n", nDataLen, timestamp);
+                        pkt.pts = 90 * nTimestamp;
+                        pkt.stream_index = pTsMuxCtx->nOutVideoindex_;
+                        pkt.dts = pkt.pts;
+                }
+                
+                if ((ret = av_interleaved_write_frame(pTsMuxCtx->pFmtCtx_, &pkt)) < 0) {
+                        logerror("Error muxing packet");
+                }
+        } else {
+                logwarn("upload context is NULL");
         }
-
-
-        int ret;
-        if ((ret = av_interleaved_write_frame(pTsMuxCtx->pFmtCtx_, &pkt)) < 0) {
-                logerror("Error muxing packet");
-        }
+        pthread_mutex_unlock(&pFFTsMuxUploader->mutex_);
         return ret;
 }
 
@@ -106,6 +112,7 @@ static int PushVideo(TsMuxUploader *_pTsMuxUploader, char * _pData, int _nDataLe
                 if(pFFTsMuxUploader->nKeyFrameCount >= 2 && //至少2个关键帧存一次
                    (_nTimestamp - pFFTsMuxUploader->nLastUploadVideoTimestamp) > 4980) {//并且要在5s左右
                         pFFTsMuxUploader->nKeyFrameCount = 0;
+                        pFFTsMuxUploader->nLastUploadVideoTimestamp = _nTimestamp;
                         pushRecycle(pFFTsMuxUploader);
                         ret = TsMuxUploaderStart(_pTsMuxUploader);
                         if (ret != 0) {
@@ -245,6 +252,13 @@ end:
         return ret;
 }
 
+static void setToken(TsMuxUploader* _PTsMuxUploader, char *_pToken)
+{
+        FFTsMuxUploader * pFFTsMuxUploader = (FFTsMuxUploader *)_PTsMuxUploader;
+        assert(strlen(_pToken) < sizeof(pFFTsMuxUploader->token_));
+        strcpy(pFFTsMuxUploader->token_, _pToken);
+}
+
 static void setAccessKey(TsMuxUploader* _PTsMuxUploader, char *_pAk, int _nAkLen)
 {
         FFTsMuxUploader * pFFTsMuxUploader = (FFTsMuxUploader *)_PTsMuxUploader;
@@ -295,6 +309,7 @@ int NewTsMuxUploader(TsMuxUploader **_pTsMuxUploader)
                 return TK_MUTEX_ERROR;
         }
         
+        pFFTsMuxUploader->tsMuxUploader_.SetToken = setToken;
         pFFTsMuxUploader->tsMuxUploader_.SetSecretKey = setSecretKey;
         pFFTsMuxUploader->tsMuxUploader_.SetAccessKey = setAccessKey;
         pFFTsMuxUploader->tsMuxUploader_.SetBucket = setBucket;
@@ -319,16 +334,23 @@ int TsMuxUploaderStart(TsMuxUploader *_pTsMuxUploader)
                 free(pFFTsMuxUploader);
                 return ret;
         }
-        pFFTsMuxUploader->pTsMuxCtx->pTsUploader_->SetAccessKey(pFFTsMuxUploader->pTsMuxCtx->pTsUploader_,
-                                                                pFFTsMuxUploader->ak_, strlen(pFFTsMuxUploader->ak_));
-        pFFTsMuxUploader->pTsMuxCtx->pTsUploader_->SetSecretKey(pFFTsMuxUploader->pTsMuxCtx->pTsUploader_,
-                                                                pFFTsMuxUploader->sk_, strlen(pFFTsMuxUploader->sk_));
+        if (pFFTsMuxUploader->token_[0] == 0) {
+                pFFTsMuxUploader->pTsMuxCtx->pTsUploader_->SetAccessKey(pFFTsMuxUploader->pTsMuxCtx->pTsUploader_,
+                                                                        pFFTsMuxUploader->ak_, strlen(pFFTsMuxUploader->ak_));
+                pFFTsMuxUploader->pTsMuxCtx->pTsUploader_->SetSecretKey(pFFTsMuxUploader->pTsMuxCtx->pTsUploader_,
+                                                                        pFFTsMuxUploader->sk_, strlen(pFFTsMuxUploader->sk_));
+        } else {
+                pFFTsMuxUploader->pTsMuxCtx->pTsUploader_->SetToken(pFFTsMuxUploader->pTsMuxCtx->pTsUploader_, pFFTsMuxUploader->token_);
+        }
         pFFTsMuxUploader->pTsMuxCtx->pTsUploader_->SetBucket(pFFTsMuxUploader->pTsMuxCtx->pTsUploader_,
-                                                                pFFTsMuxUploader->bucketName_, strlen(pFFTsMuxUploader->bucketName_));
+                                                             pFFTsMuxUploader->bucketName_, strlen(pFFTsMuxUploader->bucketName_));
         pFFTsMuxUploader->pTsMuxCtx->pTsUploader_->SetCallbackUrl(pFFTsMuxUploader->pTsMuxCtx->pTsUploader_,
-                                                                pFFTsMuxUploader->callback_, strlen(pFFTsMuxUploader->callback_));
-        pFFTsMuxUploader->pTsMuxCtx->pTsUploader_->SetDeleteAfterDays(pFFTsMuxUploader->pTsMuxCtx->pTsUploader_,
-                                                                pFFTsMuxUploader->deleteAfterDays_);
+                                                                  pFFTsMuxUploader->callback_, strlen(pFFTsMuxUploader->callback_));
+        if (pFFTsMuxUploader->deleteAfterDays_ == 0) {
+                pFFTsMuxUploader->deleteAfterDays_  = 7;
+                pFFTsMuxUploader->pTsMuxCtx->pTsUploader_->SetDeleteAfterDays(pFFTsMuxUploader->pTsMuxCtx->pTsUploader_,
+                                                                              pFFTsMuxUploader->deleteAfterDays_);
+        }
         
         pFFTsMuxUploader->pTsMuxCtx->pTsUploader_->UploadStart(pFFTsMuxUploader->pTsMuxCtx->pTsUploader_);
         return 0;

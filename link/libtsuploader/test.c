@@ -3,8 +3,7 @@
 #include <assert.h>
 #include <sys/time.h>
 #include <unistd.h>
-#include "tsmuxuploader.h"
-#include "log.h"
+#include "tsuploaderapi.h"
 
 
 typedef int (*DataCallback)(void *opaque, void *pData, int nDataLen, int nFlag, int64_t timestamp, int nIsKeyFrame);
@@ -14,6 +13,7 @@ typedef int (*DataCallback)(void *opaque, void *pData, int nDataLen, int nFlag, 
 
 FILE *outTs;
 int gTotalLen = 0;
+char gtestToken[256] = {0};
 
 static const uint8_t *ff_avc_find_startcode_internal(const uint8_t *p, const uint8_t *end)
 {
@@ -234,53 +234,49 @@ int start_file_test(char * _pAudioFile, char * _pVideoFile, DataCallback callbac
 int dataCallback(void *opaque, void *pData, int nDataLen, int nFlag, int64_t timestamp, int nIsKeyFrame)
 {
         int ret = 0;
-        TsMuxUploader *pUploader = (TsMuxUploader *)opaque;
         if (nFlag == THIS_IS_AUDIO){
-                ret = pUploader->PushAudio(pUploader, pData, nDataLen, timestamp);
+                ret = PushAudio(pData, nDataLen, timestamp);
         } else {
-                ret = pUploader->PushVideo(pUploader, pData, nDataLen, timestamp, nIsKeyFrame);
+                ret = PushVideo(pData, nDataLen, timestamp, nIsKeyFrame, 0);
         }
         return ret;
 }
+
+
 
 int main(int argc, char* argv[])
 {
 
         int ret = 0;
         
-        Qiniu_Global_Init(-1);
         SetLogLevelToDebug();
         
-        ret = StartMgr();
-        if (ret != 0) {
-                fprintf(stderr, "StartMgr fail\n");
-                return 0;
-        }
-        loginfo("main thread id:%d\n", (int)pthread_self());
-        loginfo("main thread id:%d\n", (int)pthread_self());
-        
-        TsMuxUploader *pUploader = NULL;
-        ret = NewTsMuxUploader(&pUploader);
-        if (ret != 0) {
-                fprintf(stderr, "NewTsMuxUploader fail\n");
+        ret =  SetAk("Y43mqoI_bswBDcOK-GeVRbwI7qSIyZRhels7HfeO");
+        if (ret != 0)
                 return ret;
-        }
+        ret = SetSk("hVZOIZfLw_0xzJhtVv1ddmlSkbiUrHLdNJewZRkp");
+        if (ret != 0)
+                return ret;
         
-        pUploader->SetAccessKey(pUploader, "Y43mqoI_bswBDcOK-GeVRbwI7qSIyZRhels7HfeO", strlen("Y43mqoI_bswBDcOK-GeVRbwI7qSIyZRhels7HfeO"));
-        pUploader->SetSecretKey(pUploader, "hVZOIZfLw_0xzJhtVv1ddmlSkbiUrHLdNJewZRkp", strlen("hVZOIZfLw_0xzJhtVv1ddmlSkbiUrHLdNJewZRkp"));
-        pUploader->SetBucket(pUploader, "bucket", strlen("bucket"));
-        pUploader->SetDeleteAfterDays(pUploader, 1);
+        //计算token需要，所以需要先设置
+        ret = SetBucketName("bucket");
+        if (ret != 0)
+                return ret;
         
+        ret = GetUploadToken(gtestToken, sizeof(gtestToken));
+        if (ret != 0)
+                return ret;
         
-        ret = TsMuxUploaderStart(pUploader);
-        if (ret != 0){
-                fprintf(stderr, "UploadStart fail:%d\n", ret);
+
+        
+        ret = InitUploader("testuid", "testdeviceid", "bucket", gtestToken);
+        if (ret != 0) {
                 return ret;
         }
 
-        start_file_test("/Users/liuye/Documents/qml/a.mulaw", "/Users/liuye/Documents/qml/v.h264", dataCallback, pUploader);
+        start_file_test("/Users/liuye/Documents/qml/a.mulaw", "/Users/liuye/Documents/qml/v.h264", dataCallback, NULL);
         
-        DestroyTsMuxUploader(&pUploader);
+        UninitUploader();
 
         return 0;
 }

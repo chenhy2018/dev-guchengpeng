@@ -9,15 +9,17 @@
 
 
 typedef struct _TsUploader TsUploader;
+typedef void (*TokenSetter)(TsUploader*, char *);
 typedef void (*AccessKeySetter)(TsUploader*, char *, int);
 typedef void (*SecretKeySetter)(TsUploader*, char *, int);
 typedef void (*BucketSetter)(TsUploader*, char *, int);
 typedef void (*CallbackUrlSetter)(TsUploader*, char *, int);
 typedef void (*DeleteAfterDaysSetter)(TsUploader*, int);
-typedef int (*StreamUploadStart)(TsUploader*);
+typedef int (*StreamUploadStart)(TsUploader* pUploader);
 typedef void (*StreamUploadStop)(TsUploader*);
 
 typedef struct _TsUploader{
+        TokenSetter SetToken;
         AccessKeySetter SetAccessKey;
         SecretKeySetter SetSecretKey;
         BucketSetter SetBucket;

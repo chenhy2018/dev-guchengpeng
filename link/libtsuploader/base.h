@@ -7,7 +7,9 @@
 #include <sys/time.h>
 #include <errno.h>
 #include "log.h"
+#ifndef __APPLE__
 #include <stdint.h>
+#endif
 
 #define MKTAG(a,b,c,d) ((a) | ((b) << 8) | ((c) << 16) | ((unsigned)(d) << 24))
 #define MKERRTAG(a, b, c, d) (-(int)MKTAG(a, b, c, d))
@@ -18,5 +20,6 @@
 #define TK_MUTEX_ERROR MKERRTAG('M','U','T','X')
 #define TK_COND_ERROR MKERRTAG('C','O','N','D')
 #define TK_THREAD_ERROR MKERRTAG('X','C','S','B')
+#define TK_ARG_ERROR MKERRTAG('A','R','G','E')
 
 #endif
