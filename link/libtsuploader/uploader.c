@@ -5,6 +5,8 @@
 #include <assert.h>
 #include <sys/time.h>
 
+size_t getDataCallback(void* buffer, size_t size, size_t n, void* rptr);
+
 #define TS_DIVIDE_LEN 4096
 
 static char gUid[64];
@@ -12,7 +14,13 @@ static char gDeviceId[64];
 
 typedef struct _KodoUploader{
         TsUploader uploader;
+#ifdef TK_STREAM_UPLOAD
         CircleQueue * pQueue_;
+#else
+        char *pTsData;
+        int nTsDataCap;
+        int nTsDataLen;
+#endif
         pthread_t workerId_;
         int isThreadStarted_;
         char token_[256];
@@ -22,6 +30,8 @@ typedef struct _KodoUploader{
         int deleteAfterDays_;
         char callback_[512];
         int64_t nSegmentId;
+        int64_t nFirstFrameTimestamp;
+        int64_t nLastFrameTimestamp;
 }KodoUploader;
 
 static void setSegmentId(TsUploader* _pUploader, int64_t _nId)
@@ -71,13 +81,7 @@ static void setToken(TsUploader* _pUploader, char *pToken)
         strcpy(pKodoUploader->token_, pToken);
 }
 
-size_t getDataCallback(void* buffer, size_t size, size_t n, void* rptr)
-{
-        KodoUploader * pUploader = (KodoUploader *) rptr;
-        return pUploader->pQueue_->Pop(pUploader->pQueue_, buffer, size * n);
-}
-
-void * upload(void *_pOpaque)
+static void * streamUpload(void *_pOpaque)
 {
         KodoUploader * pUploader = (KodoUploader *)_pOpaque;
         
@@ -116,10 +120,17 @@ void * upload(void *_pOpaque)
         //putExtra.upHost="http://nbxs-gate-up.qiniu.com";
         
         char key[128] = {0};
-        sprintf(key, "%s_%s_%lld_%ld.ts", gUid, gDeviceId, pUploader->nSegmentId, time(NULL));
         client.lowSpeedLimit = 30;
         client.lowSpeedTime = 3;
+#ifdef TK_STREAM_UPLOAD
+        sprintf(key, "%s_%s_%lld_%ld.ts", gUid, gDeviceId, pUploader->nSegmentId, time(NULL));
         Qiniu_Error error = Qiniu_Io_PutStream(&client, &putRet, uptoken, key, pUploader, -1, getDataCallback, &putExtra);
+#else
+        sprintf(key, "%s_%s_%lld_%lld.ts", gUid, gDeviceId, pUploader->nSegmentId, pUploader->nFirstFrameTimestamp,
+                pUploader->nLastFrameTimestamp);
+        Qiniu_Error error = Qiniu_Io_PutBuffer(&client, &putRet, uptoken, key, (const char*)pUploader->pTsData,
+                                               pUploader->nTsDataLen, &putExtra);
+#endif
         if (error.code != 200) {
                 logerror("upload file %s:%s error:%s", pUploader->bucketName_, key, Qiniu_Buffer_CStr(&client.b));
                 //debug_log(&client, error);
@@ -135,12 +146,17 @@ void * upload(void *_pOpaque)
         return 0;
 }
 
-
+#ifdef TK_STREAM_UPLOAD
+size_t getDataCallback(void* buffer, size_t size, size_t n, void* rptr)
+{
+        KodoUploader * pUploader = (KodoUploader *) rptr;
+        return pUploader->pQueue_->Pop(pUploader->pQueue_, buffer, size * n);
+}
 
 static int streamUploadStart(TsUploader * _pUploader)
 {
         KodoUploader * pKodoUploader = (KodoUploader *)_pUploader;
-        int ret = pthread_create(&pKodoUploader->workerId_, NULL, upload, _pUploader);
+        int ret = pthread_create(&pKodoUploader->workerId_, NULL, streamUpload, _pUploader);
         if (ret == 0) {
                 pKodoUploader->isThreadStarted_ = 1;
         }
@@ -158,16 +174,68 @@ static void streamUploadStop(TsUploader * _pUploader)
         return;
 }
 
-static int pushData(TsUploader *pTsUploader, char * pData, int nDataLen)
+static int streamPushData(TsUploader *pTsUploader, char * pData, int nDataLen)
 {
         KodoUploader * pKodoUploader = (KodoUploader *)pTsUploader;
         return pKodoUploader->pQueue_->Push(pKodoUploader->pQueue_, (char *)pData, nDataLen);
 }
 
+#else
+
+static int memUploadStart(TsUploader * _pUploader)
+{
+        return 0;
+}
+
+static void memUploadStop(TsUploader * _pUploader)
+{
+        return;
+}
+
+static int memPushData(TsUploader *pTsUploader, char * pData, int nDataLen)
+{
+        KodoUploader * pKodoUploader = (KodoUploader *)pTsUploader;
+        if (pKodoUploader->pTsData == NULL) {
+                pKodoUploader->pTsData = malloc(pKodoUploader->nTsDataCap);
+                pKodoUploader->nTsDataLen = 0;
+        }
+        if (pKodoUploader->nTsDataLen + nDataLen > pKodoUploader->nTsDataCap){
+                char * tmp = malloc(pKodoUploader->nTsDataCap * 2);
+                memcpy(tmp, pKodoUploader->pTsData, pKodoUploader->nTsDataLen);
+                free(pKodoUploader->pTsData);
+                pKodoUploader->pTsData = tmp;
+                pKodoUploader->nTsDataCap *= 2;
+                memcpy(tmp + pKodoUploader->nTsDataLen, pData, nDataLen);
+                pKodoUploader->nTsDataLen += nDataLen;
+                return nDataLen;
+        }
+        memcpy(pKodoUploader->pTsData + pKodoUploader->nTsDataLen, pData, nDataLen);
+        pKodoUploader->nTsDataLen += nDataLen;
+        return nDataLen;
+}
+#endif
+
 static void getStatInfo(TsUploader *pTsUploader, UploaderStatInfo *_pStatInfo)
 {
         KodoUploader * pKodoUploader = (KodoUploader *)pTsUploader;
+#ifdef TK_STREAM_UPLOAD
         pKodoUploader->pQueue_->GetStatInfo(pKodoUploader->pQueue_, _pStatInfo);
+#else
+        _pStatInfo->nLen_ = 0;
+        _pStatInfo->nPopDataBytes_ = pKodoUploader->nTsDataLen;
+        _pStatInfo->nPopDataBytes_ = pKodoUploader->nTsDataLen;
+#endif
+        return;
+}
+
+void recordTimestamp(TsUploader *_pTsUploader, int64_t _nTimestamp)
+{
+        KodoUploader * pKodoUploader = (KodoUploader *)_pTsUploader;
+        if (pKodoUploader->nFirstFrameTimestamp == -1) {
+                pKodoUploader->nFirstFrameTimestamp = _nTimestamp;
+                pKodoUploader->nLastFrameTimestamp = _nTimestamp;
+        }
+        pKodoUploader->nLastFrameTimestamp = _nTimestamp;
         return;
 }
 
@@ -178,20 +246,32 @@ int NewUploader(TsUploader ** _pUploader, enum CircleQueuePolicy _policy, int _n
                 return TK_NO_MEMORY;
         }
         memset(pKodoUploader, 0, sizeof(KodoUploader));
+#ifdef TK_STREAM_UPLOAD
         int ret = NewCircleQueue(&pKodoUploader->pQueue_, _policy, _nMaxItemLen, _nInitItemCount);
         if (ret != 0) {
                 free(pKodoUploader);
                 return ret;
         }
+#else
+        pKodoUploader->nTsDataCap = 1024 * 1024;
+#endif
+        pKodoUploader->nFirstFrameTimestamp = -1;
+        pKodoUploader->nLastFrameTimestamp = -1;
         pKodoUploader->uploader.SetToken = setToken;
         pKodoUploader->uploader.SetAccessKey = setAccessKey;
         pKodoUploader->uploader.SetSecretKey = setSecretKey;
         pKodoUploader->uploader.SetBucket = setBucket;
         pKodoUploader->uploader.SetCallbackUrl = setCallbackUrl;
         pKodoUploader->uploader.SetDeleteAfterDays = setDeleteAfterDays;
+#ifdef TK_STREAM_UPLOAD
         pKodoUploader->uploader.UploadStart = streamUploadStart;
         pKodoUploader->uploader.UploadStop = streamUploadStop;
-        pKodoUploader->uploader.Push = pushData;
+        pKodoUploader->uploader.Push = streamPushData;
+#else
+        pKodoUploader->uploader.UploadStart = memUploadStart;
+        pKodoUploader->uploader.UploadStop = memUploadStop;
+        pKodoUploader->uploader.Push = memPushData;
+#endif
         pKodoUploader->uploader.GetStatInfo = getStatInfo;
         pKodoUploader->uploader.SetSegmentId = setSegmentId;
         
@@ -202,10 +282,15 @@ int NewUploader(TsUploader ** _pUploader, enum CircleQueuePolicy _policy, int _n
 void DestroyUploader(TsUploader ** _pUploader)
 {
         KodoUploader * pKodoUploader = (KodoUploader *)(*_pUploader);
+#ifdef TK_STREAM_UPLOAD
         if (pKodoUploader->isThreadStarted_) {
                 pthread_join(pKodoUploader->workerId_, NULL);
         }
         DestroyQueue(&pKodoUploader->pQueue_);
+#else
+        free(pKodoUploader->pTsData);
+        streamUpload(* _pUploader);
+#endif
         
         free(pKodoUploader);
         * _pUploader = NULL;

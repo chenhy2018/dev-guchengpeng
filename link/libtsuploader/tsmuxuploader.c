@@ -95,6 +95,8 @@ static int push(FFTsMuxUploader *pFFTsMuxUploader, char * _pData, int _nDataLen,
                 
                 if ((ret = av_interleaved_write_frame(pTsMuxCtx->pFmtCtx_, &pkt)) < 0) {
                         logerror("Error muxing packet");
+                } else {
+                        pTsMuxCtx->pTsUploader_->RecordTimestamp(pTsMuxCtx->pTsUploader_, nTimestamp);
                 }
         } else {
                 logwarn("upload context is NULL");

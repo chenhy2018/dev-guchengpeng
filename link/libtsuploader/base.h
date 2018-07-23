@@ -11,6 +11,8 @@
 #include <stdint.h>
 #endif
 
+#define TK_STREAM_UPLOAD 1
+
 #define MKTAG(a,b,c,d) ((a) | ((b) << 8) | ((c) << 16) | ((unsigned)(d) << 24))
 #define MKERRTAG(a, b, c, d) (-(int)MKTAG(a, b, c, d))
 

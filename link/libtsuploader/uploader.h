@@ -30,6 +30,7 @@ typedef struct _TsUploader{
         void (*SetSegmentId)(TsUploader *pTsUploader, int64_t nId);
         int(*Push)(TsUploader *pTsUploader, char * pData, int nDataLen);
         void (*GetStatInfo)(TsUploader *pTsUploader, UploaderStatInfo *pStatInfo);
+        void (*RecordTimestamp)(TsUploader *pTsUploader, int64_t nTimestamp);
 }TsUploader;
 
 int NewUploader(TsUploader ** pUploader, enum CircleQueuePolicy policy, int nMaxItemLen, int nInitItemCount);
