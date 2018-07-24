@@ -1,7 +1,7 @@
+#include "tsuploaderapi.h"
 #include "tsmuxuploader.h"
 #include <assert.h>
 #include "log.h"
-#include "base.h"
 
 static char gAk[65] = {0};
 static char gSk[65] = {0};
@@ -9,6 +9,7 @@ static char gBucket[65] = {0};
 static char gToken[256] = {0};
 static int nIsInited = 0;
 static TsMuxUploader *gpTsMuxUploader = NULL;
+static AvArg gAvArg;
 
 int UpdateToken(char * pToken)
 {
@@ -36,7 +37,7 @@ int SetBucketName(char *_pName)
         return 0;
 }
 
-int InitUploader(char * _pUid, char *_pDeviceId, char *_pBucketName, char * _pToken)
+int InitUploader(char * _pUid, char *_pDeviceId, char *_pBucketName, char * _pToken, AvArg *_pAvArg)
 {
         if (nIsInited) {
                 return 0;
@@ -72,7 +73,8 @@ int InitUploader(char * _pUid, char *_pDeviceId, char *_pBucketName, char * _pTo
         logdebug("main thread id:%ld\n", (long)pthread_self());
         logdebug("main thread id:%ld\n", (long)pthread_self());
 
-        ret = NewTsMuxUploader(&gpTsMuxUploader);
+        gAvArg = *_pAvArg;
+        ret = NewTsMuxUploader(&gpTsMuxUploader, &gAvArg);
         if (ret != 0) {
                 StopMgr();
                 logerror("NewTsMuxUploader fail\n");

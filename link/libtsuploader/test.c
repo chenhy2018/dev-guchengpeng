@@ -280,13 +280,16 @@ int main(int argc, char* argv[])
         if (ret != 0)
                 return ret;
         
-
-        
-        ret = InitUploader("testuid", "testdeviceid", "bucket", gtestToken);
+        AvArg avArg;
+        avArg.nAudioFormat = TK_AUDIO_PCMU;
+        avArg.nChannels = 1;
+        avArg.nSamplerate = 8000;
+        avArg.nVideoFormat = TK_VIDEO_H264;
+        ret = InitUploader("testuid", "testdeviceid", "bucket", gtestToken, &avArg);
         if (ret != 0) {
                 return ret;
         }
-
+        
         start_file_test("/Users/liuye/Documents/qml/a.mulaw", "/Users/liuye/Documents/qml/v.h264", dataCallback, NULL);
         
         UninitUploader();

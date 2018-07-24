@@ -32,6 +32,7 @@ typedef struct _FFTsMuxUploader{
         int nKeyFrameCount;
         int nFrameCount;
         int nSegmentId;
+        AvArg avArg;
 }FFTsMuxUploader;
 
 static void pushRecycle(FFTsMuxUploader *_pFFTsMuxUploader)
@@ -178,7 +179,7 @@ static int waitToCompleUploadAndDestroyTsMuxContext(void *_pOpaque)
         return 0;
 }
 
-static int newFFTsMuxContext(FFTsMuxContext ** _pTsMuxCtx)
+static int newFFTsMuxContext(FFTsMuxContext ** _pTsMuxCtx, AvArg *_pAvArg)
 {
         FFTsMuxContext * pTsMuxCtx = (FFTsMuxContext *)malloc(sizeof(FFTsMuxContext));
         if (pTsMuxCtx == NULL) {
@@ -218,7 +219,10 @@ static int newFFTsMuxContext(FFTsMuxContext ** _pTsMuxCtx)
         pTsMuxCtx->nOutVideoindex_ = pOutStream->index;
         pOutStream->codecpar->codec_tag = 0;
         pOutStream->codecpar->codec_type = AVMEDIA_TYPE_VIDEO;
-        pOutStream->codecpar->codec_id = AV_CODEC_ID_H264;
+        if (_pAvArg->nVideoFormat == TK_VIDEO_H264)
+                pOutStream->codecpar->codec_id = AV_CODEC_ID_H264;
+        else
+                pOutStream->codecpar->codec_id = AV_CODEC_ID_H265;
         //end add video
         
         //add audio
@@ -231,9 +235,19 @@ static int newFFTsMuxContext(FFTsMuxContext ** _pTsMuxCtx)
         pTsMuxCtx->nOutAudioindex_ = pOutStream->index;
         pOutStream->codecpar->codec_tag = 0;
         pOutStream->codecpar->codec_type = AVMEDIA_TYPE_AUDIO;
-        pOutStream->codecpar->codec_id = AV_CODEC_ID_PCM_MULAW;
-        pOutStream->codecpar->sample_rate = 8000;
-        pOutStream->codecpar->channels = 1;
+        switch(_pAvArg->nAudioFormat){
+                case TK_AUDIO_PCMU:
+                        pOutStream->codecpar->codec_id = AV_CODEC_ID_PCM_MULAW;
+                        break;
+                case TK_AUDIO_PCMA:
+                        pOutStream->codecpar->codec_id = AV_CODEC_ID_PCM_ALAW;
+                        break;
+                case TK_AUDIO_AAC:
+                        pOutStream->codecpar->codec_id = AV_CODEC_ID_AAC;
+                        break;
+        }
+        pOutStream->codecpar->sample_rate = _pAvArg->nSamplerate;
+        pOutStream->codecpar->channels = _pAvArg->nChannels;
         pOutStream->codecpar->channel_layout = av_get_default_channel_layout(pOutStream->codecpar->channels);
         //end add audio
         
@@ -315,7 +329,7 @@ static void setDeleteAfterDays(TsMuxUploader* _PTsMuxUploader, int nDays)
         pFFTsMuxUploader->deleteAfterDays_ = nDays;
 }
 
-int NewTsMuxUploader(TsMuxUploader **_pTsMuxUploader)
+int NewTsMuxUploader(TsMuxUploader **_pTsMuxUploader, AvArg *_pAvArg)
 {
         FFTsMuxUploader *pFFTsMuxUploader = (FFTsMuxUploader*)malloc(sizeof(FFTsMuxUploader));
         if (pFFTsMuxUploader == NULL) {
@@ -340,6 +354,11 @@ int NewTsMuxUploader(TsMuxUploader **_pTsMuxUploader)
         pFFTsMuxUploader->tsMuxUploader_.PushAudio = PushAudio;
         pFFTsMuxUploader->tsMuxUploader_.PushVideo = PushVideo;
         
+        pFFTsMuxUploader->avArg.nAudioFormat = _pAvArg->nAudioFormat;
+        pFFTsMuxUploader->avArg.nChannels = _pAvArg->nChannels;
+        pFFTsMuxUploader->avArg.nSamplerate = _pAvArg->nSamplerate;
+        pFFTsMuxUploader->avArg.nVideoFormat = _pAvArg->nVideoFormat;
+        
         *_pTsMuxUploader = (TsMuxUploader *)pFFTsMuxUploader;
         
         return 0;
@@ -351,7 +370,7 @@ int TsMuxUploaderStart(TsMuxUploader *_pTsMuxUploader)
         
         assert(pFFTsMuxUploader->pTsMuxCtx == NULL);
         
-        int ret = newFFTsMuxContext(&pFFTsMuxUploader->pTsMuxCtx);
+        int ret = newFFTsMuxContext(&pFFTsMuxUploader->pTsMuxCtx, &pFFTsMuxUploader->avArg);
         if (ret != 0) {
                 free(pFFTsMuxUploader);
                 return ret;

@@ -2,6 +2,7 @@
 #define __TS_MUX_UPLOADER_H__
 #include "uploader.h"
 #include "resource.h"
+#include "base.h"
 
 typedef struct _TsMuxUploader TsMuxUploader;
 
@@ -22,9 +23,7 @@ typedef struct _TsMuxUploader{
         void (*SetDeleteAfterDays)(TsMuxUploader*pTsMuxUploader, int nAfterDays);
 }TsMuxUploader;
 
-
-
-int NewTsMuxUploader(TsMuxUploader **pTsMuxUploader);
+int NewTsMuxUploader(TsMuxUploader **pTsMuxUploader, AvArg *pAvArg);
 int TsMuxUploaderStart(TsMuxUploader *pTsMuxUploader);
 void DestroyTsMuxUploader(TsMuxUploader **pTsMuxUploader);
 #endif

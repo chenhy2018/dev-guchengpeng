@@ -11,6 +11,23 @@
 #include <stdint.h>
 #endif
 
+typedef enum {
+        TK_VIDEO_H264,
+        TK_VIDEO_H265
+}TkVideoFormat;
+typedef enum {
+        TK_AUDIO_PCMU,
+        TK_AUDIO_PCMA,
+        TK_AUDIO_AAC
+}TkAudioFormat;
+
+typedef struct _AvArg{
+        int nAudioFormat;
+        int nChannels;
+        int nSamplerate;
+        int nVideoFormat;
+} AvArg;
+
 #define TK_STREAM_UPLOAD 1
 
 #define MKTAG(a,b,c,d) ((a) | ((b) << 8) | ((c) << 16) | ((unsigned)(d) << 24))
