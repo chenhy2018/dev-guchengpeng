@@ -274,6 +274,7 @@ int NewUploader(TsUploader ** _pUploader, enum CircleQueuePolicy _policy, int _n
 #endif
         pKodoUploader->uploader.GetStatInfo = getStatInfo;
         pKodoUploader->uploader.SetSegmentId = setSegmentId;
+        pKodoUploader->uploader.RecordTimestamp = recordTimestamp;
         
         *_pUploader = (TsUploader*)pKodoUploader;
         return 0;

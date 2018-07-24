@@ -204,6 +204,7 @@ static int newFFTsMuxContext(FFTsMuxContext ** _pTsMuxCtx)
         pTsMuxCtx->pFmtCtx_->pb = avio_out;
         pTsMuxCtx->pFmtCtx_->flags = AVFMT_FLAG_CUSTOM_IO;
         pOutFmt->flags |= AVFMT_NOFILE;
+        pOutFmt->flags |= AVFMT_NODIMENSIONS;
         //ofmt->video_codec //是否指定为ifmt_ctx_v的视频的codec_type.同理音频也一样
         //测试下来即使video_codec和ifmt_ctx_v的视频的codec_type不一样也是没有问题的
         
