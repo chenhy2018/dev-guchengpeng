@@ -38,6 +38,6 @@ if(APPLE)
     		"-framework AudioToolbox -framework VideoToolbox -framework CoreGraphics -framework QuartzCore -framework CoreFoundation -framework CoreMedia -framework Security")
         target_link_libraries(testupload tsuploader avformat avcodec avutil qiniu curl crypto bz2 lzma iconv z)
 else()
-        target_link_libraries(testupload tsuploader avformat avcodec avutil qiniu curl crypto z m pthread)
+        target_link_libraries(testupload tsuploader avformat avcodec avutil qiniu curl crypto m pthread)
 endif()
 
