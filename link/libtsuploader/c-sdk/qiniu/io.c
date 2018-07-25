@@ -187,7 +187,7 @@ Qiniu_Error Qiniu_Io_PutFile(
 
 Qiniu_Error Qiniu_Io_PutBuffer(
         Qiniu_Client *self, Qiniu_Io_PutRet *ret,
-        const char *uptoken, const char *key, const char *buf, size_t fsize, Qiniu_Io_PutExtra *extra) {
+        const char *uptoken, const char *key, const char *buf, curl_off_t fsize, Qiniu_Io_PutExtra *extra) {
     Qiniu_Io_form form;
     Qiniu_Io_form_init(&form, uptoken, key, &extra);
 
@@ -253,7 +253,7 @@ static Qiniu_Error Qiniu_Io_call_with_callback(
 Qiniu_Error Qiniu_Io_PutStream(
         Qiniu_Client *self, Qiniu_Io_PutRet *ret,
         const char *uptoken, const char *key,
-        void *ctx, size_t fsize, rdFunc rdr,
+        void *ctx, curl_off_t fsize, rdFunc rdr,
         Qiniu_Io_PutExtra *extra) {
     Qiniu_Io_form form;
     Qiniu_Io_form_init(&form, uptoken, key, &extra);
@@ -274,7 +274,7 @@ Qiniu_Error Qiniu_Io_PutStream(
             CURLFORM_COPYNAME, "file",
             CURLFORM_FILENAME, "filename",
             CURLFORM_STREAM, ctx,
-            CURLFORM_CONTENTSLENGTH, fsize,
+            CURLFORM_CONTENTLEN, fsize,
             CURLFORM_END);
 
     return Qiniu_Io_call_with_callback(self, ret, form.formpost, rdr, extra);

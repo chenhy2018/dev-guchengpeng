@@ -11,6 +11,7 @@
 #define QINIU_IO_H
 
 #include "http.h"
+#include <curl/system.h>
 #include "reader.h"
 
 #pragma pack(1)
@@ -75,14 +76,14 @@ QINIU_DLLAPI extern Qiniu_Error Qiniu_Io_PutFile(
 
 QINIU_DLLAPI extern Qiniu_Error Qiniu_Io_PutBuffer(
 	Qiniu_Client* self, Qiniu_Io_PutRet* ret,
-	const char* uptoken, const char* key, const char* buf, size_t fsize, Qiniu_Io_PutExtra* extra);
+	const char* uptoken, const char* key, const char* buf, curl_off_t fsize, Qiniu_Io_PutExtra* extra);
 
 QINIU_DLLAPI extern Qiniu_Error Qiniu_Io_PutStream(
     Qiniu_Client* self, 
 	Qiniu_Io_PutRet* ret,
     const char* uptoken, const char* key, 
 	void* ctx, // 'ctx' is the same as rdr's last param
-	size_t fsize, 
+	curl_off_t fsize, 
 	rdFunc rdr, 
 	Qiniu_Io_PutExtra* extra);
 
