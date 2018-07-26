@@ -18,7 +18,7 @@ typedef struct _FFTsMuxContext{
 
 typedef struct _FFTsMuxUploader{
         TsMuxUploader tsMuxUploader_;
-        pthread_mutex_t mutex_;
+        pthread_mutex_t muxUploaderMutex_;
         char token_[256];
         char ak_[64];
         char sk_[64];
@@ -39,7 +39,7 @@ static void pushRecycle(FFTsMuxUploader *_pFFTsMuxUploader)
 {
         if (_pFFTsMuxUploader) {
                 
-                pthread_mutex_lock(&_pFFTsMuxUploader->mutex_);
+                pthread_mutex_lock(&_pFFTsMuxUploader->muxUploaderMutex_);
                 if (_pFFTsMuxUploader->pTsMuxCtx) {
                         av_write_trailer(_pFFTsMuxUploader->pTsMuxCtx->pFmtCtx_);
                         logerror("push to mgr:%p", _pFFTsMuxUploader->pTsMuxCtx);
@@ -47,7 +47,7 @@ static void pushRecycle(FFTsMuxUploader *_pFFTsMuxUploader)
                         _pFFTsMuxUploader->pTsMuxCtx = NULL;
                 }
                 
-                pthread_mutex_unlock(&_pFFTsMuxUploader->mutex_);
+                pthread_mutex_unlock(&_pFFTsMuxUploader->muxUploaderMutex_);
         }
         return;
 }
@@ -72,10 +72,11 @@ static int push(FFTsMuxUploader *pFFTsMuxUploader, char * _pData, int _nDataLen,
         pkt.size = _nDataLen;
         
         //logtrace("push thread id:%d\n", (int)pthread_self());
-        pthread_mutex_lock(&pFFTsMuxUploader->mutex_);
+        pthread_mutex_lock(&pFFTsMuxUploader->muxUploaderMutex_);
         
         FFTsMuxContext *pTsMuxCtx = pFFTsMuxUploader->pTsMuxCtx;
         if (pTsMuxCtx == NULL) {
+                pthread_mutex_unlock(&pFFTsMuxUploader->muxUploaderMutex_);
                 logwarn("upload context is NULL");
                 return 0;
         }
@@ -102,7 +103,7 @@ static int push(FFTsMuxUploader *pFFTsMuxUploader, char * _pData, int _nDataLen,
         } else {
                 logwarn("upload context is NULL");
         }
-        pthread_mutex_unlock(&pFFTsMuxUploader->mutex_);
+        pthread_mutex_unlock(&pFFTsMuxUploader->muxUploaderMutex_);
         return ret;
 }
 
@@ -339,7 +340,7 @@ int NewTsMuxUploader(TsMuxUploader **_pTsMuxUploader, AvArg *_pAvArg)
         pFFTsMuxUploader->nLastUploadVideoTimestamp = -1;
         
         int ret = 0;
-        ret = pthread_mutex_init(&pFFTsMuxUploader->mutex_, NULL);
+        ret = pthread_mutex_init(&pFFTsMuxUploader->muxUploaderMutex_, NULL);
         if (ret != 0){
                 free(pFFTsMuxUploader);
                 return TK_MUTEX_ERROR;
