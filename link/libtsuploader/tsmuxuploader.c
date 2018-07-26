@@ -85,15 +85,13 @@ static int push(FFTsMuxUploader *pFFTsMuxUploader, char * _pData, int _nDataLen,
         if (pTsMuxCtx != NULL) {
                 if (_nFlag == TK_STREAM_TYPE_AUDIO){
                         //printf("audio frame: len:%d pts:%lld\n", nDataLen, timestamp);
-                        pkt.pts = 8 * nTimestamp;
                         pkt.stream_index = pTsMuxCtx->nOutAudioindex_;
-                        pkt.dts = pkt.pts;
                 }else{
                         //printf("video frame: len:%d pts:%lld\n", nDataLen, timestamp);
-                        pkt.pts = 90 * nTimestamp;
                         pkt.stream_index = pTsMuxCtx->nOutVideoindex_;
-                        pkt.dts = pkt.pts;
                 }
+                pkt.pts = nTimestamp;
+                pkt.dts = nTimestamp;
                 
                 if ((ret = av_interleaved_write_frame(pTsMuxCtx->pFmtCtx_, &pkt)) < 0) {
                         logerror("Error muxing packet");
