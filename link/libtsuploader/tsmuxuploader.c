@@ -14,6 +14,8 @@ typedef struct _FFTsMuxContext{
         AVFormatContext *pFmtCtx_;
         int nOutVideoindex_;
         int nOutAudioindex_;
+        int64_t nPrevAudioTimestamp;
+        int64_t nPrevVideoTimestamp;
 }FFTsMuxContext;
 
 typedef struct _FFTsMuxUploader{
@@ -85,14 +87,26 @@ static int push(FFTsMuxUploader *pFFTsMuxUploader, char * _pData, int _nDataLen,
         if (pTsMuxCtx != NULL) {
                 if (_nFlag == TK_STREAM_TYPE_AUDIO){
                         //printf("audio frame: len:%d pts:%lld\n", nDataLen, timestamp);
+                        if (pTsMuxCtx->nPrevAudioTimestamp != 0 && nTimestamp - pTsMuxCtx->nPrevAudioTimestamp <= 0) {
+                                pthread_mutex_unlock(&pFFTsMuxUploader->muxUploaderMutex_);
+                                logwarn("audio pts not monotonically: prev:%lld now:%lld", pTsMuxCtx->nPrevAudioTimestamp, nTimestamp);
+                                return 0;
+                        }
                         pkt.pts = 8 * nTimestamp;
                         pkt.stream_index = pTsMuxCtx->nOutAudioindex_;
                         pkt.dts = pkt.pts;
+                        pTsMuxCtx->nPrevAudioTimestamp = nTimestamp;
                 }else{
                         //printf("video frame: len:%d pts:%lld\n", nDataLen, timestamp);
+                        if (pTsMuxCtx->nPrevVideoTimestamp != 0 && nTimestamp - pTsMuxCtx->nPrevVideoTimestamp <= 0) {
+                                pthread_mutex_unlock(&pFFTsMuxUploader->muxUploaderMutex_);
+                                logwarn("video pts not monotonically: prev:%lld now:%lld", pTsMuxCtx->nPrevVideoTimestamp, nTimestamp);
+                                return 0;
+                        }
                         pkt.pts = 90 * nTimestamp;
                         pkt.stream_index = pTsMuxCtx->nOutVideoindex_;
                         pkt.dts = pkt.pts;
+                        pTsMuxCtx->nPrevVideoTimestamp = nTimestamp;
                 }
                 
                 if ((ret = av_interleaved_write_frame(pTsMuxCtx->pFmtCtx_, &pkt)) < 0) {
