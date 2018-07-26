@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
-	xlog "qiniu.com/cdnbase/xlog.v1"
+	"github.com/qiniu/xlog.v1"
 )
 
 // sample requst see: https://developer.qiniu.com/kodo/manual/1653/callback

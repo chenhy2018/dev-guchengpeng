@@ -12,7 +12,7 @@ import (
 func main() {
 
 	r := gin.Default()
-
+	initDbConnect()
 	defer db.Disconnect()
 
 	r.GET("/playback/:uid/:deviceId", controllers.PlayBackGetm3u8)
