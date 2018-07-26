@@ -92,7 +92,7 @@ static int push(FFTsMuxUploader *pFFTsMuxUploader, char * _pData, int _nDataLen,
                                 logwarn("audio pts not monotonically: prev:%lld now:%lld", pTsMuxCtx->nPrevAudioTimestamp, nTimestamp);
                                 return 0;
                         }
-                        pkt.pts = 8 * nTimestamp;
+                        pkt.pts = nTimestamp * pFFTsMuxUploader->avArg.nSamplerate / 1000;
                         pkt.stream_index = pTsMuxCtx->nOutAudioindex_;
                         pkt.dts = pkt.pts;
                         pTsMuxCtx->nPrevAudioTimestamp = nTimestamp;
