@@ -12,7 +12,7 @@ type mgoDB struct {
 
 var GlobConn *mgoDB
 
-func Connect(url, db string) error {
+func Connect(url, db, username, password string) error {
 
 	if GlobConn != nil {
 		return fmt.Errorf("db already connected")
@@ -22,10 +22,22 @@ func Connect(url, db string) error {
 	if err != nil {
 		return fmt.Errorf("db not connected: %s", err)
 	}
+
+	cred := mgo.Credential{
+		Username: username,
+		Password: password,
+	}
+
+        err = session.Login(&cred)
+        if err != nil {
+                return fmt.Errorf("db login failed: %s", err)
+        }
+
 	GlobConn = &mgoDB{
 		session: session,
 		db: db,
 	}
+
 	return nil
 }
 

@@ -36,7 +36,7 @@ func initDbConnect() {
 	url := "180.97.147.164:27017"
 	//url := "mongodb://180.97.147.164:27017:180.97.147.179:27017"
 	// connect to DB
-	if err := db.Connect(url, dbName); err != nil {
+	if err := db.Connect(url, dbName, "root", "public"); err != nil {
 		fmt.Println(err)
 		os.Exit(3)
 	}

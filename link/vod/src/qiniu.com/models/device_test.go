@@ -9,9 +9,9 @@ import (
 )
 
 func TestDevice(t *testing.T) {
-        url := "39.107.247.14:27017"
+        url := "180.97.147.164:27017"
         dbName := "vod"
-        if err := db.Connect(url, dbName); err != nil {
+        if err := db.Connect(url, dbName, "root", "public"); err != nil {
 		fmt.Println(err)
 		os.Exit(3)
 	}
@@ -43,7 +43,7 @@ func TestDevice(t *testing.T) {
         assert.Equal(t, err_1, nil, "they should be equal")
         size_1 := len(r_1)
         assert.Equal(t, size_1, 1, "they should be equal")
-        assert.Equal(t, r_1[0].Expire, 1000000, "they should be equal")
+        assert.Equal(t, r_1[0].Expire, int64(1000000), "they should be equal")
         for count := 0; count < 100; count++ {
                 model.Delete("UserTest", fmt.Sprintf("daaa%d", count))
         }
