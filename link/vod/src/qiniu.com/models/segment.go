@@ -1,7 +1,7 @@
 package models
 
 import (
-	//"fmt"
+	"fmt"
         "qiniu.com/db"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
@@ -13,7 +13,7 @@ const (
         SEGMENT_COL = "segment"
 	SEGMENT_ITEM_UUID   = "uuid"
 	SEGMENT_ITEM_DEVICEID = "deviceid"
-        SEGMENT_ITEM_SEGMENT_START_TIME = "segment_start_time"
+        SEGMENT_ITEM_FRAGMENT_START_TIME = "fragment_start_time"
         SEGMENT_ITEM_START_TIME = "start_time"
         SEGMENT_ITEM_END_TIME = "end_time"
         SEGMENT_ITEM_FILE_NAME = "file_name"
@@ -36,7 +36,7 @@ func init() {
 type SegmentReq struct {
         Uuid string
         Deviceid string
-        SegmentStartTime int64
+        FragmentStartTime int64
         StartTime int64
         EndTime int64
         FileName string
@@ -52,7 +52,7 @@ func (m *segmentModel) AddSegmentTS(req SegmentReq) error {
 				bson.M{
                                         SEGMENT_ITEM_UUID: req.Uuid,
 					SEGMENT_ITEM_DEVICEID: req.Deviceid,
-                                        SEGMENT_ITEM_SEGMENT_START_TIME: req.SegmentStartTime,
+                                        SEGMENT_ITEM_FRAGMENT_START_TIME: req.FragmentStartTime,
                                         SEGMENT_ITEM_START_TIME: req.StartTime,
                                         SEGMENT_ITEM_END_TIME: req.EndTime,
 				},
@@ -60,7 +60,7 @@ func (m *segmentModel) AddSegmentTS(req SegmentReq) error {
                                         "$set": bson.M{
                                                 SEGMENT_ITEM_UUID: req.Uuid,
                                                 SEGMENT_ITEM_DEVICEID: req.Deviceid,
-                                                SEGMENT_ITEM_SEGMENT_START_TIME: req.SegmentStartTime,
+                                                SEGMENT_ITEM_FRAGMENT_START_TIME: req.FragmentStartTime,
                                                 SEGMENT_ITEM_START_TIME: req.StartTime,
                                                 SEGMENT_ITEM_END_TIME: req.EndTime,
                                                 SEGMENT_ITEM_FILE_NAME: req.FileName,
@@ -97,7 +97,7 @@ func (m *segmentModel) DeleteSegmentTS(uuid,deviceid,starttime,endtime string) e
 func (m *segmentModel) UpdateSegmentTSExpire(uuid,deviceid string, starttime,endtime, expire int64) error {
 
 	return db.WithCollection(
-		DEVICE_COL,
+		SEGMENT_COL,
 		func(c *mgo.Collection) error {
 			return c.Update(
 				bson.M{
@@ -116,28 +116,73 @@ func (m *segmentModel) UpdateSegmentTSExpire(uuid,deviceid string, starttime,end
 	)
 }
 
-type SegmentTsDispInfo struct {
+type SegmentTsInfo struct {
 	UUID      string  `bson:"uuid"       json:"uuid"`
 	DevicdID  string  `bson:"deviceid"   json:"deviceid"`
-	SegmentStartTime   int     `bson:"segmentstartTime"       json:"segmentstartTime"`
+	FragmentStartTime   int `bson:"fragmentstartTime" json:"fragmentstartTime"`
         StartTime int64  `bson:"starttime"  json:"starttime"`
         FileName string `bson:"filename"  json:"filename"`
         EndTime   int64  `bson:"endtime"  json:"endtime"`
 	Expire    int64  `bson:"expire" json:"expire"`
 }
 
-func (m *segmentModel) Display(index, rows, starttime,endtime int64, uuid,deviceid string) ([]SegmentTsDispInfo, error) {
+func (m *segmentModel) GetSegmentTsInfo(index, rows int, starttime,endtime int64, uuid,deviceid string) ([]SegmentTsInfo, error) {
 
 	// query by keywords
-
-	// direct to specific page
-	//skip := rows * index
-	limit := rows
-	if limit > 100 {
-		limit = 100
-	}
-
-	// query
-	r := []SegmentTsDispInfo{}
+        query := bson.M{}
+        query[SEGMENT_ITEM_START_TIME] = bson.M{"$gte":starttime}
+        query[SEGMENT_ITEM_END_TIME] = bson.M{"$lte":endtime}
+        skip := rows * index
+        limit := rows
+        r := []SegmentTsInfo{}
+        count := 0
+        err := db.WithCollection(
+                SEGMENT_COL,
+                func(c *mgo.Collection) error {
+                        var err error
+                        if limit > 0 {
+                                err = c.Find(query).Sort("-_id").Skip(skip).Limit(limit).All(&r);
+                        } else {
+                                err = c.Find(query).Sort("-_id").Skip(skip).All(&r);
+                        }
+                        if count, err = c.Find(query).Count(); err != nil {
+                                return fmt.Errorf("query count failed")
+                        }
+                        return nil
+                 },
+        )
+        if err != nil {
+                return []SegmentTsInfo{}, err
+        }
 	return r, nil
+}
+
+func (m *segmentModel) GetFragmentTsInfo(index, rows int, starttime,endtime int64, uuid,deviceid string) ([]SegmentTsInfo, error) {
+        // query by keywords
+        query := bson.M{}
+        query[SEGMENT_ITEM_FRAGMENT_START_TIME] = bson.M{"$gte":starttime, "$lte": endtime}
+        skip := rows * index
+        limit := rows
+        r := []SegmentTsInfo{}
+        count := 0
+        err := db.WithCollection(
+                SEGMENT_COL,
+                func(c *mgo.Collection) error {
+                        var err error
+                        if limit > 0 {
+                                err = c.Find(query).Sort("-_id").Skip(skip).Limit(limit).All(&r);
+                        } else {
+                                err = c.Find(query).Sort("-_id").Skip(skip).All(&r);
+                        }
+                        if count, err = c.Find(query).Count(); err != nil {
+                                return fmt.Errorf("query count failed")
+                        }
+                        return nil
+                 },
+        )
+        if err != nil {
+                return []SegmentTsInfo{}, err
+        }
+        return r, nil
+
 }
