@@ -48,6 +48,18 @@
   version = "v8.18.2"
 
 [[projects]]
+  branch = "v2"
+  name = "gopkg.in/mgo.v2"
+  packages = [
+    ".",
+    "bson",
+    "internal/json",
+    "internal/sasl",
+    "internal/scram"
+  ]
+  revision = "9856a29383ce1c59f308dd1cf0363a79b5bef6b5"
+
+[[projects]]
   name = "gopkg.in/yaml.v2"
   packages = ["."]
   revision = "5420a8b6744d3b0345ab293f6fcba19c978f1183"
@@ -56,6 +68,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "a31ea08ba327b164a4e05b286100e38b28d9940991ce6e86799eec49c47a4de3"
+  inputs-digest = "9eb20b1c8c0d0a2a0cdf9f5b5e12031bd23774d61a2c2c641b6598da81384057"
   solver-name = "gps-cdcl"
   solver-version = 1
