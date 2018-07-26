@@ -130,6 +130,7 @@ static int PopQueueWithTimeout(CircleQueue *_pQueue, char *pBuf_, int nBufLen, i
         int nDataLen = 0;
         memcpy(&nDataLen, pQueueImp->pData_ + pQueueImp->nStart_ * pQueueImp->nItemLen_, sizeof(int));
         int nRemain = nDataLen - nBufLen;
+	logtrace("pop remain:%d pop:%d buflen:%d len:%d", nRemain, nDataLen, nBufLen, pQueueImp->nLen_);
         if (nRemain > 0) {
                 memcpy(pBuf_, pQueueImp->pData_ + pQueueImp->nStart_ * pQueueImp->nItemLen_ + sizeof(int), nBufLen);
                 memcpy(pQueueImp->pData_ + pQueueImp->nStart_ * pQueueImp->nItemLen_, &nRemain, sizeof(int));
