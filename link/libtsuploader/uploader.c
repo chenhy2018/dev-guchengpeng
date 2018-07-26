@@ -132,7 +132,8 @@ static void * streamUpload(void *_pOpaque)
                                                pUploader->nTsDataLen, &putExtra);
 #endif
         if (error.code != 200) {
-                logerror("upload file %s:%s error:%s", pUploader->bucketName_, key, Qiniu_Buffer_CStr(&client.b));
+                logerror("upload file %s:%s code:%d curl_error:%s kodo_error:%s", pUploader->bucketName_, key,
+                         error.code, error.message,Qiniu_Buffer_CStr(&client.b));
                 //debug_log(&client, error);
         } else {
                 logdebug("upload file %s: key:%s success", pUploader->bucketName_, key);
