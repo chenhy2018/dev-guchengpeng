@@ -13,24 +13,23 @@ const (
         SEGMENT_COL = "segment"
 	SEGMENT_ITEM_UUID   = "uuid"
 	SEGMENT_ITEM_DEVICEID = "deviceid"
-        SEGMENT_ITEM_FRAGMENT_START_TIME = "fragment_start_time"
-        SEGMENT_ITEM_START_TIME = "start_time"
-        SEGMENT_ITEM_END_TIME = "end_time"
-        SEGMENT_ITEM_FILE_NAME = "file_name"
+        SEGMENT_ITEM_FRAGMENT_START_TIME = "fragmentstarttime"
+        SEGMENT_ITEM_START_TIME = "starttime"
+        SEGMENT_ITEM_END_TIME = "endtime"
+        SEGMENT_ITEM_FILE_NAME = "filename"
 	SEGMENT_ITEM_EXPIRE = "expire"
 )
 
-type segmentModel struct {
-        
+type SegmentModel struct {
 }
 
 var (
-	Segment *segmentModel
+	Segment *SegmentModel
 )
 
 func init() {
 
-	Segment = &segmentModel{}
+	Segment = &SegmentModel{}
 }
 
 type SegmentReq struct {
@@ -43,7 +42,7 @@ type SegmentReq struct {
         ExpireDay int64
 }
 
-func (m *segmentModel) AddSegmentTS(req SegmentReq) error {
+func (m *SegmentModel) AddSegmentTS(req SegmentReq) error {
 
 	err := db.WithCollection(
 		SEGMENT_COL,
@@ -77,24 +76,25 @@ func (m *segmentModel) AddSegmentTS(req SegmentReq) error {
 	return nil;
 }
 
-func (m *segmentModel) DeleteSegmentTS(uuid,deviceid,starttime,endtime string) error {
+func (m *SegmentModel) DeleteSegmentTS(uuid,deviceid string, starttime,endtime int64) error {
 
 	return db.WithCollection(
 		SEGMENT_COL,
 		func(c *mgo.Collection) error {
-			return c.Remove(
+			c.RemoveAll(
 				bson.M{
 					SEGMENT_ITEM_UUID: uuid,
                                         SEGMENT_ITEM_DEVICEID: deviceid,
-                                        SEGMENT_ITEM_START_TIME: starttime,
-                                        SEGMENT_ITEM_END_TIME: endtime,
+                                        SEGMENT_ITEM_START_TIME: bson.M{"$gte":starttime},
+                                        SEGMENT_ITEM_END_TIME: bson.M{"$lte":endtime},
 				},
 			)
+                        return nil;
 		},
 	)
 }
 
-func (m *segmentModel) UpdateSegmentTSExpire(uuid,deviceid string, starttime,endtime, expire int64) error {
+func (m *SegmentModel) UpdateSegmentTSExpire(uuid,deviceid string, starttime,endtime, expire int64) error {
 
 	return db.WithCollection(
 		SEGMENT_COL,
@@ -126,12 +126,15 @@ type SegmentTsInfo struct {
 	Expire    int64  `bson:"expire" json:"expire"`
 }
 
-func (m *segmentModel) GetSegmentTsInfo(index, rows int, starttime,endtime int64, uuid,deviceid string) ([]SegmentTsInfo, error) {
+func (m *SegmentModel) GetSegmentTsInfo(index, rows int, starttime,endtime int64, uuid,deviceid string) ([]SegmentTsInfo, error) {
 
 	// query by keywords
-        query := bson.M{}
-        query[SEGMENT_ITEM_START_TIME] = bson.M{"$gte":starttime}
-        query[SEGMENT_ITEM_END_TIME] = bson.M{"$lte":endtime}
+        query := bson.M{
+                 SEGMENT_ITEM_UUID:uuid,
+                 SEGMENT_ITEM_DEVICEID:deviceid,
+                 SEGMENT_ITEM_START_TIME: bson.M{"$gte":starttime},
+                 SEGMENT_ITEM_END_TIME : bson.M{"$lte":endtime},
+        }
         skip := rows * index
         limit := rows
         r := []SegmentTsInfo{}
@@ -141,9 +144,9 @@ func (m *segmentModel) GetSegmentTsInfo(index, rows int, starttime,endtime int64
                 func(c *mgo.Collection) error {
                         var err error
                         if limit > 0 {
-                                err = c.Find(query).Sort("-_id").Skip(skip).Limit(limit).All(&r);
+                                err = c.Find(query).Sort(SEGMENT_ITEM_START_TIME).Skip(skip).Limit(limit).All(&r);
                         } else {
-                                err = c.Find(query).Sort("-_id").Skip(skip).All(&r);
+                                err = c.Find(query).Sort(SEGMENT_ITEM_START_TIME).Skip(skip).All(&r);
                         }
                         if count, err = c.Find(query).Count(); err != nil {
                                 return fmt.Errorf("query count failed")
@@ -157,10 +160,13 @@ func (m *segmentModel) GetSegmentTsInfo(index, rows int, starttime,endtime int64
 	return r, nil
 }
 
-func (m *segmentModel) GetFragmentTsInfo(index, rows int, starttime,endtime int64, uuid,deviceid string) ([]SegmentTsInfo, error) {
+func (m *SegmentModel) GetFragmentTsInfo(index, rows int, starttime,endtime int64, uuid,deviceid string) ([]SegmentTsInfo, error) {
         // query by keywords
-        query := bson.M{}
-        query[SEGMENT_ITEM_FRAGMENT_START_TIME] = bson.M{"$gte":starttime, "$lte": endtime}
+        query := bson.M{
+                 SEGMENT_ITEM_UUID:uuid,
+                 SEGMENT_ITEM_DEVICEID:deviceid,
+                 SEGMENT_ITEM_FRAGMENT_START_TIME: bson.M{"$gte":starttime, "$lte": endtime},
+        }
         skip := rows * index
         limit := rows
         r := []SegmentTsInfo{}
@@ -170,9 +176,9 @@ func (m *segmentModel) GetFragmentTsInfo(index, rows int, starttime,endtime int6
                 func(c *mgo.Collection) error {
                         var err error
                         if limit > 0 {
-                                err = c.Find(query).Sort("-_id").Skip(skip).Limit(limit).All(&r);
+                                err = c.Find(query).Sort(SEGMENT_ITEM_START_TIME).Skip(skip).Limit(limit).All(&r);
                         } else {
-                                err = c.Find(query).Sort("-_id").Skip(skip).All(&r);
+                                err = c.Find(query).Sort(SEGMENT_ITEM_START_TIME).Skip(skip).All(&r);
                         }
                         if count, err = c.Find(query).Count(); err != nil {
                                 return fmt.Errorf("query count failed")

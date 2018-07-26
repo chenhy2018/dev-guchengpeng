@@ -33,6 +33,7 @@ func Disconnect() {
 
 	if GlobConn != nil && GlobConn.session != nil {
 		GlobConn.session.Close()
+		GlobConn = nil
 	}
 }
 

@@ -15,11 +15,10 @@ const (
 	DEVICE_ITEM_DEVICEID = "deviceid"
 	DEVICE_ITEM_DATE   = "date"
         DEVICE_ITEM_BUCKET_URL = "bucketurl"
-	DEVICE_ITEM_EXPIRE = "expire"
+	DEVICE_ITEM_EXPIRE = "remaindays"
 )
 
 type deviceModel struct {
-        
 }
 
 var (
@@ -35,7 +34,7 @@ type RegisterReq struct {
         Uuid string
         Deviceid string
         BucketUrl string
-        RemainDays int
+        RemainDays int64
 }
 
 func (m *deviceModel) Register(req RegisterReq) error {
@@ -82,7 +81,7 @@ func (m *deviceModel) Delete(uuid,deviceid string) error {
 	)
 }
 
-func (m *deviceModel) UpdateRemaindays(uuid,deviceid string, remaindays int) error {
+func (m *deviceModel) UpdateRemaindays(uuid,deviceid string, remaindays int64) error {
 
 	return db.WithCollection(
 		DEVICE_COL,
@@ -102,15 +101,15 @@ func (m *deviceModel) UpdateRemaindays(uuid,deviceid string, remaindays int) err
 	)
 }
 
-type deviceDispInfo struct {
+type deviceInfo struct {
 	UUID      string  `bson:"uuid"       json:"uuid"`
 	DevicdID  string  `bson:"deviceid"   json:"deviceid"`
 	Regtime   int     `bson:"date"       json:"date"`
         BucketUrl string  `bson:"bucketurl"  json:"bucketurl"`
-	Expire    int     `bson:"remaindays" json:"remaindays"`
+	Expire    int64   `bson:"remaindays" json:"remaindays"`
 }
 
-func (m *deviceModel) Display(index, rows int, category, like string) ([]deviceDispInfo, error) {
+func (m *deviceModel) GetDeviceInfo(index, rows int, category, like string) ([]deviceInfo, error) {
 
 	// query by keywords
 	query := bson.M{}
@@ -128,13 +127,13 @@ func (m *deviceModel) Display(index, rows int, category, like string) ([]deviceD
 	}
 
 	// query
-	r := []deviceDispInfo{}
+	r := []deviceInfo{}
 	count := 0
 	err := db.WithCollection(
 		DEVICE_COL,
 		func(c *mgo.Collection) error {
 			var err error
-			if err = c.Find(query).Sort("-_id").Skip(skip).Limit(limit).All(&r); err != nil {
+			if err = c.Find(query).Sort(DEVICE_ITEM_EXPIRE).Skip(skip).Limit(limit).All(&r); err != nil {
 				return fmt.Errorf("query failed")
 			}
 			if count, err = c.Find(query).Count(); err != nil {
@@ -144,7 +143,7 @@ func (m *deviceModel) Display(index, rows int, category, like string) ([]deviceD
 		},
 	)
 	if err != nil {
-		return []deviceDispInfo{}, err
+		return []deviceInfo{}, err
 	}
 	return r, nil
 }
