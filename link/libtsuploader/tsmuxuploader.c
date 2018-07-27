@@ -2,6 +2,7 @@
 #include "base.h"
 #include <libavformat/avformat.h>
 #include <unistd.h>
+#include "adts.h"
 
 #define FF_OUT_LEN 4096
 #define QUEUE_INIT_LEN 150
@@ -38,6 +39,42 @@ typedef struct _FFTsMuxUploader{
         AvArg avArg;
         UploadState ffMuxSatte;
 }FFTsMuxUploader;
+
+static int aAacfreqs[13] = {96000, 88200, 64000, 48000, 44100, 32000, 24000, 22050 ,16000 ,12000, 11025, 8000, 7350};
+
+static int getAacFreqIndex(int _nFreq)
+{
+        switch(_nFreq){
+                case 96000:
+                        return 0;
+                case 88200:
+                        return 1;
+                case 64000:
+                        return 2;
+                case 48000:
+                        return 3;
+                case 44100:
+                        return 4;
+                case 32000:
+                        return 5;
+                case 24000:
+                        return 6;
+                case 22050:
+                        return 7;
+                case 16000:
+                        return 8;
+                case 12000:
+                        return 9;
+                case 11025:
+                        return 10;
+                case 8000:
+                        return 11;
+                case 7350:
+                        return 12;
+                default:
+                        return -1;
+        }
+}
 
 static void pushRecycle(FFTsMuxUploader *_pFFTsMuxUploader)
 {
@@ -102,40 +139,72 @@ static int push(FFTsMuxUploader *pFFTsMuxUploader, char * _pData, int _nDataLen,
         }
 
         int ret = 0;
-        if (pTsMuxCtx != NULL) {
-                if (_nFlag == TK_STREAM_TYPE_AUDIO){
-                        //fprintf(stderr, "audio frame: len:%d pts:%lld\n", _nDataLen, _nTimestamp);
-                        if (pTsMuxCtx->nPrevAudioTimestamp != 0 && _nTimestamp - pTsMuxCtx->nPrevAudioTimestamp <= 0) {
-                                pthread_mutex_unlock(&pFFTsMuxUploader->muxUploaderMutex_);
-                                logwarn("audio pts not monotonically: prev:%lld now:%lld", pTsMuxCtx->nPrevAudioTimestamp, _nTimestamp);
-                                return 0;
-                        }
-                        pkt.pts = _nTimestamp * 90;
-                        pkt.stream_index = pTsMuxCtx->nOutAudioindex_;
-                        pkt.dts = pkt.pts;
-                        pTsMuxCtx->nPrevAudioTimestamp = _nTimestamp;
-                }else{
-                        //fprintf(stderr, "video frame: len:%d pts:%lld\n", _nDataLen, _nTimestamp);
-                        if (pTsMuxCtx->nPrevVideoTimestamp != 0 && _nTimestamp - pTsMuxCtx->nPrevVideoTimestamp <= 0) {
-                                pthread_mutex_unlock(&pFFTsMuxUploader->muxUploaderMutex_);
-                                logwarn("video pts not monotonically: prev:%lld now:%lld", pTsMuxCtx->nPrevVideoTimestamp, _nTimestamp);
-                                return 0;
-                        }
-                        pkt.pts = _nTimestamp * 90;
-                        pkt.stream_index = pTsMuxCtx->nOutVideoindex_;
-                        pkt.dts = pkt.pts;
-                        pTsMuxCtx->nPrevVideoTimestamp = _nTimestamp;
+        int isAdtsAdded = 0;
+        
+        if (_nFlag == TK_STREAM_TYPE_AUDIO){
+                //fprintf(stderr, "audio frame: len:%d pts:%lld\n", _nDataLen, _nTimestamp);
+                if (pTsMuxCtx->nPrevAudioTimestamp != 0 && _nTimestamp - pTsMuxCtx->nPrevAudioTimestamp <= 0) {
+                        pthread_mutex_unlock(&pFFTsMuxUploader->muxUploaderMutex_);
+                        logwarn("audio pts not monotonically: prev:%lld now:%lld", pTsMuxCtx->nPrevAudioTimestamp, _nTimestamp);
+                        return 0;
                 }
+                pkt.pts = _nTimestamp * 90;
+                pkt.stream_index = pTsMuxCtx->nOutAudioindex_;
+                pkt.dts = pkt.pts;
+                pTsMuxCtx->nPrevAudioTimestamp = _nTimestamp;
                 
-                if ((ret = av_interleaved_write_frame(pTsMuxCtx->pFmtCtx_, &pkt)) < 0) {
-                        logerror("Error muxing packet");
-                } else {
-                        pTsMuxCtx->pTsUploader_->RecordTimestamp(pTsMuxCtx->pTsUploader_, _nTimestamp);
+                unsigned char * pAData = (unsigned char * )_pData;
+                if (pAData[0] != 0xff || (pAData[1] & 0xf0) != 0xf0) {
+                        ADTSFixheader fixHeader;
+                        ADTSVariableHeader varHeader;
+                        InitAdtsFixedHeader(&fixHeader);
+                        InitAdtsVariableHeader(&varHeader, _nDataLen);
+                        fixHeader.channel_configuration = pFFTsMuxUploader->avArg.nChannels;
+                        int nFreqIdx = getAacFreqIndex(pFFTsMuxUploader->avArg.nSamplerate);
+                        fixHeader.sampling_frequency_index = nFreqIdx;
+                        unsigned char * pTmp = (unsigned char *)malloc(varHeader.aac_frame_length);
+                        if(pTmp == NULL || pFFTsMuxUploader->avArg.nChannels < 1 || pFFTsMuxUploader->avArg.nChannels > 2
+                           || nFreqIdx < 0) {
+                                pthread_mutex_unlock(&pFFTsMuxUploader->muxUploaderMutex_);
+                                if (pTmp == NULL) {
+                                        logwarn("malloc %d size memory fail", varHeader.aac_frame_length);
+                                        return TK_NO_MEMORY;
+                                } else {
+                                        logwarn("wrong audio arg:channel:%d sameplerate%d", pFFTsMuxUploader->avArg.nChannels,
+                                                pFFTsMuxUploader->avArg.nSamplerate);
+                                        return TK_ARG_ERROR;
+                                }
+                        }
+                        ConvertAdtsHeader2Char(&fixHeader, &varHeader, pTmp);
+                        int nHeaderLen = varHeader.aac_frame_length - _nDataLen;
+                        memcpy(pTmp + nHeaderLen, _pData, _nDataLen);
+                        isAdtsAdded = 1;
+                        pkt.data = (uint8_t *)pTmp;
+                        pkt.size = varHeader.aac_frame_length;
                 }
-        } else {
-                logwarn("upload context is NULL");
+        }else{
+                //fprintf(stderr, "video frame: len:%d pts:%lld\n", _nDataLen, _nTimestamp);
+                if (pTsMuxCtx->nPrevVideoTimestamp != 0 && _nTimestamp - pTsMuxCtx->nPrevVideoTimestamp <= 0) {
+                        pthread_mutex_unlock(&pFFTsMuxUploader->muxUploaderMutex_);
+                        logwarn("video pts not monotonically: prev:%lld now:%lld", pTsMuxCtx->nPrevVideoTimestamp, _nTimestamp);
+                        return 0;
+                }
+                pkt.pts = _nTimestamp * 90;
+                pkt.stream_index = pTsMuxCtx->nOutVideoindex_;
+                pkt.dts = pkt.pts;
+                pTsMuxCtx->nPrevVideoTimestamp = _nTimestamp;
         }
+        
+        if ((ret = av_interleaved_write_frame(pTsMuxCtx->pFmtCtx_, &pkt)) < 0) {
+                logerror("Error muxing packet");
+        } else {
+                pTsMuxCtx->pTsUploader_->RecordTimestamp(pTsMuxCtx->pTsUploader_, _nTimestamp);
+        }
+
         pthread_mutex_unlock(&pFFTsMuxUploader->muxUploaderMutex_);
+        if (isAdtsAdded) {
+                free(pkt.data);
+        }
         return ret;
 }
 

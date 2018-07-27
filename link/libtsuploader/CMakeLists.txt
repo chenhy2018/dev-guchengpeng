@@ -19,6 +19,8 @@ add_library(tsuploader STATIC
 	uploader.h
 	uploader.c
 	base.h
+	adts.h
+	adts.c
 	queue.c
 	queue.h
 	log.h
