@@ -21,6 +21,12 @@ typedef enum {
         TK_AUDIO_AAC
 }TkAudioFormat;
 
+typedef enum {
+        TK_UPLOAD_INIT,
+        TK_UPLOAD_FAIL,
+        TK_UPLOAD_OK
+}UploadState;
+
 typedef struct _AvArg{
         int nAudioFormat;
         int nChannels;

@@ -1,5 +1,4 @@
 #include "uploader.h"
-#include "base.h"
 #include <string.h>
 #include <stdlib.h>
 #include <assert.h>
@@ -32,6 +31,7 @@ typedef struct _KodoUploader{
         int64_t nSegmentId;
         int64_t nFirstFrameTimestamp;
         int64_t nLastFrameTimestamp;
+        UploadState state;
 }KodoUploader;
 
 static void setSegmentId(TsUploader* _pUploader, int64_t _nId)
@@ -132,10 +132,12 @@ static void * streamUpload(void *_pOpaque)
                                                pUploader->nTsDataLen, &putExtra);
 #endif
         if (error.code != 200) {
+                pUploader->state = TK_UPLOAD_FAIL;
                 logerror("upload file %s:%s code:%d curl_error:%s kodo_error:%s", pUploader->bucketName_, key,
                          error.code, error.message,Qiniu_Buffer_CStr(&client.b));
                 //debug_log(&client, error);
         } else {
+                pUploader->state = TK_UPLOAD_OK;
                 logdebug("upload file %s: key:%s success", pUploader->bucketName_, key);
         }
         
@@ -240,6 +242,12 @@ void recordTimestamp(TsUploader *_pTsUploader, int64_t _nTimestamp)
         return;
 }
 
+UploadState getUploaderState(TsUploader *_pTsUploader)
+{
+        KodoUploader * pKodoUploader = (KodoUploader *)_pTsUploader;
+        return pKodoUploader->state;
+}
+
 int NewUploader(TsUploader ** _pUploader, enum CircleQueuePolicy _policy, int _nMaxItemLen, int _nInitItemCount)
 {
         KodoUploader * pKodoUploader = (KodoUploader *) malloc(sizeof(KodoUploader));
@@ -276,6 +284,7 @@ int NewUploader(TsUploader ** _pUploader, enum CircleQueuePolicy _policy, int _n
         pKodoUploader->uploader.GetStatInfo = getStatInfo;
         pKodoUploader->uploader.SetSegmentId = setSegmentId;
         pKodoUploader->uploader.RecordTimestamp = recordTimestamp;
+        pKodoUploader->uploader.GetUploaderState = getUploaderState;
         
         *_pUploader = (TsUploader*)pKodoUploader;
         return 0;

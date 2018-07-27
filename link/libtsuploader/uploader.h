@@ -6,6 +6,7 @@
 #include <pthread.h>
 #include <errno.h>
 #include "queue.h"
+#include "base.h"
 
 
 typedef struct _TsUploader TsUploader;
@@ -27,6 +28,7 @@ typedef struct _TsUploader{
         DeleteAfterDaysSetter SetDeleteAfterDays;
         StreamUploadStart UploadStart;
         StreamUploadStop UploadStop;
+        UploadState (*GetUploaderState)(TsUploader *pTsUploader);
         void (*SetSegmentId)(TsUploader *pTsUploader, int64_t nId);
         int(*Push)(TsUploader *pTsUploader, char * pData, int nDataLen);
         void (*GetStatInfo)(TsUploader *pTsUploader, UploaderStatInfo *pStatInfo);
