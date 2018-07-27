@@ -272,6 +272,7 @@ void * Mqttthread(void* _pData)
                          }
                          if (rc) {
                                  OnEventCallback(pInstance, rc, mosquitto_strerror(rc));
+                                 pInstance->status = STATUS_CONNECT_ERROR;
                          }
 #if 0
                          if (rc) {

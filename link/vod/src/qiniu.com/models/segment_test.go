@@ -1,47 +1,51 @@
 package models
 
 import (
-        "os"
-        "fmt"
         "testing"
         "qiniu.com/db"
         "github.com/stretchr/testify/assert"
 )
 
 func TestSegment(t *testing.T) {
-        url := "180.97.147.164:27017"
+        url := "mongodb://root:public@180.97.147.164:27017,180.97.147.179:27017/admin"
         dbName := "vod"
-        if err := db.Connect(url, dbName, "root", "public"); err != nil {
-		fmt.Println(err)
-                os.Exit(3)
-	}
+        config := db.MgoConfig {
+                Host : url,
+                DB   : dbName,
+                Mode : "",
+                Username : "root",
+                Password : "public",
+                AuthDB : "admin",
+                Proxies : nil,
+        }
+        db.InitDb(&config)        
         assert.Equal(t, 0, 0, "they should be equal")
         model := SegmentModel{}
         model.DeleteSegmentTS("UserTest", "dev001", 0, 200)
         // Add first frament, count size 100, start time 0 to end time 100. 
         for count := 0; count < 100; count++ {
-       		p := SegmentReq{
-        		Uuid : "UserTest",
-        		Deviceid : "dev001",
-        		FragmentStartTime : 0,
-        		StartTime : int64(count),
-        		EndTime : int64(count + 1),
-        		FileName : "test1",
-        		ExpireDay : 120,
-        	}
-        	err := model.AddSegmentTS(p)
-        	assert.Equal(t, err, nil, "they should be equal")
+		p := SegmentTsInfo {
+			Uuid : "UserTest",
+			DeviceId : "dev001",
+			FragmentStartTime : 0,
+			StartTime : int64(count),
+			EndTime : int64(count + 1),
+			FileName : "test1",
+			Expire : 120,
+		}
+		err := model.AddSegmentTS(p)
+		assert.Equal(t, err, nil, "they should be equal")
         }
         // Add first frament, count size 100, start time 100 to end time 200.
         for count := 100; count < 200; count++ {
-                p := SegmentReq{
+                p := SegmentTsInfo{
                         Uuid : "UserTest",
-                        Deviceid : "dev001",
+                        DeviceId : "dev001",
                         FragmentStartTime : 100,
                         StartTime : int64(count),
                         EndTime : int64(count + 1),
                         FileName : "test1",
-                        ExpireDay : 120,
+                        Expire : 120,
                 }
                 err := model.AddSegmentTS(p)
                 assert.Equal(t, err, nil, "they should be equal")
@@ -86,11 +90,10 @@ func TestSegment(t *testing.T) {
                assert.Equal(t, r_3[count].StartTime, int64(count+100), "they should be equal")
                assert.Equal(t, r_3[count].EndTime, int64(count+101), "they should be equal")
         }
-        derr := model.DeleteSegmentTS("UserTest", "dev001", 0, 200)
-        assert.Equal(t, derr, nil, "they should be equal")
-        r_4, err_4 := model.GetSegmentTsInfo(0,0,int64(0), int64(150), "UserTest", "dev001")
-        assert.Equal(t, err_4, nil, "they should be equal")
-        size_4 := len(r_4)
-        assert.Equal(t, size_4, 0, "they should be equal")
-        db.Disconnect()
+        //derr := model.DeleteSegmentTS("UserTest", "dev001", 0, 200)
+        //assert.Equal(t, derr, nil, "they should be equal")
+        //r_4, err_4 := model.GetSegmentTsInfo(0,0,int64(0), int64(150), "UserTest", "dev001")
+        //assert.Equal(t, err_4, nil, "they should be equal")
+        //size_4 := len(r_4)
+        //assert.Equal(t, size_4, 0, "they should be equal")
 }

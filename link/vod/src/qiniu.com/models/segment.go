@@ -3,15 +3,15 @@ package models
 import (
 	"fmt"
         "qiniu.com/db"
-	"gopkg.in/mgo.v2"
-	"gopkg.in/mgo.v2/bson"
+        "gopkg.in/mgo.v2"
+        "gopkg.in/mgo.v2/bson"
 	//"time"
 )
 
 
 const (
         SEGMENT_COL = "segment"
-	SEGMENT_ITEM_UUID   = "uuid"
+	SEGMENT_ITEM_Uuid   = "uuid"
 	SEGMENT_ITEM_DEVICEID = "deviceid"
         SEGMENT_ITEM_FRAGMENT_START_TIME = "fragmentstarttime"
         SEGMENT_ITEM_START_TIME = "starttime"
@@ -32,38 +32,28 @@ func init() {
 	Segment = &SegmentModel{}
 }
 
-type SegmentReq struct {
-        Uuid string
-        Deviceid string
-        FragmentStartTime int64
-        StartTime int64
-        EndTime int64
-        FileName string
-        ExpireDay int64
-}
-
-func (m *SegmentModel) AddSegmentTS(req SegmentReq) error {
+func (m *SegmentModel) AddSegmentTS(req SegmentTsInfo) error {
 
 	err := db.WithCollection(
 		SEGMENT_COL,
 		func(c *mgo.Collection) error {
 			_, err := c.Upsert(
 				bson.M{
-                                        SEGMENT_ITEM_UUID: req.Uuid,
-					SEGMENT_ITEM_DEVICEID: req.Deviceid,
+                                        SEGMENT_ITEM_Uuid: req.Uuid,
+					SEGMENT_ITEM_DEVICEID: req.DeviceId,
                                         SEGMENT_ITEM_FRAGMENT_START_TIME: req.FragmentStartTime,
                                         SEGMENT_ITEM_START_TIME: req.StartTime,
                                         SEGMENT_ITEM_END_TIME: req.EndTime,
 				},
                                 bson.M{
                                         "$set": bson.M{
-                                                SEGMENT_ITEM_UUID: req.Uuid,
-                                                SEGMENT_ITEM_DEVICEID: req.Deviceid,
+                                                SEGMENT_ITEM_Uuid: req.Uuid,
+                                                SEGMENT_ITEM_DEVICEID: req.DeviceId,
                                                 SEGMENT_ITEM_FRAGMENT_START_TIME: req.FragmentStartTime,
                                                 SEGMENT_ITEM_START_TIME: req.StartTime,
                                                 SEGMENT_ITEM_END_TIME: req.EndTime,
                                                 SEGMENT_ITEM_FILE_NAME: req.FileName,
-                                                SEGMENT_ITEM_EXPIRE: req.ExpireDay,
+                                                SEGMENT_ITEM_EXPIRE: req.Expire,
                                         },
                                 },
 			)
@@ -83,7 +73,7 @@ func (m *SegmentModel) DeleteSegmentTS(uuid,deviceid string, starttime,endtime i
 		func(c *mgo.Collection) error {
 			c.RemoveAll(
 				bson.M{
-					SEGMENT_ITEM_UUID: uuid,
+					SEGMENT_ITEM_Uuid: uuid,
                                         SEGMENT_ITEM_DEVICEID: deviceid,
                                         SEGMENT_ITEM_START_TIME: bson.M{"$gte":starttime},
                                         SEGMENT_ITEM_END_TIME: bson.M{"$lte":endtime},
@@ -101,7 +91,7 @@ func (m *SegmentModel) UpdateSegmentTSExpire(uuid,deviceid string, starttime,end
 		func(c *mgo.Collection) error {
 			return c.Update(
 				bson.M{
-					SEGMENT_ITEM_UUID: uuid,
+					SEGMENT_ITEM_Uuid: uuid,
                                         SEGMENT_ITEM_DEVICEID: deviceid,
                                         SEGMENT_ITEM_START_TIME: starttime,
                                         SEGMENT_ITEM_END_TIME: endtime,
@@ -117,8 +107,8 @@ func (m *SegmentModel) UpdateSegmentTSExpire(uuid,deviceid string, starttime,end
 }
 
 type SegmentTsInfo struct {
-	UUID      string  `bson:"uuid"       json:"uuid"`
-	DevicdID  string  `bson:"deviceid"   json:"deviceid"`
+	Uuid      string  `bson:"uuid"       json:"uuid"`
+	DeviceId  string  `bson:"deviceid"   json:"deviceid"`
 	FragmentStartTime   int `bson:"fragmentstartTime" json:"fragmentstartTime"`
         StartTime int64  `bson:"starttime"  json:"starttime"`
         FileName string `bson:"filename"  json:"filename"`
@@ -130,7 +120,7 @@ func (m *SegmentModel) GetSegmentTsInfo(index, rows int, starttime,endtime int64
 
 	// query by keywords
         query := bson.M{
-                 SEGMENT_ITEM_UUID:uuid,
+                 SEGMENT_ITEM_Uuid:uuid,
                  SEGMENT_ITEM_DEVICEID:deviceid,
                  SEGMENT_ITEM_START_TIME: bson.M{"$gte":starttime},
                  SEGMENT_ITEM_END_TIME : bson.M{"$lte":endtime},
@@ -163,7 +153,7 @@ func (m *SegmentModel) GetSegmentTsInfo(index, rows int, starttime,endtime int64
 func (m *SegmentModel) GetFragmentTsInfo(index, rows int, starttime,endtime int64, uuid,deviceid string) ([]SegmentTsInfo, error) {
         // query by keywords
         query := bson.M{
-                 SEGMENT_ITEM_UUID:uuid,
+                 SEGMENT_ITEM_Uuid:uuid,
                  SEGMENT_ITEM_DEVICEID:deviceid,
                  SEGMENT_ITEM_FRAGMENT_START_TIME: bson.M{"$gte":starttime, "$lte": endtime},
         }

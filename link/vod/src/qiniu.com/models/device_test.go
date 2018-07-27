@@ -1,7 +1,6 @@
 package models
 
 import (
-        "os"
         "fmt"
         "testing"
         "qiniu.com/db"
@@ -9,12 +8,19 @@ import (
 )
 
 func TestDevice(t *testing.T) {
-        url := "180.97.147.164:27017"
+        url := "mongodb://root:public@180.97.147.164:27017,180.97.147.179:27017/admin"
         dbName := "vod"
-        if err := db.Connect(url, dbName, "root", "public"); err != nil {
-		fmt.Println(err)
-		os.Exit(3)
-	}
+        config := db.MgoConfig {
+                Host : url,
+                DB   : dbName,
+                Mode : "strong",
+                Username : "root",
+                Password : "public",
+                AuthDB : "admin",
+                Proxies : nil,
+        }
+        fmt.Printf("db INItDB")
+        db.InitDb(&config)
         assert.Equal(t, 0, 0, "they should be equal")
         model := deviceModel{}
         // Add device, count size 100, from 0 to 100. 
@@ -47,5 +53,4 @@ func TestDevice(t *testing.T) {
         for count := 0; count < 100; count++ {
                 model.Delete("UserTest", fmt.Sprintf("daaa%d", count))
         }
-        db.Disconnect()
 }

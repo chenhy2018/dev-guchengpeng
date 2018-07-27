@@ -3,6 +3,8 @@ package db
 import (
 	"fmt"
 	"gopkg.in/mgo.v2"
+        "github.com/qiniu/db/mgoutil.v3"
+        "qbox.us/lbsocketproxy"
 )
 
 type mgoDB struct {
@@ -10,43 +12,50 @@ type mgoDB struct {
 	db        string
 }
 
-var GlobConn *mgoDB
-
-func Connect(url, db, username, password string) error {
-
-	if GlobConn != nil {
-		return fmt.Errorf("db already connected")
-	}
-
-	session, err := mgo.Dial(url)
-	if err != nil {
-		return fmt.Errorf("db not connected: %s", err)
-	}
-
-	cred := mgo.Credential{
-		Username: username,
-		Password: password,
-	}
-
-        err = session.Login(&cred)
-        if err != nil {
-                return fmt.Errorf("db login failed: %s", err)
-        }
-
-	GlobConn = &mgoDB{
-		session: session,
-		db: db,
-	}
-
-	return nil
+type MgoConfig struct {
+        Host           string                `json:"host"`
+        DB             string                `json:"db"`
+        Mode           string                `json:"mode"`
+        Username       string                `json:"username"`
+        Password       string                `json:"password"`
+        AuthDB         string                `json:"authdb"`
+        Proxies        *lbsocketproxy.Config `json:"proxies"`
 }
 
-func Disconnect() {
+var GlobConn *mgoDB
 
-	if GlobConn != nil && GlobConn.session != nil {
-		GlobConn.session.Close()
-		GlobConn = nil
-	}
+type ColConfig struct {
+        A mgoutil.Collection      `coll:"segment"`
+        B *mgo.Collection `coll:"device"`
+}
+
+func InitDb(config *MgoConfig) error {
+
+        if GlobConn != nil {
+                fmt.Printf("db already connected")
+                return nil
+        }
+        var ret ColConfig
+        cfg := mgoutil.Config {
+                Host : config.Host,
+                DB   : config.DB,
+                Mode : config.Mode,
+                Username : "",
+                Password : "",
+                AuthDB : "",
+                Safe : nil,
+                Proxies : config.Proxies,
+        }
+        session, err := mgoutil.Open(&ret, &cfg)
+        if err != nil {
+                return fmt.Errorf("db open failed: %s", err)
+        }
+
+        GlobConn = &mgoDB{
+                session: session,
+                db: config.DB,
+        }
+        return nil
 }
 
 func Session() *mgo.Session {
