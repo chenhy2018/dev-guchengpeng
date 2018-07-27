@@ -9,11 +9,85 @@
 typedef int (*DataCallback)(void *opaque, void *pData, int nDataLen, int nFlag, int64_t timestamp, int nIsKeyFrame);
 #define THIS_IS_AUDIO 1
 #define THIS_IS_VIDEO 2
+#define TEST_AAC 1
 
 
 FILE *outTs;
 int gTotalLen = 0;
 char gtestToken[256] = {0};
+
+// start aac
+int aacfreq[13] = {96000, 88200,64000,48000,44100,32000,24000, 22050 , 16000 ,12000,11025,8000,7350};
+
+typedef struct ADTSFixheader {
+        unsigned short syncword:                12;
+        unsigned char id:                       1;
+        unsigned char layer:                    2;
+        unsigned char protection_absent:        1;
+        unsigned char profile:                  2;
+        unsigned char sampling_frequency_index: 4;
+        unsigned char private_bit:              1;
+        unsigned char channel_configuration:    3;
+        unsigned char original_copy:            1;
+        unsigned char home:                     1;
+} ADTSFixheader; // length : 28 bits
+
+typedef struct ADTSVariableHeader {
+        unsigned char copyright_identification_bit:          1;
+        unsigned char copyright_identification_start:        1;
+        unsigned short aac_frame_length:                     13;
+        unsigned short adts_buffer_fullness:                 11;
+        unsigned char number_of_raw_data_blocks_in_frame:    2;
+} ADTSVariableHeader; // length : 28 bits
+
+typedef struct ADTS{
+        ADTSFixheader fix;
+        ADTSVariableHeader var;
+}ADTS;
+
+void get_fixed_header(char *buff, ADTSFixheader *header) {
+        unsigned long long adts = 0;
+        const unsigned char *p = buff;
+        adts |= *p ++; adts <<= 8;
+        adts |= *p ++; adts <<= 8;
+        adts |= *p ++; adts <<= 8;
+        adts |= *p ++; adts <<= 8;
+        adts |= *p ++; adts <<= 8;
+        adts |= *p ++; adts <<= 8;
+        adts |= *p ++;
+        
+        
+        header->syncword                 = (adts >> 44);
+        header->id                       = (adts >> 43) & 0x01;
+        header->layer                    = (adts >> 41) & 0x03;
+        header->protection_absent        = (adts >> 40) & 0x01;
+        header->profile                  = (adts >> 38) & 0x03;
+        header->sampling_frequency_index = (adts >> 34) & 0x0f;
+        header->private_bit              = (adts >> 33) & 0x01;
+        header->channel_configuration    = (adts >> 30) & 0x07;
+        header->original_copy            = (adts >> 29) & 0x01;
+        header->home                     = (adts >> 28) & 0x01;
+}
+
+void get_variable_header(char *buff, ADTSVariableHeader *header) {
+        unsigned long long adts = 0;
+        const unsigned char *p = buff;
+        adts |= *p ++; adts <<= 8;
+        adts |= *p ++; adts <<= 8;
+        adts |= *p ++; adts <<= 8;
+        adts |= *p ++; adts <<= 8;
+        adts |= *p ++; adts <<= 8;
+        adts |= *p ++; adts <<= 8;
+        adts |= *p ++;
+        
+        header->copyright_identification_bit = (adts >> 27) & 0x01;
+        header->copyright_identification_start = (adts >> 26) & 0x01;
+        header->aac_frame_length = (adts >> 13) & ((int)pow(2, 14) - 1);
+        header->adts_buffer_fullness = (adts >> 2) & ((int)pow(2, 11) - 1);
+        header->number_of_raw_data_blocks_in_frame = adts & 0x03;
+}
+
+//end aac
 
 static const uint8_t *ff_avc_find_startcode_internal(const uint8_t *p, const uint8_t *end)
 {
@@ -148,18 +222,48 @@ int start_file_test(char * _pAudioFile, char * _pVideoFile, DataCallback callbac
         int cbRet = 0;
         int nIDR = 0;
         int nNonIDR = 0;
+        int isAAC = 0;
+        int64_t aacFrameCount = 0;
+        if (memcmp(_pAudioFile + strlen(_pAudioFile) - 3, "aac", 3) == 0)
+                isAAC = 1;
         while (bAudioOk || bVideoOk) {
                 if (bAudioOk && nNow+1 > nNextAudioTime) {
-                        if(audioOffset+160 <= nAudioDataLen) {
-                                cbRet = callback(opaque, pAudioData + audioOffset, 160, THIS_IS_AUDIO, nNextAudioTime-nSysTimeBase, 0);
-                                if (cbRet != 0) {
+                        if (isAAC) {
+                                ADTS adts;
+                                if(audioOffset+7 <= nAudioDataLen) {
+                                        get_fixed_header(pAudioData + audioOffset, &adts.fix);
+                                        int hlen = adts.fix.protection_absent == 1 ? 7 : 9;
+                                        get_variable_header(pAudioData + audioOffset, &adts.var);
+                                        if (audioOffset+hlen+adts.var.aac_frame_length <= nAudioDataLen) {
+                                                // ts需要把adts头写进去
+                                                cbRet = callback(opaque, pAudioData + audioOffset, adts.var.aac_frame_length,
+                                                                 THIS_IS_AUDIO, nNextAudioTime-nSysTimeBase, 0);
+                                                if (cbRet != 0) {
+                                                        bAudioOk = 0;
+                                                        continue;
+                                                }
+                                                audioOffset += adts.var.aac_frame_length;
+                                                aacFrameCount++;
+                                                int64_t d = ((1024*1000.0)/aacfreq[adts.fix.sampling_frequency_index]) * aacFrameCount;
+                                                nNextAudioTime = nSysTimeBase + d;
+                                        } else {
+                                                bAudioOk = 0;
+                                        }
+                                } else {
                                         bAudioOk = 0;
-                                        continue;
                                 }
-                                audioOffset += 160;
-                                nNextAudioTime += 20;
                         } else {
-                                bAudioOk = 0;
+                                if(audioOffset+160 <= nAudioDataLen) {
+                                        cbRet = callback(opaque, pAudioData + audioOffset, 160, THIS_IS_AUDIO, nNextAudioTime-nSysTimeBase, 0);
+                                        if (cbRet != 0) {
+                                                bAudioOk = 0;
+                                                continue;
+                                        }
+                                        audioOffset += 160;
+                                        nNextAudioTime += 20;
+                                } else {
+                                        bAudioOk = 0;
+                                }
                         }
                 }
                 if (bVideoOk && nNow+1 > nNextVideoTime) {
@@ -281,16 +385,30 @@ int main(int argc, char* argv[])
                 return ret;
         
         AvArg avArg;
+#ifdef TEST_AAC
+        avArg.nAudioFormat = TK_AUDIO_AAC;
+        avArg.nChannels = 2;
+        avArg.nSamplerate = 48000;
+#else
         avArg.nAudioFormat = TK_AUDIO_PCMU;
         avArg.nChannels = 1;
         avArg.nSamplerate = 8000;
+#endif
         avArg.nVideoFormat = TK_VIDEO_H264;
         ret = InitUploader("testuid", "testdeviceid", "bucket", gtestToken, &avArg);
         if (ret != 0) {
                 return ret;
         }
-        
+#ifdef TEST_AAC
+        start_file_test("/Users/liuye/tmp/a.aac", "/Users/liuye/tmp/v.h264", dataCallback, NULL);
+#else
+#ifdef __APPLE__
         start_file_test("/Users/liuye/Documents/qml/a.mulaw", "/Users/liuye/Documents/qml/v.h264", dataCallback, NULL);
+#else
+        start_file_test( "/opt2/a.mulaw", "/opt2/v.h264", dataCallback, NULL);
+#endif
+#endif
+        
         
         UninitUploader();
         loginfo("should total:%d\n", nByteCount);
