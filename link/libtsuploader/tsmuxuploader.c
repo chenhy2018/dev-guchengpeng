@@ -1,6 +1,7 @@
 #include "tsmuxuploader.h"
 #include "base.h"
 #include <libavformat/avformat.h>
+#include <unistd.h>
 
 #define FF_OUT_LEN 4096
 #define QUEUE_INIT_LEN 150
@@ -35,6 +36,7 @@ typedef struct _FFTsMuxUploader{
         int nFrameCount;
         int nSegmentId;
         AvArg avArg;
+        UploadState ffMuxSatte;
 }FFTsMuxUploader;
 
 static void pushRecycle(FFTsMuxUploader *_pFFTsMuxUploader)
@@ -67,7 +69,7 @@ static int ffWriteTsPacketToMem(void *opaque, uint8_t *buf, int buf_size)
         return ret;
 }
 
-static int push(FFTsMuxUploader *pFFTsMuxUploader, char * _pData, int _nDataLen, int64_t nTimestamp, int _nFlag){
+static int push(FFTsMuxUploader *pFFTsMuxUploader, char * _pData, int _nDataLen, int64_t _nTimestamp, int _nFlag){
         AVPacket pkt;
         av_init_packet(&pkt);
         pkt.data = (uint8_t *)_pData;
@@ -76,43 +78,59 @@ static int push(FFTsMuxUploader *pFFTsMuxUploader, char * _pData, int _nDataLen,
         //logtrace("push thread id:%d\n", (int)pthread_self());
         pthread_mutex_lock(&pFFTsMuxUploader->muxUploaderMutex_);
         
-        FFTsMuxContext *pTsMuxCtx = pFFTsMuxUploader->pTsMuxCtx;
+        FFTsMuxContext *pTsMuxCtx = NULL;
+        int count = 0;
+
+        count = 1;
+        pTsMuxCtx = pFFTsMuxUploader->pTsMuxCtx;
+        while(pTsMuxCtx == NULL && count) {
+                pthread_mutex_unlock(&pFFTsMuxUploader->muxUploaderMutex_);
+                usleep(3*1000);
+                pthread_mutex_lock(&pFFTsMuxUploader->muxUploaderMutex_);
+                pTsMuxCtx = pFFTsMuxUploader->pTsMuxCtx;
+                count--;
+        }
         if (pTsMuxCtx == NULL) {
                 pthread_mutex_unlock(&pFFTsMuxUploader->muxUploaderMutex_);
                 logwarn("upload context is NULL");
+                return 0;
+        }
+        if (pTsMuxCtx->pTsUploader_->GetUploaderState(pTsMuxCtx->pTsUploader_) == TK_UPLOAD_FAIL) {
+                pFFTsMuxUploader->ffMuxSatte = TK_UPLOAD_FAIL;
+                pthread_mutex_unlock(&pFFTsMuxUploader->muxUploaderMutex_);
                 return 0;
         }
 
         int ret = 0;
         if (pTsMuxCtx != NULL) {
                 if (_nFlag == TK_STREAM_TYPE_AUDIO){
-                        //printf("audio frame: len:%d pts:%lld\n", nDataLen, timestamp);
-                        if (pTsMuxCtx->nPrevAudioTimestamp != 0 && nTimestamp - pTsMuxCtx->nPrevAudioTimestamp <= 0) {
+                        //fprintf(stderr, "audio frame: len:%d pts:%lld\n", _nDataLen, _nTimestamp);
+                        if (pTsMuxCtx->nPrevAudioTimestamp != 0 && _nTimestamp - pTsMuxCtx->nPrevAudioTimestamp <= 0) {
                                 pthread_mutex_unlock(&pFFTsMuxUploader->muxUploaderMutex_);
-                                logwarn("audio pts not monotonically: prev:%lld now:%lld", pTsMuxCtx->nPrevAudioTimestamp, nTimestamp);
+                                logwarn("audio pts not monotonically: prev:%lld now:%lld", pTsMuxCtx->nPrevAudioTimestamp, _nTimestamp);
                                 return 0;
                         }
-                        pkt.pts = nTimestamp * pFFTsMuxUploader->avArg.nSamplerate / 1000;
+                        pkt.pts = _nTimestamp * 90;
                         pkt.stream_index = pTsMuxCtx->nOutAudioindex_;
                         pkt.dts = pkt.pts;
-                        pTsMuxCtx->nPrevAudioTimestamp = nTimestamp;
+                        pTsMuxCtx->nPrevAudioTimestamp = _nTimestamp;
                 }else{
-                        //printf("video frame: len:%d pts:%lld\n", nDataLen, timestamp);
-                        if (pTsMuxCtx->nPrevVideoTimestamp != 0 && nTimestamp - pTsMuxCtx->nPrevVideoTimestamp <= 0) {
+                        //fprintf(stderr, "video frame: len:%d pts:%lld\n", _nDataLen, _nTimestamp);
+                        if (pTsMuxCtx->nPrevVideoTimestamp != 0 && _nTimestamp - pTsMuxCtx->nPrevVideoTimestamp <= 0) {
                                 pthread_mutex_unlock(&pFFTsMuxUploader->muxUploaderMutex_);
-                                logwarn("video pts not monotonically: prev:%lld now:%lld", pTsMuxCtx->nPrevVideoTimestamp, nTimestamp);
+                                logwarn("video pts not monotonically: prev:%lld now:%lld", pTsMuxCtx->nPrevVideoTimestamp, _nTimestamp);
                                 return 0;
                         }
-                        pkt.pts = 90 * nTimestamp;
+                        pkt.pts = _nTimestamp * 90;
                         pkt.stream_index = pTsMuxCtx->nOutVideoindex_;
                         pkt.dts = pkt.pts;
-                        pTsMuxCtx->nPrevVideoTimestamp = nTimestamp;
+                        pTsMuxCtx->nPrevVideoTimestamp = _nTimestamp;
                 }
                 
                 if ((ret = av_interleaved_write_frame(pTsMuxCtx->pFmtCtx_, &pkt)) < 0) {
                         logerror("Error muxing packet");
                 } else {
-                        pTsMuxCtx->pTsUploader_->RecordTimestamp(pTsMuxCtx->pTsUploader_, nTimestamp);
+                        pTsMuxCtx->pTsUploader_->RecordTimestamp(pTsMuxCtx->pTsUploader_, _nTimestamp);
                 }
         } else {
                 logwarn("upload context is NULL");
@@ -133,13 +151,16 @@ static int PushVideo(TsMuxUploader *_pTsMuxUploader, char * _pData, int _nDataLe
         if (pFFTsMuxUploader->nLastUploadVideoTimestamp == -1) {
                 pFFTsMuxUploader->nLastUploadVideoTimestamp = _nTimestamp;
         }
+        // if start new uploader, start from keyframe
         if (nIsKeyFrame) {
-                if( (pFFTsMuxUploader->nKeyFrameCount >= 2 && //至少2个关键帧存一次
-                   (_nTimestamp - pFFTsMuxUploader->nLastUploadVideoTimestamp) > 4980) //并且要在5s左右
-                   || (_nIsSegStart && pFFTsMuxUploader->nFrameCount != 0)){ //新的片段开始
+                if( (pFFTsMuxUploader->nKeyFrameCount >= 2 && (_nTimestamp - pFFTsMuxUploader->nLastUploadVideoTimestamp) > 4980)
+                   //at least 2 keyframe and aoubt last 5 second
+                   || (_nIsSegStart && pFFTsMuxUploader->nFrameCount != 0)// new segment is specified
+                   ||  pFFTsMuxUploader->ffMuxSatte == TK_UPLOAD_FAIL){   // upload fail
                         pFFTsMuxUploader->nKeyFrameCount = 0;
                         pFFTsMuxUploader->nFrameCount = 0;
                         pFFTsMuxUploader->nLastUploadVideoTimestamp = _nTimestamp;
+                        pFFTsMuxUploader->ffMuxSatte = TK_UPLOAD_INIT;
                         pushRecycle(pFFTsMuxUploader);
                         if (_nIsSegStart) {
                                 pFFTsMuxUploader->nSegmentId = (int64_t)time(NULL);
@@ -231,6 +252,8 @@ static int newFFTsMuxContext(FFTsMuxContext ** _pTsMuxCtx, AvArg *_pAvArg)
                 ret = AVERROR_UNKNOWN;
                 goto end;
         }
+        pOutStream->time_base.num = 1;
+        pOutStream->time_base.den = 90000;
         pTsMuxCtx->nOutVideoindex_ = pOutStream->index;
         pOutStream->codecpar->codec_tag = 0;
         pOutStream->codecpar->codec_type = AVMEDIA_TYPE_VIDEO;
@@ -247,6 +270,8 @@ static int newFFTsMuxContext(FFTsMuxContext ** _pTsMuxCtx, AvArg *_pAvArg)
                 ret = AVERROR_UNKNOWN;
                 goto end;
         }
+        pOutStream->time_base.num = 1;
+        pOutStream->time_base.den = 90000;
         pTsMuxCtx->nOutAudioindex_ = pOutStream->index;
         pOutStream->codecpar->codec_tag = 0;
         pOutStream->codecpar->codec_type = AVMEDIA_TYPE_AUDIO;
