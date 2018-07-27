@@ -330,8 +330,8 @@ int main(int argc, char* argv[])
         AvArg avArg;
 #ifdef TEST_AAC
         avArg.nAudioFormat = TK_AUDIO_AAC;
-        //avArg.nChannels = 2;
-        avArg.nSamplerate = 4800;
+        avArg.nChannels = 2;
+        avArg.nSamplerate = 48000;
 #else
         avArg.nAudioFormat = TK_AUDIO_PCMU;
         avArg.nChannels = 1;
