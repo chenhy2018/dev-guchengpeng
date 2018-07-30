@@ -1,12 +1,6 @@
-1. 搭建GO编程环境
-2. clone qiniu base库到本地(https://github.com/qbox/base)
-3. source base/env.sh base/env-mock.sh
-4. 安装dep curl https://raw.githubusercontent.com/golang/dep/master/install.sh | sh
-5. 添加xxx/linking/link/vod 到GOPATH里
-6. make然后在bin/目录下会生成一个main的可执行文件
-7. ./bin/main 可以运行这个文件
-8. 浏览器打开指定的url就可以测试了
-
-dep的日常使用参考 https://golang.github.io/dep/
-
-添加新包之后记得更新push Gopkg.lock, 这个可以保证大家使用的外部版本都是一样的
+1. docker 启动时加参数 -p 8080:8080
+2. cd 到/opt2/linking/link/vod
+3. source env.sh
+4. make
+5. ./bin/main 运行服务端
+6. 用本地rest 客户端可以访问对应的接口
