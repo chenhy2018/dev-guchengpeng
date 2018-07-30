@@ -1,7 +1,7 @@
 #include "sip.h"
 
 #include <sys/time.h>
-#include <ncurses.h>
+//#include <ncurses.h>
 #include <stdio.h>
 #include <string.h>
 #include <time.h>
@@ -98,9 +98,6 @@ void UpdateInvCount(SipAnswerCode _StatusCode) {
         case CALL_TSX_DOES_NOT_EXIST:
                 Inv481++;
                 break;
-        case SEND_NEXT_HOP_FAILED:
-                Inv477++;
-                break;
         default:
 		OtherCode[OtherIdx++] = _StatusCode;
                 if (OtherIdx == 200)
@@ -123,9 +120,6 @@ void UpdateByeCount(SipAnswerCode _StatusCode) {
                 break;
         case 200:
                 BYE200++;
-                break;
-        case SEND_NEXT_HOP_FAILED:
-                BYE477;
                 break;
         default:
                 BYEOthers++;
@@ -292,6 +286,7 @@ void GetCurrentDateTime(char* buffer)
         ts = localtime(&now);
         strftime(buffer, 80, "%m-%d %H:%M:%S", ts);
 }
+/*
 void updateOnNcuser() {
         char StartTime[80];
         GetCurrentDateTime(StartTime);
@@ -344,7 +339,7 @@ void updateOnNcuser() {
 
         endwin();
 }
-
+*/
 void writeToFile() {
         char StartTime[80];
         GetCurrentDateTime(StartTime);

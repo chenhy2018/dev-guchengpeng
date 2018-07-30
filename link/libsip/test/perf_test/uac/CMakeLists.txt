@@ -8,4 +8,4 @@ link_directories(${CMAKE_CURRENT_SOURCE_DIR}/../../../../../third_party/pjprojec
 aux_source_directory(. uac)
 add_executable(perf_test_uac-$ENV{LIBPREFIX} ${uac})
 
-target_link_libraries(perf_test_uac-$ENV{LIBPREFIX} sip-$ENV{LIBPREFIX} pjsip-ua-$ENV{LIBPREFIX}.a pjsip-$ENV{LIBPREFIX} pjmedia-$ENV{LIBPREFIX} pjlib-util-$ENV{LIBPREFIX} pj-$ENV{LIBPREFIX} pthread m ncurses)
+target_link_libraries(perf_test_uac-$ENV{LIBPREFIX} sip-$ENV{LIBPREFIX} pjsip-ua-$ENV{LIBPREFIX}.a pjsip-$ENV{LIBPREFIX} pjmedia-$ENV{LIBPREFIX} pjlib-util-$ENV{LIBPREFIX} pj-$ENV{LIBPREFIX} pthread m)

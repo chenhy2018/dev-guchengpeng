@@ -1,7 +1,7 @@
 #include "sip.h"
 
 #include <sys/time.h>
-#include <ncurses.h>
+//#include <ncurses.h>
 #include <stdio.h>
 #include <string.h>
 #include <time.h>
