@@ -1,4 +1,4 @@
-1. docker 启动时加参数 -p 8080:880
+1. docker 启动时加参数 -p 8080:8080
 2. cd 到/opt2/linking/link/vod
 3. source env.sh
 4. make
