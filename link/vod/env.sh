@@ -1,4 +1,4 @@
-export QBOXROOT=/opt2/linking/third_party
-source $QBOXROOT/base/env.sh
-source $QBOXROOT/base/env-mock.sh
-export GOPATH=$GOPATH:/opt2/linking/third_party/vendor/:/opt2/linking/link/vod
+export QBOXROOT="$(dirname "$(dirname "$(pwd)")")/third_party"
+export GOPATH=$GOPATH:$QBOXROOT/vendor/:`pwd`
+source "$QBOXROOT/base/env.sh"
+source "$QBOXROOT/base/mockacc/env.sh"
