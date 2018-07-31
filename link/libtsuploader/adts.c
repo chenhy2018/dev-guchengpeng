@@ -18,8 +18,8 @@ void InitAdtsVariableHeader(ADTSVariableHeader *_pHeader, const int _nAacLenWith
     _pHeader->copyright_identification_bit       = 0;
     _pHeader->copyright_identification_start     = 0;
     _pHeader->aac_frame_length                   = _nAacLenWithoutHeader + 7;
-    _pHeader->adts_buffer_fullness               = 0x7f;
-    _pHeader->number_of_raw_data_blocks_in_frame = 2;
+    _pHeader->adts_buffer_fullness               = 0x7ff;
+    _pHeader->number_of_raw_data_blocks_in_frame = 0;
 }
 
 void ParseAdtsfixedHeader(const unsigned char *pData, ADTSFixheader *_pHeader) {
