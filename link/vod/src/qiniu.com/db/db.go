@@ -58,6 +58,13 @@ func InitDb(config *MgoConfig) error {
         return nil
 }
 
+func DinitDb() {
+        if GlobConn != nil && GlobConn.session != nil {
+                GlobConn.session.Close()
+        }
+        GlobConn = nil
+}
+
 func Session() *mgo.Session {
 
 	// return the original session
@@ -67,12 +74,18 @@ func Session() *mgo.Session {
 func cloneSession() *mgo.Session {
 
 	// return cloned session
-	return GlobConn.session.Clone()
+        if GlobConn != nil && GlobConn.session != nil {
+	        return GlobConn.session.Clone()
+        }
+        return nil
 }
 
 func WithCollection(coll string, cb func(*mgo.Collection) error) error {
 
 	session := cloneSession()
+        if session == nil {
+                return nil
+        }
 	defer session.Close()
 	c := session.DB(GlobConn.db).C(coll)
 	return cb(c)
