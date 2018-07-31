@@ -22,7 +22,7 @@ typedef struct _KodoUploader{
 #endif
         pthread_t workerId_;
         int isThreadStarted_;
-        char token_[256];
+        char token_[512];
         char ak_[64];
         char sk_[64];
         char bucketName_[256];
@@ -96,6 +96,7 @@ static void * streamUpload(void *_pOpaque)
                 Qiniu_Zero(putPolicy);
                 putPolicy.scope = pUploader->bucketName_;
                 putPolicy.deleteAfterDays = pUploader->deleteAfterDays_;
+                putPolicy.callbackUrl = pUploader->callback_;
                 uptoken = Qiniu_RS_PutPolicy_Token(&putPolicy, &mac);
 
                 //init

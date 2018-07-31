@@ -23,7 +23,7 @@ typedef struct _FFTsMuxContext{
 typedef struct _FFTsMuxUploader{
         TsMuxUploader tsMuxUploader_;
         pthread_mutex_t muxUploaderMutex_;
-        char token_[256];
+        char token_[512];
         char ak_[64];
         char sk_[64];
         char bucketName_[256];
@@ -105,7 +105,6 @@ static int ffWriteTsPacketToMem(void *opaque, uint8_t *buf, int buf_size)
         }
         return ret;
 }
-
 static int push(FFTsMuxUploader *pFFTsMuxUploader, char * _pData, int _nDataLen, int64_t _nTimestamp, int _nFlag){
         AVPacket pkt;
         av_init_packet(&pkt);
@@ -222,10 +221,11 @@ static int PushVideo(TsMuxUploader *_pTsMuxUploader, char * _pData, int _nDataLe
         }
         // if start new uploader, start from keyframe
         if (nIsKeyFrame) {
-                if( (pFFTsMuxUploader->nKeyFrameCount >= 2 && (_nTimestamp - pFFTsMuxUploader->nLastUploadVideoTimestamp) > 4980)
+                if( (_nTimestamp - pFFTsMuxUploader->nLastUploadVideoTimestamp) > 4980
                    //at least 2 keyframe and aoubt last 5 second
                    || (_nIsSegStart && pFFTsMuxUploader->nFrameCount != 0)// new segment is specified
                    ||  pFFTsMuxUploader->ffMuxSatte == TK_UPLOAD_FAIL){   // upload fail
+                        printf("next ts:%d %lld\n", pFFTsMuxUploader->nKeyFrameCount, _nTimestamp - pFFTsMuxUploader->nLastUploadVideoTimestamp);
                         pFFTsMuxUploader->nKeyFrameCount = 0;
                         pFFTsMuxUploader->nFrameCount = 0;
                         pFFTsMuxUploader->nLastUploadVideoTimestamp = _nTimestamp;

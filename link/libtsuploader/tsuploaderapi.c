@@ -6,7 +6,7 @@
 static char gAk[65] = {0};
 static char gSk[65] = {0};
 static char gBucket[65] = {0};
-static char gToken[256] = {0};
+static char gToken[512] = {0};
 static int nIsInited = 0;
 static TsMuxUploader *gpTsMuxUploader = NULL;
 static AvArg gAvArg;
@@ -15,7 +15,7 @@ int UpdateToken(char * pToken)
 {
         int ret = 0;
         ret = snprintf(gToken, sizeof(gToken), "%s", pToken);
-        assert(ret > 0);
+        assert(ret < sizeof(gToken));
         if (ret == sizeof(gToken)) {
                 logerror("token:%s is too long", pToken);
                 return TK_ARG_ERROR;
@@ -28,7 +28,7 @@ int SetBucketName(char *_pName)
 {
         int ret = 0;
         ret = snprintf(gBucket, sizeof(gBucket), "%s", _pName);
-        assert(ret > 0);
+        assert(ret < sizeof(gBucket));
         if (ret == sizeof(gBucket)) {
                 logerror("bucketname:%s is too long", _pName);
                 return TK_ARG_ERROR;
@@ -89,6 +89,8 @@ int InitUploader(char * _pUid, char *_pDeviceId, char *_pBucketName, char * _pTo
                 logerror("UploadStart fail:%d\n", ret);
                 return ret;
         }
+        gpTsMuxUploader->SetCallbackUrl(gpTsMuxUploader, "http://39.107.247.14:8088/qiniu/upload/callback",
+                                        strlen("http://39.107.247.14:8088/qiniu/upload/callback"));
         nIsInited = 1;
         return 0;
 }
@@ -156,6 +158,9 @@ int GetUploadToken(char *pBuf, int nBufLen)
         Qiniu_Zero(putPolicy);
         putPolicy.scope = gBucket;
         putPolicy.deleteAfterDays = 7;
+        putPolicy.callbackBody = "{\"key\":\"$(key)\",\"hash\":\"$(etag)\",\"fsize\":$(fsize),\"bucket\":\"$(bucket)\",\"name\":\"$(x:name)\"";
+        putPolicy.callbackUrl = "http://39.107.247.14:8088/qiniu/upload/callback";
+        putPolicy.callbackBodyType = "application/json";
         
         char *uptoken;
         uptoken = Qiniu_RS_PutPolicy_Token(&putPolicy, &mac);
