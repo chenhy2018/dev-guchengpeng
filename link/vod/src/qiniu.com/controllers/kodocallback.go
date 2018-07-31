@@ -52,11 +52,10 @@ func UploadTs(c *gin.Context) {
 	var kodoData kodoCallBack
 	err = json.Unmarshal(body, &kodoData)
 	xl.Infof("%s", kodoData)
-	fileName := kodoData.Name
+	fileName := kodoData.Key
 
 	xl.Infof("upload file = %s", fileName)
-	// filename = uid_devciceid_segmentid.ts
-	// models.addDevice(xl, fileName[0], fileName[1], fileName[2], time.Now().Unix())
+
 	UidDevicIdSegId := strings.Split(fileName, "_")
 	if len(UidDevicIdSegId) < 3 {
 		c.JSON(500, gin.H{

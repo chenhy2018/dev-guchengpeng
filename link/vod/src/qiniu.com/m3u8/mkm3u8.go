@@ -1,5 +1,4 @@
-//package m3u8
-package main
+package m3u8
 
 import (
     "bytes"
