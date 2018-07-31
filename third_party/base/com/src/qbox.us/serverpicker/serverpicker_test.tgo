@@ -1,0 +1,154 @@
+package serverpicker
+
+import (
+	"fmt"
+	"strconv"
+	"testing"
+)
+
+func checkSort(r *instance) bool {
+
+	for i := 1; i < len(r.nodes); i++ {
+		if r.nodes[i].hash < r.nodes[i-1].hash {
+			return false
+		}
+	}
+	return true
+}
+
+func TestNormal(t *testing.T) {
+
+	r, err := New([]string{}, 10)
+	if err != nil {
+		t.Fatal("New:", err)
+	}
+
+	node, err := r.PickServer("abc")
+	if err != ErrNoServers {
+		t.Fatal("r.PickServer: expect \"\",ErrNoAvaliableServer", node, err)
+	}
+
+	r, err = New([]string{"192.168.1.100:2802", "192.168.1.101:2802"}, 10)
+	if err != nil {
+		t.Fatal("New:", err)
+	}
+	if len(r.nodes) != 20 {
+		t.Fatal("New: unexpect len(r.nodes)", len(r.nodes))
+	}
+	if !checkSort(r) {
+		t.Fatal("New: unsorted nodes", r.nodes)
+	}
+	old := r.nodes
+
+	node, err = r.PickServer("key1")
+	if err != nil {
+		t.Fatal("r.PickServer: unexpect error", err)
+	}
+
+	r, err = New([]string{"192.168.1.100:2802", "192.168.1.101:2802"}, 10)
+	if len(r.nodes) != 20 {
+		t.Fatal("New: unexpect len(r.nodes)", len(r.nodes))
+	}
+	if !checkSort(r) {
+		t.Fatal("New: unsorted nodes", r.nodes)
+	}
+	for i := range r.nodes {
+		if old[i].hash != r.nodes[i].hash {
+			t.Fatal("New: unmatch nodes", r.nodes)
+		}
+	}
+}
+
+// ----------------------------------------------------------------------------
+
+func checkBalance(nodes []string, count int) map[string]int {
+
+	r, _ := New(nodes, 20)
+	m := make(map[string]int, len(nodes))
+	for i := 0; i < count; i++ {
+		node, _ := r.PickServer("key" + strconv.Itoa(i))
+		m[node.String()]++
+	}
+	return m
+}
+
+func TestBalance(t *testing.T) {
+
+	fmt.Println("TestBalance:", checkBalance([]string{
+		"192.168.1.100:2802",
+	}, 1e6))
+
+	fmt.Println("TestBalance:", checkBalance([]string{
+		"192.168.1.100:2802",
+		"192.168.1.101:2802",
+	}, 1e6))
+
+	fmt.Println("TestBalance:", checkBalance([]string{
+		"192.168.1.100:2802",
+		"192.168.1.101:2802",
+		"192.168.1.102:2802",
+	}, 1e6))
+
+	fmt.Println("TestBalance:", checkBalance([]string{
+		"192.168.1.100:2802",
+		"192.168.1.101:2802",
+		"192.168.1.102:2802",
+		"192.168.1.103:2802",
+	}, 1e6))
+
+	fmt.Println("TestBalance:", checkBalance([]string{
+		"192.168.1.100:2802",
+		"192.168.1.101:2802",
+		"192.168.1.102:2802",
+		"192.168.1.103:2802",
+		"192.168.1.104:2802",
+		"192.168.1.105:2802",
+		"192.168.1.106:2802",
+		"192.168.1.107:2802",
+	}, 1e6))
+}
+
+// ----------------------------------------------------------------------------
+
+func benchmarkPickServer(b *testing.B, key string) {
+
+	r, err := New([]string{
+		"192.168.1.100:2802",
+		"192.168.1.101:2802",
+		"192.168.1.102:2802",
+		"192.168.1.103:2802",
+		"192.168.1.104:2802",
+		"192.168.1.105:2802",
+		"192.168.1.106:2802",
+		"192.168.1.107:2802",
+	}, 20)
+	if err != nil {
+		b.Fatal("New:", err)
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		r.PickServer("http://iovip.qbox.me/testkey?imageView/1/w/300/h/400/sharp/1")
+	}
+}
+
+// go test -test.bench="BenchmarkPickServerLongKey"
+// BenchmarkPickServerLongKey	 5000000	       751 ns/op
+func BenchmarkPickServerLongKey(b *testing.B) {
+
+	benchmarkPickServer(b, "http://iovip.qbox.me/testkey?imageView/1/w/300/h/400/quality/90/sharp/1")
+}
+
+// go test -test.bench="BenchmarkPickServerNormalKey"
+// BenchmarkPickServerNormalKey	 5000000	       747 ns/op
+func BenchmarkPickServerNormalKey(b *testing.B) {
+
+	benchmarkPickServer(b, "http://iovip.qbox.me/testkey")
+}
+
+// go test -test.bench="BenchmarkPickServerShortKey"
+// BenchmarkPickServerShortKey	 5000000	       740 ns/op
+func BenchmarkPickServerShortKey(b *testing.B) {
+
+	benchmarkPickServer(b, "testkey")
+}
