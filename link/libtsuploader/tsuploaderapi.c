@@ -158,7 +158,7 @@ int GetUploadToken(char *pBuf, int nBufLen)
         Qiniu_Zero(putPolicy);
         putPolicy.scope = gBucket;
         putPolicy.deleteAfterDays = 7;
-        putPolicy.callbackBody = "{\"key\":\"$(key)\",\"hash\":\"$(etag)\",\"fsize\":$(fsize),\"bucket\":\"$(bucket)\",\"name\":\"$(x:name)\"";
+        putPolicy.callbackBody = "{\"key\":\"$(key)\",\"hash\":\"$(etag)\",\"fsize\":$(fsize),\"bucket\":\"$(bucket)\",\"name\":\"$(x:name)\"}";
         putPolicy.callbackUrl = "http://39.107.247.14:8088/qiniu/upload/callback";
         putPolicy.callbackBodyType = "application/json";
         
