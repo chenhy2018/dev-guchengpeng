@@ -20,6 +20,9 @@ func PlayBackGetm3u8(c *gin.Context) {
 	expire := c.DefaultQuery("e", "")
 	token := c.DefaultQuery("token", "")
 
+	if strings.Contains(DeviceId, ".m3u8") {
+		DeviceId = strings.TrimRight(DeviceId, ".m3u8")
+	}
 	fromT, err := strconv.ParseInt(from, 10, 32)
 	if err != nil {
 		c.JSON(500, gin.H{"status": "Parse from time failed"})
