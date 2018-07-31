@@ -5,18 +5,19 @@
 #include <unistd.h>
 #include "tsuploaderapi.h"
 #include "adts.h"
-
+AvArg avArg;
 
 typedef int (*DataCallback)(void *opaque, void *pData, int nDataLen, int nFlag, int64_t timestamp, int nIsKeyFrame);
 #define THIS_IS_AUDIO 1
 #define THIS_IS_VIDEO 2
 #define TEST_AAC 1
 #define TEST_AAC_NO_ADTS 1
+#define USE_LINK_ACC 1
 
 
 FILE *outTs;
 int gTotalLen = 0;
-char gtestToken[256] = {0};
+char gtestToken[512] = {0};
 
 // start aac
 static int aacfreq[13] = {96000, 88200,64000,48000,44100,32000,24000, 22050 , 16000 ,12000,11025,8000,7350};
@@ -228,25 +229,48 @@ int start_file_test(char * _pAudioFile, char * _pVideoFile, DataCallback callbac
                                         break;
                                 }
                                 
-                                if(start[2] == 0x01){//0x 00 00 01
-                                        type = start[3] & 0x1F;
-                                }else{ // 0x 00 00 00 01
-                                        type = start[4] & 0x1F;
-                                }
-                                
-                                if(type == 1 || type == 5 ){
-                                        if (type == 1) {
-                                                nNonIDR++;
-                                        } else {
-                                                nIDR++;
+                                if (avArg.nVideoFormat == TK_VIDEO_H264) {
+                                        if(start[2] == 0x01){//0x 00 00 01
+                                                type = start[3] & 0x1F;
+                                        }else{ // 0x 00 00 00 01
+                                                type = start[4] & 0x1F;
                                         }
-                                        //printf("send one video(%d) frame packet:%ld", type, end - sendp);
-                                        cbRet = callback(opaque, sendp, end - sendp, THIS_IS_VIDEO, nNextVideoTime-nSysTimeBase, type == 5);
-                                        if (cbRet != 0) {
-                                                bVideoOk = 0;
+                                        if(type == 1 || type == 5 ){
+                                                if (type == 1) {
+                                                        nNonIDR++;
+                                                } else {
+                                                        nIDR++;
+                                                }
+                                                //printf("send one video(%d) frame packet:%ld", type, end - sendp);
+                                                cbRet = callback(opaque, sendp, end - sendp, THIS_IS_VIDEO, nNextVideoTime-nSysTimeBase, type == 5);
+                                                if (cbRet != 0) {
+                                                        bVideoOk = 0;
+                                                }
+                                                nNextVideoTime += 40;
+                                                break;
                                         }
-                                        nNextVideoTime += 40;
-                                        break;
+                                }else{
+                                        if(start[2] == 0x01){//0x 00 00 01
+                                                type = start[3] & 0x7E;
+                                        }else{ // 0x 00 00 00 01
+                                                type = start[4] & 0x7E;
+                                        }
+                                        type = (type >> 1);
+                                        printf("------------->%d\n", type);
+                                        if(type == 19 || type == 20 ){
+                                                if (type == 20) {
+                                                        nNonIDR++;
+                                                } else {
+                                                        nIDR++;
+                                                }
+                                                //printf("send one video(%d) frame packet:%ld", type, end - sendp);
+                                                //cbRet = callback(opaque, sendp, end - sendp, THIS_IS_VIDEO, nNextVideoTime-nSysTimeBase, type == 19);
+                                                if (cbRet != 0) {
+                                                        bVideoOk = 0;
+                                                }
+                                                nNextVideoTime += 40;
+                                                break;
+                                        }
                                 }
                         }while(1);
                 }
@@ -311,6 +335,19 @@ int main(int argc, char* argv[])
         
         SetLogLevelToDebug();
         
+#ifdef USE_LINK_ACC
+        ret = SetAk("kevidUP5vchk8Qs9f9cjKo1dH3nscIkQSaVBjYx7");
+        if (ret != 0)
+                return ret;
+        ret = SetSk("KG9zawEhR4axJT0Kgn_VX_046LZxkUZBhcgURAC0");
+        if (ret != 0)
+                return ret;
+        
+        //计算token需要，所以需要先设置
+        ret = SetBucketName("ipcamera");
+        if (ret != 0)
+                return ret;
+#else
         ret =  SetAk("Y43mqoI_bswBDcOK-GeVRbwI7qSIyZRhels7HfeO");
         if (ret != 0)
                 return ret;
@@ -322,34 +359,56 @@ int main(int argc, char* argv[])
         ret = SetBucketName("bucket");
         if (ret != 0)
                 return ret;
+#endif
+
         
         ret = GetUploadToken(gtestToken, sizeof(gtestToken));
         if (ret != 0)
                 return ret;
+        printf("token:%s\n", gtestToken);
         
-        AvArg avArg;
 #ifdef TEST_AAC
         avArg.nAudioFormat = TK_AUDIO_AAC;
-        avArg.nChannels = 2;
-        avArg.nSamplerate = 48000;
+        avArg.nChannels = 1;
+        avArg.nSamplerate = 16000;
 #else
         avArg.nAudioFormat = TK_AUDIO_PCMU;
         avArg.nChannels = 1;
         avArg.nSamplerate = 8000;
 #endif
         avArg.nVideoFormat = TK_VIDEO_H264;
+#ifdef USE_LINK_ACC
+        ret = InitUploader("testuid3", "testdeviceid", "ipcamera", gtestToken, &avArg);
+#else
         ret = InitUploader("testuid3", "testdeviceid", "bucket", gtestToken, &avArg);
+#endif
         if (ret != 0) {
                 return ret;
         }
-#ifdef TEST_AAC
-        start_file_test("/Users/liuye/tmp/a.aac", "/Users/liuye/tmp/v.h264", dataCallback, NULL);
-#else
 #ifdef __APPLE__
-        start_file_test("/Users/liuye/Documents/qml/a.mulaw", "/Users/liuye/Documents/qml/v.h264", dataCallback, NULL);
+        char * pVFile = "/Users/liuye/Documents/material/h265_aac_1_16000_h264.h264";
+#ifdef TEST_AAC
+        char * pAFile = "/Users/liuye/Documents/material/h265_aac_1_16000_a.aac";
 #else
-        start_file_test( "/opt2/a.mulaw", "/opt2/v.h264", dataCallback, NULL);
+        char * pAFile = "/Users/liuye/Documents/material/h265_aac_1_16000_pcmu_8000.mulaw";
 #endif
+        if (avArg.nVideoFormat == TK_VIDEO_H265) {
+                pVFile = "/Users/liuye/Documents/material/h265_aac_1_16000_v.h265";
+        }
+        start_file_test(pAFile, pVFile, dataCallback, NULL);
+
+#else
+
+        char * pVFile = "/Users/liuye/tmp/v.h264";
+#ifdef TEST_AAC
+        char * pAFile = "/Users/liuye/tmp/a.aac";
+#else
+        char * pAFile = "/Users/liuye/tmp/a.mulaw";
+#endif
+        if (avArg.nVideoFormat == TK_VIDEO_H265) {
+                pVFile = "/Users/liuye/tmp/v.h265";
+        }
+        start_file_test(pAFile, pVFile, dataCallback, NULL);
 #endif
         
         
