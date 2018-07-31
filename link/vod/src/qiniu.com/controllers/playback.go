@@ -7,6 +7,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/qiniu/xlog.v1"
+	"qiniu.com/m3u8"
+	"qiniu.com/models"
 )
 
 // sample requset url = /playback/13764829407/12345?from=1532499345&to=1532499345&e=1532499345&token=xxxxxx
@@ -41,21 +43,18 @@ func PlayBackGetm3u8(c *gin.Context) {
 		return
 	}
 
-	// get ts list from models
-	// models.GetTsByStartEnd(xl, Uid, DeviceId, time.Unix(fromT, 0), time.Unix(toT, 0))
-
-	// makem3u8
-	m3u8 := "#EXTM3U\n" +
-		"#EXT-X-STREAM-INF:PROGRAM-ID=1, BANDWIDTH=200000\n" +
-		"gear1/prog_index.m3u8\n" +
-		"#EXT-X-STREAM-INF:PROGRAM-ID=1, BANDWIDTH=311111\n" +
-		"gear2/prog_index.m3u8\n" +
-		"#EXT-X-STREAM-INF:PROGRAM-ID=1, BANDWIDTH=484444\n" +
-		"gear3/prog_index.m3u8\n" +
-		"#EXT-X-STREAM-INF:PROGRAM-ID=1, BANDWIDTH=737777\n" +
-		"gear4/prog_index.m3u8"
+	segMod := &models.SegmentModel{}
+	xl.Info(0, 0, fromT, toT, Uid, DeviceId)
+	segs, err := segMod.GetFragmentTsInfo(0, 0, fromT, toT, Uid, DeviceId)
+	pPlaylist := new(m3u8.MediaPlaylist)
+	pPlaylist.Init(32, 32)
+	if err == nil {
+		for _, v := range segs {
+			pPlaylist.AppendSegment("pcgtsa42m.bkt.clouddn.com/"+v.FileName, 5.0, v.DeviceId)
+		}
+	}
 	c.Header("Content-Type", "text/plain")
-	c.String(200, m3u8)
+	c.String(200, pPlaylist.String())
 }
 
 func verifyToken(xl *xlog.Logger, expire, token, url string) bool {
