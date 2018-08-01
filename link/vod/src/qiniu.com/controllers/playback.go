@@ -48,7 +48,7 @@ func PlayBackGetm3u8(c *gin.Context) {
 
 	segMod := &models.SegmentModel{}
 	xl.Info(0, 0, fromT, toT, Uid, DeviceId)
-	segs, err := segMod.GetFragmentTsInfo(0, 0, fromT, toT, Uid, DeviceId)
+	segs, err := segMod.GetSegmentTsInfo(0, 0, fromT, toT, Uid, DeviceId)
 	pPlaylist := new(m3u8.MediaPlaylist)
 	pPlaylist.Init(32, 32)
 	if err == nil {
