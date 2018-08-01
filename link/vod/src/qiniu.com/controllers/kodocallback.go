@@ -12,19 +12,13 @@ import (
 	"qiniu.com/models"
 )
 
-type avFormat struct {
-	Duration string `json:"duration"`
-}
-type avinfo struct {
-	Format avFormat `json:"format"`
-}
 type kodoCallBack struct {
-	Key    string `json:"key"`
-	Hash   string `json:"hash"`
-	Size   int64  `json:"fsize"`
-	Bucket string `json:"bucket"`
-	Name   string `json:"name"`
-	AvInfo avinfo `json:"avinfo"`
+	Key      string `json:"key"`
+	Hash     string `json:"hash"`
+	Size     int64  `json:"fsize"`
+	Bucket   string `json:"bucket"`
+	Name     string `json:"name"`
+	Duration string `json:"duration"`
 }
 
 // sample requst see: https://developer.qiniu.com/kodo/manual/1653/callback
@@ -53,7 +47,6 @@ func UploadTs(c *gin.Context) {
 	err = json.Unmarshal(body, &kodoData)
 	xl.Infof("%#v", kodoData)
 	fileName := kodoData.Key
-
 	UidDevicIdSegId := strings.Split(fileName, "_")
 	if len(UidDevicIdSegId) < 3 {
 		c.JSON(500, gin.H{
@@ -62,15 +55,14 @@ func UploadTs(c *gin.Context) {
 		return
 
 	}
-	segId, err := strconv.ParseInt(UidDevicIdSegId[1], 10, 32)
+	segId, err := strconv.ParseInt(UidDevicIdSegId[2], 10, 32)
 	if err != nil {
 		c.JSON(500, gin.H{"status": "bad file name"})
 		return
 	}
 
 	endTime := time.Now()
-	duration := kodoData.AvInfo.Format.Duration + "s"
-	d, _ := time.ParseDuration(duration)
+	d, _ := time.ParseDuration(kodoData.Duration + "s")
 	startTime := endTime.Add(-d)
 	xl.Infof("start = %v\n, end = %v", startTime, endTime, d)
 	ts := models.SegmentTsInfo{
