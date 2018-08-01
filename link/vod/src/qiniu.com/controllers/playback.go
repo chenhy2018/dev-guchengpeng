@@ -48,14 +48,14 @@ func PlayBackGetm3u8(c *gin.Context) {
 
 	segMod := &models.SegmentModel{}
 	xl.Info(0, 0, fromT, toT, Uid, DeviceId)
-	segs, err := segMod.GetSegmentTsInfo(0, 0, fromT, toT, Uid, DeviceId)
+	segs, err := segMod.GetSegmentTsInfo(0, 0, time.Unix(fromT, 0).UnixNano(), time.Unix(toT, 0).UnixNano(), Uid, DeviceId)
 	pPlaylist := new(m3u8.MediaPlaylist)
 	pPlaylist.Init(32, 32)
 	if err == nil {
 		for _, v := range segs {
 			duration := float64(v.EndTime-v.StartTime) / 1000000
 			pPlaylist.AppendSegment("http://pcgtsa42m.bkt.clouddn.com/"+v.FileName, duration, v.DeviceId)
-			xl.Info(v.StartTime, v.EndTime, time.Unix(v.StartTime, 0), time.Unix(v.EndTime, 0))
+			xl.Info(v.StartTime, v.EndTime, time.Unix(v.StartTime, 0).UnixNano(), time.Unix(v.EndTime, 0).UnixNano())
 		}
 	}
 	c.Header("Content-Type", "application/x-mpegURL")
