@@ -64,7 +64,7 @@ func UploadTs(c *gin.Context) {
 	endTime := time.Now()
 	d, _ := time.ParseDuration(kodoData.Duration + "s")
 	startTime := endTime.Add(-d)
-	xl.Infof("start = %v\n, end = %v", startTime, endTime, d)
+	xl.Infof("start = %v\n, end = %v", startTime, endTime, d.Nanoseconds())
 	ts := models.SegmentTsInfo{
 		Uuid:              UidDevicIdSegId[0],
 		DeviceId:          UidDevicIdSegId[1],
