@@ -153,7 +153,7 @@ static int push(FFTsMuxUploader *pFFTsMuxUploader, char * _pData, int _nDataLen,
                 pTsMuxCtx->nPrevAudioTimestamp = _nTimestamp;
                 
                 unsigned char * pAData = (unsigned char * )_pData;
-                if (pAData[0] != 0xff || (pAData[1] & 0xf0) != 0xf0) {
+                if (pFFTsMuxUploader->avArg.nAudioFormat ==  TK_AUDIO_AAC && (pAData[0] != 0xff || (pAData[1] & 0xf0) != 0xf0)) {
                         ADTSFixheader fixHeader;
                         ADTSVariableHeader varHeader;
                         InitAdtsFixedHeader(&fixHeader);
