@@ -3,7 +3,6 @@ package controllers
 import (
 	"encoding/json"
 	"io/ioutil"
-	"net/http"
 	"strconv"
 	"strings"
 	"time"
@@ -11,21 +10,16 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/qiniu/xlog.v1"
 	"qiniu.com/models"
-	"qiniupkg.com/api.v7/auth/qbox"
 )
 
 type kodoCallBack struct {
-	Key    string `json:"key"`
-	Hash   string `json:"hash"`
-	Fsize  int64  `json:"fsize"`
-	Bucket string `json:"bucket"`
-	Name   string `json:"name"`
+	Key      string `json:"key"`
+	Hash     string `json:"hash"`
+	Size     int64  `json:"fsize"`
+	Bucket   string `json:"bucket"`
+	Name     string `json:"name"`
+	Duration string `json:"duration"`
 }
-
-const (
-	accessKey = "kevidUP5vchk8Qs9f9cjKo1dH3nscIkQSaVBjYx7"
-	secretKey = "KG9zawEhR4axJT0Kgn_VX_046LZxkUZBhcgURAC0"
-)
 
 // sample requst see: https://developer.qiniu.com/kodo/manual/1653/callback
 func UploadTs(c *gin.Context) {
@@ -33,10 +27,10 @@ func UploadTs(c *gin.Context) {
 	xl := xlog.New(c.Writer, c.Request)
 
 	c.Header("Content-Type", "application/json")
-	if ok, err := verifyAuth(xl, c.Request); err == nil && ok == true {
-		xl.Infof("verify auth falied %#v", err)
+	if ok, err := VerifyAuth(xl, c.Request); err == nil && ok == true {
+		xl.Infof("verify auth failed %#v", err)
 		c.JSON(401, gin.H{
-			"error": "verify auth falied",
+			"error": "verify auth failed",
 		})
 		return
 	}
@@ -44,18 +38,15 @@ func UploadTs(c *gin.Context) {
 	body, err := ioutil.ReadAll(c.Request.Body)
 	if err != nil {
 		c.JSON(500, gin.H{
-			"error": "read callback body falied",
+			"error": "read callback body failed",
 		})
 		return
 	}
 	xl.Infof("%s", body)
 	var kodoData kodoCallBack
 	err = json.Unmarshal(body, &kodoData)
-	xl.Infof("%s", kodoData)
+	xl.Infof("%#v", kodoData)
 	fileName := kodoData.Key
-
-	xl.Infof("upload file = %s", fileName)
-
 	UidDevicIdSegId := strings.Split(fileName, "_")
 	if len(UidDevicIdSegId) < 3 {
 		c.JSON(500, gin.H{
@@ -64,14 +55,22 @@ func UploadTs(c *gin.Context) {
 		return
 
 	}
-	segId, err := strconv.ParseInt(UidDevicIdSegId[1], 10, 32)
+	segId, err := strconv.ParseInt(UidDevicIdSegId[2], 10, 32)
+	if err != nil {
+		c.JSON(500, gin.H{"status": "bad file name"})
+		return
+	}
 
+	endTime := time.Now()
+	d, _ := time.ParseDuration(kodoData.Duration + "s")
+	startTime := endTime.Add(-d)
+	xl.Infof("start = %v\n, end = %v", startTime, endTime, d.Nanoseconds())
 	ts := models.SegmentTsInfo{
 		Uuid:              UidDevicIdSegId[0],
 		DeviceId:          UidDevicIdSegId[1],
-		StartTime:         time.Now().Unix(),
+		StartTime:         startTime.UnixNano(),
 		FileName:          fileName,
-		EndTime:           time.Now().Add(time.Minute).Unix(),
+		EndTime:           endTime.UnixNano(),
 		FragmentStartTime: int(segId),
 	}
 	segMod := &models.SegmentModel{}
@@ -81,10 +80,4 @@ func UploadTs(c *gin.Context) {
 		"success": true,
 		"name":    fileName,
 	})
-}
-
-func verifyAuth(xl *xlog.Logger, req *http.Request) (bool, error) {
-
-	mac := qbox.NewMac(accessKey, secretKey)
-	return mac.VerifyCallback(req)
 }
