@@ -13,7 +13,7 @@ type format struct {
 	Duration string `json:"duration"`
 }
 type fopNotifyInfo struct {
-	format format `json:"formant"`
+	Format format `json:"formant"`
 }
 
 func FopNotify(c *gin.Context) {
@@ -47,6 +47,6 @@ func FopNotify(c *gin.Context) {
 	}
 	if action == "avinfo" {
 		// update duration
-		xl.Info(notifyData.format.Duration, notifyData.format.Filename)
+		xl.Info(notifyData.Format.Duration, notifyData.Format.Filename)
 	}
 }

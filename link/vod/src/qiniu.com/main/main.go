@@ -21,7 +21,7 @@ func main() {
 	initDb()
 	r.GET("/playback/:uid/:deviceId", controllers.PlayBackGetm3u8)
 	r.POST("/qiniu/upload/callback", controllers.UploadTs)
-	r.POST("/qiniu/notify/*action", controllers.FopNotify)
+	//	r.POST("/qiniu/notify/*action", controllers.FopNotify)
 	r.Run(Config.Bind) // listen and serve on 0.0.0.0:8080
 
 }
