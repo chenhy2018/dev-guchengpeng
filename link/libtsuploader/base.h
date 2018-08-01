@@ -28,10 +28,10 @@ typedef enum {
 }UploadState;
 
 typedef struct _AvArg{
-        int nAudioFormat;
+        TkAudioFormat nAudioFormat;
         int nChannels;
         int nSamplerate;
-        int nVideoFormat;
+        TkVideoFormat nVideoFormat;
 } AvArg;
 
 #define TK_STREAM_UPLOAD 1

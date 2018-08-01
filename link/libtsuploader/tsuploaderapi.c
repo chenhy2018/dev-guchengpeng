@@ -5,21 +5,35 @@
 
 static char gAk[65] = {0};
 static char gSk[65] = {0};
-static char gBucket[65] = {0};
-static char gToken[512] = {0};
+static char gBucket[128] = {0};
+static char * gpTokenBackup = NULL;
+static char * gpToken = NULL;
+static int gnTokenLen = 0;
 static int nIsInited = 0;
 static TsMuxUploader *gpTsMuxUploader = NULL;
 static AvArg gAvArg;
 
 int UpdateToken(char * pToken)
 {
-        int ret = 0;
-        ret = snprintf(gToken, sizeof(gToken), "%s", pToken);
-        assert(ret < sizeof(gToken));
-        if (ret == sizeof(gToken)) {
-                logerror("token:%s is too long", pToken);
-                return TK_ARG_ERROR;
+
+        int nTokenLen = strlen(pToken);
+        if (gpToken == NULL) {
+                gpToken = malloc(nTokenLen + 1);
+                memcpy(gpToken, pToken, nTokenLen);
+                
         }
+        if (gnTokenLen <= nTokenLen) {
+                if (gpTokenBackup != NULL) {
+                        free(gpTokenBackup);
+                }
+                gpTokenBackup = gpToken;
+                gpToken = malloc(nTokenLen + 1);
+                memcpy(gpToken, pToken, nTokenLen);
+        } else {
+                memcpy(gpToken, pToken, nTokenLen);
+        }
+        gnTokenLen = nTokenLen;
+        gpToken[nTokenLen] = 0;
         
         return 0;
 }
@@ -77,7 +91,7 @@ int InitUploader(char * _pUid, char *_pDeviceId, char * _pToken, AvArg *_pAvArg)
                 return ret;
         }
 
-        gpTsMuxUploader->SetToken(gpTsMuxUploader, gToken);
+        gpTsMuxUploader->SetToken(gpTsMuxUploader, gpToken);
         ret = TsMuxUploaderStart(gpTsMuxUploader);
         if (ret != 0){
                 StopMgr();
@@ -114,6 +128,15 @@ void UninitUploader()
         DestroyTsMuxUploader(&gpTsMuxUploader);
         StopMgr();
         Qiniu_Global_Cleanup();
+        if (gpToken) {
+                free(gpToken);
+                gpToken = NULL;
+                gnTokenLen = 0;
+        }
+        if (gpTokenBackup) {
+                free(gpTokenBackup);
+                gpTokenBackup = NULL;
+        }
 }
 
 int SetAk(char *_pAk)
@@ -154,7 +177,7 @@ int GetUploadToken(char *pBuf, int nBufLen)
         Qiniu_Zero(putPolicy);
         putPolicy.scope = gBucket;
         putPolicy.deleteAfterDays = 7;
-        putPolicy.callbackBody = "{\"key\":\"$(key)\",\"hash\":\"$(etag)\",\"fsize\":$(fsize),\"bucket\":\"$(bucket)\",\"name\":\"$(x:name)\",\"avinfo\":\"$(avinfo)\"}";
+        putPolicy.callbackBody = "{\"key\":\"$(key)\",\"hash\":\"$(etag)\",\"fsize\":$(fsize),\"bucket\":\"$(bucket)\",\"name\":\"$(x:name)\",\"duration\":\"$(avinfo.format.duration)\"}";
         putPolicy.callbackUrl = "http://39.107.247.14:8088/qiniu/upload/callback";
         putPolicy.callbackBodyType = "application/json";
         

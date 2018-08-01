@@ -23,7 +23,7 @@ typedef struct _FFTsMuxContext{
 typedef struct _FFTsMuxUploader{
         TsMuxUploader tsMuxUploader_;
         pthread_mutex_t muxUploaderMutex_;
-        char token_[512];
+        char *pToken_;
         char ak_[64];
         char sk_[64];
         char bucketName_[256];
@@ -400,8 +400,7 @@ end:
 static void setToken(TsMuxUploader* _PTsMuxUploader, char *_pToken)
 {
         FFTsMuxUploader * pFFTsMuxUploader = (FFTsMuxUploader *)_PTsMuxUploader;
-        assert(strlen(_pToken) < sizeof(pFFTsMuxUploader->token_));
-        strcpy(pFFTsMuxUploader->token_, _pToken);
+        pFFTsMuxUploader->pToken_ = _pToken;
 }
 
 static void setAccessKey(TsMuxUploader* _PTsMuxUploader, char *_pAk, int _nAkLen)
@@ -484,13 +483,13 @@ int TsMuxUploaderStart(TsMuxUploader *_pTsMuxUploader)
                 free(pFFTsMuxUploader);
                 return ret;
         }
-        if (pFFTsMuxUploader->token_[0] == 0) {
+        if (pFFTsMuxUploader->pToken_ == NULL || pFFTsMuxUploader->pToken_[0] == 0) {
                 pFFTsMuxUploader->pTsMuxCtx->pTsUploader_->SetAccessKey(pFFTsMuxUploader->pTsMuxCtx->pTsUploader_,
                                                                         pFFTsMuxUploader->ak_, strlen(pFFTsMuxUploader->ak_));
                 pFFTsMuxUploader->pTsMuxCtx->pTsUploader_->SetSecretKey(pFFTsMuxUploader->pTsMuxCtx->pTsUploader_,
                                                                         pFFTsMuxUploader->sk_, strlen(pFFTsMuxUploader->sk_));
         } else {
-                pFFTsMuxUploader->pTsMuxCtx->pTsUploader_->SetToken(pFFTsMuxUploader->pTsMuxCtx->pTsUploader_, pFFTsMuxUploader->token_);
+                pFFTsMuxUploader->pTsMuxCtx->pTsUploader_->SetToken(pFFTsMuxUploader->pTsMuxCtx->pTsUploader_, pFFTsMuxUploader->pToken_);
         }
         pFFTsMuxUploader->pTsMuxCtx->pTsUploader_->SetBucket(pFFTsMuxUploader->pTsMuxCtx->pTsUploader_,
                                                              pFFTsMuxUploader->bucketName_, strlen(pFFTsMuxUploader->bucketName_));

@@ -22,7 +22,7 @@ typedef struct _KodoUploader{
 #endif
         pthread_t workerId_;
         int isThreadStarted_;
-        char token_[512];
+        char *pToken_;
         char ak_[64];
         char sk_[64];
         char bucketName_[256];
@@ -74,11 +74,10 @@ static void setDeleteAfterDays(TsUploader* _pUploader, int nDays)
         pKodoUploader->deleteAfterDays_ = nDays;
 }
 
-static void setToken(TsUploader* _pUploader, char *pToken)
+static void setToken(TsUploader* _pUploader, char *_pToken)
 {
         KodoUploader * pKodoUploader = (KodoUploader *)_pUploader;
-        assert(strlen(pToken) < sizeof(pKodoUploader->token_));
-        strcpy(pKodoUploader->token_, pToken);
+        pKodoUploader->pToken_ = _pToken;
 }
 
 static void * streamUpload(void *_pOpaque)
@@ -87,7 +86,7 @@ static void * streamUpload(void *_pOpaque)
         
         char *uptoken = NULL;
         Qiniu_Client client;
-        if (pUploader->token_[0] == 0) {
+        if (pUploader->pToken_ == NULL || pUploader->pToken_[0] == 0) {
                 Qiniu_Mac mac;
                 mac.accessKey = pUploader->ak_;
                 mac.secretKey = pUploader->sk_;
@@ -103,7 +102,7 @@ static void * streamUpload(void *_pOpaque)
                 Qiniu_Client_InitMacAuth(&client, 1024, &mac);
         } else {
                 logdebug("client upload");
-                uptoken = pUploader->token_;
+                uptoken = pUploader->pToken_;
                 Qiniu_Client_InitNoAuth(&client, 1024);
         }
         
@@ -142,7 +141,7 @@ static void * streamUpload(void *_pOpaque)
                 logdebug("upload file %s: key:%s success", pUploader->bucketName_, key);
         }
         
-        if (pUploader->token_[0] == 0) {
+        if (pUploader->pToken_[0] == 0) {
                 Qiniu_Free(uptoken);
         }
         Qiniu_Client_Cleanup(&client);

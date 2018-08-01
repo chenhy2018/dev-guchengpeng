@@ -17,7 +17,7 @@ typedef int (*DataCallback)(void *opaque, void *pData, int nDataLen, int nFlag, 
 
 FILE *outTs;
 int gTotalLen = 0;
-char gtestToken[512] = {0};
+char gtestToken[1024] = {0};
 
 // start aac
 static int aacfreq[13] = {96000, 88200,64000,48000,44100,32000,24000, 22050 , 16000 ,12000,11025,8000,7350};
