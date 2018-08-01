@@ -37,7 +37,7 @@ int SetBucketName(char *_pName)
         return 0;
 }
 
-int InitUploader(char * _pUid, char *_pDeviceId, char *_pBucketName, char * _pToken, AvArg *_pAvArg)
+int InitUploader(char * _pUid, char *_pDeviceId, char * _pToken, AvArg *_pAvArg)
 {
         if (nIsInited) {
                 return 0;
@@ -47,10 +47,6 @@ int InitUploader(char * _pUid, char *_pDeviceId, char *_pBucketName, char * _pTo
 
         int ret = 0;
         ret = UpdateToken(_pToken);
-        if (ret != 0) {
-                return ret;
-        }
-        ret = SetBucketName(_pBucketName);
         if (ret != 0) {
                 return ret;
         }

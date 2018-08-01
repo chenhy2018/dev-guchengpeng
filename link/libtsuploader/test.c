@@ -250,13 +250,15 @@ int start_file_test(char * _pAudioFile, char * _pVideoFile, DataCallback callbac
                                                 break;
                                         }
                                 }else{
+                                        int dlen = 3;
                                         if(start[2] == 0x01){//0x 00 00 01
                                                 type = start[3] & 0x7E;
                                         }else{ // 0x 00 00 00 01
+                                                dlen = 4;
                                                 type = start[4] & 0x7E;
                                         }
                                         type = (type >> 1);
-                                        printf("------------->%d\n", type);
+                                        printf("%d------------->%d\n",dlen, type);
                                         if(type == 19 || type == 20 ){
                                                 if (type == 20) {
                                                         nNonIDR++;
@@ -377,11 +379,8 @@ int main(int argc, char* argv[])
         avArg.nSamplerate = 8000;
 #endif
         avArg.nVideoFormat = TK_VIDEO_H264;
-#ifdef USE_LINK_ACC
-        ret = InitUploader("testuid3", "testdeviceid", "ipcamera", gtestToken, &avArg);
-#else
-        ret = InitUploader("testuid3", "testdeviceid", "bucket", gtestToken, &avArg);
-#endif
+
+        ret = InitUploader("testuid3", "testdeviceid", gtestToken, &avArg);
         if (ret != 0) {
                 return ret;
         }
