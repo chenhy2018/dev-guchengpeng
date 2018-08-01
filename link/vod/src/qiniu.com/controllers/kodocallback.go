@@ -3,7 +3,6 @@ package controllers
 import (
 	"encoding/json"
 	"io/ioutil"
-	"net/http"
 	"strconv"
 	"strings"
 	"time"
@@ -11,7 +10,6 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/qiniu/xlog.v1"
 	"qiniu.com/models"
-	"qiniupkg.com/api.v7/auth/qbox"
 )
 
 type kodoCallBack struct {
@@ -22,21 +20,16 @@ type kodoCallBack struct {
 	Name   string `json:"name"`
 }
 
-const (
-	accessKey = "kevidUP5vchk8Qs9f9cjKo1dH3nscIkQSaVBjYx7"
-	secretKey = "KG9zawEhR4axJT0Kgn_VX_046LZxkUZBhcgURAC0"
-)
-
 // sample requst see: https://developer.qiniu.com/kodo/manual/1653/callback
 func UploadTs(c *gin.Context) {
 
 	xl := xlog.New(c.Writer, c.Request)
 
 	c.Header("Content-Type", "application/json")
-	if ok, err := verifyAuth(xl, c.Request); err == nil && ok == true {
-		xl.Infof("verify auth falied %#v", err)
+	if ok, err := VerifyAuth(xl, c.Request); err == nil && ok == true {
+		xl.Infof("verify auth failed %#v", err)
 		c.JSON(401, gin.H{
-			"error": "verify auth falied",
+			"error": "verify auth failed",
 		})
 		return
 	}
@@ -44,7 +37,7 @@ func UploadTs(c *gin.Context) {
 	body, err := ioutil.ReadAll(c.Request.Body)
 	if err != nil {
 		c.JSON(500, gin.H{
-			"error": "read callback body falied",
+			"error": "read callback body failed",
 		})
 		return
 	}
@@ -81,10 +74,4 @@ func UploadTs(c *gin.Context) {
 		"success": true,
 		"name":    fileName,
 	})
-}
-
-func verifyAuth(xl *xlog.Logger, req *http.Request) (bool, error) {
-
-	mac := qbox.NewMac(accessKey, secretKey)
-	return mac.VerifyCallback(req)
 }
