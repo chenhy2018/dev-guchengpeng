@@ -12,12 +12,19 @@ import (
 	"qiniu.com/models"
 )
 
+type avFormat struct {
+	duration string `json:"duration"`
+}
+type avinfo struct {
+	format avFormat `json:"format"`
+}
 type kodoCallBack struct {
-	Key    string `json:"key"`
-	Hash   string `json:"hash"`
-	Fsize  int64  `json:"fsize"`
-	Bucket string `json:"bucket"`
-	Name   string `json:"name"`
+	key    string `json:"key"`
+	hash   string `json:"hash"`
+	size   int64  `json:"fsize"`
+	bucket string `json:"bucket"`
+	name   string `json:"name"`
+	avInfo avinfo `json:"avinfo"`
 }
 
 // sample requst see: https://developer.qiniu.com/kodo/manual/1653/callback
@@ -45,7 +52,7 @@ func UploadTs(c *gin.Context) {
 	var kodoData kodoCallBack
 	err = json.Unmarshal(body, &kodoData)
 	xl.Infof("%s", kodoData)
-	fileName := kodoData.Key
+	fileName := kodoData.key
 
 	xl.Infof("upload file = %s", fileName)
 
