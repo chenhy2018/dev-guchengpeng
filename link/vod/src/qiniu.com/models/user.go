@@ -98,6 +98,24 @@ func ResetPassword(uid, opwd, pwd string) error {
         )
 }
 
+func GetPwdByUID(uid string) (string, error) {
+        r := UserInfo{}
+        err := db.WithCollection(
+                USER_COL,
+                func(c *mgo.Collection) error {
+                        return c.Find(
+                                bson.M{
+                                        "uid": uid,
+                                },
+                        ).One(&r)
+                },
+        )
+        if err != nil {
+                return "", fmt.Errorf("pwd get error: %v", err)
+        }
+        return r.Password, nil
+}
+
 func Logout(uid string) error {
         return db.WithCollection(
                 USER_COL,
