@@ -53,7 +53,8 @@ func PlayBackGetm3u8(c *gin.Context) {
 	pPlaylist.Init(32, 32)
 	if err == nil {
 		for _, v := range segs {
-			pPlaylist.AppendSegment("http://pcgtsa42m.bkt.clouddn.com/"+v.FileName, 5.0, v.DeviceId)
+			duration := float64(v.EndTime-v.StartTime) / 1000000
+			pPlaylist.AppendSegment("http://pcgtsa42m.bkt.clouddn.com/"+v.FileName, duration, v.DeviceId)
 			xl.Info(v.StartTime, v.EndTime, time.Unix(v.StartTime, 0), time.Unix(v.EndTime, 0))
 		}
 	}

@@ -62,22 +62,23 @@ func UploadTs(c *gin.Context) {
 		return
 
 	}
-
-	duration, err := strconv.ParseFloat(kodoData.AvInfo.Format.Duration, 64)
+	segId, err := strconv.ParseInt(UidDevicIdSegId[1], 10, 32)
 	if err != nil {
-		c.JSON(500, gin.H{"status": "Parse expire time failed"})
+		c.JSON(500, gin.H{"status": "bad file name"})
 		return
 	}
-	segId, err := strconv.ParseInt(UidDevicIdSegId[1], 10, 32)
-	startTime := time.Now().Unix()
-	endTime := startTime + int64(duration)
 
+	endTime := time.Now()
+	duration := kodoData.AvInfo.Format.Duration + "s"
+	d, _ := time.ParseDuration(duration)
+	startTime := endTime.Add(-d)
+	xl.Infof("start = %v\n, end = %v", startTime, endTime, d)
 	ts := models.SegmentTsInfo{
 		Uuid:              UidDevicIdSegId[0],
 		DeviceId:          UidDevicIdSegId[1],
-		StartTime:         startTime,
+		StartTime:         startTime.UnixNano(),
 		FileName:          fileName,
-		EndTime:           endTime,
+		EndTime:           endTime.UnixNano(),
 		FragmentStartTime: int(segId),
 	}
 	segMod := &models.SegmentModel{}
