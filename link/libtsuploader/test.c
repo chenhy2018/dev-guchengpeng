@@ -27,6 +27,55 @@ typedef struct ADTS{
 }ADTS;
 //end aac
 
+enum HEVCNALUnitType {
+        HEVC_NAL_TRAIL_N    = 0,
+        HEVC_NAL_TRAIL_R    = 1,
+        HEVC_NAL_TSA_N      = 2,
+        HEVC_NAL_TSA_R      = 3,
+        HEVC_NAL_STSA_N     = 4,
+        HEVC_NAL_STSA_R     = 5,
+        HEVC_NAL_RADL_N     = 6,
+        HEVC_NAL_RADL_R     = 7,
+        HEVC_NAL_RASL_N     = 8,
+        HEVC_NAL_RASL_R     = 9,
+        HEVC_NAL_VCL_N10    = 10,
+        HEVC_NAL_VCL_R11    = 11,
+        HEVC_NAL_VCL_N12    = 12,
+        HEVC_NAL_VCL_R13    = 13,
+        HEVC_NAL_VCL_N14    = 14,
+        HEVC_NAL_VCL_R15    = 15,
+        HEVC_NAL_BLA_W_LP   = 16,
+        HEVC_NAL_BLA_W_RADL = 17,
+        HEVC_NAL_BLA_N_LP   = 18,
+        HEVC_NAL_IDR_W_RADL = 19,
+        HEVC_NAL_IDR_N_LP   = 20,
+        HEVC_NAL_CRA_NUT    = 21,
+        HEVC_NAL_IRAP_VCL22 = 22,
+        HEVC_NAL_IRAP_VCL23 = 23,
+        HEVC_NAL_RSV_VCL24  = 24,
+        HEVC_NAL_RSV_VCL25  = 25,
+        HEVC_NAL_RSV_VCL26  = 26,
+        HEVC_NAL_RSV_VCL27  = 27,
+        HEVC_NAL_RSV_VCL28  = 28,
+        HEVC_NAL_RSV_VCL29  = 29,
+        HEVC_NAL_RSV_VCL30  = 30,
+        HEVC_NAL_RSV_VCL31  = 31,
+        HEVC_NAL_VPS        = 32,
+        HEVC_NAL_SPS        = 33,
+        HEVC_NAL_PPS        = 34,
+        HEVC_NAL_AUD        = 35,
+        HEVC_NAL_EOS_NUT    = 36,
+        HEVC_NAL_EOB_NUT    = 37,
+        HEVC_NAL_FD_NUT     = 38,
+        HEVC_NAL_SEI_PREFIX = 39,
+        HEVC_NAL_SEI_SUFFIX = 40,
+};
+enum HevcType {
+        HEVC_META = 0,
+        HEVC_I = 1,
+        HEVC_B =2
+};
+
 static const uint8_t *ff_avc_find_startcode_internal(const uint8_t *p, const uint8_t *end)
 {
         const uint8_t *a = p + 4 - ((intptr_t)p & 3);
@@ -112,6 +161,27 @@ static int readFileToBuf(char * _pFilename, char ** _pBuf, int *_pLen)
         *_pBuf = pData;
         *_pLen = nLen;
         return 0;
+}
+
+static int is_h265_picture(int t)
+{
+        switch (t) {
+                case HEVC_NAL_VPS:
+                case HEVC_NAL_SPS:
+                case HEVC_NAL_PPS:
+                case HEVC_NAL_SEI_PREFIX:
+                        return HEVC_META;
+                case HEVC_NAL_IDR_W_RADL:
+                case HEVC_NAL_CRA_NUT:
+                        return HEVC_I;
+                case HEVC_NAL_TRAIL_N:
+                case HEVC_NAL_TRAIL_R:
+                case HEVC_NAL_RASL_N:
+                case HEVC_NAL_RASL_R:
+                        return HEVC_B;
+                default:
+                        return -1;
+        }
 }
 
 int start_file_test(char * _pAudioFile, char * _pVideoFile, DataCallback callback, void *opaque)
@@ -258,15 +328,20 @@ int start_file_test(char * _pAudioFile, char * _pVideoFile, DataCallback callbac
                                                 type = start[4] & 0x7E;
                                         }
                                         type = (type >> 1);
-                                        printf("%d------------->%d\n",dlen, type);
-                                        if(type == 19 || type == 20 ){
+                                        int hevctype = is_h265_picture(type);
+                                        if (hevctype == -1) {
+                                                printf("unknown type:%d\n", type);
+                                                continue;
+                                        }
+                                        //printf("%d------------->%d\n",dlen, type);
+                                        if(hevctype == HEVC_I || hevctype == HEVC_B ){
                                                 if (type == 20) {
                                                         nNonIDR++;
                                                 } else {
                                                         nIDR++;
                                                 }
                                                 //printf("send one video(%d) frame packet:%ld", type, end - sendp);
-                                                //cbRet = callback(opaque, sendp, end - sendp, THIS_IS_VIDEO, nNextVideoTime-nSysTimeBase, type == 19);
+                                                cbRet = callback(opaque, sendp, end - sendp, THIS_IS_VIDEO, nNextVideoTime-nSysTimeBase, hevctype == HEVC_I);
                                                 if (cbRet != 0) {
                                                         bVideoOk = 0;
                                                 }
@@ -367,10 +442,10 @@ int main(int argc, char* argv[])
         pthread_attr_destroy (&attr);
         
 #ifdef USE_LINK_ACC
-        ret = SetAk("kevidUP5vchk8Qs9f9cjKo1dH3nscIkQSaVBjYx7");
+        ret = SetAk("JAwTPb8dmrbiwt89Eaxa4VsL4_xSIYJoJh4rQfOQ");
         if (ret != 0)
                 return ret;
-        ret = SetSk("KG9zawEhR4axJT0Kgn_VX_046LZxkUZBhcgURAC0");
+        ret = SetSk("G5mtjT3QzG4Lf7jpCAN5PZHrGeoSH9jRdC96ecYS");
         if (ret != 0)
                 return ret;
         
@@ -379,7 +454,7 @@ int main(int argc, char* argv[])
         if (ret != 0)
                 return ret;
 #else
-        ret =  SetAk("Y43mqoI_bswBDcOK-GeVRbwI7qSIyZRhels7HfeO");
+        ret =  SetAk("p4y2X-zKqiDoWeIvmhhXkR3mHbHx_Yw36YHFz9e1");
         if (ret != 0)
                 return ret;
         ret = SetSk("hVZOIZfLw_0xzJhtVv1ddmlSkbiUrHLdNJewZRkp");
@@ -421,7 +496,8 @@ int main(int argc, char* argv[])
         char * pAFile = "/Users/liuye/Documents/material/h265_aac_1_16000_pcmu_8000.mulaw";
   #endif
         if (avArg.nVideoFormat == TK_VIDEO_H265) {
-                pVFile = "/Users/liuye/Documents/material/h265_aac_1_16000_v.h265";
+                //pVFile = "/Users/liuye/Documents/material/h265_aac_1_16000_v.h265";
+                pVFile = "/Users/liuye/Documents/material/h265.h265";
         }
         start_file_test(pAFile, pVFile, dataCallback, NULL);
 
