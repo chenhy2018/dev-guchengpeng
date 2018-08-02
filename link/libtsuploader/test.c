@@ -328,6 +328,24 @@ static int dataCallback(void *opaque, void *pData, int nDataLen, int nFlag, int6
         return ret;
 }
 
+static void * upadateToken() {
+        int ret = 0;
+        while(1) {
+                sleep(30);
+                ret = GetUploadToken(gtestToken, sizeof(gtestToken));
+                if (ret != 0) {
+                        printf("update token file<<<<<<<<<<<<<\n");
+                        return NULL;
+                }
+                printf("token:%s\n", gtestToken);
+                ret = UpdateToken(gtestToken);
+                if (ret != 0) {
+                        printf("update token file<<<<<<<<<<<<<\n");
+                        return NULL;
+                }
+        }
+        return NULL;
+}
 
 
 int main(int argc, char* argv[])
@@ -336,6 +354,17 @@ int main(int argc, char* argv[])
         int ret = 0;
         
         SetLogLevelToDebug();
+        
+        pthread_t updateTokenThread;
+        pthread_attr_t attr;
+        pthread_attr_init (&attr);
+        pthread_attr_setdetachstate (&attr, PTHREAD_CREATE_DETACHED);
+        ret = pthread_create(&updateTokenThread, &attr, upadateToken, NULL);
+        if (ret != 0) {
+                printf("create update token thread fail\n");
+                return ret;
+        }
+        pthread_attr_destroy (&attr);
         
 #ifdef USE_LINK_ACC
         ret = SetAk("kevidUP5vchk8Qs9f9cjKo1dH3nscIkQSaVBjYx7");
@@ -386,11 +415,11 @@ int main(int argc, char* argv[])
         }
 #ifdef __APPLE__
         char * pVFile = "/Users/liuye/Documents/material/h265_aac_1_16000_h264.h264";
-#ifdef TEST_AAC
+  #ifdef TEST_AAC
         char * pAFile = "/Users/liuye/Documents/material/h265_aac_1_16000_a.aac";
-#else
+  #else
         char * pAFile = "/Users/liuye/Documents/material/h265_aac_1_16000_pcmu_8000.mulaw";
-#endif
+  #endif
         if (avArg.nVideoFormat == TK_VIDEO_H265) {
                 pVFile = "/Users/liuye/Documents/material/h265_aac_1_16000_v.h265";
         }
@@ -399,11 +428,11 @@ int main(int argc, char* argv[])
 #else
 
         char * pVFile = "/Users/liuye/tmp/v.h264";
-#ifdef TEST_AAC
+  #ifdef TEST_AAC
         char * pAFile = "/Users/liuye/tmp/a.aac";
-#else
+  #else
         char * pAFile = "/Users/liuye/tmp/a.mulaw";
-#endif
+  #endif
         if (avArg.nVideoFormat == TK_VIDEO_H265) {
                 pVFile = "/Users/liuye/tmp/v.h265";
         }
