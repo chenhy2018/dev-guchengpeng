@@ -21,20 +21,23 @@ int UpdateToken(char * pToken)
                 gpToken = malloc(nTokenLen + 1);
                 memcpy(gpToken, pToken, nTokenLen);
                 
-        }
-        if (gnTokenLen <= nTokenLen) {
-                if (gpTokenBackup != NULL) {
-                        free(gpTokenBackup);
+        }else {
+                if (gnTokenLen <= nTokenLen) {
+                        if (gpTokenBackup != NULL) {
+                                free(gpTokenBackup);
+                        }
+                        gpTokenBackup = gpToken;
+                        gpToken = malloc(nTokenLen + 1);
+                        memcpy(gpToken, pToken, nTokenLen);
+                } else {
+                        memcpy(gpToken, pToken, nTokenLen);
                 }
-                gpTokenBackup = gpToken;
-                gpToken = malloc(nTokenLen + 1);
-                memcpy(gpToken, pToken, nTokenLen);
-        } else {
-                memcpy(gpToken, pToken, nTokenLen);
         }
         gnTokenLen = nTokenLen;
         gpToken[nTokenLen] = 0;
-        
+        if (gpTsMuxUploader != NULL) {
+                gpTsMuxUploader->SetToken(gpTsMuxUploader, gpToken);
+        }
         return 0;
 }
 
