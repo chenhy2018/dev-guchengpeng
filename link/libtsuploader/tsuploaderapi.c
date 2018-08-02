@@ -2,42 +2,50 @@
 #include "tsmuxuploader.h"
 #include <assert.h>
 #include "log.h"
+#include <pthread.h>
 
 static char gAk[65] = {0};
 static char gSk[65] = {0};
 static char gBucket[128] = {0};
-static char * gpTokenBackup = NULL;
-static char * gpToken = NULL;
-static int gnTokenLen = 0;
-static int nIsInited = 0;
+static int nProcStatus = 0;
 static TsMuxUploader *gpTsMuxUploader = NULL;
 static AvArg gAvArg;
 
+typedef struct _Token {
+        int nQuit;
+        char * pPrevToken_;
+        int nPrevTokenLen_;
+        char * pToken_;
+        int nTokenLen_;
+        pthread_mutex_t tokenMutex_;
+}Token;
+static Token gToken;
+
 int UpdateToken(char * pToken)
 {
-
+        if (gToken.nQuit) {
+                return 0;
+        }
+        pthread_mutex_lock(&gToken.tokenMutex_);
         int nTokenLen = strlen(pToken);
-        if (gpToken == NULL) {
-                gpToken = malloc(nTokenLen + 1);
-                memcpy(gpToken, pToken, nTokenLen);
-                
+        if (gToken.pToken_ == NULL) {
+                gToken.pToken_ = malloc(nTokenLen + 1);
         }else {
-                if (gnTokenLen <= nTokenLen) {
-                        if (gpTokenBackup != NULL) {
-                                free(gpTokenBackup);
-                        }
-                        gpTokenBackup = gpToken;
-                        gpToken = malloc(nTokenLen + 1);
-                        memcpy(gpToken, pToken, nTokenLen);
-                } else {
-                        memcpy(gpToken, pToken, nTokenLen);
+                if (gToken.pPrevToken_ != NULL) {
+                        free(gToken.pPrevToken_);
                 }
+                gToken.pPrevToken_ = gToken.pToken_;
+                gToken.nPrevTokenLen_ = gToken.nTokenLen_;
+                
+                gToken.pToken_ = malloc(nTokenLen + 1);
         }
-        gnTokenLen = nTokenLen;
-        gpToken[nTokenLen] = 0;
+        memcpy(gToken.pToken_, pToken, nTokenLen);
+        gToken.nTokenLen_ = nTokenLen;
+        gToken.pToken_[nTokenLen] = 0;
         if (gpTsMuxUploader != NULL) {
-                gpTsMuxUploader->SetToken(gpTsMuxUploader, gpToken);
+                gpTsMuxUploader->SetToken(gpTsMuxUploader, gToken.pToken_);
         }
+        pthread_mutex_unlock(&gToken.tokenMutex_);
         return 0;
 }
 
@@ -56,13 +64,18 @@ int SetBucketName(char *_pName)
 
 int InitUploader(char * _pUid, char *_pDeviceId, char * _pToken, AvArg *_pAvArg)
 {
-        if (nIsInited) {
+        if (nProcStatus) {
                 return 0;
         }
-        
+
         Qiniu_Global_Init(-1);
 
         int ret = 0;
+        ret = pthread_mutex_init(&gToken.tokenMutex_, NULL);
+        if (ret != 0) {
+                return ret;
+        }
+
         ret = UpdateToken(_pToken);
         if (ret != 0) {
                 return ret;
@@ -94,7 +107,7 @@ int InitUploader(char * _pUid, char *_pDeviceId, char * _pToken, AvArg *_pAvArg)
                 return ret;
         }
 
-        gpTsMuxUploader->SetToken(gpTsMuxUploader, gpToken);
+        gpTsMuxUploader->SetToken(gpTsMuxUploader, gToken.pToken_);
         ret = TsMuxUploaderStart(gpTsMuxUploader);
         if (ret != 0){
                 StopMgr();
@@ -104,7 +117,7 @@ int InitUploader(char * _pUid, char *_pDeviceId, char * _pToken, AvArg *_pAvArg)
         }
         gpTsMuxUploader->SetCallbackUrl(gpTsMuxUploader, "http://39.107.247.14:8088/qiniu/upload/callback",
                                         strlen("http://39.107.247.14:8088/qiniu/upload/callback"));
-        nIsInited = 1;
+        nProcStatus = 1;
         return 0;
 }
 
@@ -126,20 +139,25 @@ int PushAudio(char * _pData, int _nDataLen, int64_t _nTimestamp)
 
 void UninitUploader()
 {
-        if (!nIsInited)
+        if (nProcStatus != 1)
                 return;
+        nProcStatus = 2;
         DestroyTsMuxUploader(&gpTsMuxUploader);
         StopMgr();
         Qiniu_Global_Cleanup();
-        if (gpToken) {
-                free(gpToken);
-                gpToken = NULL;
-                gnTokenLen = 0;
+        
+        gToken.nQuit = 1;
+        pthread_mutex_lock(&gToken.tokenMutex_);
+        if (gToken.pToken_) {
+                free(gToken.pToken_);
+                gToken.pToken_ = NULL;
         }
-        if (gpTokenBackup) {
-                free(gpTokenBackup);
-                gpTokenBackup = NULL;
+        if (gToken.pPrevToken_) {
+                free(gToken.pPrevToken_);
         }
+        pthread_mutex_unlock(&gToken.tokenMutex_);
+
+        pthread_mutex_destroy(&gToken.tokenMutex_);
 }
 
 int SetAk(char *_pAk)
@@ -179,6 +197,7 @@ int GetUploadToken(char *pBuf, int nBufLen)
         Qiniu_RS_PutPolicy putPolicy;
         Qiniu_Zero(putPolicy);
         putPolicy.scope = gBucket;
+        putPolicy.expires = 40;
         putPolicy.deleteAfterDays = 7;
         putPolicy.callbackBody = "{\"key\":\"$(key)\",\"hash\":\"$(etag)\",\"fsize\":$(fsize),\"bucket\":\"$(bucket)\",\"name\":\"$(x:name)\",\"duration\":\"$(avinfo.format.duration)\"}";
         putPolicy.callbackUrl = "http://39.107.247.14:8088/qiniu/upload/callback";

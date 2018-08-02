@@ -86,6 +86,7 @@ static void * streamUpload(void *_pOpaque)
         
         char *uptoken = NULL;
         Qiniu_Client client;
+        int canFreeToken = 0;
         if (pUploader->pToken_ == NULL || pUploader->pToken_[0] == 0) {
                 Qiniu_Mac mac;
                 mac.accessKey = pUploader->ak_;
@@ -97,7 +98,7 @@ static void * streamUpload(void *_pOpaque)
                 putPolicy.deleteAfterDays = pUploader->deleteAfterDays_;
                 putPolicy.callbackUrl = pUploader->callback_;
                 uptoken = Qiniu_RS_PutPolicy_Token(&putPolicy, &mac);
-
+                canFreeToken = 1;
                 //init
                 Qiniu_Client_InitMacAuth(&client, 1024, &mac);
         } else {
@@ -141,7 +142,7 @@ static void * streamUpload(void *_pOpaque)
                 logdebug("upload file %s: key:%s success", pUploader->bucketName_, key);
         }
         
-        if (pUploader->pToken_[0] == 0) {
+        if (canFreeToken) {
                 Qiniu_Free(uptoken);
         }
         Qiniu_Client_Cleanup(&client);

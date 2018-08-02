@@ -482,7 +482,7 @@ int main(int argc, char* argv[])
         avArg.nChannels = 1;
         avArg.nSamplerate = 8000;
 #endif
-        avArg.nVideoFormat = TK_VIDEO_H264;
+        avArg.nVideoFormat = TK_VIDEO_H265;
 
         ret = InitUploader("testuid3", "testdeviceid", gtestToken, &avArg);
         if (ret != 0) {
