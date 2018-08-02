@@ -20,7 +20,7 @@ func TestUser(t *testing.T) {
                 AuthDB : "admin",
                 Proxies : nil,
         }
-        fmt.Printf("db test user")
+        fmt.Printf("db test user \n")
         db.InitDb(&config)
         info := UserInfo {
                 Uid : "test",

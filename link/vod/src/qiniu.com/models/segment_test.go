@@ -18,7 +18,7 @@ func TestSegment(t *testing.T) {
                 AuthDB : "admin",
                 Proxies : nil,
         }
-        db.InitDb(&config)        
+        db.InitDb(&config)
         assert.Equal(t, 0, 0, "they should be equal")
         model := SegmentModel{}
         model.DeleteSegmentTS("UserTest", "dev001", 0, 200)
@@ -50,6 +50,10 @@ func TestSegment(t *testing.T) {
                 err := model.AddSegmentTS(p)
                 assert.Equal(t, err, nil, "they should be equal")
         }
+        last,err_0 := model.GetLastSegmentTsInfo("UserTest", "dev001")
+        assert.Equal(t, err_0, nil, "they should be equal")
+        assert.Equal(t, last.StartTime, int64(199), "they should be equal")
+        assert.Equal(t, last.EndTime, int64(200), "they should be equal")
 
         // Get segment from start time 0 to end time 150.
         r, err := model.GetSegmentTsInfo(0,0,int64(0), int64(150), "UserTest", "dev001")
@@ -61,7 +65,11 @@ func TestSegment(t *testing.T) {
         r1, err1 := model.GetFragmentTsInfo(0,0,int64(0), int64(150), "UserTest", "dev001")
         assert.Equal(t, err1, nil, "they should be equal")
         size1 := len(r1)
-        assert.Equal(t, size1, 200, "they should be equal")
+        assert.Equal(t, size1, 2, "they should be equal")
+        assert.Equal(t, r1[0].StartTime, int64(0))
+        assert.Equal(t, r1[0].EndTime, int64(100))
+        assert.Equal(t, r1[1].StartTime, int64(100))
+        assert.Equal(t, r1[1].EndTime, int64(200))
 
         // Get segment from start time 0 to end time 150. only get 0 - 50 count.
         r_1, err_1 := model.GetSegmentTsInfo(0,50,int64(0), int64(150), "UserTest", "dev001")

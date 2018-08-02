@@ -9,6 +9,7 @@ import (
 )
 
 func TestDevice(t *testing.T) {
+        fmt.Printf("TestDevice\n")
         url := "mongodb://root:public@180.97.147.164:27017,180.97.147.179:27017/admin"
         dbName := "vod"
         config := db.MgoConfig {
@@ -20,20 +21,20 @@ func TestDevice(t *testing.T) {
                 AuthDB : "admin",
                 Proxies : nil,
         }
-        fmt.Printf("db INItDB")
+        fmt.Printf("DB init \n")
         db.InitDb(&config)
         assert.Equal(t, 0, 0, "they should be equal")
         model := deviceModel{}
         // Add device, count size 100, from 0 to 100. 
         for count := 0; count < 100; count++ {
-       		p := RegisterReq{
-        		Uuid : "UserTest",
-        		Deviceid : fmt.Sprintf("daaa%d", count),
-        		BucketUrl : "www.qiniu.io/test/",
-        		RemainDays : int64(count),
-        	}
-        	err := model.Register(p)
-        	assert.Equal(t, err, nil, "they should be equal")
+                        p := RegisterReq{
+                        Uuid : "UserTest",
+                        Deviceid : fmt.Sprintf("daaa%d", count),
+                        BucketUrl : "www.qiniu.io/test/",
+                        RemainDays : int64(count),
+                }
+                err := model.Register(p)
+                assert.Equal(t, err, nil, "they should be equal")
         }
 
         // Get device.
@@ -41,7 +42,7 @@ func TestDevice(t *testing.T) {
         assert.Equal(t, err, nil, "they should be equal")
         size := len(r)
         assert.Equal(t, size, 100, "they should be equal")
-        
+
         for count := 0; count < 100; count++ {
                 assert.Equal(t, r[count].Expire, int64(count), "they should be equal") 
         }
@@ -57,6 +58,7 @@ func TestDevice(t *testing.T) {
 }
 
 func TestWrongPriUrl(t *testing.T) {
+        fmt.Printf("TestWrongPriUrl\n")
         url := "mongodb://root:public@180.97.147.164:27017,180.97.147.179:27017/admin"
         dbName := "vod"
         config := db.MgoConfig {
@@ -69,11 +71,11 @@ func TestWrongPriUrl(t *testing.T) {
                 Proxies : nil,
         }
         db.DinitDb()
-        fmt.Printf("db INITDB\n")
+        fmt.Printf("DB init\n")
         db.InitDb(&config)
         assert.Equal(t, 0, 0, "they should be equal")
         fmt.Printf("Test sleep 60s, please use rs.stepDown(20) to switch secondard by manual\n")
-        time.Sleep(time.Duration(60)*time.Second)
+        time.Sleep(time.Duration(1)*time.Second)
         model := deviceModel{}
         // Add device, count size 10, from 0 to 10.
         for count := 0; count < 100; count++ {

@@ -25,9 +25,31 @@ var (
 	Device *deviceModel
 )
 
-func init() {
+func (m *deviceModel) Init() error {
 
-	Device = &deviceModel{}
+//     index := Index{
+//         Key: []string{"uuid"},
+//         Unique: true,
+//         DropDups: true,
+//         Background: true, // See notes.
+//         Sparse: true,
+//     }
+//     err := collection.EnsureIndex(index)
+
+       index := mgo.Index{
+           Key: []string{DEVICE_ITEM_UUID},
+           Unique: true,
+           DropDups: true,
+           Background: true, // See notes.
+           Sparse: true,
+       }
+
+        return db.WithCollection(
+                DEVICE_COL,
+                func(c *mgo.Collection) error {
+                        return c.EnsureIndex(index)
+                },
+        )
 }
 
 type RegisterReq struct {

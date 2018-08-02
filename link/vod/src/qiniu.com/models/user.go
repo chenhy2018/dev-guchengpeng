@@ -36,6 +36,10 @@ type UserInfo struct {
 // -----------------------------------------------------------------------------------------------------------
 
 func ValidateLogin(uid, pwd string) error {
+
+        /*
+               db.collection.update( bson.M{ "uid" : uid, "password" : pwd }, bson.M{ "$set": bson.M{ "status" : true} })
+        */
         return db.WithCollection(
                 USER_COL,
                 func(c *mgo.Collection) error {
@@ -60,6 +64,9 @@ func ValidateLogin(uid, pwd string) error {
 
 func ValidateUid(uid string) error {
 
+        /*
+               db.collection.Find(bson.M{ "uid" : uid})
+        */
         return db.WithCollection(
                 USER_COL,
                 func(c *mgo.Collection) error {
@@ -81,6 +88,9 @@ func ValidateUid(uid string) error {
 
 func ResetPassword(uid, opwd, pwd string) error {
 
+        /*
+               db.collection.update( bson.M{ "uid" : uid, "password" : opwd }, bson.M{ "$set": bson.M{ "password" : pwd} })
+        */
         return db.WithCollection(
                 USER_COL,
                 func(c *mgo.Collection) error {
@@ -99,6 +109,10 @@ func ResetPassword(uid, opwd, pwd string) error {
 }
 
 func GetPwdByUID(uid string) (string, error) {
+
+        /*
+               db.collection.find( bson.M{ "uid" : uid})
+        */
         r := UserInfo{}
         err := db.WithCollection(
                 USER_COL,
@@ -117,6 +131,11 @@ func GetPwdByUID(uid string) (string, error) {
 }
 
 func Logout(uid string) error {
+
+        /*
+               db.collection.update( bson.M{ "uid" : uid, "password" : pwd }, bson.M{ "$set": bson.M{ "status" : false} })
+        */
+
         return db.WithCollection(
                 USER_COL,
                 func(c *mgo.Collection) error {
@@ -135,6 +154,12 @@ func Logout(uid string) error {
 }
 
 func AddUser(info UserInfo, uid, pwd string) error {
+
+        /*
+               db.collection.find( bson.M{ "uid" : info.uid, "password" : info.pwd, "issuperuser" : true })
+               db.collection.find( bson.M{ "uid" : uid} )
+               db.collection.update( bson.M{ "uid" : uid}, bson.M{ "$set": bson.M{xxx}}, upsert:true)
+        */
 
         return db.WithCollection(
                 USER_COL,
@@ -181,6 +206,12 @@ func AddUser(info UserInfo, uid, pwd string) error {
 }
 
 func DelUser(info UserInfo, uid, pwd string) error {
+
+        /*
+               db.collection.find(bson.M{ "uid" : info.uid, "password" : info.pwd, "issuperuser" : true })
+               db.collection.remove(bson.M{ "uid" : uid})
+        */
+
         return db.WithCollection(
                 USER_COL,
                 func(c *mgo.Collection) error {
@@ -208,6 +239,12 @@ func DelUser(info UserInfo, uid, pwd string) error {
 }
 
 func GetUserInfo(index, rows int, uid, pwd string, category, like string) ([]UserInfo, error) {
+        
+        /*
+               db.collection.find(bson.M{ "uid" : info.uid, "password" : info.pwd, "issuperuser" : true })
+               db.collection.find(bson.M{category : like}).sort("uid").skip(index * row).limit(rows)
+        */
+ 
         // query by keywords
         query := bson.M{}
         if like != "" {

@@ -32,7 +32,7 @@ type ColConfig struct {
 func InitDb(config *MgoConfig) error {
 
         if GlobConn != nil {
-                fmt.Printf("db already connected")
+                fmt.Printf("db already connected \n")
                 return nil
         }
         var ret ColConfig
