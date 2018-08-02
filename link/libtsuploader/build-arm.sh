@@ -8,4 +8,3 @@ fi
 
 cmake . -DCMAKE_TOOLCHAIN_FILE=./toolchain.cmake
 make
-cp -rvf testupload /home/share
