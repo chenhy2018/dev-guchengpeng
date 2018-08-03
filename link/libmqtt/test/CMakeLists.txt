@@ -27,4 +27,8 @@ link_directories(${CMAKE_CURRENT_SOURCE_DIR}/..)
 aux_source_directory(. LIB_MOSQUITTO_TEST)
 add_executable(mos_test-$ENV{LIBPREFIX} ${LIB_MOSQUITTO_TEST})
 
+if (${WITH_TLS} STREQUAL ON)
 target_link_libraries(mos_test-$ENV{LIBPREFIX} mqtt pthread libcrypto.so libssl.so)
+else()
+target_link_libraries(mos_test-$ENV{LIBPREFIX} mqtt pthread)
+endif()

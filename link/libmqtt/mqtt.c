@@ -136,6 +136,7 @@ void OnConnectCallback(struct mosquitto* _pMosq, void* _pObj, int result)
 {
         int rc = MOSQ_ERR_SUCCESS;
         struct MqttInstance* pInstance = (struct MqttInstance*)(_pObj);
+        printf("OnConnectCallback result %d", result);
         OnEventCallback(pInstance,
                         (result == 0) ? MQTT_CONNECT_SUCCESS : MqttErrorStatusChange(result),
                         (result == 0) ? "on connect success" : mosquitto_connack_string(result));
@@ -160,6 +161,7 @@ void OnConnectCallback(struct mosquitto* _pMosq, void* _pObj, int result)
 void OnDisconnectCallback(struct mosquitto* _pMosq, void* _pObj, int rc)
 {
         struct MqttInstance* pInstance = (struct MqttInstance*)(_pObj);
+        printf("OnDisconnectCallback result %d", rc);
         OnEventCallback(pInstance,
                (rc == 0) ? MQTT_DISCONNECT_SUCCESS : MqttErrorStatusChange(rc),
                (rc == 0) ? "on disconnect success" : mosquitto_strerror(rc));
@@ -272,6 +274,8 @@ void * Mqttthread(void* _pData)
                          }
                          if (rc) {
                                  OnEventCallback(pInstance, rc, mosquitto_strerror(rc));
+                                 printf("connecting pInstance->status = STATUS_CONNECT_ERROR \n");
+                                 pInstance->status = STATUS_CONNECT_ERROR;
                          }
 #if 0
                          if (rc) {

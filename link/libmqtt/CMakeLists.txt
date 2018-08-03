@@ -22,8 +22,14 @@ else (${WITH_THREADING} STREQUAL ON)
         set (PTHREAD_INCLUDE_DIR "")
 endif (${WITH_THREADING} STREQUAL ON)
 
+if ($ENV{WITH_OPENSSL} STREQUAL "ON")
 option(WITH_TLS
         "Include SSL/TLS support?" ON)
+else()
+option(WITH_TLS
+        "Include SSL/TLS support?" OFF)
+endif()
+
 option(WITH_TLS_PSK
         "Include TLS-PSK support (requires WITH_TLS)?" OFF)
 option(WITH_EC
@@ -36,6 +42,7 @@ supported on your platform)." OFF)
 
 if (${WITH_TLS} STREQUAL ON)
         add_definitions("-DWITH_TLS")
+        message("DWITH_TLS")
 
         if (${WITH_TLS_PSK} STREQUAL ON)
                 add_definitions("-DWITH_TLS_PSK")
@@ -59,7 +66,12 @@ endif (${WITH_UUID} STREQUAL ON)
 
 option(WITH_SRV "Include SRV lookup support?" OFF)
 
+if ($ENV{WITH_OPENSSL} STREQUAL "ON")
 SET(GCC_INCLUDE_PATH "-I../../third_party/mosquitto-1.5/lib/ -I../../third_party/mosquitto-1.5/ -I ../../third_party/openssl-1.1.0h/prefix/$ENV{ARCH}/include/")
+else()
+SET(GCC_INCLUDE_PATH "-I../../third_party/mosquitto-1.5/lib/ -I../../third_party/mosquitto-1.5/")
+endif()
+
 SET(CMAKE_C_FLAGS "${GCC_INCLUDE_PATH} ${GCC_COVERAGE_COMPILE_FLAGS}")
 
 aux_source_directory(. LIB_MOSQUITTO_SRC)
