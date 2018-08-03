@@ -71,7 +71,7 @@ func UploadTs(c *gin.Context) {
 		StartTime:         startTime.UnixNano(),
 		FileName:          fileName,
 		EndTime:           endTime.UnixNano(),
-		FragmentStartTime: int(segId),
+		FragmentStartTime: segId,
 	}
 	segMod := &models.SegmentModel{}
 	segMod.AddSegmentTS(ts)
