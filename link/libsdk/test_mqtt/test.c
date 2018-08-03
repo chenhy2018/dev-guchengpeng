@@ -21,7 +21,7 @@
 #include <pthread.h>
 
 #define ARRSZ(arr) (sizeof(arr)/sizeof(arr[0]))
-#define HOST "180.97.147.176"
+#define HOST "180.97.147.170"
 #define INVALID_SERVER "192.168.1.239"
 
 #define MAX_COUNT 145
