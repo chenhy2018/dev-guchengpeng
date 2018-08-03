@@ -52,7 +52,7 @@ ExternalProject_Add(curl-7.61.0
 include(ExternalProject)
 ExternalProject_Add(ffmpeg
         SOURCE_DIR ffmpeg-4.0
-        CONFIGURE_COMMAND PKG_CONFIG_PATH=${X264_PREFIX_PATH}/pkgconfig:${FDKAAC_PREFIX_PATH}/pkgconfig ./configure --disable-zlib --enable-small --disable-programs --disable-doc --disable-avdevice --disable-swresample --disable-swscale --disable-postproc --disable-avfilter --disable-network --disable-dct --disable-dwt --disable-error-resilience --disable-lsp --disable-lzo --disable-mdct --disable-rdft --disable-fft --disable-faan --disable-pixelutils --disable-everything --enable-muxer=mpegts --bindir=./bin --datadir=./data --docdir=./doc --libdir=./lib
+        CONFIGURE_COMMAND PKG_CONFIG_PATH=${X264_PREFIX_PATH}/pkgconfig:${FDKAAC_PREFIX_PATH}/pkgconfig ./configure --disable-x86asm --disable-zlib --enable-small --disable-programs --disable-doc --disable-avdevice --disable-swresample --disable-swscale --disable-postproc --disable-avfilter --disable-network --disable-dct --disable-dwt --disable-error-resilience --disable-lsp --disable-lzo --disable-mdct --disable-rdft --disable-fft --disable-faan --disable-pixelutils --disable-everything --enable-muxer=mpegts --bindir=./bin --datadir=./data --docdir=./doc --libdir=./lib
         BUILD_COMMAND make
         INSTALL_COMMAND ""
         BUILD_IN_SOURCE 1
