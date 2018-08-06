@@ -54,7 +54,7 @@ func PlayBackGetm3u8(c *gin.Context) {
 	if err == nil {
 		for _, v := range segs {
 			duration := float64(v.EndTime-v.StartTime) / 1000000000
-			pPlaylist.AppendSegment("http://pcgtsa42m.bkt.clouddn.com/"+v.FileName, duration, v.DeviceId)
+			pPlaylist.AppendSegment("http://pcgtsa42m.bkt.clouddn.com/"+v.FileName, duration, v.UaId)
 		}
 	}
 	c.Header("Content-Type", "application/x-mpegURL")

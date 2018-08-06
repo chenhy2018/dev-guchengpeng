@@ -1,12 +1,14 @@
 package models
 
 import (
+        "fmt"
         "testing"
         "qiniu.com/db"
         "github.com/stretchr/testify/assert"
 )
 
 func TestSegment(t *testing.T) {
+        fmt.Printf("TestSegment start\n")
         url := "mongodb://root:public@180.97.147.164:27017,180.97.147.179:27017/admin"
         dbName := "vod"
         config := db.MgoConfig {
@@ -26,7 +28,7 @@ func TestSegment(t *testing.T) {
         for count := 0; count < 100; count++ {
 		p := SegmentTsInfo {
 			Uuid : "UserTest",
-			DeviceId : "dev001",
+			UaId : "dev001",
 			FragmentStartTime : 0,
 			StartTime : int64(count),
 			EndTime : int64(count + 1),
@@ -40,7 +42,7 @@ func TestSegment(t *testing.T) {
         for count := 100; count < 200; count++ {
                 p := SegmentTsInfo{
                         Uuid : "UserTest",
-                        DeviceId : "dev001",
+                        UaId : "dev001",
                         FragmentStartTime : 100,
                         StartTime : int64(count),
                         EndTime : int64(count + 1),

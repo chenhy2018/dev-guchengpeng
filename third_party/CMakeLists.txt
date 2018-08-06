@@ -1,6 +1,5 @@
+if ($ENV{WITH_OPENSSL} STREQUAL "ON")
 SET(OPENSSL_PREFIX_PATH "${CMAKE_CURRENT_SOURCE_DIR}/openssl-1.1.0h/prefix/$ENV{ARCH}")
-
-#TO DO . if WITH_OPENSSL is OFF. not need build openssl. Will do this in vod branch.
 include(ExternalProject)
 ExternalProject_Add(openssl-1.1.0h
         SOURCE_DIR openssl-1.1.0h
@@ -9,6 +8,7 @@ ExternalProject_Add(openssl-1.1.0h
         INSTALL_COMMAND ""
         BUILD_IN_SOURCE 1
 )
+endif()
 
 SET(PJ_PREFIX_PATH "${CMAKE_CURRENT_SOURCE_DIR}/pjproject-2.7.2/prefix/$ENV{ARCH}")
 include(ExternalProject)
@@ -25,7 +25,6 @@ ExternalProject_Add(pjsip
 else()
 add_definitions(-DPJMEDIA_HAS_SRTP=0)
 ExternalProject_Add(pjsip
-        DEPENDS openssl-1.1.0h
         SOURCE_DIR pjproject-2.7.2
         CONFIGURE_COMMAND ./configure  --host=$ENV{HOST}  --prefix=${PJ_PREFIX_PATH} --disable-ssl --disable-sdl --disable-ffmpeg --disable-v4l2 --disable-openh264 --disable-libwebrtc --disable-sound --disable-oss --disable-video --disable-speex-aec --disable-g711-code --disable-l16-codec --disable-gsm-codec --disable-g722-codec --disable-g7221-codec --disable-speex-codec --disable-ilbc-codec --disable-bcg729 --disable-libyuv
         BUILD_COMMAND make dep COMMAND make
