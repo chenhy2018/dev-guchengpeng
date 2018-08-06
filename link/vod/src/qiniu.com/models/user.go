@@ -15,7 +15,7 @@ const (
         USER_PASSWORD = "password"
         USER_STATUS = "status"
         USER_REGTIME = "registertime"
-	USER_IS_SUPERUSER = "issuperuser"
+        USER_IS_SUPERUSER = "issuperuser"
 )
 
 type UserModel struct {

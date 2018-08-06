@@ -1,23 +1,22 @@
 package models
 
 import (
-        //"fmt"
+        "fmt"
         "qiniu.com/db"
         "gopkg.in/mgo.v2"
         "gopkg.in/mgo.v2/bson"
 	//"time"
 )
 
-
 const (
         SEGMENT_COL = "segment"
-	SEGMENT_ITEM_UUID   = "uuid"
-	SEGMENT_ITEM_DEVICEID = "deviceid"
+	SEGMENT_ITEM_UID   = "uid"
+	SEGMENT_ITEM_UAID   = "uaid"
         SEGMENT_ITEM_FRAGMENT_START_TIME = "fragmentstarttime"
         SEGMENT_ITEM_START_TIME = "starttime"
         SEGMENT_ITEM_END_TIME = "endtime"
         SEGMENT_ITEM_FILE_NAME = "filename"
-	SEGMENT_ITEM_EXPIRE = "expire"
+	SEGMENT_ITEM_EXPIRE = "expireAfterdays"
 )
 
 type SegmentModel struct {
@@ -30,7 +29,7 @@ var (
 func (m *SegmentModel) Init() error {
         /*
              index := Index{
-                   Key: []string{"uuid", "deviceid"},
+                   Key: []string{"uid", "uaid"},
                    Unique: true,
                    DropDups: true,
                    Background: true, // See notes.
@@ -40,7 +39,7 @@ func (m *SegmentModel) Init() error {
         */
 
         index := mgo.Index{
-            Key: []string{SEGMENT_ITEM_UUID, SEGMENT_ITEM_DEVICEID},
+            Key: []string{SEGMENT_ITEM_UID, SEGMENT_ITEM_UAID},
             Unique: true,
             DropDups: true,
             Background: true, // See notes.
@@ -56,7 +55,7 @@ func (m *SegmentModel) Init() error {
 
 func (m *SegmentModel) AddSegmentTS(req SegmentTsInfo) error {
         /*
-                 collection.update(bson.M{uuid: id, deviceid: id, xxx}, bson.M{"$set": bson.M{"expire": time}},
+                 collection.update(bson.M{uid: id, uaid: id, xxx}, bson.M{"$set": bson.M{"expireAfterdays": time}},
                  { upsert: true })
         */
 
@@ -65,16 +64,16 @@ func (m *SegmentModel) AddSegmentTS(req SegmentTsInfo) error {
 		func(c *mgo.Collection) error {
 			_, err := c.Upsert(
 				bson.M{
-                                        SEGMENT_ITEM_UUID: req.Uuid,
-					SEGMENT_ITEM_DEVICEID: req.DeviceId,
+                                        SEGMENT_ITEM_UID: req.Uid,
+					SEGMENT_ITEM_UAID: req.UaId,
                                         SEGMENT_ITEM_FRAGMENT_START_TIME: req.FragmentStartTime,
                                         SEGMENT_ITEM_START_TIME: req.StartTime,
                                         SEGMENT_ITEM_END_TIME: req.EndTime,
 				},
                                 bson.M{
                                         "$set": bson.M{
-                                                SEGMENT_ITEM_UUID: req.Uuid,
-                                                SEGMENT_ITEM_DEVICEID: req.DeviceId,
+                                                SEGMENT_ITEM_UID: req.Uid,
+                                                SEGMENT_ITEM_UAID: req.UaId,
                                                 SEGMENT_ITEM_FRAGMENT_START_TIME: req.FragmentStartTime,
                                                 SEGMENT_ITEM_START_TIME: req.StartTime,
                                                 SEGMENT_ITEM_END_TIME: req.EndTime,
@@ -92,10 +91,10 @@ func (m *SegmentModel) AddSegmentTS(req SegmentTsInfo) error {
 	return nil;
 }
 
-func (m *SegmentModel) DeleteSegmentTS(uuid,deviceid string, starttime,endtime int64) error {
+func (m *SegmentModel) DeleteSegmentTS(uid,uaid string, starttime,endtime int64) error {
 
         /*
-                 db.collection.remove({uid:"bbc", "deviceid": "", xxx},
+                 db.collection.remove({uid:"bbc", "uaid": "", xxx},
                  { justOne: false } )
         */
 
@@ -104,8 +103,8 @@ func (m *SegmentModel) DeleteSegmentTS(uuid,deviceid string, starttime,endtime i
 		func(c *mgo.Collection) error {
 			c.RemoveAll(
 				bson.M{
-					SEGMENT_ITEM_UUID: uuid,
-                                        SEGMENT_ITEM_DEVICEID: deviceid,
+					SEGMENT_ITEM_UID: uid,
+                                        SEGMENT_ITEM_UAID: uaid,
                                         SEGMENT_ITEM_START_TIME: bson.M{"$gte":starttime},
                                         SEGMENT_ITEM_END_TIME: bson.M{"$lte":endtime},
 				},
@@ -115,9 +114,9 @@ func (m *SegmentModel) DeleteSegmentTS(uuid,deviceid string, starttime,endtime i
 	)
 }
 
-func (m *SegmentModel) UpdateSegmentTSExpire(uuid,deviceid string, starttime,endtime, expire int64) error {
+func (m *SegmentModel) UpdateSegmentTSExpire(uid,uaid string, starttime,endtime, expire int64) error {
         /*
-                 db.collection.update({uid:"bbc", "deviceid": "", xxx},
+                 db.collection.update({uid:"bbc", "uaid": "", xxx},
                  { upsert: true } )
         */
 	return db.WithCollection(
@@ -125,8 +124,8 @@ func (m *SegmentModel) UpdateSegmentTSExpire(uuid,deviceid string, starttime,end
 		func(c *mgo.Collection) error {
 			return c.Update(
 				bson.M{
-					SEGMENT_ITEM_UUID: uuid,
-                                        SEGMENT_ITEM_DEVICEID: deviceid,
+					SEGMENT_ITEM_UID:  uid,
+                                        SEGMENT_ITEM_UAID: uaid,
                                         SEGMENT_ITEM_START_TIME: starttime,
                                         SEGMENT_ITEM_END_TIME: endtime,
 				},
@@ -141,25 +140,25 @@ func (m *SegmentModel) UpdateSegmentTSExpire(uuid,deviceid string, starttime,end
 }
 
 type SegmentTsInfo struct {
-	Uuid      string  `bson:"uuid"       json:"uuid"`
-	DeviceId  string  `bson:"deviceid"   json:"deviceid"`
-	FragmentStartTime   int64 `bson:"fragmentstarttime" json:"fragmentstarttime"`
-        StartTime int64  `bson:"starttime"  json:"starttime"`
-        FileName string `bson:"filename"  json:"filename"`
-        EndTime   int64  `bson:"endtime"  json:"endtime"`
-	Expire    int64  `bson:"expire" json:"expire"`
+	Uid                 string `bson:"uid"                json:"uid"`
+	UaId                string `bson:"uaid"               json:"uaid"`
+	FragmentStartTime   int64  `bson:"fragmentstarttime"  json:"fragmentstarttime"`
+        StartTime           int64  `bson:"starttime"          json:"starttime"`
+        FileName            string `bson:"filename"           json:"filename"`
+        EndTime             int64  `bson:"endtime"            json:"endtime"`
+	Expire              int64  `bson:"expireAfterdays"    json:"expireAfterdays"`
 }
 
-func (m *SegmentModel) GetSegmentTsInfo(index, rows int, starttime,endtime int64, uuid,deviceid string) ([]SegmentTsInfo, error) {
+func (m *SegmentModel) GetSegmentTsInfo(index, rows int, starttime,endtime int64, uid,uaid string) ([]SegmentTsInfo, error) {
 
         /*
-                 db.collection.find(bson.M{uid:"bbc", "deviceid": "aaa", "starttime": bson.M{"$gte":starttime}, "endtime": bson.M{"$lte":endtime} },
+                 db.collection.find(bson.M{uid:"bbc", "uaid": "aaa", "starttime": bson.M{"$gte":starttime}, "endtime": bson.M{"$lte":endtime} },
                  ).sort("starttime").limit(rows),skip(rows * index)
         */
 	// query by keywords
         query := bson.M{
-                 SEGMENT_ITEM_UUID:uuid,
-                 SEGMENT_ITEM_DEVICEID:deviceid,
+                 SEGMENT_ITEM_UID:uid,
+                 SEGMENT_ITEM_UAID:uaid,
                  SEGMENT_ITEM_START_TIME: bson.M{"$gte":starttime},
                  SEGMENT_ITEM_END_TIME : bson.M{"$lte":endtime},
         }
@@ -183,15 +182,15 @@ func (m *SegmentModel) GetSegmentTsInfo(index, rows int, starttime,endtime int64
         }
 	return r, nil
 }
-func (m *SegmentModel) GetLastSegmentTsInfo(uuid,deviceid string) (SegmentTsInfo, error) {
+func (m *SegmentModel) GetLastSegmentTsInfo(uid,uaid string) (SegmentTsInfo, error) {
         /*
-                 db.collection.find(bson.M{uid:"bbc", "deviceid": "aaa", "starttime": bson.M{"$gte":starttime}, "endtime": bson.M{"$lte":endtime} },
+                 db.collection.find(bson.M{uid:"bbc", "uaid": "aaa", "starttime": bson.M{"$gte":starttime}, "endtime": bson.M{"$lte":endtime} },
                  ).sort("starttime").limit(rows),skip(rows * index)
         */
         // query by keywords
         query := bson.M{
-                 SEGMENT_ITEM_UUID:uuid,
-                 SEGMENT_ITEM_DEVICEID:deviceid,
+                 SEGMENT_ITEM_UID:uid,
+                 SEGMENT_ITEM_UAID:uaid,
         }
         r := SegmentTsInfo{}
         err := db.WithCollection(
@@ -220,7 +219,7 @@ func searchLastSegmentbyFragmentId(arr []SegmentTsInfo, low, high int, k int64) 
 	}
 	for low < high {
 		mid := low + (high-low)>>1
-                //fmt.Printf("%d %d %d FragmentStartTime %d %d %d\n", mid, low, high, arr[mid].StartTime, arr[mid + 1].StartTime, k)
+                fmt.Printf("%d %d %d FragmentStartTime %d %d %d\n", mid, low, high, arr[mid].StartTime, arr[mid + 1].StartTime, k)
 		if k < arr[mid].FragmentStartTime {
                         high = mid - 1
 		} else if k > arr[mid].FragmentStartTime {
@@ -234,16 +233,16 @@ func searchLastSegmentbyFragmentId(arr []SegmentTsInfo, low, high int, k int64) 
 	return -1
 }
 
-func (m *SegmentModel) GetFragmentTsInfo(index, rows int, starttime,endtime int64, uuid,deviceid string) ([]FragmentInfo, error) {
+func (m *SegmentModel) GetFragmentTsInfo(index, rows int, starttime,endtime int64, uid,uaid string) ([]FragmentInfo, error) {
 
         /*
-                 db.collection.find(bson.M{uid:"bbc", "deviceid": "aaa", "startfragmenttime": bson.M{"$gte":starttime, "$lte": endtime} },
+                 db.collection.find(bson.M{uid:"bbc", "uaid": "aaa", "startfragmenttime": bson.M{"$gte":starttime, "$lte": endtime} },
                  ).sort("starttime").limit(rows),skip(rows * index)
         */
         // query by keywords
         query := bson.M{
-                 SEGMENT_ITEM_UUID:uuid,
-                 SEGMENT_ITEM_DEVICEID:deviceid,
+                 SEGMENT_ITEM_UID:uid,
+                 SEGMENT_ITEM_UAID:uaid,
                  SEGMENT_ITEM_FRAGMENT_START_TIME: bson.M{"$gte":starttime, "$lte": endtime},
         }
         skip := rows * index
@@ -266,10 +265,16 @@ func (m *SegmentModel) GetFragmentTsInfo(index, rows int, starttime,endtime int6
         }
 
         info := []FragmentInfo{}
+
+        if (len(r) < 1) {
+               return []FragmentInfo{}, nil
+        }
+
         fragmentStartTime := r[0].FragmentStartTime
         low := 0
         high := len(r) - 1
         for low <= high && low >= 0 {
+                fmt.Printf("%d %d \n", low, high)
                 low = searchLastSegmentbyFragmentId(r, low, high, fragmentStartTime);
                 var one = FragmentInfo{}
                 if (low == -1) {
