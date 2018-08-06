@@ -13,8 +13,8 @@ import (
 )
 
 const (
-	accessKey = "kevidUP5vchk8Qs9f9cjKo1dH3nscIkQSaVBjYx7"
-	secretKey = "KG9zawEhR4axJT0Kgn_VX_046LZxkUZBhcgURAC0"
+	accessKey = "JAwTPb8dmrbiwt89Eaxa4VsL4_xSIYJoJh4rQfOQ"
+	secretKey = "G5mtjT3QzG4Lf7jpCAN5PZHrGeoSH9jRdC96ecYS"
 )
 
 type requestParams struct {

@@ -10,10 +10,10 @@ import (
 )
 
 var (
-	accessKey = "kevidUP5vchk8Qs9f9cjKo1dH3nscIkQSaVBjYx7"
-	secretKey = "KG9zawEhR4axJT0Kgn_VX_046LZxkUZBhcgURAC0"
+	accessKey = "JAwTPb8dmrbiwt89Eaxa4VsL4_xSIYJoJh4rQfOQ"
+	secretKey = "G5mtjT3QzG4Lf7jpCAN5PZHrGeoSH9jRdC96ecYS"
 	bucket    = "ipcamera"
-	host      = "http://0.0.0.0:8081"
+	host      = "http://39.107.247.14:8088"
 )
 
 func GetUnloadToken(c *gin.Context) {
@@ -31,13 +31,15 @@ func GetUnloadToken(c *gin.Context) {
 		CallbackURL:      "http://39.107.247.14:8088/qiniu/upload/callback",
 		CallbackBody:     `{"key":"$(key)","hash":"$(etag)","fsize":$(fsize),"bucket":"$(bucket)","name":"$(x:name)", "duration":"$(avinfo.format.duration)"}`,
 		CallbackBodyType: "application/json",
+		DeleteAfterDays:  7,
 	}
 	putPolicy.Expires = 7200 //示例2小时有效期
 
 	upToken := putPolicy.UploadToken(mac)
 
 	c.JSON(200, gin.H{
-		"token": upToken,
+		"token":           upToken,
+		"deleteAfterdays": 7,
 	})
 }
 
