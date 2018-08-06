@@ -1,0 +1,142 @@
+GOAuth
+======
+
+This is the source code repository for the GOAuth an OAuth consumer
+written on the Go programming language.
+
+Copyright 2010 The GOAuth Authors. All rights reserved.
+Use of this source code is governed by a BSD-style
+license that can be found in the LICENSE file.
+
+V 0.0.5
+
+Example Usage :
+
+...
+
+var AT *goauth.AccessToken
+var goauthcon *goauth.OAuthConsumer
+
+...
+
+GET OAuth
+---------
+
+	r, err := goauthcon.Get(
+		"http://api.twitter.com/1/account/verify_credentials.json",
+		nil,
+		AT )
+
+
+POST OAuth 
+----------
+	
+	r, err := goauthcon.Post(
+		"http://api.twitter.com/1/statuses/update.json",
+		goauth.Params{
+			&goauth.Pair{Key:"status", Value:"Testing Status Update via GOAuth - OAuth consumer for #Golang"},
+		},
+		AT )
+
+More Complete Example 
+---------------------
+
+See example.go for a simple http example that connects to twitter 
+allows you to get the Home Time Lime for the OAuthed twitter account, 
+send a tweet & Check Credentials. 
+
+Note that the Check Credentials & Home Time Line use GET methods and the 
+Update status uses a POST method.
+
+Another Example (example_buzz) shows a simple Google Buzz Consumer
+that searching for activites.  Note: This example is dependant on 
+my gobuzz package here : http://github.com/hokapoka/gobuzz
+
+Revision History 
+----------------
+
+    == Version 0.0.5 ==
+	
+	Minor changes to make GetRequestToken more robust.
+
+	Until now, if the ConsumerKey / ConsumerSecrets were incorrect
+	there was no feedback to the consumer that it had failed to 
+	obtain the Request token correctally.
+
+	Now the consumer returns the an error that reflects the status
+	that has been returned from the OAuth service.  Additionally 
+	it also returns an error if to token has been recivied even if
+	the service hasn't responed with an error.
+
+	An additional Exported member has been added to the AccessToken
+	that allows it to be stored in a persistant data store with the 
+	service that it relates to.
+
+    == Version 0.0.4 ==
+
+	Added a Google Buzz example that demos the use of the package 
+	with a google OAuth supported service. 
+
+	Also added minor fix to the original twitter example so that 
+	it works with the latest Exported interfaces provided by the 
+	OAuthConsumer.
+
+	Tested with : 
+		Google Buzz, Calender, Adwords
+		Twitter 
+		Digg 
+	
+	All work.  
+
+    == Version 0.0.3 ==
+
+	Previous versions only worked with twitter.  Issues, especially
+	with Googles API, have been fixed.
+   
+	Replaced URL Encoder with Calvin McAnarney version that conforms
+	to RFC 3986.
+	(https://github.com/csmcanarney/gooauth/blob/master/encode.go)
+ 
+	Additional issues with Googles OAuth API fixed. - Inparticular 
+	Certain chars contiained in their tokens end up getting double 
+	encoded if you follow the RFC specification.  Current fix is a
+ 	bit of a hack, parts are allowed to be Encoded twice, and then
+	replaced with the actual values that should be sent.
+
+	Tested with Googles Buzz, Adwords, Calender & Reader OAuth 
+	servies all functions as expected. 
+
+	Additional testing is required with other services, such as
+	twitter, digg to see if these fixes have effected these.
+
+		oauth.Get now recives a Params object too. 
+
+   == Version  0.0.2 ==
+   
+	Minor fixes to Makefile to work with latest revision of Go. 
+	Additional fixes to other changes in Go.
+
+
+   == Version 0.0.1 ==
+
+	Initial release, general mechs are functional GET/POST, creation
+	of an OAuth consumer.
+
+Contact 
+-------
+
+If you have any issues please feel free to contact : 
+
+    email - hoka@hokapoka.com
+      web - http://go.hokapoka.com
+     buzz - hokapoka.com@gmail.com 
+  twitter - @hokapokadotcom
+   github - github.com/hokapoka/goauth
+      irc - hokapoka (freenode #go-nuts)
+
+
+============================================================
+
+TODO : add link to example on go.hokapoka.com (once written)
+
+
