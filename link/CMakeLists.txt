@@ -18,7 +18,7 @@ if ($ENV{ARCH} STREQUAL "x86")
         ExternalProject_Add(vod
                 SOURCE_DIR vod
                 BUILD_COMMAND  make
-                CONFIGURE_COMMAND bash env.sh
+                CONFIGURE_COMMAND ""
                 INSTALL_COMMAND ""
                 BUILD_IN_SOURCE 1
         )

@@ -34,15 +34,15 @@ int main()
         Config.nMaxAccount = 20;
 
         SipCreateInstance(&Config);
-        SipSetLogLevel(4);
+        SipSetLogLevel(6);
         sleep(2);
         int *user = (int *)malloc(sizeof(int));
         *user = 12345;
         int nid = -1;
         SipAccountConfig AccountConfig;
-        AccountConfig.pUserName = "1039";
-        AccountConfig.pPassWord = "1039";
-        AccountConfig.pDomain = "123.59.204.198";
+        AccountConfig.pUserName = "1002";
+        AccountConfig.pPassWord = "gAs2Bpg2";
+        AccountConfig.pDomain = "180.97.147.174";
         AccountConfig.pUserData = (void *)user;
         AccountConfig.nMaxOngoingCall = 2;
 
@@ -53,8 +53,8 @@ int main()
         void *pLocalSdp;
         CreateTmpSDP(&pLocalSdp);
 
-        SipMakeNewCall(2, "<sip:1040@123.59.204.198;transport=tcp>", pLocalSdp, 2);
-        sleep(10);
+        SipMakeNewCall(2, "<sip:1001@180.97.147.174;transport=tcp>", pLocalSdp, 2);
+        sleep(20);
         SipDestroyInstance();
         sleep(10);
         return 0;

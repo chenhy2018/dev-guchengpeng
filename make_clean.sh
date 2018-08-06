@@ -16,4 +16,4 @@ make clean
 cd ../libsdk/
 make clean
 cd ../../
-rm -rf CMakeCache.txt  CMakeFiles
+rm -rf CMakeCache.txt  CMakeFiles ./third_party/CMakeFiles

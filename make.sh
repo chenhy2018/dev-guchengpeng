@@ -3,11 +3,14 @@ if [ $# != 1 ];then
     echo "e.g:$0 mstar"
     exit 1;
 fi
+
 source env.sh
 
 export ARCH=$1
 
 export WITH_P2P="OFF"
+export WITH_OPENSSL="OFF"
+
 prefix=
 if [ "$1" = "mstar" ];then
     export CC=arm-linux-gnueabihf-gcc
@@ -26,10 +29,14 @@ elif [ "$1" = "clean" ];then
     exit 1;
 fi
 
-cmake .
-make VERBOSE=1
+if [ -f CMakeCache.txt ];then
+rm CMakeCache.txt
+fi
 
-./merge-lib.sh $1
+cmake .
+if ! make VERBOSE=1; then echo "build failed"; exit 1; fi
+
+if ! ./merge-lib.sh $1; then echo "merge lib failed"; exit 1; fi
 
 cd link/libsdk/
 ./test.sh $1

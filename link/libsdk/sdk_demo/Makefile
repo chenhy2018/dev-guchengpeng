@@ -2,10 +2,15 @@
 #CC=arm-linux-gnueabihf-gcc
 #ARCH:=x86
 THIRD_PARTY_PATH=../../../third_party
-OPENSSL_PATH=$(THIRD_PARTY_PATH)/openssl-1.1.0h
-OPENSSL_LIB=${OPENSSL_PATH}/prefix/$(ARCH)/lib/
 
-LDFLAGS=-L./lib -L../../../output/lib/$(ARCH) -L$(OPENSSL_LIB) -lua -lpthread -lm -lssl -lcrypto  -lcurl -lrtmp_sdk -lev -ldevsdk -ltools -lstdc++ -lfdk-aac
+ifeq ($(WITH_OPENSSL), ON)
+OPENSSL_PATH=$(THIRD_PARTY_PATH)/openssl-1.1.0h
+OPENSSL_LIB=${OPENSSL_PATH}/prefix/$(ARCH)/lib
+LDFLAGS=-L../../../output/lib/$(ARCH) -L$(OPENSSL_LIB) -lua -lpthread -lm  -lssl -lcrypto -lcurl -lrtmp_sdk -lev -ldevsdk -ltools -lstdc++ -lfdk-aac
+else
+LDFLAGS=-L../../../output/lib/$(ARCH) -lua -lpthread -lm -lcurl -lrtmp_sdk -lev -ldevsdk -ltools -lstdc++ -lfdk-aac
+endif
+
 CFLAGS=-g -std=gnu99
 TARGET_OBJS= main.o dbg.o stream.o h264_parse.o command.o dev_core.o aj_ipc.o
 OBJS_DIR=./objs
