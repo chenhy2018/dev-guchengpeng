@@ -3,6 +3,7 @@
 #include <assert.h>
 #include "log.h"
 #include <pthread.h>
+#include <curl/curl.h>
 
 static char gAk[65] = {0};
 static char gSk[65] = {0};
@@ -186,10 +187,62 @@ int SetSk(char *_pSk)
         return 0;
 }
 
+struct CurlToken {
+        char * pData;
+        int nDataLen;
+        int nCurlRet;
+};
+
+size_t writeData(void *pTokenStr, size_t size,  size_t nmemb,  void *pUserData) {
+        struct CurlToken *pToken = (struct CurlToken *)pUserData;
+        if (pToken->nDataLen < size * nmemb) {
+                pToken->nCurlRet = -11;
+                return 0;
+        }
+        char *pTokenStart = strstr(pTokenStr, "\"token\"");
+        if (pTokenStart == NULL) {
+                pToken->nCurlRet = -11;
+                return 0;
+        }
+        pTokenStart += strlen("\"token\"");
+        while(*pTokenStart++ != '\"') {
+        }
+        
+        char *pTokenEnd = strchr(pTokenStart, '\"');
+        if (pTokenEnd == NULL) {
+                pToken->nCurlRet = -11;
+                return 0;
+        }
+        memcpy(pToken->pData, pTokenStart, pTokenEnd - pTokenStart);
+        return size * nmemb;
+}
+
 int GetUploadToken(char *pBuf, int nBufLen)
 {
+#ifdef DISABLE_OPENSSL
+        memset(pBuf, 0, nBufLen);
+        CURL *curl;
+        curl_global_init(CURL_GLOBAL_ALL);
+        curl = curl_easy_init();
+        curl_easy_setopt(curl, CURLOPT_URL, "http://39.107.247.14:8086/qiniu/upload/token");
+        curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, writeData);
+        
+        struct CurlToken token;
+        token.pData = pBuf;
+        token.nDataLen = nBufLen;
+        token.nCurlRet = 0;
+        curl_easy_setopt(curl, CURLOPT_WRITEDATA, &token);
+        int ret =curl_easy_perform(curl);
+        if (ret != 0) {
+                curl_easy_cleanup(curl);
+                return ret;
+        }
+        curl_easy_cleanup(curl);
+        return token.nCurlRet;
+#else
         if (gAk[0] == 0 || gSk[0] == 0 || gBucket[0] == 0)
                 return -11;
+        memset(pBuf, 0, nBufLen);
         Qiniu_Mac mac;
         mac.accessKey = gAk;
         mac.secretKey = gSk;
@@ -209,4 +262,5 @@ int GetUploadToken(char *pBuf, int nBufLen)
         strcpy(pBuf, uptoken);
         Qiniu_Free(uptoken);
         return 0;
+#endif
 }
