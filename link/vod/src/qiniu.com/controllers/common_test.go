@@ -10,7 +10,7 @@ import (
 func GetRouter() *gin.Engine {
 	gin.SetMode(gin.ReleaseMode)
 	r := gin.Default()
-	r.GET("/playback/:uid/:deviceId", PlayBackGetm3u8)
+	r.GET("/playback/:uid/:deviceId", GetPlayBackm3u8)
 	r.POST("/upload", UploadTs)
 	return r
 }
