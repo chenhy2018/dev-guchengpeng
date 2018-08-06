@@ -49,8 +49,15 @@ static int MqttErrorStatusChange(int nStatus)
 static void MallocAndStrcpy(char** des, const char* src)
 {
       if (src) {
-              *des = malloc(sizeof(src));
-              if (*des) strcpy(*des, src);
+              char* p = malloc(strlen(src) + 1);
+              if (p) {
+                      strncpy(p, src, strlen(src));
+                      p[strlen(src)]= '\0';
+                      *des = p;
+              }
+              else {
+                      *des = NULL;
+              }
       }
       else {
               *des = NULL;
@@ -62,7 +69,7 @@ static void SafeFree(char* des)
       if (des) free(des);
 }
 
-static bool InsertNode(Node* pHead, char* val) {
+static bool InsertNode(Node* pHead, const char* val) {
         Node* p = pHead;
         while(p->pNext) {
                 p = p->pNext;
@@ -74,7 +81,7 @@ static bool InsertNode(Node* pHead, char* val) {
         return true;
 }
 
-static bool DeleteNode(Node* PHead, char * pval)
+static bool DeleteNode(Node* PHead, const char * pval)
 {
         int i = 0;
         Node* p = PHead;
@@ -104,8 +111,11 @@ static void ClearNode(Node* PHead)
 void OnEventCallback(struct MqttInstance* _pInstance, int rc, const char* _pStr)
 {
         if (_pInstance->options.callbacks.OnEvent != NULL) {
-                _pInstance->options.callbacks.OnEvent(_pInstance, _pInstance->options.nAccountId, rc, _pStr);
+                if (_pInstance->lastStatus < MQTT_ERR_NOMEM || rc < MQTT_ERR_NOMEM) { 
+                        _pInstance->options.callbacks.OnEvent(_pInstance, _pInstance->options.nAccountId, rc, _pStr);
+                }
         }
+        _pInstance->lastStatus = rc;
 }
 
 void OnLogCallback(struct mosquitto* _pMosq, void* _pObj, int level, const char* _pStr)
@@ -126,13 +136,17 @@ void OnConnectCallback(struct mosquitto* _pMosq, void* _pObj, int result)
 {
         int rc = MOSQ_ERR_SUCCESS;
         struct MqttInstance* pInstance = (struct MqttInstance*)(_pObj);
-        pInstance->connected = true;
+        printf("OnConnectCallback result %d", result);
+        OnEventCallback(pInstance,
+                        (result == 0) ? MQTT_CONNECT_SUCCESS : MqttErrorStatusChange(result),
+                        (result == 0) ? "on connect success" : mosquitto_connack_string(result));
         if (result) {
-                fprintf(stderr, "%s\n", mosquitto_connack_string(result));
+                pInstance->connected = false;
                 pInstance->status = STATUS_CONNECT_ERROR;
         }
         else {
                 pInstance->status = STATUS_CONNACK_RECVD;
+                pInstance->connected = true;
                 pthread_mutex_lock(&pInstance->listMutex);
                 Node* p = pInstance->pSubsribeList.pNext;
                 while (p) {
@@ -141,38 +155,38 @@ void OnConnectCallback(struct mosquitto* _pMosq, void* _pObj, int result)
                 }
                 pthread_mutex_unlock(&pInstance->listMutex);
         }
-        OnEventCallback(pInstance,
-                        (result == 0) ? MQTT_CONNECT_SUCCESS : MqttErrorStatusChange(result),
-                        (result == 0) ? "on connect success" : mosquitto_connack_string(result));
 }
 
 
 void OnDisconnectCallback(struct mosquitto* _pMosq, void* _pObj, int rc)
 {
-
         struct MqttInstance* pInstance = (struct MqttInstance*)(_pObj);
+        printf("OnDisconnectCallback result %d", rc);
+        OnEventCallback(pInstance,
+               (rc == 0) ? MQTT_DISCONNECT_SUCCESS : MqttErrorStatusChange(rc),
+               (rc == 0) ? "on disconnect success" : mosquitto_strerror(rc));
         pInstance->connected = false;
         if (!rc) {
                 pInstance->status = STATUS_IDLE;
         }
-        OnEventCallback(pInstance,
-                       (rc == 0) ? MQTT_DISCONNECT_SUCCESS : MqttErrorStatusChange(rc),
-                       (rc == 0) ? "on disconnect success" : mosquitto_connack_string(rc));
+        else {
+                pInstance->status = STATUS_CONNECT_ERROR;
+        }
 }
 
 void OnSubscribeCallback(struct mosquitto* _pMosq, void* pObj, int mid, int qos_count, const int* pGranted_qos)
 {       
-        fprintf(stderr, "Subscribed (mid: %d): %d \n", mid, pGranted_qos[0]);
+        //fprintf(stderr, "Subscribed (mid: %d): %d \n", mid, pGranted_qos[0]);
 }
 
 void OnUnsubscribeCallback(struct mosquitto* _pMosq, void* _pObj, int mid)
 {
-        fprintf(stderr, "Unsubscribed (mid: %d) \n", mid);
+        //fprintf(stderr, "Unsubscribed (mid: %d) \n", mid);
 }
 
 void OnPublishCallback(struct mosquitto* _pMosq, void* _pObj, int mid)
 {
-        fprintf(stderr, " my_publish_callback \n ");
+        //fprintf(stderr, " my_publish_callback \n ");
         struct MqttInstance* pInstance = (struct MqttInstance*)(_pObj);
         int last_mid_sent = mid;
 }
@@ -181,6 +195,7 @@ void OnPublishCallback(struct mosquitto* _pMosq, void* _pObj, int mid)
 static void MqttInstanceInit(struct MqttInstance* _pInstance, const struct MqttOptions* _pOption)
 {
         /* copy options */
+
         memcpy(&_pInstance->options, _pOption, sizeof(struct MqttOptions));
         MallocAndStrcpy(&_pInstance->options.pId, _pOption->pId);
         MallocAndStrcpy(&_pInstance->options.primaryUserInfo.pUsername, _pOption->primaryUserInfo.pUsername);
@@ -207,19 +222,15 @@ bool ClientOptSet(struct MqttInstance* _pInstance, struct mosquitto* _pMosq, str
 {
         int rc = 0;
         if (info.nAuthenicatinMode & MQTT_AUTHENTICATION_USER) {
-                printf("mosquitto_username_pw_set \n");
                 rc = mosquitto_username_pw_set(_pMosq, info.pUsername, info.pPassword);
                 if (rc)
                         return rc;
         }
         if (info.nAuthenicatinMode & MQTT_AUTHENTICATION_ONEWAY_SSL) {
-                printf("mosquitto_tls_set %s \n", info.pCafile);
                 rc = mosquitto_tls_set(_pMosq, info.pCafile, NULL, NULL, NULL, NULL);
-                printf("mosquitto_tls_set rc %d \n", rc);
         }
         else if (info.nAuthenicatinMode & MQTT_AUTHENTICATION_TWOWAY_SSL) {
                 rc = mosquitto_tls_set(_pMosq, info.pCafile, NULL, info.pCertfile, info.pKeyfile, NULL);
-                printf("mosquitto_tls_set 111 rc %d \n", rc);
         }
         if (rc) {
                 printf("ClientOptSet error %d\n", rc);
@@ -254,10 +265,8 @@ void * Mqttthread(void* _pData)
         mosquitto_message_callback_set(pInstance->mosq, OnMessageCallback);
         mosquitto_subscribe_callback_set(pInstance->mosq, OnSubscribeCallback);
         mosquitto_unsubscribe_callback_set(pInstance->mosq, OnUnsubscribeCallback);
-        
         do {
-                 if (!pInstance->connected && pInstance->status == STATUS_IDLE) {
-                         fprintf(stderr, "connecting \n");
+                 if (!pInstance->connected && pInstance->status != STATUS_CONNECTING) {
                          pInstance->status = STATUS_CONNECTING;
                          rc = ClientOptSet(pInstance, pInstance->mosq, pInstance->options.primaryUserInfo);
                          if (rc == 0) {
@@ -265,13 +274,17 @@ void * Mqttthread(void* _pData)
                          }
                          if (rc) {
                                  OnEventCallback(pInstance, rc, mosquitto_strerror(rc));
-                                 fprintf(stderr, "Unable to connect (%s). try to reconnect to secondary server. \n", mosquitto_strerror(rc));
+                                 printf("connecting pInstance->status = STATUS_CONNECT_ERROR \n");
+                                 pInstance->status = STATUS_CONNECT_ERROR;
+                         }
+#if 0
+                         if (rc) {
+                                 OnEventCallback(pInstance, rc, mosquitto_strerror(rc));
                                  rc = ClientOptSet(pInstance, pInstance->mosq, pInstance->options.secondaryUserInfo);
                                  if (rc == 0) {
                                          rc = mosquitto_connect(pInstance->mosq, pInstance->options.secondaryUserInfo.pHostname, pInstance->options.secondaryUserInfo.nPort, pInstance->options.nKeepalive);
                                  }
                                  if (rc) {
-                                         fprintf(stderr, "Unable to connect Secondary server  %s \n", mosquitto_strerror(rc) );
                                          pInstance->status = STATUS_IDLE;
                                          OnEventCallback(pInstance, rc, mosquitto_strerror(rc));
                                          sleep(30);
@@ -280,6 +293,11 @@ void * Mqttthread(void* _pData)
                                          pInstance->status = STATUS_CONNECTING;
                                  }
                          }
+#endif                   
+                         rc = mosquitto_loop(pInstance->mosq, -1, 1);
+                         sleep(1);
+                 }
+                 else if (pInstance->status == STATUS_CONNECTING) {
                          sleep(1);
                  }
                  rc = mosquitto_loop(pInstance->mosq, -1, 1);
@@ -336,7 +354,7 @@ void MqttDestroy(IN const void* _pInstance)
         pInstance->options.callbacks.OnEvent = NULL;
 }
 
-int MqttPublish(IN const void* _pInstance, IN char* _pTopic, IN int _nPayloadlen, IN const void* _pPayload)
+int MqttPublish(IN const void* _pInstance, IN const char* _pTopic, IN int _nPayloadlen, IN const void* _pPayload)
 {
        struct MqttInstance* pInstance = (struct MqttInstance*)(_pInstance);
        int rc = mosquitto_publish(pInstance->mosq, NULL, _pTopic, _nPayloadlen, _pPayload, pInstance->options.nQos, pInstance->options.bRetain);
@@ -362,15 +380,13 @@ int MqttPublish(IN const void* _pInstance, IN char* _pTopic, IN int _nPayloadlen
        return MqttErrorStatusChange(rc);
 }
 
-int MqttSubscribe(IN const void* _pInstance, IN char* _pTopic)
+int MqttSubscribe(IN const void* _pInstance, IN const char* _pTopic)
 {
         struct MqttInstance* pInstance = (struct MqttInstance*)(_pInstance);
         if (_pTopic == NULL) {
-               fprintf(stderr, "Error: Invalid input.\n");
                return MQTT_ERR_INVAL;
         }
         int rc = mosquitto_subscribe(pInstance->mosq, NULL, _pTopic, pInstance->options.nQos);
-        fprintf(stderr, "mos sub %d", rc);
         if (!rc) {
                 pthread_mutex_lock(&pInstance->listMutex);
                 InsertNode(&pInstance->pSubsribeList, _pTopic);
@@ -398,7 +414,7 @@ int MqttSubscribe(IN const void* _pInstance, IN char* _pTopic)
         return MqttErrorStatusChange(rc);
 }
 
-int MqttUnsubscribe(IN const void* _pInstance, IN char* _pTopic)
+int MqttUnsubscribe(IN const void* _pInstance, IN const char* _pTopic)
 {
         struct MqttInstance* pInstance = (struct MqttInstance*)(_pInstance);
         if (_pTopic == NULL) {

@@ -9,6 +9,7 @@
 
 #include "MediaStream.h"
 #include "qrtc.h"
+#include "../util/queue.h"
 
 
 typedef enum _IceRole{
@@ -20,26 +21,30 @@ typedef enum _IceRole{
 typedef struct _TransportIce
 {
         pjmedia_transport *pTransport;
-        pj_ioqueue_t      *pIoQueue;
-        pj_pool_t         *pIoqueuePool;
-        pj_timer_heap_t   *pTimerHeap;
-        pj_pool_t         *pTimerHeapPool;
-        pj_thread_t       *pPollThread;
-        pj_pool_t         *pThreadPool;
         pj_pool_t         *pNegotiationPool;
         IceState iceState;
         pj_ice_strans_cfg iceConfig;
         void *pPeerConnection;
 }TransportIce;
 
+#define PC_STATUS_ALLOC 0
+#define PC_STATUS_INIT_OK 1
+#define PC_STATUS_CREATE_OFFER_OK 2
+#define PC_STATUS_CREATE_ANSWER_OK 3
+#define PC_STATUS_SET_REMOTE_OK 4
+#define PC_STATUS_NEG_OK 5
+#define PC_STATUS_INIT_FAIL 11
+#define PC_STATUS_CREATE_OFFER_FAIL 12
+#define PC_STATUS_CREATE_ANSWER_FAIL 13
+#define PC_STATUS_SET_REMOTE_FAIL 14
+#define PC_STATUS_NEG_FAIL 15
+
 typedef struct _PeerConnection
 {
+        int nState;
         IceConfig         userIceConfig;
         TransportIce      transportIce[2]; //audio and video
         int               nAvIndex[2];
-        pj_caching_pool   cachingPool;
-        pj_pool_factory   *pPoolFactory;
-        pjmedia_endpt     *pMediaEndpt;
         MediaStream       mediaStream;
         pjmedia_sdp_session *pLocalSdp;
         pjmedia_sdp_session *pRemoteSdp;
@@ -54,8 +59,29 @@ typedef struct _PeerConnection
         int nIsFailCallbackDone;
         pj_mutex_t *pMutex;
         pj_pool_t *pMutexPool;
-        int bQuit;
+        int nQuitCnt;
         IceRole role;
+        int nDestroy;
+        pj_pool_t *pGrpPool;
+        pj_grp_lock_t *pGrpLock1;
+        pj_grp_lock_t *pGrpLock2;
+        char * pRemoteSdpStr;
+        int nSdpStrLen;
 }PeerConnection;
+
+
+#define MQ_TYPE_SEND 2
+#define MQ_TYPE_CREATE_OFFER 3
+#define MQ_TYPE_CREATE_ANSWER 4
+#define MQ_TYPE_NEG 7
+#define MQ_TYPE_RELEASE 8
+
+typedef struct _RtpMqMsg{
+        Message msg;
+        int nType;
+        PeerConnection *pPeerConnection;
+        RtpPacket pkt;
+        void * pArg;
+}RtpMqMsg;
 
 #endif

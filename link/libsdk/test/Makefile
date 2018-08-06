@@ -1,13 +1,28 @@
 
-
-LIBUA=../output/lib/x86/libua.a
-LDFLAGS=-L../output/lib/x86 -lua -lpthread -lm /usr/lib/x86_64-linux-gnu/libcrypto.so /usr/lib/x86_64-linux-gnu/libssl.so
-CFLAGS=-g
-TARGET_OBJS=test.o unit_test.o call_test.o register_test.o
+THIRD_PARTY_PATH=../../../third_party
+OPENSSL_PATH=$(THIRD_PARTY_PATH)/openssl-1.1.0h
+OPENSSL_LIB=${OPENSSL_PATH}/prefix/$(ARCH)/lib
+LDFLAGS=-L../../../output/lib/$(ARCH) -L$(OPENSSL_LIB) -lua -lpthread -lm -lcrypto -lssl 
+CFLAGS=-g -std=gnu99
+ifeq ($(WITH_P2P), ON)
+CFLAGS=-g -std=gnu99 -D WITH_P2P
+TARGET_OBJS=test.o unit_test.o call_test.o register_test.o send_pkt_test.o hangup_call_test.o answercall_test.o \
+			rejectcall_test.o
+else
+CFLAGS=-g -std=gnu99
+TARGET_OBJS=test.o unit_test.o call_test.o register_test.o  hangup_call_test.o answercall_test.o \
+                        rejectcall_test.o
+endif
 TESTCASE_OBJS_DIR=./objs
-INCLUDE_PATH=-I../
+INCLUDE_PATH=-I../ -I../../libsip/
 TARGET=test
-CC=gcc
+
+ifeq ($(ARCH), x86)
+	CC=gcc
+else ifeq ($(ARCH), mstar)
+	CC=arm-linux-gnueabihf-gcc
+endif
+
 
 all:$(TARGET)
 

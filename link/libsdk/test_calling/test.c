@@ -8,26 +8,28 @@
  */
 #include <string.h>
 #include <stdio.h>
-#include "sdk_interface.h"
 #include "dbg.h"
 #include "unit_test.h"
 #include "test.h"
 #include <unistd.h> 
 #include <stdlib.h>
+#include <pthread.h>
+#ifdef WITH_P2P
+#include "sdk_interface_p2p.h"
+#else
+#include "sdk_interface.h"
+#endif
 
 #define ARRSZ(arr) (sizeof(arr)/sizeof(arr[0]))
-#define HOST "123.59.204.198"
-#define INVALID_SERVER "192,.168.1.239"
+#define HOST "39.107.247.14"
+#define INVALID_SERVER "192.168.1.239"
 
+#define MAX_COUNT 9
+#define CHENGPENG 1
+//#define MENGKE 1
 int RegisterTestSuitCallback( TestSuit *this );
 int RegisterTestSuitInit( TestSuit *this, TestSuitManager *_pManager );
 int RegisterTestSuitGetTestCase( TestSuit *this, TestCase **testCase );
-int RegisterTestSuitCallback2( TestSuit *this );
-void *UA1_EventLoopThread( void *arg );
-void *UA2_EventLoopThread( void *arg );
-void *UA3_EventLoopThread( void *arg );
-void *UA4_EventLoopThread( void *arg );
-void *UA5_EventLoopThread( void *arg );
 
 typedef struct {
     char *id;
@@ -37,6 +39,10 @@ typedef struct {
     char *imHost;
     int timeOut;
     unsigned char init;
+    int accountid;
+    int callid;
+    int sendflag;
+    int64_t timecount;
 } RegisterData;
 
 typedef struct {
@@ -44,44 +50,93 @@ typedef struct {
     RegisterData data;
 } RegisterTestCase;
 
+#ifdef CHENGPENG
+RegisterTestCase gRegisterTestCases[] =
+{
+    {
+        { "valid_account1", CALL_STATUS_REGISTERED, NULL },
+        { "2041", "LDb1wHu9", HOST, HOST, HOST, 10, 1 }
+    },
+    {
+        { "valid_account2", CALL_STATUS_REGISTERED, NULL },
+        { "2042", "qIwCXfUp", HOST, HOST, HOST, 10, 0 }
+    },
+    {
+        { "invalid_account1", CALL_STATUS_REGISTERED, NULL },
+        { "2043", "IZYkxp5O", HOST, HOST, HOST, 10, 0 }
+    },
+    {
+        { "invalid_account2", CALL_STATUS_REGISTERED, NULL },
+        { "2044", "WZx6T3Er", HOST, HOST, HOST, 10, 0 }
+    },
+    {
+        { "invalid_sip_register_server", CALL_STATUS_REGISTERED, NULL},
+        { "2045", "vdK3TsK0", HOST, HOST, HOST, 10, 0 }
+    },
+    {
+        { "invalid_account", 0 },
+        { "2046", "I1gj5Wef", HOST, HOST, HOST, 100, 0 }
+    },
+    {
+        { "normal", 0 },
+        { "2047", "rx7HOnDT", HOST, HOST, HOST, 100, 1 }
+    },
+    {
+        { "invalid_account", 0 },
+        { "2048", "VidAZJIM", HOST, HOST, HOST, 100, 0 }
+    },
+    {
+        { "normal", 0 },
+        { "2049", "1NR6D190", HOST, HOST, HOST, 100, 1 }
+    },
+};
+#endif
+
+#ifdef MENGKE
 RegisterTestCase gRegisterTestCases[] =
 {
     {
         { "valid_account1", CALL_STATUS_REGISTERED, UA1_EventLoopThread },
-        { "1011", "1011", HOST, HOST, HOST, 10, 1 }
+        { "1711", "aUSEOnOy", HOST, HOST, HOST, 10, 1 }
     },
     {
         { "valid_account2", CALL_STATUS_REGISTERED, UA2_EventLoopThread },
-        { "1003", "1003", HOST, HOST, HOST, 10, 0 }
+        { "1712", "Q0EEBOEc", HOST, HOST, HOST, 10, 0 }
     },
     {
         { "invalid_account1", CALL_STATUS_REGISTER_FAIL, UA3_EventLoopThread },
-        { "1003", "1004", HOST, HOST, HOST, 10, 0 }
+        { "1713", "IeFxv0sP", HOST, HOST, HOST, 10, 0 }
     },
     {
         { "invalid_account2", CALL_STATUS_REGISTER_FAIL, UA4_EventLoopThread },
-        { "0000", "0000", HOST, HOST, HOST, 10, 0 }
+        { "1714", "9ZykZwsJ", HOST, HOST, HOST, 10, 0 }
     },
     {
         { "invalid_sip_register_server", CALL_STATUS_REGISTER_FAIL, UA5_EventLoopThread },
-        { "1003", "1003", INVALID_SERVER, INVALID_SERVER, INVALID_SERVER, 10, 0 }
-    }
+        { "1715", "AzkaVAo0", INVALID_SERVER, INVALID_SERVER, INVALID_SERVER, 10, 0 }
+    },
+    {
+        { "invalid_account", 0 },
+        { "1716", "5XPM9DUv", HOST, HOST, HOST, 100, 0 }
+    },
+    {
+        { "normal", 0 },
+        { "1717", "W9DaI77R", HOST, HOST, HOST, 100, 1 }
+    },
+    {
+        { "invalid_account", 0 },
+        { "1718", "4JoChsXl", HOST, HOST, HOST, 100, 0 }
+    },
+    {
+        { "normal", 0 },
+        { "1719", "NVWrpASp", HOST, HOST, HOST, 100, 1 }
+    },
 };
-
+#endif
 TestSuit gRegisterTestSuit =
 {
     "Register",
     RegisterTestSuitCallback,
-    RegisterTestSuitInit,
-    RegisterTestSuitGetTestCase,
-    (void*)&gRegisterTestCases,
-    1
-};
-
-TestSuit gRegisterTestSuit2 =
-{
-    "Register2",
-    RegisterTestSuitCallback2,
     RegisterTestSuitInit,
     RegisterTestSuitGetTestCase,
     (void*)&gRegisterTestCases,
@@ -111,6 +166,96 @@ int RegisterTestSuitGetTestCase( TestSuit *this, TestCase **testCase )
     return 0;
 }
 
+void Mthread1(void* data)
+{   
+    RegisterData *pData = (RegisterData*) data;
+    Event * event= (Event*) malloc(sizeof(Event));
+    ErrorID id = 0;
+    EventType type;
+    int timecount = 0;
+    int sendflag = 0;
+    char data1[100] = {1};
+    DBG_LOG("send pack *****%d call id %d\n", pData->accountid, pData->callid);
+    while (1) {
+#ifdef WITH_P2P     
+                    if (sendflag) {
+                            if (timecount > 500) {
+                                    DBG_LOG("hangcall ******************\n");
+                                    HangupCall(pData->accountid, pData->callid);
+                                    sendflag = 0;
+                                    timecount = 0;
+                                    continue;
+                            }
+                            id = SendPacket(pData->accountid, pData->callid, STREAM_AUDIO, data1, 100, timecount);
+                            if (id > 0) DBG_LOG("send pack *****%d\n", id);
+                            timecount += 1;
+                            usleep(10000);
+                            continue;
+                    }
+#endif
+                    id = PollEvent(pData->accountid, &type, &event, 10);
+                    if (id != RET_OK) {
+#ifndef WITH_P2P
+                           ++ timecount;
+                           if (sendflag) {
+                                    if (timecount > 500) {
+                                           HangupCall(pData->accountid, pData->callid);
+                                           sendflag = 0;
+                                           timecount = 0;
+                                    }
+                           }
+#endif
+                           continue;
+                    }
+                    switch (type) {
+                            case EVENT_CALL:
+                            {     
+                                  CallEvent *pCallEvent = &(event->body.callEvent);
+                                  DBG_LOG("Call status %d call id %d call account id %d\n", pCallEvent->status, pCallEvent->callID, pData->accountid);
+                                  if (pCallEvent->status == CALL_STATUS_INCOMING) {
+                                      DBG_LOG("AnswerCall ******************\n");
+                                      AnswerCall(pData->accountid, pCallEvent->callID);
+                                      DBG_LOG("AnswerCall end *****************\n");
+                                  }
+                                  if (pCallEvent->status == CALL_STATUS_ERROR || pCallEvent->status == CALL_STATUS_HANGUP) {
+                                        DBG_LOG("makecall **************************** reason %d\n", pCallEvent->reasonCode);
+                                        do {
+                                                sleep(1);
+                                                id = MakeCall(pData->accountid, "2040", HOST, &pData->callid);
+                                        } while (id != RET_OK);
+                                  }
+                                  if (pCallEvent->status == CALL_STATUS_ESTABLISHED) {
+#ifdef WITH_P2P
+                                        MediaInfo* info = (MediaInfo *)pCallEvent->context;
+                                        DBG_LOG("CALL_STATUS_ESTABLISHED call id %d account id %d mediacount %d, type 1 %d type 2 %d\n",
+                                                 pCallEvent->callID, pData->accountid, info->nCount, info->media[0].codecType, info->media[1].codecType);
+                                        sendflag = 1;
+#else
+                                        sendflag = 1;
+                                        DBG_LOG("CALL_STATUS_ESTABLISHED call id %d account id %d \n", pCallEvent->callID, pData->accountid);
+#endif
+                                  }
+
+                                  break;
+                            }
+#ifdef WITH_P2P
+                            case EVENT_DATA:
+                            {     
+                                  DataEvent *pDataEvent = &(event->body.dataEvent);
+                                  //DBG_LOG("Data size %d call id %d call account id %d timestamp %lld \n", pDataEvent->size, pDataEvent->callID, pData->accountid, pDataEvent->pts);
+                                  break;
+                            }
+#endif
+                            case EVENT_MESSAGE:
+                            {
+                                  MessageEvent *pMessage = &(event->body.messageEvent);
+                                  DBG_LOG("Message %s status id %d account id %d\n", pMessage->message, pMessage->status, pData->accountid);
+                                  break;
+                            }
+                   }
+           }
+}
+
 int RegisterTestSuitCallback( TestSuit *this )
 {
     RegisterTestCase *pTestCases = NULL;
@@ -130,7 +275,7 @@ int RegisterTestSuitCallback( TestSuit *this )
     if ( !this ) {
         return -1;
     }
-
+    int all_count = 0;
     pTestCases = (RegisterTestCase *) this->testCases;
     UT_LOG("this->index = %d\n", this->index );
     pData = &pTestCases[this->index].data;
@@ -143,361 +288,50 @@ int RegisterTestSuitCallback( TestSuit *this )
             return TEST_FAIL;
         }
     }
-
+    setPjLogLevel(2);
     UT_STR( pData->id );
-    UT_STR( pData->password );
-    UT_STR( pData->sigHost );
-    UT_LOG("Register in\n");
-    sts = Register( pData->id, pData->password, pData->sigHost, pData->mediaHost, pData->imHost);
-    UT_LOG("Register out %x %x\n", sts, pTestCases->father.expact);
-    TEST_GT( sts, pTestCases->father.expact );
-    int nCallId1 = -1;
+    for (int count = 0; count < MAX_COUNT; ++ count) {
+            pData = &pTestCases[count].data;
+            UT_STR(pData->password);
+            UT_STR(pData->sigHost);
+            UT_LOG("Register in\n");
+#ifdef WITH_P2P
+            pData->accountid = Register(pData->id, pData->password, pData->sigHost, pData->mediaHost, pData->imHost);
+#else
+            pData->accountid = Register(pData->id, pData->password, pData->sigHost, pData->imHost);
+#endif
+            UT_LOG("Register out %x %x\n", pData->accountid, pTestCases->father.expact);
+            int nCallId1 = -1;
+    }
+    sleep(10);
+
+        pthread_t t_1;
+        pthread_attr_t attr_1;
+        pthread_attr_init(&attr_1);
+        pthread_attr_setdetachstate(&attr_1, PTHREAD_CREATE_DETACHED);
+
+    Event* event = (Event*) malloc(sizeof(Event));
     ErrorID id;
-    //sleep(10);
-    int count = 0;
-    while (count != 10) {
-            UT_LOG("MakeCall in\n");
-            id = MakeCall(sts, "1010", "123.59.204.198", &nCallId1);
-            if (RET_OK != id) {
+    for (int count = 0; count < MAX_COUNT; ++ count) {
+           pData = &pTestCases[count].data;
+           pData->sendflag = 0;
+           pData->timecount = 0;
+           UT_LOG("MakeCall in accountid %d\n", pData->accountid);
+           pData->callid = 0;
+           id = MakeCall(pData->accountid, "2040", HOST, &pData->callid);
+           if (RET_OK != id) {
                     fprintf(stderr, "call error %d \n", id);
-                    sleep(1);
-                    ++ count;
-                    continue;
-            }
-            EventType type;
-            Event* event = (Event*) malloc(sizeof(Event));
-            int sendflag = 0;
-            int callId = 0;
-            int64_t timecount = 0;
-            while (1) {
-              DBG_LOG("PullEvent start \n");
-              id = PollEvent(sts, &type, &event, 1);
-              DBG_LOG("PullEvent end id %d \n", id);
-              if (sendflag) {
-                     DBG_LOG("send packet STREAM_AUDIO\n");
-                     sleep(1);
-                     SendPacket(sts, callId, STREAM_AUDIO, "123456788901234567890123456", 15, timecount);
-                     timecount += 20;
-              }
-              if (id != RET_OK) {
-                    usleep(1000000);
-                    continue;
-              }
-              switch (type) {
-                     case EVENT_CALL:
-                     {
-                             CallEvent *pCallEvent = &(event->body.callEvent);
-                             DBG_LOG("Call status %d call id %d call account id %d\n", pCallEvent->status, pCallEvent->callID, sts);
-                             break;
-                     }
-                     case EVENT_DATA:
-                     {
-                            DataEvent *pDataEvent = &(event->body.dataEvent);
-                            DBG_LOG("Data size %d call id %d call account id %d\n", pDataEvent->size, pDataEvent->callID, sts);
-                            break;
-                     }
-                     case EVENT_MESSAGE:
-                     {
-                           MessageEvent *pMessage = &(event->body.messageEvent);
-                           DBG_LOG("Message %s status id %d account id %d\n", pMessage->message, pMessage->status, sts);
-                           break;
-                     }
-                     case EVENT_MEDIA:
-                     {
-                           MediaEvent *pMedia = &(event->body.mediaEvent);
-                           DBG_LOG("Callid %d ncount %d type 1 %d type 2 %d\n", pMedia->callID, pMedia->nCount, pMedia->media[0].codecType, pMedia->media[1].codecType);
-                           callId = pMedia->callID;
-                           sendflag = 1;
-                           break;
-                     }
-              }
-              usleep(100000);
-            }
-            UT_LOG("HangupCall in\n");
-            int ret = HangupCall(sts, nCallId1);
-            TEST_EQUAL(ret, RET_OK);
-            UT_LOG("HangupCall out\n");
-            sleep(1);
-            ++ count;
+                     continue;
+           }
+           UT_LOG("MakeCall in callidid %d\n", pData->callid);
+           pthread_create(&t_1, &attr_1, Mthread1, pData);
     }
-    UnRegister(sts);
-}
-
-int RegisterTestSuitCallback2( TestSuit *this )
-{
-    RegisterTestCase *pTestCases = NULL;
-    RegisterData *pData = NULL;
-    RegisterTestCase *pTestCase = NULL;
-    Media media;
-    int i = 0;
-    int ret = 0;
-    static ErrorID sts = 0;
-    EventManger *pEventManager = &this->pManager->eventManager;
-
-    UT_LINE();
-    if ( !this ) {
-        return -1;
-    }
-
-    pTestCases = (RegisterTestCase *) this->testCases;
-    UT_LOG("this->index = %d\n", this->index );
-    pTestCase = &pTestCases[this->index];
-    pData = &pTestCase->data;
-
-    if ( pData->init ) {
-        sts = InitSDK( &media, 1 );
-        if ( RET_OK != sts ) {
-            UT_ERROR("sdk init error\n");
-            return TEST_FAIL;
-        }
-    }
-
-    UT_STR( pData->id );
-    UT_STR( pData->password );
-    UT_STR( pData->sigHost );
-
-    sts = Register( pData->id, pData->password, pData->sigHost, pData->mediaHost, pData->imHost );
-    if ( sts >= RET_MEM_ERROR ) {
-        DBG_ERROR("sts = %d\n", sts );
-        return TEST_FAIL;
-    }
-    UT_VAL( sts );
-    this->pManager->AddPrivateData( &sts );
-    if ( pTestCase->father.threadEntry )
-        this->pManager->ThreadRegister( pTestCase->father.threadEntry );
-
-    if ( pEventManager->WaitForEvent ) {
-        UT_VAL( pTestCase->father.expact );
-        ret = pEventManager->WaitForEvent( pTestCase->father.expact, pData->timeOut );
-        if ( ret == ERROR_TIMEOUT ) {
-            UT_ERROR("ERROR_TIMEOUT\n");
-            return TEST_FAIL;
-        } else if ( ret == ERROR_INVAL ) {
-            UT_ERROR("ERROR_INVAL\n");
-            return TEST_FAIL;
-        }
-        UT_VAL( ret );
-        return TEST_PASS;
-    }
-
-    return TEST_FAIL;
-}
-
-void *UA1_EventLoopThread( void *arg )
-{
-    TestSuitManager *pManager = (TestSuitManager *)arg;
-    ErrorID ret = 0;
-    EventType type = 0;
-    AccountID id = 0;
-    Event event, *pEvent;
-    CallEvent *pCallEvent;
-    EventManger *pEventManager = &pManager->eventManager;
-
-    UT_LOG("EventLoopThread enter ...\n");
-    if ( !pManager ) {
-        UT_ERROR("check param error\n");
-        return NULL;
-    }
-
-    if ( !pManager->data ) {
-        UT_ERROR("check data error\n");
-        return NULL;
-    }
-
-    id = *(AccountID *)pManager->data;
-    UT_VAL( id );
-
-
-    for (;;) {
-        UT_LOG("call PollEvent\n");
-        ret = PollEvent( id, &type, &pEvent, 0 );
-        UT_VAL( type );
-        if ( type == EVENT_CALL ) {
-            UT_LINE();
-            pCallEvent = &pEvent->body.callEvent;
-            if ( pManager->NotifyAllEvent ) {
-                UT_VAL( pCallEvent->status );
-                pManager->NotifyAllEvent( pCallEvent->status );
-            }
-        }
-    }
-
-    return NULL;
-}
-
-void *UA2_EventLoopThread( void *arg )
-{
-    TestSuitManager *pManager = (TestSuitManager *)arg;
-    ErrorID ret = 0;
-    EventType type = 0;
-    AccountID id = 0;
-    Event event, *pEvent;
-    CallEvent *pCallEvent;
-    EventManger *pEventManager = &pManager->eventManager;
-
-    UT_LOG("EventLoopThread enter ...\n");
-    if ( !pManager ) {
-        UT_ERROR("check param error\n");
-        return NULL;
-    }
-
-    if ( !pManager->data ) {
-        UT_ERROR("check data error\n");
-        return NULL;
-    }
-
-    id = *(AccountID *)pManager->data;
-    UT_VAL( id );
-
-
-    for (;;) {
-        UT_LOG("call PollEvent\n");
-        ret = PollEvent( id, &type, &pEvent, 0 );
-        UT_VAL( type );
-        if ( type == EVENT_CALL ) {
-            UT_LINE();
-            pCallEvent = &pEvent->body.callEvent;
-            if ( pManager->NotifyAllEvent ) {
-                UT_VAL( pCallEvent->status );
-                pManager->NotifyAllEvent( pCallEvent->status );
-            }
-        }
-    }
-
-    return NULL;
-}
-
-void *UA3_EventLoopThread( void *arg )
-{
-    TestSuitManager *pManager = (TestSuitManager *)arg;
-    ErrorID ret = 0;
-    EventType type = 0;
-    AccountID id = 0;
-    Event event, *pEvent;
-    CallEvent *pCallEvent;
-    EventManger *pEventManager = &pManager->eventManager;
-
-    UT_LOG("EventLoopThread enter ...\n");
-    if ( !pManager ) {
-        UT_ERROR("check param error\n");
-        return NULL;
-    }
-
-    if ( !pManager->data ) {
-        UT_ERROR("check data error\n");
-        return NULL;
-    }
-
-    id = *(AccountID *)pManager->data;
-    UT_VAL( id );
-
-
-    for (;;) {
-        UT_LOG("call PollEvent\n");
-        ret = PollEvent( id, &type, &pEvent, 0 );
-        UT_VAL( type );
-        if ( type == EVENT_CALL ) {
-            UT_LINE();
-            pCallEvent = &pEvent->body.callEvent;
-            if ( pManager->NotifyAllEvent ) {
-                UT_VAL( pCallEvent->status );
-                pManager->NotifyAllEvent( pCallEvent->status );
-            }
-        }
-    }
-
-    return NULL;
-}
-
-void *UA4_EventLoopThread( void *arg )
-{
-    TestSuitManager *pManager = (TestSuitManager *)arg;
-    ErrorID ret = 0;
-    EventType type = 0;
-    AccountID id = 0;
-    Event event, *pEvent;
-    CallEvent *pCallEvent;
-    EventManger *pEventManager = &pManager->eventManager;
-
-    UT_LOG("EventLoopThread enter ...\n");
-    if ( !pManager ) {
-        UT_ERROR("check param error\n");
-        return NULL;
-    }
-
-    if ( !pManager->data ) {
-        UT_ERROR("check data error\n");
-        return NULL;
-    }
-
-    id = *(AccountID *)pManager->data;
-    UT_VAL( id );
-
-
-    for (;;) {
-        UT_LOG("call PollEvent\n");
-        ret = PollEvent( id, &type, &pEvent, 0 );
-        UT_VAL( type );
-        if ( type == EVENT_CALL ) {
-            UT_LINE();
-            pCallEvent = &pEvent->body.callEvent;
-            if ( pManager->NotifyAllEvent ) {
-                UT_VAL( pCallEvent->status );
-                pManager->NotifyAllEvent( pCallEvent->status );
-            }
-        }
-    }
-
-    return NULL;
-}
-
-void *UA5_EventLoopThread( void *arg )
-{
-    TestSuitManager *pManager = (TestSuitManager *)arg;
-    ErrorID ret = 0;
-    EventType type = 0;
-    AccountID id = 0;
-    Event event, *pEvent;
-    CallEvent *pCallEvent;
-    EventManger *pEventManager = &pManager->eventManager;
-
-    UT_LOG("EventLoopThread enter ...\n");
-    if ( !pManager ) {
-        UT_ERROR("check param error\n");
-        return NULL;
-    }
-
-    if ( !pManager->data ) {
-        UT_ERROR("check data error\n");
-        return NULL;
-    }
-
-    id = *(AccountID *)pManager->data;
-    UT_VAL( id );
-
-
-    for (;;) {
-        UT_LOG("call PollEvent\n");
-        ret = PollEvent( id, &type, &pEvent, 0 );
-        UT_VAL( type );
-        if ( type == EVENT_CALL ) {
-            UT_LINE();
-            pCallEvent = &pEvent->body.callEvent;
-            if ( pManager->NotifyAllEvent ) {
-                UT_VAL( pCallEvent->status );
-                pManager->NotifyAllEvent( pCallEvent->status );
-            }
-        }
-    }
-
-    return NULL;
+    while(1) { sleep(10); }
 }
 
 int InitAllTestSuit()
 {
     AddTestSuit( &gRegisterTestSuit );
-    //AddTestSuit( &gRegisterTestSuit2 );
-
     return 0;
 }
 

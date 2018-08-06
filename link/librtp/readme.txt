@@ -65,12 +65,22 @@ TODO 未解决
         }
 
 
+//这liang个问题待更严格的测试
 11.  时间戳维护, rtp时间戳溢出问题？
 	uint32_t类型的时间错，在90000hz时钟频率情况下，大概13h15m就会溢出
-
-
-
 12. 音频的rtp marker位是否需要设置?
+
+未解决：
+13 sdp协商一边成功一边失败的问题
+    加日志，失败时候的sdp，codec=0的那里
+
+14 sdk测试程序发送视频coredump问题
+
+15 sdp pj_trans.c  assert失败问题
+
+16 setRemoteDescripton 返回失败-2
+
+stun会挂，sip 状态更新
 
 
 
@@ -82,4 +92,5 @@ TODO 未解决
         
         
 2. StartNegotiation移动到checkAndNeg最后面去，即offer和answer都获取到就自动协商了. 可能最后做，这样做了不好通过文件sdp手动测试了
+
 

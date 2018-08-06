@@ -10,12 +10,12 @@ struct connect_status {
 
 struct connect_status Status[10];
 
-void OnMessage(IN const void* _pInstance, IN const char* _pTopic, IN const char* _pMessage, IN size_t nLength)
+void OnMessage(IN const void* _pInstance, IN int _nAccountId, IN const char* _pTopic, IN const char* _pMessage, IN size_t nLength)
 {
         fprintf(stderr, "%p topic %s message %s \n", _pInstance, _pTopic, _pMessage);
 }
 
-void OnEvent(IN const void* _pInstance, IN int _nId,  IN const char* _pReason)
+void OnEvent(IN const void* _pInstance, IN int _nAccountId, IN int _nId,  IN const char* _pReason)
 {
         fprintf(stderr, "%p id %d, reason  %s \n",_pInstance, _nId, _pReason);
         struct connect_status* pStatus;
@@ -34,12 +34,12 @@ int main()
         options.pId = "test";
         options.bCleanSession = false;
         options.primaryUserInfo.nAuthenicatinMode = MQTT_AUTHENTICATION_USER;
-        options.primaryUserInfo.pHostname = "123.59.204.198";
+        options.primaryUserInfo.pHostname = "39.107.247.14";
         //strcpy(options.bindaddress, "172.17.0.2");
         options.secondaryUserInfo.pHostname = "172.17.0.4";
         //strcpy(options.secondBindaddress, "172.17.0.2`");
-        options.primaryUserInfo.pUsername = "test_sub";
-        options.primaryUserInfo.pPassword = "testsub1";
+        options.primaryUserInfo.pUsername = "1008";
+        options.primaryUserInfo.pPassword = "1008";
         options.secondaryUserInfo.pUsername = "test";
         options.secondaryUserInfo.pPassword = "111";
         options.secondaryUserInfo.nPort = 1883;
@@ -65,8 +65,8 @@ int main()
         MqttSubscribe(instance, "test/#");
         printf("try pub %p \n", instance);
         options.pId = "pubtest";
-        options.primaryUserInfo.pUsername = "test_pub";
-        options.primaryUserInfo.pPassword = "testpub";
+        options.primaryUserInfo.pUsername = "1002";
+        options.primaryUserInfo.pPassword = "1002";
         void* pubInstance = MqttCreateInstance(&options);
         Status[1].pInstance = pubInstance;
         while (!(Status[1].status & 3000)) {
@@ -86,7 +86,7 @@ int main()
         MqttDestroy(pubInstance);
         printf("try second \n");
         options.primaryUserInfo.nAuthenicatinMode = MQTT_AUTHENTICATION_USER;
-        options.primaryUserInfo.pHostname = "123.59.204.198";
+        options.primaryUserInfo.pHostname = "39.107.247.14";
         options.primaryUserInfo.pUsername = "root";
         options.primaryUserInfo.pPassword = "root";
         instance = MqttCreateInstance(&options);

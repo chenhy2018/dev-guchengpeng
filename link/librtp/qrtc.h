@@ -60,7 +60,8 @@ typedef struct _MediaConfigSet{
 typedef enum _CallbackType{
         CALLBACK_ICE,
         CALLBACK_RTP,
-        CALLBACK_RTCP
+        CALLBACK_RTCP,
+        CALLBACK_SEND_RESULT
 }CallbackType;
 
 typedef void(*UserCallback)(void *pUserData, CallbackType type, void *pCbData);
@@ -117,6 +118,7 @@ typedef struct _IceNegInfo {
         void *pData;
 }IceNegInfo;
 
+int InitialiseRtp();
 
 void InitMediaConfig(IN MediaConfigSet * pMediaConfig);
 void InitIceConfig(IN OUT IceConfig *pIceConfig);
@@ -127,13 +129,14 @@ int InitPeerConnectoin(OUT PeerConnection ** pPeerConnectoin,
 
 int AddAudioTrack(IN OUT PeerConnection * pPeerConnection, IN MediaConfigSet *pAudioConfig);
 int AddVideoTrack(IN OUT PeerConnection * pPeerConnection, IN MediaConfigSet *pVideoConfig);
-int createOffer(IN OUT PeerConnection * pPeerConnection);
-int createAnswer(IN OUT PeerConnection * pPeerConnection, IN void *pOffer);
-int setRemoteDescription(IN OUT PeerConnection * pPeerConnection, IN void * pSdp);
+int CreateOffer(IN OUT PeerConnection * pPeerConnection);
+int CreateAnswer(IN OUT PeerConnection * pPeerConnection, IN void *pOffer);
+int SetRemoteDescription(IN OUT PeerConnection * pPeerConnection, IN void * pSdp);
 int StartNegotiation(IN PeerConnection * pPeerConnection);
 
 int SendRtpPacket(IN PeerConnection *pPeerConnection, IN OUT RtpPacket * pPacket);
 
 int ReleasePeerConnectoin(IN OUT PeerConnection * _pPeerConnection);
 
+void UninitialiseRtp();
 #endif

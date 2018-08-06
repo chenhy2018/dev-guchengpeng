@@ -4,28 +4,67 @@
 # and merge all the .o file to a only one .a file. the name is libqnsip.a
 
 cnt=0
-pjsip_path=./third_party/pjproject-2.7.2
+pjsip_path=third_party/pjproject-2.7.2
 
-rm -rvf ./libs/ori
-rm -rvf ./libs/objs
-rm -rvf ./libs/tmp
+if [ $# != 1 ];then
+    echo "USAGE:$0 arch"
+    echo "e.g:$0 mstar"
+    exit 1;
+fi
 
-mkdir -p ./libs/ori
-mkdir -p ./libs/objs
+LIBPREFIX=x86_64-unknown-linux-gnu
+prefix=
+if [ "$1" = "mstar" ];then
+    prefix=arm-linux-gnueabihf-
+    LIBPREFIX=arm-unknown-linux-gnueabihf
+elif [ "$1" = "a12" ];then
+    prefix=arm-linux-gnueabi-
+fi
+OUTPUT=output
+target=./${OUTPUT}/lib/$1/libua.a
 
+rm -rf ./${OUTPUT}/objs
+rm -rf ./${OUTPUT}/tmp
+rm -rf ./${OUTPUT}/ori/$1
+
+mkdir -p ./${OUTPUT}/ori
+mkdir -p ./${OUTPUT}/objs
+mkdir -p ./${OUTPUT}/ori/$1
+mkdir -p ./${OUTPUT}/lib/$1/
+#read WITH_P2P
 # 1. copy all the .a file from pjproject to libs/ori directory
-find $pjsip_path -name "*.a" -exec cp -v {} ./libs/ori \;
+cp -rvf third_party/pjproject-2.7.2/prefix/$1/lib/libpjsip*-${LIBPREFIX}.a ${OUTPUT}/ori/$1
+cp -rvf third_party/pjproject-2.7.2/prefix/$1/lib/libpjmedia-${LIBPREFIX}.a ${OUTPUT}/ori/$1
+cp -rvf third_party/pjproject-2.7.2/prefix/$1/lib/libpj-${LIBPREFIX}.a ${OUTPUT}/ori/$1
+cp -rvf third_party/pjproject-2.7.2/prefix/$1/lib/libpjlib-util-${LIBPREFIX}.a ${OUTPUT}/ori/$1
 
-cd libs/ori
+if [ "${WITH_P2P}" = "ON" ]; then
+cp -rvf third_party/pjproject-2.7.2/prefix/$1/lib/libpjnath-${LIBPREFIX}.a ${OUTPUT}/ori/$1
+cp -rvf third_party/pjproject-2.7.2/prefix/$1/lib/libsrtp-${LIBPREFIX}.a ${OUTPUT}/ori/$1
+cp -rvf third_party/pjproject-2.7.2/prefix/$1/lib/libpjmedia-audiodev-${LIBPREFIX}.a ${OUTPUT}/ori/$1
+cp -rvf third_party/pjproject-2.7.2/prefix/$1/lib/libpjmedia-codec-${LIBPREFIX}.a ${OUTPUT}/ori/$1
+fi
+
+cp -rvf link/libsip/libsip-${LIBPREFIX}.a ${OUTPUT}/ori/$1
+
+if [ "${WITH_P2P}" = "ON" ]; then 
+cp -rvf link/librtp/librtp-${LIBPREFIX}.a ${OUTPUT}/ori/$1
+fi
+
+cp -rvf link/libmqtt/libmqtt-${LIBPREFIX}.a ${OUTPUT}/ori/$1
+cp -rvf link/libsdk/libsdk-${LIBPREFIX}.a ${OUTPUT}/ori/$1
+
+cd ${OUTPUT}/ori/$1
 for f in ./*
 do
     if test -f $f
     then
-        mkdir -p ../tmp/$f
-        cp $f ../tmp/$f
-        cd ../tmp/$f/
+        mkdir -p ../../tmp/$f
+        cp $f ../../tmp/$f
+        cd ../../tmp/$f/
         # 2. release all the .o to tmp directory
-        ar x $f
+#        echo $f
+        ${prefix}ar x $f
         for bin in ./*.o
         do
             # 3. copy all the .o files to libs/objs, if found a file already exist, then rename the current file
@@ -37,13 +76,13 @@ do
                 cp $bin ../../objs/
             fi
         done
-        cd ../../ori
+        cd ../../ori/$1
     fi
 done
-
-cd ../objs
+cd ../../objs
 # 4. strip all the .o files
-arm-linux-gnueabihf-strip *.o --strip-unneeded
-# 5. gen new library
-arm-linux-gnueabihf-ar r libqnsip.a *.o
-cp libqnsip.a ../
+#${prefix}strip *.o --strip-unneeded
+# 5. gen new library 
+echo "gen new lib"
+${prefix}ar r ../../${target} *.o
+cp ../../link/libsdk/sdk_interface.h ../../${OUTPUT}/lib/$1/sdk_interface.h

@@ -4,7 +4,11 @@
 # and merge all the .o file to a only one .a file. the name is libqnsip.a
 
 cnt=0
+
+THIRD_PARTY_PATH=../../third_party
 pjsip_path=../../third_party/pjproject-2.7.2
+MOSQUITTO_PATH=${THIRD_PARTY_PATH}/mosquitto-1.5
+
 
 if [ $# != 1 ];then
     echo "USAGE:$0 arch"
@@ -13,17 +17,19 @@ if [ $# != 1 ];then
 fi
 
 prefix=
+LIBPREFIX=x86_64-unknown-linux-gnu
 if [ "$1" = "mstar" ];then
     prefix=arm-linux-gnueabihf-
+    LIBPREFIX=arm-unknown-linux-gnueabihf
 elif [ "$1" = "a12" ];then
     prefix=arm-linux-gnueabi-
 fi
 OUTPUT=output
 target=./${OUTPUT}/lib/$1/libua.a
 
-rm -rvf ./${OUTPUT}/objs
-rm -rvf ./${OUTPUT}/tmp
-rm -rvf ./${OUTPUT}/ori/$1
+rm -rf ./${OUTPUT}/objs
+rm -rf ./${OUTPUT}/tmp
+rm -rf ./${OUTPUT}/ori/$1
 
 mkdir -p ./${OUTPUT}/ori
 mkdir -p ./${OUTPUT}/objs
@@ -31,13 +37,21 @@ mkdir -p ./${OUTPUT}/ori/$1
 mkdir -p ./${OUTPUT}/lib/$1/
 
 # 1. copy all the .a file from pjproject to libs/ori directory
-cp -rvf ${OUTPUT}/pjsip/lib/* ${OUTPUT}/ori/$1
-rm -rvf ${OUTPUT}/ori/$1/libpjsua2-x86_64-unknown-linux-gnu.a
+cp -rvf ${OUTPUT}/pjsip/lib/libpjsip*-${LIBPREFIX}.a ${OUTPUT}/ori/$1
+cp -rvf ${OUTPUT}/pjsip/lib/libpjmedia-${LIBPREFIX}.a ${OUTPUT}/ori/$1
+cp -rvf ${OUTPUT}/pjsip/lib/libpj-${LIBPREFIX}.a ${OUTPUT}/ori/$1
+cp -rvf ${OUTPUT}/pjsip/lib/libpjnath-${LIBPREFIX}.a ${OUTPUT}/ori/$1
+cp -rvf ${OUTPUT}/pjsip/lib/libpjlib-util-${LIBPREFIX}.a ${OUTPUT}/ori/$1
+cp -rvf ${OUTPUT}/pjsip/lib/libsrtp-${LIBPREFIX}.a ${OUTPUT}/ori/$1
+cp -rvf ${OUTPUT}/pjsip/lib/libpjmedia-audiodev-${LIBPREFIX}.a ${OUTPUT}/ori/$1
+cp -rvf ${OUTPUT}/pjsip/lib/libpjmedia-codec-${LIBPREFIX}.a ${OUTPUT}/ori/$1
+cp -rvf ${MOSQUITTO_PATH}/output/$1/lib/libmosquitto.a ${OUTPUT}/ori/$1
 
 cp -rvf ${OUTPUT}/libsip/*.o ${OUTPUT}/objs
 cp -rvf ${OUTPUT}/libsdk/*.o ${OUTPUT}/objs
-cp -rvf ../libmqtt/*.a ${OUTPUT}/ori/$1
-cp -rvf ../librtp/*.a ${OUTPUT}/ori/$1
+cp -rvf ${OUTPUT}/librtp/*.o ${OUTPUT}/objs
+cp -rvf ${OUTPUT}/libmqtt/*.o ${OUTPUT}/objs
+
 cd ${OUTPUT}/ori/$1
 for f in ./*
 do
@@ -63,7 +77,6 @@ do
         cd ../../ori/$1
     fi
 done
-
 cd ../../objs
 # 4. strip all the .o files
 ${prefix}strip *.o --strip-unneeded

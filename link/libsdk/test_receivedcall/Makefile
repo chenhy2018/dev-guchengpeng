@@ -1,13 +1,23 @@
+THIRD_PARTY_PATH=../../../third_party
 
+ifeq ($(WITH_OPENSSL), ON)
+OPENSSL_PATH=$(THIRD_PARTY_PATH)/openssl-1.1.0h
+OPENSSL_LIB=${OPENSSL_PATH}/prefix/$(ARCH)/lib
+LDFLAGS=-L../../../output/lib/$(ARCH) -L$(OPENSSL_LIB) -lua -lpthread -lm  -lssl -lcrypto
+else
+LDFLAGS=-L../../../output/lib/$(ARCH) -lua -lpthread -lm
+endif
 
-LIBUA=../output/lib/x86/libua.a
-LDFLAGS=-L../output/lib/x86 -lua -lpthread -lm /usr/lib/x86_64-linux-gnu/libcrypto.so /usr/lib/x86_64-linux-gnu/libssl.so
-CFLAGS=-g
+ifeq ($(WITH_P2P), ON)
+CFLAGS=-g -std=gnu99 -D WITH_P2P
+else
+CFLAGS=-g -std=gnu99
+endif
+
 TARGET_OBJS=test.o unit_test.o
 TESTCASE_OBJS_DIR=./objs
 INCLUDE_PATH=-I../
 TARGET=test
-CC=gcc
 
 all:$(TARGET)
 

@@ -1,11 +1,38 @@
+SET(OPENSSL_PREFIX_PATH "${CMAKE_CURRENT_SOURCE_DIR}/openssl-1.1.0h/prefix/$ENV{ARCH}")
+
+#TO DO . if WITH_OPENSSL is OFF. not need build openssl. Will do this in vod branch.
 include(ExternalProject)
-ExternalProject_Add(pjsip
-        SOURCE_DIR pjproject-2.7.2
-        BUILD_COMMAND make dep COMMAND make
-        CONFIGURE_COMMAND ./configure
+ExternalProject_Add(openssl-1.1.0h
+        SOURCE_DIR openssl-1.1.0h
+        BUILD_COMMAND make COMMAND make install
+        CONFIGURE_COMMAND ./Configure --prefix=${OPENSSL_PREFIX_PATH} my-gcc;
         INSTALL_COMMAND ""
         BUILD_IN_SOURCE 1
 )
+
+SET(PJ_PREFIX_PATH "${CMAKE_CURRENT_SOURCE_DIR}/pjproject-2.7.2/prefix/$ENV{ARCH}")
+include(ExternalProject)
+
+if ($ENV{WITH_OPENSSL} STREQUAL "ON")
+ExternalProject_Add(pjsip
+        DEPENDS openssl-1.1.0h
+        SOURCE_DIR pjproject-2.7.2
+        CONFIGURE_COMMAND ./configure  --host=$ENV{HOST}  --with-ssl=${OPENSSL_PREFIX_PATH} --prefix=${PJ_PREFIX_PATH} --disable-sdl --disable-ffmpeg --disable-v4l2 --disable-openh264 --disable-libwebrtc --disable-sound --disable-oss --disable-video --disable-speex-aec --disable-g711-code --disable-l16-codec --disable-gsm-codec --disable-g722-codec --disable-g7221-codec --disable-speex-codec --disable-ilbc-codec --disable-bcg729 --disable-libyuv
+        BUILD_COMMAND make dep COMMAND make
+        INSTALL_COMMAND make install
+        BUILD_IN_SOURCE 1
+)
+else()
+add_definitions(-DPJMEDIA_HAS_SRTP=0)
+ExternalProject_Add(pjsip
+        DEPENDS openssl-1.1.0h
+        SOURCE_DIR pjproject-2.7.2
+        CONFIGURE_COMMAND ./configure  --host=$ENV{HOST}  --prefix=${PJ_PREFIX_PATH} --disable-ssl --disable-sdl --disable-ffmpeg --disable-v4l2 --disable-openh264 --disable-libwebrtc --disable-sound --disable-oss --disable-video --disable-speex-aec --disable-g711-code --disable-l16-codec --disable-gsm-codec --disable-g722-codec --disable-g7221-codec --disable-speex-codec --disable-ilbc-codec --disable-bcg729 --disable-libyuv
+        BUILD_COMMAND make dep COMMAND make
+        INSTALL_COMMAND make install
+        BUILD_IN_SOURCE 1
+)
+endif()
 
 #SET(X264_PREFIX_PATH "${CMAKE_CURRENT_SOURCE_DIR}/x264/prefix")
 #include(ExternalProject)

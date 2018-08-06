@@ -4,16 +4,22 @@
 #include "sdk_local.h"
 
 // make a call, user need to save call id
-Call* CALLMakeCall(AccountID _nAccountId, const char* id, const char* host, OUT int* callID,
+Call* CALLMakeCall(AccountID _nAccountId, const char* id, const char* host, IN const int nCallId,
                    CallConfig* _pConfig);
+
+void CALLMakeNewCall(Call* _pCall);
 
 ErrorID CALLAnswerCall(Call* _pCall);
 
 ErrorID CALLRejectCall(Call* _pCall);
 // hangup a call
 ErrorID CALLHangupCall(Call* _pCall);
+
+#ifdef WITH_P2P
 // send a packet
 ErrorID CALLSendPacket(Call* _pCall, Stream streamID, const uint8_t* buffer, int size, int64_t nTimestamp);
+#endif
+
 // poll a event
 // if the EventData have video or audio data
 // the user shuould copy the the packet data as soon as possible
