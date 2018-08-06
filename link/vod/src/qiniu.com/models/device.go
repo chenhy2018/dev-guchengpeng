@@ -10,22 +10,22 @@ import (
 
 
 const (
-        UA_COL = "device"
-	UA_ITEM_UUID   = "uuid"
-	UA_ITEM_UAID = "uaid"
-	UA_ITEM_DATE   = "date"
-        UA_ITEM_BUCKET_URL = "bucketurl"
-	UA_ITEM_EXPIRE = "remaindays"
+        DEVICE_COL = "device"
+	DEVICE_ITEM_UUID   = "uuid"
+	DEVICE_ITEM_DEVICEID = "deviceid"
+	DEVICE_ITEM_DATE   = "date"
+        DEVICE_ITEM_BUCKET_URL = "bucketurl"
+	DEVICE_ITEM_EXPIRE = "remaindays"
 )
 
-type uaModel struct {
+type deviceModel struct {
 }
 
 var (
-	Ua *uaModel
+	Device *deviceModel
 )
 
-func (m *uaModel) Init() error {
+func (m *deviceModel) Init() error {
 
 //     index := Index{
 //         Key: []string{"uuid"},
@@ -37,7 +37,7 @@ func (m *uaModel) Init() error {
 //     err := collection.EnsureIndex(index)
 
        index := mgo.Index{
-           Key: []string{UA_ITEM_UUID},
+           Key: []string{DEVICE_ITEM_UUID},
            Unique: true,
            DropDups: true,
            Background: true, // See notes.
@@ -45,30 +45,37 @@ func (m *uaModel) Init() error {
        }
 
         return db.WithCollection(
-                UA_COL,
+                DEVICE_COL,
                 func(c *mgo.Collection) error {
                         return c.EnsureIndex(index)
                 },
         )
 }
 
-func (m *uaModel) Register(req UaInfo) error {
+type RegisterReq struct {
+        Uuid string
+        Deviceid string
+        BucketUrl string
+        RemainDays int64
+}
+
+func (m *deviceModel) Register(req RegisterReq) error {
 
 	err := db.WithCollection(
-		UA_COL,
+		DEVICE_COL,
 		func(c *mgo.Collection) error {
 			_, err := c.Upsert(
 				bson.M{
-                                        UA_ITEM_UUID: req.UuId,
-					UA_ITEM_UAID: req.UaId,
+                                        DEVICE_ITEM_UUID: req.Uuid,
+					DEVICE_ITEM_DEVICEID: req.Deviceid,
 				},
 				bson.M{
 					"$set": bson.M{
-                                                UA_ITEM_UUID: req.UuId,
-						UA_ITEM_UAID: req.UaId,
-						UA_ITEM_DATE: time.Now().Unix(),
-                                                UA_ITEM_BUCKET_URL: req.BucketUrl,
-                                                UA_ITEM_EXPIRE : req.RemainDays,
+                                                DEVICE_ITEM_UUID: req.Uuid,
+						DEVICE_ITEM_DEVICEID: req.Deviceid,
+						DEVICE_ITEM_DATE: time.Now().Unix(),
+                                                DEVICE_ITEM_BUCKET_URL: req.BucketUrl,
+                                                DEVICE_ITEM_EXPIRE : req.RemainDays,
 					},
 				},
 			)
@@ -81,34 +88,34 @@ func (m *uaModel) Register(req UaInfo) error {
 	return nil;
 }
 
-func (m *uaModel) Delete(uuid,uaid string) error {
+func (m *deviceModel) Delete(uuid,deviceid string) error {
 
 	return db.WithCollection(
-		UA_COL,
+		DEVICE_COL,
 		func(c *mgo.Collection) error {
 			return c.Remove(
 				bson.M{
-					UA_ITEM_UUID: uuid,
-                                        UA_ITEM_UAID: uaid,
+					DEVICE_ITEM_UUID: uuid,
+                                        DEVICE_ITEM_DEVICEID: deviceid,
 				},
 			)
 		},
 	)
 }
 
-func (m *uaModel) UpdateRemaindays(uuid,uaid string, remaindays int64) error {
+func (m *deviceModel) UpdateRemaindays(uuid,deviceid string, remaindays int64) error {
 
 	return db.WithCollection(
-		UA_COL,
+		DEVICE_COL,
 		func(c *mgo.Collection) error {
 			return c.Update(
 				bson.M{
-					UA_ITEM_UUID: uuid,
-                                        UA_ITEM_UAID: uaid,
+					DEVICE_ITEM_UUID: uuid,
+                                        DEVICE_ITEM_DEVICEID: deviceid,
 				},
 				bson.M{
 					"$set": bson.M{
-						UA_ITEM_EXPIRE: remaindays,
+						DEVICE_ITEM_EXPIRE: remaindays,
 					},
 				},
 			)
@@ -116,15 +123,15 @@ func (m *uaModel) UpdateRemaindays(uuid,uaid string, remaindays int64) error {
 	)
 }
 
-type UaInfo struct {
-	UuId          string  `bson:"uuid"       json:"uuid"`
-	UaId          string  `bson:"uaid"       json:"uaid"`
-	Regtime       int     `bson:"date"       json:"date"`
-        BucketUrl     string  `bson:"bucketurl"  json:"bucketurl"`
-        RemainDays    int64   `bson:"remaindays" json:"remaindays"`
+type deviceInfo struct {
+	UUID      string  `bson:"uuid"       json:"uuid"`
+	DevicdID  string  `bson:"deviceid"   json:"deviceid"`
+	Regtime   int     `bson:"date"       json:"date"`
+        BucketUrl string  `bson:"bucketurl"  json:"bucketurl"`
+	Expire    int64   `bson:"remaindays" json:"remaindays"`
 }
 
-func (m *uaModel) GetUaInfo(index, rows int, category, like string) ([]UaInfo, error) {
+func (m *deviceModel) GetDeviceInfo(index, rows int, category, like string) ([]deviceInfo, error) {
 
 	// query by keywords
 	query := bson.M{}
@@ -142,13 +149,13 @@ func (m *uaModel) GetUaInfo(index, rows int, category, like string) ([]UaInfo, e
 	}
 
 	// query
-	r := []UaInfo{}
+	r := []deviceInfo{}
 	count := 0
 	err := db.WithCollection(
-		UA_COL,
+		DEVICE_COL,
 		func(c *mgo.Collection) error {
 			var err error
-			if err = c.Find(query).Sort(UA_ITEM_DATE).Skip(skip).Limit(limit).All(&r); err != nil {
+			if err = c.Find(query).Sort(DEVICE_ITEM_EXPIRE).Skip(skip).Limit(limit).All(&r); err != nil {
 				return fmt.Errorf("query failed")
 			}
 			if count, err = c.Find(query).Count(); err != nil {
@@ -158,7 +165,7 @@ func (m *uaModel) GetUaInfo(index, rows int, category, like string) ([]UaInfo, e
 		},
 	)
 	if err != nil {
-		return []UaInfo{}, err
+		return []deviceInfo{}, err
 	}
 	return r, nil
 }
