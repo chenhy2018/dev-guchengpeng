@@ -53,9 +53,9 @@ func (suite *PlayBackTestSuite) TestPlayBackWithoutToken() {
 }
 
 func (suite *PlayBackTestSuite) TestPlayBack() {
-	req, _ := http.NewRequest("GET", "/playback/13764829407/12345?from=1532499345&to=1532499345&e=1532499345&token=xxxxxx", nil)
+	req, _ := http.NewRequest("GET", "/playback/13764829407/12345?from=1532499345&to=1532499345&e=1532499345&token=fadsfasddfs", nil)
 	w := PerformRequest(suite.r, req)
-	suite.Equal(200, w.Code, "200 for correct request")
+	suite.Equal(401, w.Code, "401 for bad token")
 }
 
 func TestPlayBackSuite(t *testing.T) {
