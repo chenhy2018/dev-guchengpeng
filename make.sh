@@ -4,6 +4,8 @@ if [ $# != 1 ];then
     exit 1;
 fi
 
+source env.sh
+
 export ARCH=$1
 
 export WITH_P2P="OFF"

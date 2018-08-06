@@ -1,0 +1,88 @@
+package stack
+
+import (
+	"testing"
+)
+
+func TestStackInt(t *testing.T) {
+
+	var stk Stack@int
+
+	stk.Push(1)
+	stk.Push(2)
+
+	v0 := stk.Top()
+	if v0 != 2 {
+		t.Fatal("stk.Top() != 2")
+	}
+
+	v1, ok := stk.Pop()
+	if !ok || v1 != 2 {
+		t.Fatal("stk.Pop failed")
+	}
+
+	if stk.Empty() {
+		t.Fatal("stk.Empty failed")
+	}
+
+	v2, ok := stk.Pop()
+	if !ok || v2 != 1 {
+		t.Fatal("stk.Pop failed")
+	}
+
+	_, ok = stk.Pop()
+	if ok {
+		t.Fatal("stk.Pop empty stack failed")
+	}
+
+	v := stk.Top()
+	if v != 0 {
+		t.Fatal("stk.Top() != 0")
+	}
+
+	if !stk.Empty() {
+		t.Fatal("stk.Empty failed")
+	}
+}
+
+func TestStackPtr(t *testing.T) {
+
+	var stk Stack@map[string]string
+
+	stk.Push(map[string]string{"1": "foo1"})
+	stk.Push(map[string]string{"2": "foo2"})
+
+	v0 := stk.Top()
+	if v0 == nil || v0["2"] != "foo2" {
+		t.Fatal("stk.Top failed")
+	}
+
+	v1, ok := stk.Pop()
+	if !ok || v1["2"] != "foo2" {
+		t.Fatal("stk.Pop failed")
+	}
+
+	if stk.Empty() {
+		t.Fatal("stk.Empty failed")
+	}
+
+	v2, ok := stk.Pop()
+	if !ok || v2["1"] != "foo1" {
+		t.Fatal("stk.Pop failed")
+	}
+
+	_, ok = stk.Pop()
+	if ok {
+		t.Fatal("stk.Pop empty stack failed")
+	}
+
+	v := stk.Top()
+	if v != nil {
+		t.Fatal("stk.Top() != nil")
+	}
+
+	if !stk.Empty() {
+		t.Fatal("stk.Empty failed")
+	}
+}
+

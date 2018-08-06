@@ -1,0 +1,17 @@
+#!/usr/bin/env qiniutest
+
+match $(user) `env QiniuPortalUser`
+match $(pwd) `env QiniuPortalPwd`
+
+get https://portal.qiniu.com/signin
+ret
+match $(cookie1) $(resp.header.Set-Cookie)
+#echo $(resp)
+
+post https://portal.qiniu.com/signin
+header Cookie $(cookie1)
+form username=$(user)&password=$(pwd)
+#CSRF Attack Detected
+ret 422
+echo $(resp)
+
