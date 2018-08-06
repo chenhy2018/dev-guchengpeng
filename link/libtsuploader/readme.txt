@@ -28,5 +28,14 @@ openssl的裁剪比较麻烦，按照齐斌的意思openssl 链接摄像头的�
 
 5. 音视频格式的指定
 
-TODO
 1. upload 失败立即结束上传线程，开启下个上传线程
+
+名字可选: 回调函数,应该不用了
+
+1. 从token中获取expire加到文件名中. 完成
+2. openssl 开关. 完成
+3. http获取token，解析expre. 完成
+
+TODO
+4. 从服务器获取时间，然后对应到本地时间(机器启动时间或者程序启动时间)
+5. 文件名用/分割, 名字还是试用uid_deviceid_seg_ts.ts seg由时间来决定
