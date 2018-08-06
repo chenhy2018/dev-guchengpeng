@@ -69,7 +69,7 @@ func UploadTs(c *gin.Context) {
 	xl.Infof("start = %v\n, end = %v", startTime, endTime, d.Nanoseconds())
 	ts := models.SegmentTsInfo{
 		Uuid:              UidDevicIdSegId[1],
-		DeviceId:          UidDevicIdSegId[2],
+		UaId:              UidDevicIdSegId[2],
 		StartTime:         startTime.UnixNano(),
 		FileName:          fileName,
 		EndTime:           endTime.UnixNano(),
