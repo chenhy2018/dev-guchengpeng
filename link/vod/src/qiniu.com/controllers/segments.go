@@ -29,7 +29,14 @@ func GetSegments(c *gin.Context) {
 
 	segMod := &models.SegmentModel{}
 	segs, err := segMod.GetFragmentTsInfo(0, 0, time.Unix(params.from, 0).UnixNano(), time.Unix(params.to, 0).UnixNano(), params.uid, params.deviceid)
+	if err != nil {
+		xl.Errorf("get segments list error, error =%v", err)
+		c.JSON(500, nil)
+		return
+	}
+
 	c.JSON(200, gin.H{
 		"segments": segs,
 	})
+
 }

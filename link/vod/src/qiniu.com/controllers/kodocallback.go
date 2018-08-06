@@ -27,7 +27,7 @@ func UploadTs(c *gin.Context) {
 	xl := xlog.New(c.Writer, c.Request)
 
 	c.Header("Content-Type", "application/json")
-	if ok, err := VerifyAuth(xl, c.Request); err == nil && ok == true {
+	if ok, err := VerifyAuth(xl, c.Request); err != nil || ok != true {
 		xl.Infof("verify auth failed %#v", err)
 		c.JSON(401, gin.H{
 			"error": "verify auth failed",
