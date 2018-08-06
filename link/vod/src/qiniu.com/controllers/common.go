@@ -32,7 +32,7 @@ func VerifyAuth(xl *xlog.Logger, req *http.Request) (bool, error) {
 	return mac.VerifyCallback(req)
 }
 
-func GetDownLoadToken(xl *xlog.Logger, url string) string {
+func GetUrlWithDownLoadToken(xl *xlog.Logger, url string) string {
 	mac := qbox.NewMac(accessKey, secretKey)
 	expireT := time.Now().Add(time.Hour).Unix()
 	url = url + "&e=" + strconv.FormatInt(expireT, 10)

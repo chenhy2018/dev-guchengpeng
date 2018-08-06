@@ -34,18 +34,22 @@ func GetPlayBackm3u8(c *gin.Context) {
 	pPlaylist := new(m3u8.MediaPlaylist)
 	pPlaylist.Init(32, 32)
 	var playlist []map[string]interface{}
+
 	if err == nil {
 		for _, v := range segs {
 			duration := float64(v.EndTime-v.StartTime) / 1000000000
-			realUrl := GetDownLoadToken(xl, "http://pcgtsa42m.bkt.clouddn.com/"+v.FileName)
+			realUrl := GetUrlWithDownLoadToken(xl, "http://pcgtsa42m.bkt.clouddn.com/"+v.FileName)
 			pPlaylist.AppendSegment(realUrl, duration, v.DeviceId)
-			m := make(map[string]interface{})
-			m["duration"] = duration
-			m["url"] = realUrl
+
+			m := map[string]interface{}{
+				"duration": duration,
+				"url":      realUrl,
+			}
 			playlist = append(playlist, m)
 
 		}
 	}
+
 	c.Header("Content-Type", "application/x-mpegURL")
 	c.String(200, pPlaylist.String())
 }
