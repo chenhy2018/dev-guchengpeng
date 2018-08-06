@@ -87,6 +87,7 @@ static void * streamUpload(void *_pOpaque)
         char *uptoken = NULL;
         Qiniu_Client client;
         int canFreeToken = 0;
+#ifndef DISABLE_OPENSSL
         if (pUploader->pToken_ == NULL || pUploader->pToken_[0] == 0) {
                 Qiniu_Mac mac;
                 mac.accessKey = pUploader->ak_;
@@ -102,10 +103,15 @@ static void * streamUpload(void *_pOpaque)
                 //init
                 Qiniu_Client_InitMacAuth(&client, 1024, &mac);
         } else {
+#else
                 logdebug("client upload");
                 uptoken = pUploader->pToken_;
                 Qiniu_Client_InitNoAuth(&client, 1024);
+#endif
+        
+#ifndef DISABLE_OPENSSL
         }
+#endif
         
         Qiniu_Io_PutRet putRet;
         Qiniu_Io_PutExtra putExtra;
@@ -114,7 +120,11 @@ static void * streamUpload(void *_pOpaque)
         //Qiniu_Use_Zone_Beimei(Qiniu_False);
         //Qiniu_Use_Zone_Huabei(Qiniu_True);
         //Qiniu_Use_Zone_Huadong(Qiniu_True);
+#ifdef DISABLE_OPENSSL
         Qiniu_Use_Zone_Huadong(Qiniu_False);
+#else
+        Qiniu_Use_Zone_Huadong(Qiniu_True);
+#endif
         //Qiniu_Use_Zone_Huanan(Qiniu_True);
         
         //put extra
