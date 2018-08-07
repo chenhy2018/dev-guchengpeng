@@ -3,31 +3,23 @@
 #include <curl/curl.h>
 #include <string.h>
 #include "base.h"
-#ifdef __APPLE__
-#include <sys/types.h>
-#include <sys/sysctl.h>
-#else
 #include <time.h>
-#endif
 
 #define USE_CLOCK 1
 
-#ifndef __APPLE__
 #ifdef USE_CLOCK
 static struct timespec tmResolution;
-#endif
 #endif
 
 int uptimefd = -1;
 
 static int64_t getUptime()
 {
-#ifndef __APPLE__
-    #ifdef USE_CLOCK
+#ifdef USE_CLOCK
         struct timespec tp;
         clock_gettime(CLOCK_MONOTONIC, &tp);
         return (int64_t)(tp.tv_sec * 1000000000 + tp.tv_nsec / tmResolution.tv_nsec);
-    #else
+#else
         char str[33];
         if(uptimefd < 0) {
                 uptimefd = open("/proc/uptime", O_RDONLY);
@@ -43,13 +35,6 @@ static int64_t getUptime()
         char *pSpace = strchr(str, ' ');
         *pSpace = 0;
         return (int64_t)(atof(str) * 1000000000);
-    #endif
-#else
-        struct timeval tm;
-        size_t s = sizeof(tm);
-        memset(&tm, 0, sizeof(tm));
-        sysctlbyname("kern.boottime", &tm, &s, NULL, 0);
-        return (int64_t)(tm.tv_sec * 1000000000 + tm.tv_usec * 1000);
 #endif
 }
 
@@ -119,10 +104,8 @@ int64_t GetCurrentMillisecond()
 }
 
 int InitTime() {
-#ifndef __APPLE__
-    #ifdef USE_CLOCK
+#ifdef USE_CLOCK
         clock_getres(CLOCK_MONOTONIC, &tmResolution);
-    #endif
 #endif
         int ret = 0;
         ret = getTimeFromServer(&nServerTimestamp);
