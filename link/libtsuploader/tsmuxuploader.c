@@ -590,11 +590,11 @@ int TsMuxUploaderStart(TsMuxUploader *_pTsMuxUploader)
                 if (pFFTsMuxUploader->deleteAfterDays_ == 0) {
                         pFFTsMuxUploader->deleteAfterDays_  = 7;
                 }
-                pFFTsMuxUploader->pTsMuxCtx->pTsUploader_->SetDeleteAfterDays(pFFTsMuxUploader->pTsMuxCtx->pTsUploader_,
-                                                                              pFFTsMuxUploader->deleteAfterDays_);
         } else {
                 pFFTsMuxUploader->pTsMuxCtx->pTsUploader_->SetToken(pFFTsMuxUploader->pTsMuxCtx->pTsUploader_, pFFTsMuxUploader->pToken_);
         }
+        pFFTsMuxUploader->pTsMuxCtx->pTsUploader_->SetDeleteAfterDays(pFFTsMuxUploader->pTsMuxCtx->pTsUploader_,
+                                                                      pFFTsMuxUploader->deleteAfterDays_);
 
         if (pFFTsMuxUploader->nSegmentId == 0) {
                 pFFTsMuxUploader->nSegmentId = (int64_t)time(NULL);
