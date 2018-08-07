@@ -186,7 +186,6 @@ func (m *SegmentModel) GetLastSegmentTsInfo(uid,uaid string) (SegmentTsInfo, err
                  ).sort("starttime").limit(rows),skip(rows * index)
         */
         // query by keywords
-        // query by keywords
         query := bson.M{}
         query[SEGMENT_ITEM_ID] = bson.M{
                         "$regex": uid + "." + uaid + ".*",
