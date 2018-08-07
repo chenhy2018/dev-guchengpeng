@@ -5,7 +5,6 @@ import (
 	"io/ioutil"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/qiniu/xlog.v1"
@@ -62,17 +61,16 @@ func UploadTs(c *gin.Context) {
 	}
 	expireAfter, _ := strconv.ParseInt(UidDevicIdSegId[0], 10, 32)
 
-	start, err := strconv.ParseInt(UidDevicIdSegId[3], 10, 32)
-	startTime := time.Unix(start, 0)
-	d, _ := time.ParseDuration(kodoData.Duration + "s")
-	endTime := startTime.Add(d)
-	xl.Infof("start = %v\n, end = %v", startTime, endTime, d.Nanoseconds())
+	startTime, err := strconv.ParseInt(UidDevicIdSegId[3], 10, 64)
+	duration, err := strconv.ParseFloat(kodoData.Duration, 64)
+	endTime := startTime + int64(duration*1000)
+	xl.Infof("start = %v\n, end = %v", startTime, endTime, duration)
 	ts := models.SegmentTsInfo{
 		Uid:               UidDevicIdSegId[1],
 		UaId:              UidDevicIdSegId[2],
-		StartTime:         startTime.UnixNano(),
+		StartTime:         startTime,
 		FileName:          fileName,
-		EndTime:           endTime.UnixNano(),
+		EndTime:           endTime,
 		Expire:            expireAfter * 24 * 60 * 60,
 		FragmentStartTime: int64(segId),
 	}
