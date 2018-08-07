@@ -583,18 +583,18 @@ int TsMuxUploaderStart(TsMuxUploader *_pTsMuxUploader)
                                                                         pFFTsMuxUploader->ak_, strlen(pFFTsMuxUploader->ak_));
                 pFFTsMuxUploader->pTsMuxCtx->pTsUploader_->SetSecretKey(pFFTsMuxUploader->pTsMuxCtx->pTsUploader_,
                                                                         pFFTsMuxUploader->sk_, strlen(pFFTsMuxUploader->sk_));
+                pFFTsMuxUploader->pTsMuxCtx->pTsUploader_->SetBucket(pFFTsMuxUploader->pTsMuxCtx->pTsUploader_,
+                                                                     pFFTsMuxUploader->bucketName_, strlen(pFFTsMuxUploader->bucketName_));
+                pFFTsMuxUploader->pTsMuxCtx->pTsUploader_->SetCallbackUrl(pFFTsMuxUploader->pTsMuxCtx->pTsUploader_,
+                                                                          pFFTsMuxUploader->callback_, strlen(pFFTsMuxUploader->callback_));
+                if (pFFTsMuxUploader->deleteAfterDays_ == 0) {
+                        pFFTsMuxUploader->deleteAfterDays_  = 7;
+                }
+                pFFTsMuxUploader->pTsMuxCtx->pTsUploader_->SetDeleteAfterDays(pFFTsMuxUploader->pTsMuxCtx->pTsUploader_,
+                                                                              pFFTsMuxUploader->deleteAfterDays_);
         } else {
                 pFFTsMuxUploader->pTsMuxCtx->pTsUploader_->SetToken(pFFTsMuxUploader->pTsMuxCtx->pTsUploader_, pFFTsMuxUploader->pToken_);
         }
-        pFFTsMuxUploader->pTsMuxCtx->pTsUploader_->SetBucket(pFFTsMuxUploader->pTsMuxCtx->pTsUploader_,
-                                                             pFFTsMuxUploader->bucketName_, strlen(pFFTsMuxUploader->bucketName_));
-        pFFTsMuxUploader->pTsMuxCtx->pTsUploader_->SetCallbackUrl(pFFTsMuxUploader->pTsMuxCtx->pTsUploader_,
-                                                                  pFFTsMuxUploader->callback_, strlen(pFFTsMuxUploader->callback_));
-        if (pFFTsMuxUploader->deleteAfterDays_ == 0) {
-                pFFTsMuxUploader->deleteAfterDays_  = 7;
-        }
-        pFFTsMuxUploader->pTsMuxCtx->pTsUploader_->SetDeleteAfterDays(pFFTsMuxUploader->pTsMuxCtx->pTsUploader_,
-                                                                      pFFTsMuxUploader->deleteAfterDays_);
 
         if (pFFTsMuxUploader->nSegmentId == 0) {
                 pFFTsMuxUploader->nSegmentId = (int64_t)time(NULL);

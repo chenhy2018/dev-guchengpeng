@@ -10,7 +10,7 @@ AvArg avArg;
 typedef int (*DataCallback)(void *opaque, void *pData, int nDataLen, int nFlag, int64_t timestamp, int nIsKeyFrame);
 #define THIS_IS_AUDIO 1
 #define THIS_IS_VIDEO 2
-#define TEST_AAC 1
+//#define TEST_AAC 1
 #define TEST_AAC_NO_ADTS 1
 #define USE_LINK_ACC 1
 
@@ -442,29 +442,15 @@ int main(int argc, char* argv[])
         pthread_attr_destroy (&attr);
         
 #ifdef USE_LINK_ACC
-        ret = SetAk("JAwTPb8dmrbiwt89Eaxa4VsL4_xSIYJoJh4rQfOQ");
-        if (ret != 0)
-                return ret;
-        ret = SetSk("G5mtjT3QzG4Lf7jpCAN5PZHrGeoSH9jRdC96ecYS");
-        if (ret != 0)
-                return ret;
+        SetAk("JAwTPb8dmrbiwt89Eaxa4VsL4_xSIYJoJh4rQfOQ");
+        SetSk("G5mtjT3QzG4Lf7jpCAN5PZHrGeoSH9jRdC96ecYS");
         
         //计算token需要，所以需要先设置
-        ret = SetBucketName("ipcamera");
-        if (ret != 0)
-                return ret;
+        SetBucketName("ipcamera");
 #else
-        ret =  SetAk("p4y2X-zKqiDoWeIvmhhXkR3mHbHx_Yw36YHFz9e1");
-        if (ret != 0)
-                return ret;
-        ret = SetSk("hVZOIZfLw_0xzJhtVv1ddmlSkbiUrHLdNJewZRkp");
-        if (ret != 0)
-                return ret;
-        
-        //计算token需要，所以需要先设置
-        ret = SetBucketName("bucket");
-        if (ret != 0)
-                return ret;
+        SetAk("p4y2X-zKqiDoWeIvmhhXkR3mHbHx_Yw36YHFz9e1");
+        SetSk("hVZOIZfLw_0xzJhtVv1ddmlSkbiUrHLdNJewZRkp");
+        SetBucketName("bucket");
 #endif
 
         
@@ -482,7 +468,7 @@ int main(int argc, char* argv[])
         avArg.nChannels = 1;
         avArg.nSamplerate = 8000;
 #endif
-        avArg.nVideoFormat = TK_VIDEO_H265;
+        avArg.nVideoFormat = TK_VIDEO_H264;
 
         ret = InitUploader("testuid3", "testdeviceid", gtestToken, &avArg);
         if (ret != 0) {
@@ -496,8 +482,7 @@ int main(int argc, char* argv[])
         char * pAFile = "/Users/liuye/Documents/material/h265_aac_1_16000_pcmu_8000.mulaw";
   #endif
         if (avArg.nVideoFormat == TK_VIDEO_H265) {
-                //pVFile = "/Users/liuye/Documents/material/h265_aac_1_16000_v.h265";
-                pVFile = "/Users/liuye/Documents/material/h265.h265";
+                pVFile = "/Users/liuye/Documents/material/h265_aac_1_16000_v.h265";
         }
         start_file_test(pAFile, pVFile, dataCallback, NULL);
 

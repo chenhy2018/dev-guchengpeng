@@ -8,9 +8,13 @@
 static char gAk[65] = {0};
 static char gSk[65] = {0};
 static char gBucket[128] = {0};
+static char gCallbackUrl[256] = {0};
 static int nProcStatus = 0;
 static TsMuxUploader *gpTsMuxUploader = NULL;
+static int nDeleteAfterDays = -1;
 static AvArg gAvArg;
+
+#define CALLBACK_URL "http://39.107.247.14:8088/qiniu/upload/callback"
 
 typedef struct _Token {
         int nQuit;
@@ -50,17 +54,14 @@ int UpdateToken(char * pToken)
         return 0;
 }
 
-int SetBucketName(char *_pName)
+void SetBucketName(char *_pName)
 {
-        int ret = 0;
-        ret = snprintf(gBucket, sizeof(gBucket), "%s", _pName);
-        assert(ret < sizeof(gBucket));
-        if (ret == sizeof(gBucket)) {
-                logerror("bucketname:%s is too long", _pName);
-                return TK_ARG_ERROR;
-        }
+        int nLen = strlen(_pName);
+        assert(nLen < sizeof(gBucket));
+        strcpy(gBucket, _pName);
+        gBucket[nLen] = 0;
         
-        return 0;
+        return;
 }
 
 int InitUploader(char * _pUid, char *_pDeviceId, char * _pToken, AvArg *_pAvArg)
@@ -109,6 +110,7 @@ int InitUploader(char * _pUid, char *_pDeviceId, char * _pToken, AvArg *_pAvArg)
         }
 
         gpTsMuxUploader->SetToken(gpTsMuxUploader, gToken.pToken_);
+        gpTsMuxUploader->SetCallbackUrl(gpTsMuxUploader, CALLBACK_URL, strlen(CALLBACK_URL));
         ret = TsMuxUploaderStart(gpTsMuxUploader);
         if (ret != 0){
                 StopMgr();
@@ -116,8 +118,7 @@ int InitUploader(char * _pUid, char *_pDeviceId, char * _pToken, AvArg *_pAvArg)
                 logerror("UploadStart fail:%d\n", ret);
                 return ret;
         }
-        gpTsMuxUploader->SetCallbackUrl(gpTsMuxUploader, "http://39.107.247.14:8088/qiniu/upload/callback",
-                                        strlen("http://39.107.247.14:8088/qiniu/upload/callback"));
+
         nProcStatus = 1;
         return 0;
 }
@@ -161,30 +162,38 @@ void UninitUploader()
         pthread_mutex_destroy(&gToken.tokenMutex_);
 }
 
-int SetAk(char *_pAk)
+void SetAk(char *_pAk)
 {
-        int ret = 0;
-        ret = snprintf(gAk, sizeof(gAk), "%s", _pAk);
-        assert(ret > 0);
-        if (ret == sizeof(gAk)) {
-                logerror("sk:%s is too long", _pAk);
-                return TK_ARG_ERROR;
-        }
+        int nLen = strlen(_pAk);
+        assert(nLen < sizeof(gAk));
+        strcpy(gAk, _pAk);
+        gAk[nLen] = 0;
         
-        return 0;
+        return;
 }
 
-int SetSk(char *_pSk)
+void SetSk(char *_pSk)
 {
-        int ret = 0;
-        ret = snprintf(gSk, sizeof(gSk), "%s", _pSk);
-        assert(ret > 0);
-        if (ret == sizeof(gSk)) {
-                logerror("sk:%s is too long", _pSk);
-                return TK_ARG_ERROR;
-        }
+        int nLen = strlen(_pSk);
+        assert(nLen < sizeof(gSk));
+        strcpy(gSk, _pSk);
+        gSk[nLen] = 0;
         
-        return 0;
+        return;
+}
+
+void SetCallbackUrl(char *pUrl)
+{
+        int nLen = strlen(pUrl);
+        assert(nLen < sizeof(gCallbackUrl));
+        strcpy(gCallbackUrl, pUrl);
+        gCallbackUrl[nLen] = 0;
+        return;
+}
+
+void SetDeleteAfterDays(int nDays)
+{
+        nDeleteAfterDays = nDays;
 }
 
 struct CurlToken {
@@ -253,7 +262,7 @@ int GetUploadToken(char *pBuf, int nBufLen)
         putPolicy.expires = 40;
         putPolicy.deleteAfterDays = 7;
         putPolicy.callbackBody = "{\"key\":\"$(key)\",\"hash\":\"$(etag)\",\"fsize\":$(fsize),\"bucket\":\"$(bucket)\",\"name\":\"$(x:name)\",\"duration\":\"$(avinfo.format.duration)\"}";
-        putPolicy.callbackUrl = "http://39.107.247.14:8088/qiniu/upload/callback";
+        putPolicy.callbackUrl = CALLBACK_URL;
         putPolicy.callbackBodyType = "application/json";
         
         char *uptoken;
