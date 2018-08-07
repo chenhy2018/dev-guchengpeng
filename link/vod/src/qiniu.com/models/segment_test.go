@@ -5,6 +5,7 @@ import (
         "testing"
         "qiniu.com/db"
         "github.com/stretchr/testify/assert"
+        "time"
 )
 
 func TestSegment(t *testing.T) {
@@ -34,7 +35,7 @@ func TestSegment(t *testing.T) {
 			StartTime : int64(count),
 			EndTime : int64(count + 1),
 			FileName : "test1",
-			Expire : 120,
+			Expire : time.Now().Add(30*time.Second),
 		}
 		err := model.AddSegmentTS(p)
 		assert.Equal(t, err, nil, "they should be equal")
@@ -48,7 +49,7 @@ func TestSegment(t *testing.T) {
                         StartTime : int64(count),
                         EndTime : int64(count + 1),
                         FileName : "test1",
-                        Expire : 120,
+                        Expire : time.Now().Add(30*time.Second),
                 }
                 err := model.AddSegmentTS(p)
                 assert.Equal(t, err, nil, "they should be equal")
