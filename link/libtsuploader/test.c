@@ -488,14 +488,14 @@ int main(int argc, char* argv[])
 
 #else
 
-        char * pVFile = "/Users/liuye/tmp/v.h264";
+        char * pVFile = "/liuye/Documents/material/h265_aac_1_16000_h264.h264";
   #ifdef TEST_AAC
-        char * pAFile = "/Users/liuye/tmp/a.aac";
+        char * pAFile = "/liuye/Documents/material/h265_aac_1_16000_a.aac";
   #else
-        char * pAFile = "/Users/liuye/tmp/a.mulaw";
+        char * pAFile = "/liuye/Documents/material/h265_aac_1_16000_pcmu_8000.mulaw";
   #endif
         if (avArg.nVideoFormat == TK_VIDEO_H265) {
-                pVFile = "/Users/liuye/tmp/v.h265";
+                pVFile = "/liuye/Documents/material/h265_aac_1_16000_v.h265";
         }
         start_file_test(pAFile, pVFile, dataCallback, NULL);
 #endif
