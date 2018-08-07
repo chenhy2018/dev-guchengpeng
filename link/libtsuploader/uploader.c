@@ -12,6 +12,8 @@ size_t getDataCallback(void* buffer, size_t size, size_t n, void* rptr);
 
 static char gUid[64];
 static char gDeviceId[64];
+static int64_t nSegmentId;
+static int64_t nLastUploadTsTime;
 
 enum WaitFirstFlag {
         WF_INIT,
@@ -157,8 +159,12 @@ static void * streamUpload(void *_pOpaque)
         
         //segmentid(time)
         int64_t curTime = GetCurrentMillisecond();
+        if ((curTime - nLastUploadTsTime) > 30 * 1000000000ll) {
+                nSegmentId = curTime;
+        }
+        nLastUploadTsTime = curTime;
 #ifdef TK_STREAM_UPLOAD
-        sprintf(key, "%d/%s/%s/%lld/%ld.ts",pUploader->deleteAfterDays_, gUid, gDeviceId, curTime / 1000000, time(NULL));
+        sprintf(key, "%d/%s/%s/%lld/%ld.ts",pUploader->deleteAfterDays_, gUid, gDeviceId, nSegmentId / 1000000, time(NULL));
         Qiniu_Error error = Qiniu_Io_PutStream(&client, &putRet, uptoken, key, pUploader, -1, getDataCallback, &putExtra);
 #else
         sprintf(key, "%s_%s_%lld_%lld.ts", gUid, gDeviceId, pUploader->nSegmentId, pUploader->nFirstFrameTimestamp,
