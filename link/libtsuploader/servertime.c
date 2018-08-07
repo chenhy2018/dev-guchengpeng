@@ -68,8 +68,23 @@ static size_t writeTime(void *pTimeStr, size_t size,  size_t nmemb,  void *pUser
                 pTime->nCurlRet = -11;
                 return 0;
         }
-       
-        memcpy(pTime->pData, pTimeStr, size * nmemb);
+        
+        char *pTokenStart = strstr(pTimeStr, "\"timestamp\"");
+        if (pTokenStart == NULL) {
+                pTime->nCurlRet = -11;
+                return 0;
+        }
+        pTokenStart += strlen("\"timestamp\"");
+        while(!(*pTokenStart >= '1' && *pTokenStart <= '9')) {
+                pTokenStart++;
+        }
+        
+        char *pTokenEnd = pTokenStart+1;
+        while(*pTokenEnd >= '0' && *pTokenEnd <= '9') {
+                pTokenEnd++;
+        }
+        memcpy(pTime->pData, pTokenStart, pTokenEnd - pTokenStart);
+
         return size * nmemb;
 }
 
@@ -78,7 +93,7 @@ static int getTimeFromServer(int64_t *pStime) {
         curl_global_init(CURL_GLOBAL_ALL);
         curl = curl_easy_init();
         
-        curl_easy_setopt(curl, CURLOPT_URL, "http://127.0.0.1:12345/hello");//"http://39.107.247.14:8086/qiniu/upload/token");
+        curl_easy_setopt(curl, CURLOPT_URL, "http://39.107.247.14:8086/timestamp");
         curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, writeTime);
         
         char timeStr[128] = {0};
