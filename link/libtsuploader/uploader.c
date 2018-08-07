@@ -164,7 +164,7 @@ static void * streamUpload(void *_pOpaque)
         }
         nLastUploadTsTime = curTime;
 #ifdef TK_STREAM_UPLOAD
-        sprintf(key, "%d/%s/%s/%lld/%ld.ts",pUploader->deleteAfterDays_, gUid, gDeviceId, nSegmentId / 1000000, time(NULL));
+        sprintf(key, "%d/%s/%s/%lld/%lld.ts",pUploader->deleteAfterDays_, gUid, gDeviceId, nSegmentId / 1000000, curTime / 1000000);
         Qiniu_Error error = Qiniu_Io_PutStream(&client, &putRet, uptoken, key, pUploader, -1, getDataCallback, &putExtra);
 #else
         sprintf(key, "%s_%s_%lld_%lld.ts", gUid, gDeviceId, pUploader->nSegmentId, pUploader->nFirstFrameTimestamp,
