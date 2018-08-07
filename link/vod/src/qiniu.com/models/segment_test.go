@@ -23,6 +23,7 @@ func TestSegment(t *testing.T) {
         db.InitDb(&config)
         assert.Equal(t, 0, 0, "they should be equal")
         model := SegmentModel{}
+        model.Init()
         model.DeleteSegmentTS("UserTest", "dev001", 0, 200)
         // Add first frament, count size 100, start time 0 to end time 100. 
         for count := 0; count < 100; count++ {

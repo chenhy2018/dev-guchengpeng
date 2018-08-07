@@ -7,6 +7,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"qiniu.com/controllers"
 	"qiniu.com/db"
+        "qiniu.com/models"
 	"qiniu.com/system"
 )
 
@@ -44,4 +45,9 @@ func initDb() {
 		fmt.Println(err)
 		os.Exit(3)
 	}
+        segment := models.SegmentModel{}
+        if err := segment.Init(); err != nil {
+                fmt.Println(err)
+                os.Exit(3)
+        }
 }
