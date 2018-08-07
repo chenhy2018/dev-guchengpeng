@@ -4,6 +4,7 @@
 #include <assert.h>
 #include <sys/time.h>
 #include <pthread.h>
+#include "servertime.h"
 
 size_t getDataCallback(void* buffer, size_t size, size_t n, void* rptr);
 
@@ -154,9 +155,10 @@ static void * streamUpload(void *_pOpaque)
                 goto END;
         }
         
-        //TODO segmentid(time)
+        //segmentid(time)
+        int64_t curTime = GetCurrentMillisecond();
 #ifdef TK_STREAM_UPLOAD
-        sprintf(key, "%d/%s/%s/%lld/%ld.ts",pUploader->deleteAfterDays_, gUid, gDeviceId, pUploader->nSegmentId, time(NULL));
+        sprintf(key, "%d/%s/%s/%lld/%ld.ts",pUploader->deleteAfterDays_, gUid, gDeviceId, curTime / 1000000, time(NULL));
         Qiniu_Error error = Qiniu_Io_PutStream(&client, &putRet, uptoken, key, pUploader, -1, getDataCallback, &putExtra);
 #else
         sprintf(key, "%s_%s_%lld_%lld.ts", gUid, gDeviceId, pUploader->nSegmentId, pUploader->nFirstFrameTimestamp,

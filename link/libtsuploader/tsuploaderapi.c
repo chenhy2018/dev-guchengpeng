@@ -4,6 +4,7 @@
 #include "log.h"
 #include <pthread.h>
 #include <curl/curl.h>
+#include "servertime.h"
 
 static char gAk[65] = {0};
 static char gSk[65] = {0};
@@ -73,6 +74,10 @@ int InitUploader(char * _pUid, char *_pDeviceId, char * _pToken, AvArg *_pAvArg)
         Qiniu_Global_Init(-1);
 
         int ret = 0;
+        ret = InitTime();
+        if (ret != 0) {
+                return ret;
+        }
         ret = pthread_mutex_init(&gToken.tokenMutex_, NULL);
         if (ret != 0) {
                 return ret;

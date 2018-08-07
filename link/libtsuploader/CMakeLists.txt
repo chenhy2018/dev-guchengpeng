@@ -32,6 +32,8 @@ add_library(tsuploader STATIC
 	queue.h
 	log.h
 	log.c
+	servertime.h
+	servertime.c
 	tsmuxuploader.c
 	tsmuxuploader.h
 	tsuploaderapi.c
