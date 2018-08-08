@@ -9,6 +9,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/qiniu/api.v7/auth/qbox"
+	"github.com/qiniu/api.v7/storage"
 	xlog "github.com/qiniu/xlog.v1"
 )
 
@@ -32,12 +33,10 @@ func VerifyAuth(xl *xlog.Logger, req *http.Request) (bool, error) {
 	return mac.VerifyCallback(req)
 }
 
-func GetUrlWithDownLoadToken(xl *xlog.Logger, url string) string {
+func GetUrlWithDownLoadToken(xl *xlog.Logger, domain, fname string) string {
 	mac := qbox.NewMac(accessKey, secretKey)
 	expireT := time.Now().Add(time.Hour).Unix()
-	url = url + "&e=" + strconv.FormatInt(expireT, 10)
-	token := mac.Sign([]byte(url))
-	realUrl := url + "&token=" + accessKey + ":" + token
+	realUrl := storage.MakePrivateURL(mac, domain, fname, expireT)
 	return realUrl
 }
 
