@@ -37,7 +37,7 @@ func GetUrlWithDownLoadToken(xl *xlog.Logger, url string) string {
 	expireT := time.Now().Add(time.Hour).Unix()
 	url = url + "&e=" + strconv.FormatInt(expireT, 10)
 	token := mac.Sign([]byte(url))
-	realUrl := url + "&token=" + token
+	realUrl := url + "&token=" + accessKey + ":" + token
 	return realUrl
 }
 
