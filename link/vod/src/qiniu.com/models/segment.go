@@ -31,10 +31,7 @@ func (m *SegmentModel) Init() error {
         /*
              index := Index{
                    Key: []string{"expireAt"},
-                   Unique: false,
-                   DropDups: true,
-                   Background: true, // See notes.
-                   Sparse: true,
+                   ExpireAfter : time.Second,
              }
              err := collection.EnsureIndex(index)
         */
