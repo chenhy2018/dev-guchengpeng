@@ -1,49 +1,44 @@
 package models
 
 import (
-        "fmt"
+        //"fmt"
+        "strconv"
         "qiniu.com/db"
         "gopkg.in/mgo.v2"
         "gopkg.in/mgo.v2/bson"
-	//"time"
+        "time"
 )
 
 const (
         SEGMENT_COL = "segment"
-	SEGMENT_ITEM_UID   = "uid"
-	SEGMENT_ITEM_UAID   = "uaid"
+        SEGMENT_ITEM_ID   = "_id"
+        SEGMENT_ITEM_UAID   = "uaid"
         SEGMENT_ITEM_FRAGMENT_START_TIME = "fragmentstarttime"
         SEGMENT_ITEM_START_TIME = "starttime"
         SEGMENT_ITEM_END_TIME = "endtime"
         SEGMENT_ITEM_FILE_NAME = "filename"
-	SEGMENT_ITEM_EXPIRE = "expireAfterdays"
+        SEGMENT_ITEM_EXPIRE = "expireAt"
 )
 
 type SegmentModel struct {
 }
 
 var (
-	Segment *SegmentModel
+        Segment *SegmentModel
 )
 
 func (m *SegmentModel) Init() error {
         /*
              index := Index{
-                   Key: []string{"uid", "uaid"},
-                   Unique: true,
-                   DropDups: true,
-                   Background: true, // See notes.
-                   Sparse: true,
+                   Key: []string{"expireAt"},
+                   ExpireAfter : time.Second,
              }
              err := collection.EnsureIndex(index)
         */
 
         index := mgo.Index{
-            Key: []string{SEGMENT_ITEM_UID, SEGMENT_ITEM_UAID},
-            Unique: true,
-            DropDups: true,
-            Background: true, // See notes.
-            Sparse: true,
+            Key: []string{SEGMENT_ITEM_EXPIRE},
+            ExpireAfter : time.Second,
         }
         return db.WithCollection(
                 SEGMENT_COL,
@@ -55,25 +50,27 @@ func (m *SegmentModel) Init() error {
 
 func (m *SegmentModel) AddSegmentTS(req SegmentTsInfo) error {
         /*
-                 collection.update(bson.M{uid: id, uaid: id, xxx}, bson.M{"$set": bson.M{"expireAfterdays": time}},
+                 collection.update(bson.M{"_id": bson.M{"$regex": req.Uid + "." + req.UaId + "." + strconv.FormatInt(req.StartTime,10) },
+                                          "fragmentstarttime" : req.FragmentStartTime,
+                                          "starttime" : req.StartTime,
+                                          "endtime" : req.EndTime,}
+                                   bson.M{"$set": bson.M{"expireAfterdays": time}},
                  { upsert: true })
         */
 
-	err := db.WithCollection(
-		SEGMENT_COL,
-		func(c *mgo.Collection) error {
-			_, err := c.Upsert(
-				bson.M{
-                                        SEGMENT_ITEM_UID: req.Uid,
-					SEGMENT_ITEM_UAID: req.UaId,
+        err := db.WithCollection(
+                SEGMENT_COL,
+                func(c *mgo.Collection) error {
+                        _, err := c.Upsert(
+                                bson.M{
+                                        SEGMENT_ITEM_ID: req.Uid + "." + req.UaId + "." + strconv.FormatInt(req.StartTime,10),
                                         SEGMENT_ITEM_FRAGMENT_START_TIME: req.FragmentStartTime,
                                         SEGMENT_ITEM_START_TIME: req.StartTime,
                                         SEGMENT_ITEM_END_TIME: req.EndTime,
-				},
+                                },
                                 bson.M{
                                         "$set": bson.M{
-                                                SEGMENT_ITEM_UID: req.Uid,
-                                                SEGMENT_ITEM_UAID: req.UaId,
+                                                SEGMENT_ITEM_ID: req.Uid + "." + req.UaId + "." + strconv.FormatInt(req.StartTime,10),
                                                 SEGMENT_ITEM_FRAGMENT_START_TIME: req.FragmentStartTime,
                                                 SEGMENT_ITEM_START_TIME: req.StartTime,
                                                 SEGMENT_ITEM_END_TIME: req.EndTime,
@@ -81,62 +78,65 @@ func (m *SegmentModel) AddSegmentTS(req SegmentTsInfo) error {
                                                 SEGMENT_ITEM_EXPIRE: req.Expire,
                                         },
                                 },
-			)
-			return err
-		},
+                        )
+                        return err
+                },
 	)
 	if err != nil {
-		return err
+                return err
 	}
-	return nil;
+        return nil;
 }
 
 func (m *SegmentModel) DeleteSegmentTS(uid,uaid string, starttime,endtime int64) error {
 
         /*
-                 db.collection.remove({uid:"bbc", "uaid": "", xxx},
+                 db.collection.remove({"_id": bson.M{"$regex": uid + "." + uaid + ".*"},
+                                        "starttime": bson.M{ "$gte" : starttime},
+                                         "endtime" : bson.M{ "$gte" : endtime},},
                  { justOne: false } )
         */
 
-	return db.WithCollection(
-		SEGMENT_COL,
-		func(c *mgo.Collection) error {
-			c.RemoveAll(
-				bson.M{
-					SEGMENT_ITEM_UID: uid,
-                                        SEGMENT_ITEM_UAID: uaid,
-                                        SEGMENT_ITEM_START_TIME: bson.M{"$gte":starttime},
-                                        SEGMENT_ITEM_END_TIME: bson.M{"$lte":endtime},
-				},
-			)
+        return db.WithCollection(
+                SEGMENT_COL,
+                func(c *mgo.Collection) error {
+                        c.RemoveAll(
+                                bson.M{
+                                        SEGMENT_ITEM_ID: bson.M{"$regex": uid + "." + uaid + ".*"},
+                                        SEGMENT_ITEM_START_TIME : bson.M{ "$gte" : starttime},
+                                        SEGMENT_ITEM_END_TIME : bson.M{ "$lte" :  endtime},
+                                },
+                        )
                         return nil;
-		},
+                },
 	)
 }
 
 func (m *SegmentModel) UpdateSegmentTSExpire(uid,uaid string, starttime,endtime, expire int64) error {
         /*
-                 db.collection.update({uid:"bbc", "uaid": "", xxx},
-                 { upsert: true } )
+                 db.collection.update({"_id": bson.M{"$regex": uid + "." + uaid + ".*"},
+                                        "starttime": bson.M{ "$gte" : starttime},
+                                         "endtime" : bson.M{ "$gte" : endtime},},
+                                      { $set : {"expireAfterdays" : expire} }
+                                      { upsert: true } )
         */
 	return db.WithCollection(
-		SEGMENT_COL,
+                SEGMENT_COL,
 		func(c *mgo.Collection) error {
-			return c.Update(
-				bson.M{
-					SEGMENT_ITEM_UID:  uid,
-                                        SEGMENT_ITEM_UAID: uaid,
-                                        SEGMENT_ITEM_START_TIME: starttime,
-                                        SEGMENT_ITEM_END_TIME: endtime,
-				},
-				bson.M{
-					"$set": bson.M{
-						SEGMENT_ITEM_EXPIRE: expire,
-					},
-				},
-			)
-		},
-	)
+                        return c.Update(
+                                bson.M{
+                                        SEGMENT_ITEM_ID: bson.M{"$regex": uid + "." + uaid + ".*"},
+                                        SEGMENT_ITEM_START_TIME : bson.M{ "$gte" : starttime},
+                                        SEGMENT_ITEM_END_TIME : bson.M{ "$lte" :  endtime},
+                                },
+                                bson.M{
+                                        "$set": bson.M{
+                                                SEGMENT_ITEM_EXPIRE: expire,
+                                        },
+                               },
+                       )
+                },
+        )
 }
 
 type SegmentTsInfo struct {
@@ -146,21 +146,20 @@ type SegmentTsInfo struct {
         StartTime           int64  `bson:"starttime"          json:"starttime"`
         FileName            string `bson:"filename"           json:"filename"`
         EndTime             int64  `bson:"endtime"            json:"endtime"`
-	Expire              int64  `bson:"expireAfterdays"    json:"expireAfterdays"`
+	Expire              time.Time  `bson:"expireAt"           json:"expireAt"`
 }
 
 func (m *SegmentModel) GetSegmentTsInfo(index, rows int, starttime,endtime int64, uid,uaid string) ([]SegmentTsInfo, error) {
 
         /*
-                 db.collection.find(bson.M{uid:"bbc", "uaid": "aaa", "starttime": bson.M{"$gte":starttime}, "endtime": bson.M{"$lte":endtime} },
+                 db.collection.find(bson.M{"_id": bson.M{"$regex": uid + "." + uaid + ".*"}, "starttime": bson.M{"$gte":starttime}, "endtime": bson.M{"$lte":endtime} },
                  ).sort("starttime").limit(rows),skip(rows * index)
         */
 	// query by keywords
         query := bson.M{
-                 SEGMENT_ITEM_UID:uid,
-                 SEGMENT_ITEM_UAID:uaid,
-                 SEGMENT_ITEM_START_TIME: bson.M{"$gte":starttime},
-                 SEGMENT_ITEM_END_TIME : bson.M{"$lte":endtime},
+               SEGMENT_ITEM_ID: bson.M{"$regex": uid + "." + uaid + ".*"},
+               SEGMENT_ITEM_START_TIME : bson.M{ "$gte" : starttime},
+               SEGMENT_ITEM_END_TIME : bson.M{ "$lte" :  endtime},
         }
         skip := rows * index
         limit := rows
@@ -184,13 +183,13 @@ func (m *SegmentModel) GetSegmentTsInfo(index, rows int, starttime,endtime int64
 }
 func (m *SegmentModel) GetLastSegmentTsInfo(uid,uaid string) (SegmentTsInfo, error) {
         /*
-                 db.collection.find(bson.M{uid:"bbc", "uaid": "aaa", "starttime": bson.M{"$gte":starttime}, "endtime": bson.M{"$lte":endtime} },
+                 db.collection.find(bson.M{"_id": bson.M{"$regex": uid + "." + uaid + ".*"}, "starttime": bson.M{"$gte":starttime}, "endtime": bson.M{"$lte":endtime} },
                  ).sort("starttime").limit(rows),skip(rows * index)
         */
         // query by keywords
-        query := bson.M{
-                 SEGMENT_ITEM_UID:uid,
-                 SEGMENT_ITEM_UAID:uaid,
+        query := bson.M{}
+        query[SEGMENT_ITEM_ID] = bson.M{
+                        "$regex": uid + "." + uaid + ".*",
         }
         r := SegmentTsInfo{}
         err := db.WithCollection(
@@ -207,84 +206,70 @@ func (m *SegmentModel) GetLastSegmentTsInfo(uid,uaid string) (SegmentTsInfo, err
 }
 
 type FragmentInfo struct {
-        FragmentStartTime   int64 `bson:"fragmentstartTime" json:"fragmentstartTime"`
+        FragmentStartTime   int64 `bson:"_id" json:"_id"`
         StartTime int64  `bson:"starttime"  json:"starttime"`
         EndTime   int64  `bson:"endtime"  json:"endtime"`
-}
-
-
-func searchLastSegmentbyFragmentId(arr []SegmentTsInfo, low, high int, k int64) int {
-	if low < 0 || high < 0 {
-		return -1
-	}
-	for low < high {
-		mid := low + (high-low)>>1
-                fmt.Printf("%d %d %d FragmentStartTime %d %d %d\n", mid, low, high, arr[mid].StartTime, arr[mid + 1].StartTime, k)
-		if k < arr[mid].FragmentStartTime {
-                        high = mid - 1
-		} else if k > arr[mid].FragmentStartTime {
-                        low = mid + 1
-		} else if (k == arr[mid].FragmentStartTime && k < arr[mid + 1].FragmentStartTime) {
-		        return mid + 1
-		} else {
-                        low = mid + 1
-                }
-	}
-	return -1
 }
 
 func (m *SegmentModel) GetFragmentTsInfo(index, rows int, starttime,endtime int64, uid,uaid string) ([]FragmentInfo, error) {
 
         /*
-                 db.collection.find(bson.M{uid:"bbc", "uaid": "aaa", "startfragmenttime": bson.M{"$gte":starttime, "$lte": endtime} },
-                 ).sort("starttime").limit(rows),skip(rows * index)
+                 query = []bson.M{
+                        {"$match": bson.M{
+                                "_id": bson.M{"$regex": uid + "." + uaid + ".*"}
+                                SEGMENT_ITEM_FRAGMENT_START_TIME: bson.M{"$gte":starttime, "$lte": endtime},},
+                        },
+                        {"$group": bson.M{
+                                "_id": bson.M{SEGMENT_ITEM_FRAGMENT_START_TIME : "$fragmentstarttime"},
+                                SEGMENT_ITEM_START_TIME : bson.M{ "$min" :  "$starttime"},
+                                SEGMENT_ITEM_END_TIME : bson.M{ "$max" :  "$endtime"},},
+                        },
+                        {"$sort" : bson.M{SEGMENT_ITEM_START_TIME : 1},},
+                        {"$skip" : skip},
+                        {"$limit": limit},
+                 },
+
+                 db.collection.aggregate(query)
         */
         // query by keywords
-        query := bson.M{
-                 SEGMENT_ITEM_UID:uid,
-                 SEGMENT_ITEM_UAID:uaid,
-                 SEGMENT_ITEM_FRAGMENT_START_TIME: bson.M{"$gte":starttime, "$lte": endtime},
-        }
         skip := rows * index
         limit := rows
-        r := []SegmentTsInfo{}
+        if (rows == 0) {
+              limit = 200
+        }
+        r := []FragmentInfo{}
         err := db.WithCollection(
                 SEGMENT_COL,
                 func(c *mgo.Collection) error {
-                        var err error
-                        if limit > 0 {
-                                err = c.Find(query).Sort(SEGMENT_ITEM_FRAGMENT_START_TIME).Skip(skip).Limit(limit).All(&r);
-                        } else {
-                                err = c.Find(query).Sort(SEGMENT_ITEM_FRAGMENT_START_TIME).Skip(skip).All(&r);
+                        err := c.Pipe(
+                                []bson.M{
+                                        {"$match": bson.M{
+                                                 SEGMENT_ITEM_ID:  bson.M{"$regex": uid + "." + uaid + ".*"},
+                                                 SEGMENT_ITEM_FRAGMENT_START_TIME: bson.M{"$gte":starttime, "$lte": endtime},},
+                                        },
+                                        {"$group": bson.M{
+                                                 "_id": bson.M{SEGMENT_ITEM_FRAGMENT_START_TIME : "$fragmentstarttime"},
+                                                 SEGMENT_ITEM_START_TIME : bson.M{ "$min" :  "$starttime"},
+                                                 SEGMENT_ITEM_END_TIME : bson.M{ "$max" :  "$endtime"},},
+                                        },
+                                        {"$sort" : bson.M{SEGMENT_ITEM_START_TIME : 1},},
+                                        {"$skip" : skip},
+                                        {"$limit": limit},
+                                },
+                        ).All(&r)
+                        if err != nil {
+                                return err
                         }
-                        return err
+                        return nil
                  },
         )
         if err != nil {
                 return []FragmentInfo{}, err
         }
 
-        info := []FragmentInfo{}
-
         if (len(r) < 1) {
                return []FragmentInfo{}, nil
         }
 
-        fragmentStartTime := r[0].FragmentStartTime
-        low := 0
-        high := len(r) - 1
-        for low <= high && low >= 0 {
-                fmt.Printf("%d %d \n", low, high)
-                low = searchLastSegmentbyFragmentId(r, low, high, fragmentStartTime);
-                var one = FragmentInfo{}
-                if (low == -1) {
-                       one = FragmentInfo{ FragmentStartTime:fragmentStartTime,   StartTime: fragmentStartTime, EndTime: r[high].EndTime}
-                } else {
-                       one = FragmentInfo{ FragmentStartTime:fragmentStartTime,   StartTime: fragmentStartTime, EndTime: r[low - 1].EndTime}
-                       fragmentStartTime = r[low].StartTime
-                }
-                info = append(info, one);
-                
-        }
-        return info, nil
+        return r, nil
 }

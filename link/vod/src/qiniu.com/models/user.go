@@ -239,12 +239,12 @@ func DelUser(info UserInfo, uid, pwd string) error {
 }
 
 func GetUserInfo(index, rows int, uid, pwd string, category, like string) ([]UserInfo, error) {
-        
+
         /*
                db.collection.find(bson.M{ "uid" : info.uid, "password" : info.pwd, "issuperuser" : true })
                db.collection.find(bson.M{category : like}).sort("uid").skip(index * row).limit(rows)
         */
- 
+
         // query by keywords
         query := bson.M{}
         if like != "" {
