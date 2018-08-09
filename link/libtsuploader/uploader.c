@@ -3,6 +3,8 @@
 #include <stdlib.h>
 #include <assert.h>
 #include <sys/time.h>
+#include <pthread.h>
+#include "servertime.h"
 
 size_t getDataCallback(void* buffer, size_t size, size_t n, void* rptr);
 
@@ -10,6 +12,15 @@ size_t getDataCallback(void* buffer, size_t size, size_t n, void* rptr);
 
 static char gUid[64];
 static char gDeviceId[64];
+static int64_t nSegmentId;
+static int64_t nLastUploadTsTime;
+
+enum WaitFirstFlag {
+        WF_INIT,
+        WF_LOCKED,
+        WF_FIRST,
+        WF_QUIT,
+};
 
 typedef struct _KodoUploader{
         TsUploader uploader;
@@ -32,6 +43,9 @@ typedef struct _KodoUploader{
         int64_t nFirstFrameTimestamp;
         int64_t nLastFrameTimestamp;
         UploadState state;
+        
+        pthread_mutex_t waitFirstMutex_;
+        enum WaitFirstFlag nWaitFirstMutexLocked_;
 }KodoUploader;
 
 static void setSegmentId(TsUploader* _pUploader, int64_t _nId)
@@ -87,6 +101,7 @@ static void * streamUpload(void *_pOpaque)
         char *uptoken = NULL;
         Qiniu_Client client;
         int canFreeToken = 0;
+#ifndef DISABLE_OPENSSL
         if (pUploader->pToken_ == NULL || pUploader->pToken_[0] == 0) {
                 Qiniu_Mac mac;
                 mac.accessKey = pUploader->ak_;
@@ -102,10 +117,15 @@ static void * streamUpload(void *_pOpaque)
                 //init
                 Qiniu_Client_InitMacAuth(&client, 1024, &mac);
         } else {
+#else
                 logdebug("client upload");
                 uptoken = pUploader->pToken_;
                 Qiniu_Client_InitNoAuth(&client, 1024);
+#endif
+        
+#ifndef DISABLE_OPENSSL
         }
+#endif
         
         Qiniu_Io_PutRet putRet;
         Qiniu_Io_PutExtra putExtra;
@@ -114,7 +134,11 @@ static void * streamUpload(void *_pOpaque)
         //Qiniu_Use_Zone_Beimei(Qiniu_False);
         //Qiniu_Use_Zone_Huabei(Qiniu_True);
         //Qiniu_Use_Zone_Huadong(Qiniu_True);
+#ifdef DISABLE_OPENSSL
         Qiniu_Use_Zone_Huadong(Qiniu_False);
+#else
+        Qiniu_Use_Zone_Huadong(Qiniu_True);
+#endif
         //Qiniu_Use_Zone_Huanan(Qiniu_True);
         
         //put extra
@@ -123,8 +147,24 @@ static void * streamUpload(void *_pOpaque)
         char key[128] = {0};
         client.lowSpeedLimit = 30;
         client.lowSpeedTime = 3;
+        
+        //todo wait for first packet
+        if (pUploader->nWaitFirstMutexLocked_ == WF_LOCKED) {
+                pthread_mutex_lock(&pUploader->waitFirstMutex_);
+                pthread_mutex_unlock(&pUploader->waitFirstMutex_);
+        }
+        if (pUploader->nWaitFirstMutexLocked_ != WF_FIRST) {
+                goto END;
+        }
+        
+        //segmentid(time)
+        int64_t curTime = GetCurrentMillisecond();
+        if ((curTime - nLastUploadTsTime) > 30 * 1000000000ll) {
+                nSegmentId = curTime;
+        }
+        nLastUploadTsTime = curTime;
 #ifdef TK_STREAM_UPLOAD
-        sprintf(key, "%d/%s/%s/%lld/%ld.ts",pUploader->deleteAfterDays_, gUid, gDeviceId, pUploader->nSegmentId, time(NULL));
+        sprintf(key, "%d/%s/%s/%lld/%lld.ts",pUploader->deleteAfterDays_, gUid, gDeviceId, nSegmentId / 1000000, curTime / 1000000);
         Qiniu_Error error = Qiniu_Io_PutStream(&client, &putRet, uptoken, key, pUploader, -1, getDataCallback, &putExtra);
 #else
         sprintf(key, "%s_%s_%lld_%lld.ts", gUid, gDeviceId, pUploader->nSegmentId, pUploader->nFirstFrameTimestamp,
@@ -141,7 +181,7 @@ static void * streamUpload(void *_pOpaque)
                 pUploader->state = TK_UPLOAD_OK;
                 logdebug("upload file %s: key:%s success", pUploader->bucketName_, key);
         }
-        
+END:
         if (canFreeToken) {
                 Qiniu_Free(uptoken);
         }
@@ -181,7 +221,13 @@ static void streamUploadStop(TsUploader * _pUploader)
 static int streamPushData(TsUploader *pTsUploader, char * pData, int nDataLen)
 {
         KodoUploader * pKodoUploader = (KodoUploader *)pTsUploader;
-        return pKodoUploader->pQueue_->Push(pKodoUploader->pQueue_, (char *)pData, nDataLen);
+        
+        int ret = pKodoUploader->pQueue_->Push(pKodoUploader->pQueue_, (char *)pData, nDataLen);
+        if (pKodoUploader->nWaitFirstMutexLocked_ == WF_LOCKED) {
+                pKodoUploader->nWaitFirstMutexLocked_ = WF_FIRST;
+                pthread_mutex_unlock(&pKodoUploader->waitFirstMutex_);
+        }
+        return ret;
 }
 
 #else
@@ -255,9 +301,17 @@ int NewUploader(TsUploader ** _pUploader, enum CircleQueuePolicy _policy, int _n
         if (pKodoUploader == NULL) {
                 return TK_NO_MEMORY;
         }
+
         memset(pKodoUploader, 0, sizeof(KodoUploader));
+        int ret = pthread_mutex_init(&pKodoUploader->waitFirstMutex_, NULL);
+        if (ret != 0){
+                free(pKodoUploader);
+                return TK_MUTEX_ERROR;
+        }
+        pthread_mutex_lock(&pKodoUploader->waitFirstMutex_);
+        pKodoUploader->nWaitFirstMutexLocked_ = WF_LOCKED;
 #ifdef TK_STREAM_UPLOAD
-        int ret = NewCircleQueue(&pKodoUploader->pQueue_, _policy, _nMaxItemLen, _nInitItemCount);
+        ret = NewCircleQueue(&pKodoUploader->pQueue_, _policy, _nMaxItemLen, _nInitItemCount);
         if (ret != 0) {
                 free(pKodoUploader);
                 return ret;
@@ -288,12 +342,22 @@ int NewUploader(TsUploader ** _pUploader, enum CircleQueuePolicy _policy, int _n
         pKodoUploader->uploader.GetUploaderState = getUploaderState;
         
         *_pUploader = (TsUploader*)pKodoUploader;
+        
         return 0;
 }
 
 void DestroyUploader(TsUploader ** _pUploader)
 {
         KodoUploader * pKodoUploader = (KodoUploader *)(*_pUploader);
+        if(pKodoUploader->nWaitFirstMutexLocked_ == WF_LOCKED) {
+                pKodoUploader->nWaitFirstMutexLocked_ = WF_QUIT;
+                pthread_mutex_unlock(&pKodoUploader->waitFirstMutex_);
+        }
+        pthread_mutex_lock(&pKodoUploader->waitFirstMutex_);
+        pKodoUploader->nWaitFirstMutexLocked_ = WF_QUIT;
+        pthread_mutex_unlock(&pKodoUploader->waitFirstMutex_);
+        
+        pthread_mutex_destroy(&pKodoUploader->waitFirstMutex_);
 #ifdef TK_STREAM_UPLOAD
         if (pKodoUploader->isThreadStarted_) {
                 pthread_join(pKodoUploader->workerId_, NULL);

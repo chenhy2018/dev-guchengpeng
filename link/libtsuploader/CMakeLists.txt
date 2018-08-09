@@ -11,6 +11,13 @@ link_directories("${CMAKE_CURRENT_SOURCE_DIR}/../../third_party/ffmpeg-4.0/libav
 link_directories("${CMAKE_CURRENT_SOURCE_DIR}/../../third_party/ffmpeg-4.0/libavutil")
 link_directories("${CMAKE_CURRENT_SOURCE_DIR}/../../third_party/curl-7.61.0/lib/.libs")
 
+set(DISABLE_OPENSSL OFF)
+if(NOT WITH_OPENSSL)
+        message("WITHOUT_OPENSSL")
+        set(DISABLE_OPENSSL ON)
+        add_definitions(-DDISABLE_OPENSSL)
+endif()
+
 add_subdirectory(c-sdk)
 
 add_library(tsuploader STATIC
@@ -25,6 +32,8 @@ add_library(tsuploader STATIC
 	queue.h
 	log.h
 	log.c
+	servertime.h
+	servertime.c
 	tsmuxuploader.c
 	tsmuxuploader.h
 	tsuploaderapi.c
@@ -38,8 +47,16 @@ add_executable(testupload
 if(APPLE)
 	set(CMAKE_EXE_LINKER_FLAGS
     		"-framework AudioToolbox -framework VideoToolbox -framework CoreGraphics -framework QuartzCore -framework CoreFoundation -framework CoreMedia -framework Security")
-        target_link_libraries(testupload tsuploader avformat avcodec avutil qiniu curl crypto bz2 lzma iconv z)
+	if(DISABLE_OPENSSL)
+        	target_link_libraries(testupload tsuploader avformat avcodec avutil qiniu curl bz2 lzma iconv z)
+        else()
+        	target_link_libraries(testupload tsuploader avformat avcodec avutil qiniu curl crypto bz2 lzma iconv z)
+        endif()
 else()
-        target_link_libraries(testupload tsuploader avformat avcodec avutil qiniu curl crypto m pthread)
+        if(DISABLE_OPENSSL)
+        	target_link_libraries(testupload tsuploader avformat avcodec avutil qiniu curl m pthread)
+        else()
+        	target_link_libraries(testupload tsuploader avformat avcodec avutil qiniu curl crypto m pthread)
+        endif()
 endif()
 
