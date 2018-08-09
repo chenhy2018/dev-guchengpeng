@@ -19,12 +19,12 @@ const (
 )
 
 type requestParams struct {
-	uid      string
-	deviceid string
-	from     int64
-	to       int64
-	expire   int64
-	token    string
+	uid    string
+	uaid   string
+	from   int64
+	to     int64
+	expire int64
+	token  string
 }
 
 func VerifyAuth(xl *xlog.Logger, req *http.Request) (bool, error) {
@@ -55,15 +55,18 @@ func VerifyToken(xl *xlog.Logger, expire int64, realToken, url, uid string) bool
 }
 
 func ParseRequest(c *gin.Context, xl *xlog.Logger) (*requestParams, error) {
-	uid := c.Param("uid")
-	deviceid := c.Param("deviceId")
+	uaid := c.Param("uaid")
 	from := c.Query("from")
 	to := c.Query("to")
 	expire := c.Query("e")
 	token := c.Query("token")
-
-	if strings.Contains(deviceid, ".m3u8") {
-		deviceid = strings.TrimRight(deviceid, ".m3u8")
+	splitedToken := strings.Split(token, ":")
+	if len(splitedToken) < 2 {
+		return nil, errors.New("invalid token")
+	}
+	uid := strings.Split(token, ":")[0]
+	if strings.Contains(uaid, ".m3u8") {
+		uaid = strings.TrimRight(uaid, ".m3u8")
 	}
 	fromT, err := strconv.ParseInt(from, 10, 32)
 	if err != nil {
@@ -79,12 +82,12 @@ func ParseRequest(c *gin.Context, xl *xlog.Logger) (*requestParams, error) {
 	}
 
 	params := &requestParams{
-		uid:      uid,
-		deviceid: deviceid,
-		from:     fromT,
-		to:       toT,
-		expire:   expireT,
-		token:    token,
+		uid:    uid,
+		uaid:   uaid,
+		from:   fromT,
+		to:     toT,
+		expire: expireT,
+		token:  token,
 	}
 
 	return params, nil
