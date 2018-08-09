@@ -7,7 +7,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"qiniu.com/controllers"
 	"qiniu.com/db"
-        "qiniu.com/models"
+	"qiniu.com/models"
 	"qiniu.com/system"
 )
 
@@ -21,8 +21,8 @@ func main() {
 	}
 	initDb()
 
-	r.GET("/playback/:uid/:deviceId", controllers.GetPlayBackm3u8)
-	r.GET("/segments/:uid/:deviceId", controllers.GetSegments)
+	r.GET("/playback/:uaid", controllers.GetPlayBackm3u8)
+	r.GET("/segments/:uaid", controllers.GetSegments)
 	r.POST("/qiniu/upload/callback", controllers.UploadTs)
 	//	r.POST("/qiniu/notify/*action", controllers.FopNotify)
 	r.Run(Config.Bind) // listen and serve on 0.0.0.0:8080
@@ -45,9 +45,9 @@ func initDb() {
 		fmt.Println(err)
 		os.Exit(3)
 	}
-        segment := models.SegmentModel{}
-        if err := segment.Init(); err != nil {
-                fmt.Println(err)
-                os.Exit(3)
-        }
+	segment := models.SegmentModel{}
+	if err := segment.Init(); err != nil {
+		fmt.Println(err)
+		os.Exit(3)
+	}
 }

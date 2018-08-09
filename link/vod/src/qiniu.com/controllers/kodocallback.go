@@ -47,29 +47,29 @@ func UploadTs(c *gin.Context) {
 	err = json.Unmarshal(body, &kodoData)
 	xl.Infof("%#v", kodoData)
 	fileName := kodoData.Key
-	UidDevicIdSegId := strings.Split(fileName, "/")
-	if len(UidDevicIdSegId) < 5 {
+	ids := strings.Split(fileName, "/")
+	if len(ids) < 5 {
 		c.JSON(500, gin.H{
 			"error": "bad file name",
 		})
 		return
 
 	}
-	segId, err := strconv.ParseInt(UidDevicIdSegId[3], 10, 32)
+	segId, err := strconv.ParseInt(ids[3], 10, 32)
 	if err != nil {
 		c.JSON(500, gin.H{"status": "bad file name"})
 		return
 	}
-	expireAfter, _ := strconv.ParseInt(UidDevicIdSegId[0], 10, 32)
+	expireAfter, _ := strconv.ParseInt(ids[0], 10, 32)
 
-	startTime, err := strconv.ParseInt(UidDevicIdSegId[3], 10, 64)
+	startTime, err := strconv.ParseInt(strings.TrimRight(ids[4], ".ts"), 10, 64)
 	duration, err := strconv.ParseFloat(kodoData.Duration, 64)
 	endTime := startTime + int64(duration*1000)
 	xl.Infof("start = %v\n, end = %v", startTime, endTime, duration)
 	expireAfterSecond := time.Duration(expireAfter * 24 * 60 * 60)
 	ts := models.SegmentTsInfo{
-		Uid:               UidDevicIdSegId[1],
-		UaId:              UidDevicIdSegId[2],
+		Uid:               ids[1],
+		UaId:              ids[2],
 		StartTime:         startTime,
 		FileName:          fileName,
 		EndTime:           endTime,
