@@ -21,7 +21,8 @@ func GetPlayBackm3u8(c *gin.Context) {
 		return
 	}
 
-	if !VerifyToken(xl, params.expire, params.token, c.Request.URL.String(), params.uid) {
+	fullUrl := "http://" + c.Request.Host + c.Request.URL.String()
+	if !VerifyToken(xl, params.expire, params.token, fullUrl, params.uid) {
 		c.JSON(401, gin.H{
 			"error": "bad token",
 		})
@@ -36,9 +37,11 @@ func GetPlayBackm3u8(c *gin.Context) {
 	var playlist []map[string]interface{}
 
 	if err == nil {
+		var total int64
 		for _, v := range segs {
 			duration := float64(v.EndTime-v.StartTime) / 1000
-			realUrl := GetUrlWithDownLoadToken(xl, "http://pcgtsa42m.bkt.clouddn.com/", v.FileName)
+			total += int64(duration)
+			realUrl := GetUrlWithDownLoadToken(xl, "http://pcgtsa42m.bkt.clouddn.com/", v.FileName, total)
 			pPlaylist.AppendSegment(realUrl, duration, v.UaId)
 
 			m := map[string]interface{}{

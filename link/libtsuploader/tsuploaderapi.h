@@ -14,9 +14,11 @@ void UninitUploader();
 
 //for test
 int GetUploadToken(char *pBuf, int nBufLen);
-int SetAk(char *pAk);
-int SetSk(char *pSk);
-int SetBucketName(char *_pName);
+void SetAk(char *pAk);
+void SetSk(char *pSk);
+void SetBucketName(char *_pName);
+void SetCallbackUrl(char *pUrl);
+void SetDeleteAfterDays(int days);
 
 
 #endif
