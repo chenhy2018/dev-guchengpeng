@@ -9,7 +9,7 @@ import (
 	"qiniu.com/models"
 )
 
-// sample requset url = /playback/13764829407/12345?from=1532499345&to=1532499345&e=1532499345&token=xxxxxx
+// sample requset url = /playback/12345.m3u8?from=1532499345&to=1532499345&e=1532499345&token=xxxxxx
 func GetPlayBackm3u8(c *gin.Context) {
 
 	xl := xlog.New(c.Writer, c.Request)
@@ -27,18 +27,18 @@ func GetPlayBackm3u8(c *gin.Context) {
 		})
 		return
 	}
-	xl.Infof("uid= %v, deviceid = %v, from = %v, to = %v", params.uid, params.deviceid, time.Unix(params.from, 0), time.Unix(params.to, 0))
+	xl.Infof("uid= %v, uaid = %v, from = %v, to = %v", params.uid, params.uaid, time.Unix(params.from, 0), time.Unix(params.to, 0))
 
 	segMod := &models.SegmentModel{}
-	segs, err := segMod.GetSegmentTsInfo(0, 0, time.Unix(params.from, 0).UnixNano(), time.Unix(params.to, 0).UnixNano(), params.uid, params.deviceid)
+	segs, err := segMod.GetSegmentTsInfo(0, 0, params.from*1000, params.to*1000, params.uid, params.uaid)
 	pPlaylist := new(m3u8.MediaPlaylist)
 	pPlaylist.Init(32, 32)
 	var playlist []map[string]interface{}
 
 	if err == nil {
 		for _, v := range segs {
-			duration := float64(v.EndTime-v.StartTime) / 1000000000
-			realUrl := GetUrlWithDownLoadToken(xl, "http://pcgtsa42m.bkt.clouddn.com/"+v.FileName)
+			duration := float64(v.EndTime-v.StartTime) / 1000
+			realUrl := GetUrlWithDownLoadToken(xl, "http://pcgtsa42m.bkt.clouddn.com/", v.FileName)
 			pPlaylist.AppendSegment(realUrl, duration, v.UaId)
 
 			m := map[string]interface{}{
