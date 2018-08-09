@@ -21,7 +21,8 @@ func GetPlayBackm3u8(c *gin.Context) {
 		return
 	}
 
-	if !VerifyToken(xl, params.expire, params.token, c.Request.URL.String(), params.uid) {
+	fullUrl := "http://" + c.Request.Host + c.Request.URL.String()
+	if !VerifyToken(xl, params.expire, params.token, fullUrl, params.uid) {
 		c.JSON(401, gin.H{
 			"error": "bad token",
 		})
