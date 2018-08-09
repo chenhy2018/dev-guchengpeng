@@ -97,7 +97,7 @@ static int getTimeFromServer(int64_t *pStime) {
         return ret;
 }
 
-int64_t GetCurrentMillisecond()
+int64_t GetCurrentNanosecond()
 {
         int64_t nUptime = getUptime();
         return (nUptime - nLocalupTimestamp)+nServerTimestamp;

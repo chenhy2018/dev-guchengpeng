@@ -158,7 +158,7 @@ static void * streamUpload(void *_pOpaque)
         }
         
         //segmentid(time)
-        int64_t curTime = GetCurrentMillisecond();
+        int64_t curTime = GetCurrentNanosecond();
         if ((curTime - nLastUploadTsTime) > 30 * 1000000000ll) {
                 nSegmentId = curTime;
         }
