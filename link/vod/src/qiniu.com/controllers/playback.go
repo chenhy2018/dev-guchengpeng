@@ -38,7 +38,7 @@ func GetPlayBackm3u8(c *gin.Context) {
 	if err == nil {
 		for _, v := range segs {
 			duration := float64(v.EndTime-v.StartTime) / 1000
-			realUrl := GetUrlWithDownLoadToken(xl, "http://pcgtsa42m.bkt.clouddn.com/"+v.FileName)
+			realUrl := GetUrlWithDownLoadToken(xl, "http://pcgtsa42m.bkt.clouddn.com/", v.FileName)
 			pPlaylist.AppendSegment(realUrl, duration, v.UaId)
 
 			m := map[string]interface{}{

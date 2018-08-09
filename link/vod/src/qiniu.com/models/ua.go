@@ -53,7 +53,10 @@ func (m *uaModel) Init() error {
 }
 
 func (m *uaModel) Register(req UaInfo) error {
-
+        /*
+                 collection.update(bson.M{uid: id, uaid: id, xxx}, bson.M{"$set": bson.M{"bucketurl": url, "remaindays": time}},
+                 { upsert: true })
+        */
         err := db.WithCollection(
                 UA_COL,
                 func(c *mgo.Collection) error {
@@ -82,7 +85,9 @@ func (m *uaModel) Register(req UaInfo) error {
 }
 
 func (m *uaModel) Delete(uid,uaid string) error {
-
+        /*
+                 collection.remove(bson.M{uid: id, uaid: id})
+        */
         return db.WithCollection(
                 UA_COL,
                 func(c *mgo.Collection) error {
@@ -97,7 +102,9 @@ func (m *uaModel) Delete(uid,uaid string) error {
 }
 
 func (m *uaModel) UpdateRemaindays(uid,uaid string, remaindays int64) error {
-
+        /*
+                 collection.update(bson.M{uid: id, uaid: id}, bson.M{"$set": "remaindays": time}},
+        */
          return db.WithCollection(
                 UA_COL,
                 func(c *mgo.Collection) error {
@@ -117,7 +124,7 @@ func (m *uaModel) UpdateRemaindays(uid,uaid string, remaindays int64) error {
 }
 
 type UaInfo struct {
-        Uid           string  `bson:"uid"       json:"uid"`
+        Uid           string  `bson:"uid"        json:"uid"`
         UaId          string  `bson:"uaid"       json:"uaid"`
         Regtime       int     `bson:"date"       json:"date"`
         BucketUrl     string  `bson:"bucketurl"  json:"bucketurl"`
@@ -126,6 +133,10 @@ type UaInfo struct {
 
 func (m *uaModel) GetUaInfo(index, rows int, category, like string) ([]UaInfo, error) {
 
+        /*
+                 db.collection.find(bson.M{category:"*like*"},
+                 ).sort("date").limit(rows),skip(rows * index)
+        */
         // query by keywords
         query := bson.M{}
         if like != "" {

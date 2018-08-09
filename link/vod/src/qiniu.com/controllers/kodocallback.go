@@ -5,9 +5,10 @@ import (
 	"io/ioutil"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/qiniu/xlog.v1"
+	xlog "github.com/qiniu/xlog.v1"
 	"qiniu.com/models"
 )
 
@@ -65,13 +66,14 @@ func UploadTs(c *gin.Context) {
 	duration, err := strconv.ParseFloat(kodoData.Duration, 64)
 	endTime := startTime + int64(duration*1000)
 	xl.Infof("start = %v\n, end = %v", startTime, endTime, duration)
+	expireAfterSecond := time.Duration(expireAfter * 24 * 60 * 60)
 	ts := models.SegmentTsInfo{
 		Uid:               UidDevicIdSegId[1],
 		UaId:              UidDevicIdSegId[2],
 		StartTime:         startTime,
 		FileName:          fileName,
 		EndTime:           endTime,
-		Expire:            expireAfter * 24 * 60 * 60,
+		Expire:            time.Now().Add(expireAfterSecond * time.Second),
 		FragmentStartTime: int64(segId),
 	}
 	segMod := &models.SegmentModel{}
