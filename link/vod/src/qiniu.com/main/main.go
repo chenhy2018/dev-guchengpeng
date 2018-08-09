@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"os"
-
 	"github.com/gin-gonic/gin"
 	"qiniu.com/controllers"
 	"qiniu.com/db"
