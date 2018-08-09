@@ -55,12 +55,12 @@ func UploadTs(c *gin.Context) {
 		return
 
 	}
-	segId, err := strconv.ParseInt(ids[3], 10, 32)
+	segId, err := strconv.ParseInt(ids[3], 10, 64)
 	if err != nil {
 		c.JSON(500, gin.H{"status": "bad file name"})
 		return
 	}
-	expireAfter, _ := strconv.ParseInt(ids[0], 10, 32)
+	expireAfter, _ := strconv.ParseInt(ids[0], 10, 64)
 
 	startTime, err := strconv.ParseInt(strings.TrimRight(ids[4], ".ts"), 10, 64)
 	duration, err := strconv.ParseFloat(kodoData.Duration, 64)
