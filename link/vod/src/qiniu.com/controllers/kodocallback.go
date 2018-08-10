@@ -77,7 +77,7 @@ func UploadTs(c *gin.Context) {
 		FragmentStartTime: int64(segId),
 	}
 	segMod := &models.SegmentModel{}
-	segMod.AddSegmentTS(ts)
+	segMod.AddSegmentTS(xl, ts)
 
 	c.JSON(200, gin.H{
 		"success": true,
