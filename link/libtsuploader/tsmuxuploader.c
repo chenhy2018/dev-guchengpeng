@@ -267,8 +267,10 @@ static int waitToCompleUploadAndDestroyTsMuxContext(void *_pOpaque)
         
         if (pTsMuxCtx) {
                 if (pTsMuxCtx->pFmtCtx_) {
-                        if (pTsMuxCtx->pFmtCtx_ && !(pTsMuxCtx->pFmtCtx_->oformat->flags & AVFMT_NOFILE))
+                        if (pTsMuxCtx->pFmtCtx_ && !(pTsMuxCtx->pFmtCtx_->oformat->flags & AVFMT_NOFILE)) {
+                                av_freep(&pTsMuxCtx->pFmtCtx_->pb->buffer);
                                 avio_close(pTsMuxCtx->pFmtCtx_->pb);
+                        }
                         avformat_free_context(pTsMuxCtx->pFmtCtx_);
                 }
                 pTsMuxCtx->pTsUploader_->UploadStop(pTsMuxCtx->pTsUploader_);
