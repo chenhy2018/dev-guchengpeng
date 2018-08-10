@@ -83,9 +83,11 @@ int InitUploader(char * _pUid, char *_pDeviceId, char * _pToken, AvArg *_pAvArg)
                 return ret;
         }
 
-        ret = UpdateToken(_pToken);
-        if (ret != 0) {
-                return ret;
+        if (_pToken != NULL) {
+                ret = UpdateToken(_pToken);
+                if (ret != 0) {
+                        return ret;
+                }
         }
 
         ret = SetUid(_pUid);
@@ -114,8 +116,15 @@ int InitUploader(char * _pUid, char *_pDeviceId, char * _pToken, AvArg *_pAvArg)
                 return ret;
         }
 
-        gpTsMuxUploader->SetToken(gpTsMuxUploader, gToken.pToken_);
-        gpTsMuxUploader->SetCallbackUrl(gpTsMuxUploader, CALLBACK_URL, strlen(CALLBACK_URL));
+        if (_pToken != NULL) {
+                gpTsMuxUploader->SetToken(gpTsMuxUploader, gToken.pToken_);
+        } else {
+                gpTsMuxUploader->SetAccessKey(gpTsMuxUploader, gAk, sizeof(gAk));
+                gpTsMuxUploader->SetSecretKey(gpTsMuxUploader, gSk, sizeof(gSk));
+                gpTsMuxUploader->SetDeleteAfterDays(gpTsMuxUploader, nDeleteAfterDays);
+                gpTsMuxUploader->SetBucket(gpTsMuxUploader, gBucket, sizeof(gBucket));
+                gpTsMuxUploader->SetCallbackUrl(gpTsMuxUploader, gCallbackUrl, strlen(gCallbackUrl));
+        }
         ret = TsMuxUploaderStart(gpTsMuxUploader);
         if (ret != 0){
                 StopMgr();
