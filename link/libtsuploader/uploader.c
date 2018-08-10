@@ -210,6 +210,14 @@ static int streamUploadStart(TsUploader * _pUploader)
 static void streamUploadStop(TsUploader * _pUploader)
 {
         KodoUploader * pKodoUploader = (KodoUploader *)_pUploader;
+        if(pKodoUploader->nWaitFirstMutexLocked_ == WF_LOCKED) {
+                pKodoUploader->nWaitFirstMutexLocked_ = WF_QUIT;
+                pthread_mutex_unlock(&pKodoUploader->waitFirstMutex_);
+        }
+        pthread_mutex_lock(&pKodoUploader->waitFirstMutex_);
+        pKodoUploader->nWaitFirstMutexLocked_ = WF_QUIT;
+        pthread_mutex_unlock(&pKodoUploader->waitFirstMutex_);
+        
         if (pKodoUploader->isThreadStarted_) {
                 pKodoUploader->pQueue_->StopPush(pKodoUploader->pQueue_);
                 pthread_join(pKodoUploader->workerId_, NULL);
@@ -349,13 +357,6 @@ int NewUploader(TsUploader ** _pUploader, enum CircleQueuePolicy _policy, int _n
 void DestroyUploader(TsUploader ** _pUploader)
 {
         KodoUploader * pKodoUploader = (KodoUploader *)(*_pUploader);
-        if(pKodoUploader->nWaitFirstMutexLocked_ == WF_LOCKED) {
-                pKodoUploader->nWaitFirstMutexLocked_ = WF_QUIT;
-                pthread_mutex_unlock(&pKodoUploader->waitFirstMutex_);
-        }
-        pthread_mutex_lock(&pKodoUploader->waitFirstMutex_);
-        pKodoUploader->nWaitFirstMutexLocked_ = WF_QUIT;
-        pthread_mutex_unlock(&pKodoUploader->waitFirstMutex_);
         
         pthread_mutex_destroy(&pKodoUploader->waitFirstMutex_);
 #ifdef TK_STREAM_UPLOAD
