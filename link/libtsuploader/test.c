@@ -10,9 +10,17 @@ AvArg avArg;
 typedef int (*DataCallback)(void *opaque, void *pData, int nDataLen, int nFlag, int64_t timestamp, int nIsKeyFrame);
 #define THIS_IS_AUDIO 1
 #define THIS_IS_VIDEO 2
-//#define TEST_AAC 1
+#define TEST_AAC 1
 #define TEST_AAC_NO_ADTS 1
 #define USE_LINK_ACC 1
+
+//#define INPUT_FROM_FFMPEG
+
+#ifdef INPUT_FROM_FFMPEG
+#ifndef TEST_AAC
+#define TEST_AAC 1
+#endif
+#endif
 
 
 FILE *outTs;
@@ -377,6 +385,86 @@ int start_file_test(char * _pAudioFile, char * _pVideoFile, DataCallback callbac
         return 0;
 }
 
+int start_ffmpeg_test(char * _pUrl, DataCallback callback, void *opaque)
+{
+        AVFormatContext *pFmtCtx = NULL;
+        int ret = avformat_open_input(&pFmtCtx, _pUrl, NULL, NULL);
+        if (ret != 0) {
+                return ret;
+        }
+        
+        if ((ret = avformat_find_stream_info(pFmtCtx, 0)) < 0) {
+                printf("Failed to retrieve input stream information");
+                goto end;
+        }
+
+        printf("===========Input Information==========\n");
+        av_dump_format(pFmtCtx, 0, _pUrl, 0);
+        printf("======================================\n");
+        
+        int nAudioIndex = 0;
+        int nVideoIndex = 0;
+        for (size_t i = 0; i < pFmtCtx->nb_streams; ++i) {
+                if (pFmtCtx->streams[i]->codecpar->codec_type == AVMEDIA_TYPE_AUDIO) {
+                        printf("find audio\n");
+                        nAudioIndex = i;
+                        continue;
+                }
+                if (pFmtCtx->streams[i]->codecpar->codec_type == AVMEDIA_TYPE_VIDEO) {
+                        printf("find video\n");
+                        nVideoIndex = i;
+                        continue;
+                }
+                printf("other type:%d\n", pFmtCtx->streams[i]->codecpar->codec_type);
+        }
+        AVBSFContext *pBsfCtx = NULL;
+        const AVBitStreamFilter *filter = av_bsf_get_by_name("h264_mp4toannexb");
+        if(!filter){
+                av_log(NULL,AV_LOG_ERROR,"Unkonw bitstream filter");
+                goto end;
+        }
+        
+        ret = av_bsf_alloc(filter, &pBsfCtx);
+        if (ret != 0) {
+                goto end;
+        }
+        
+        AVPacket pkt;
+        av_init_packet(&pkt);
+        while(av_read_frame(pFmtCtx, &pkt) >= 0){
+                if(nVideoIndex == pkt.stream_index) {
+                        ret = av_bsf_send_packet(pBsfCtx, &pkt);
+                        if(ret < 0) {
+                                fprintf(stderr, "av_bsf_send_packet fail: %d\n", ret);
+                                goto end;
+                        }
+                        ret = av_bsf_receive_packet(pBsfCtx, &pkt);
+                        if(ret < 0){
+                                fprintf(stderr, "av_bsf_receive_packet: %d\n", ret);
+                                goto end;
+                        }
+                        ret = callback(opaque, pkt.data, pkt.size, THIS_IS_VIDEO, pkt.pts, pkt.flags == 1);
+                } else {
+                        ret = callback(opaque, pkt.data, pkt.size, THIS_IS_AUDIO, pkt.pts, pkt.flags == 1);
+                }
+
+                av_packet_unref(&pkt);
+        }
+
+end:
+        if (pBsfCtx)
+                av_bsf_free(&pBsfCtx);
+        if (pFmtCtx)
+                avformat_close_input(&pFmtCtx);
+        /* close output */
+        if (ret < 0 && ret != AVERROR_EOF) {
+                printf("Error occurred.\n");
+                return -1;
+        }
+        
+        return 0;
+}
+
 static int64_t firstTimeStamp = -1;
 static int segStartCount = 0;
 static int nByteCount = 0;
@@ -484,8 +572,6 @@ int main(int argc, char* argv[])
         if (avArg.nVideoFormat == TK_VIDEO_H265) {
                 pVFile = "/Users/liuye/Documents/material/h265_aac_1_16000_v.h265";
         }
-        start_file_test(pAFile, pVFile, dataCallback, NULL);
-
 #else
 
         char * pVFile = "/liuye/Documents/material/h265_aac_1_16000_h264.h264";
@@ -497,6 +583,11 @@ int main(int argc, char* argv[])
         if (avArg.nVideoFormat == TK_VIDEO_H265) {
                 pVFile = "/liuye/Documents/material/h265_aac_1_16000_v.h265";
         }
+#endif
+
+#ifdef INPUT_FROM_FFMPEG
+        start_ffmpeg_test("rtmp://live.hkstv.hk.lxdns.com/live/hks", dataCallback, NULL);
+#else
         start_file_test(pAFile, pVFile, dataCallback, NULL);
 #endif
         
