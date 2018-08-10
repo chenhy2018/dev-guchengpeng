@@ -33,9 +33,9 @@ func VerifyAuth(xl *xlog.Logger, req *http.Request) (bool, error) {
 	return mac.VerifyCallback(req)
 }
 
-func GetUrlWithDownLoadToken(xl *xlog.Logger, domain, fname string) string {
+func GetUrlWithDownLoadToken(xl *xlog.Logger, domain, fname string, tsExpire int64) string {
 	mac := qbox.NewMac(accessKey, secretKey)
-	expireT := time.Now().Add(time.Hour).Unix()
+	expireT := time.Now().Add(time.Hour).Unix() + tsExpire
 	realUrl := storage.MakePrivateURL(mac, domain, fname, expireT)
 	return realUrl
 }
