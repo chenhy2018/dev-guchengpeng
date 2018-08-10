@@ -35,6 +35,10 @@ func GetSegments(c *gin.Context) {
 		return
 	}
 
+	for _, v := range segs {
+		delete(v, "_id")
+	}
+
 	c.JSON(200, gin.H{
 		"segments": segs,
 	})
