@@ -30,16 +30,16 @@ func GetPlayBackm3u8(c *gin.Context) {
 	xl.Infof("uid= %v, uaid = %v, from = %v, to = %v", params.uid, params.uaid, time.Unix(params.from, 0), time.Unix(params.to, 0))
 
 	segMod := &models.SegmentModel{}
-	segs, err := segMod.GetSegmentTsInfo(0, 0, params.from*1000, params.to*1000, params.uid, params.uaid)
+	segs, err := segMod.GetSegmentTsInfo(xl, 0, 0, params.from*1000, params.to*1000, params.uid, params.uaid)
 	pPlaylist := new(m3u8.MediaPlaylist)
 	pPlaylist.Init(32, 32)
 	var playlist []map[string]interface{}
 
 	if err == nil {
-		for _, v := range segs {
-			duration := float64(v.EndTime-v.StartTime) / 1000
-			realUrl := GetUrlWithDownLoadToken(xl, "http://pcgtsa42m.bkt.clouddn.com/", v.FileName)
-			pPlaylist.AppendSegment(realUrl, duration, v.UaId)
+		for count := 0; count < len(segs); count++ {
+			duration := float64(segs[count][models.SEGMENT_ITEM_END_TIME].(int64)-segs[count][models.SEGMENT_ITEM_START_TIME].(int64)) / 1000000000
+			realUrl := GetUrlWithDownLoadToken(xl, "http://pcgtsa42m.bkt.clouddn.com/",segs[count][models.SEGMENT_ITEM_FILE_NAME].(string))
+			pPlaylist.AppendSegment(realUrl, duration, params.uid)
 
 			m := map[string]interface{}{
 				"duration": duration,

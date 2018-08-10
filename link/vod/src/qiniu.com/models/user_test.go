@@ -1,10 +1,10 @@
 package models
 
 import (
-        "fmt"
         "testing"
         "qiniu.com/db"
         "github.com/stretchr/testify/assert"
+        "github.com/qiniu/xlog.v1"
         "time"
 )
 
@@ -20,21 +20,22 @@ func TestUser(t *testing.T) {
                 AuthDB : "admin",
                 Proxies : nil,
         }
-        fmt.Printf("db test user \n")
+        xl := xlog.NewDummy()
+        xl.Infof("TestUser")
         db.InitDb(&config)
         info := UserInfo {
                 Uid : "test",
                 Password : "test",
                 RegTime : time.Now().Unix(),
         }
-        err := AddUser(info, "admin", "linking")
+        err := AddUser(xl, info, "admin", "linking")
         assert.Equal(t, err, nil, "they should be equal")
         info = UserInfo {
                 Uid : "test1",
                 Password : "test1",
                 RegTime : time.Now().Unix(),
         }
-        err = AddUser(info, "admin", "linking")
+        err = AddUser(xl, info, "admin", "linking")
         assert.Equal(t, err, nil, "they should be equal")
 
         info = UserInfo {
@@ -42,7 +43,7 @@ func TestUser(t *testing.T) {
                 Password : "test2",
                 RegTime : time.Now().Unix(),
         }
-        err = AddUser(info, "admin", "linking")
+        err = AddUser(xl, info, "admin", "linking")
         assert.Equal(t, err, nil, "they should be equal")
 
         info = UserInfo {
@@ -50,41 +51,41 @@ func TestUser(t *testing.T) {
                 Password : "test3",
                 RegTime : time.Now().Unix(),
         }
-        AddUser(info, "admin", "linking")
+        AddUser(xl, info, "admin", "linking")
         assert.Equal(t, err, nil, "they should be equal")
 
-        r, err := GetUserInfo(0, 0, "admin", "linking", "uid", "test")
+        r, err := GetUserInfo(xl, 0, 0, "admin", "linking", "uid", "test")
         assert.Equal(t, err, nil, "they should be equal")
         size := len(r)
         assert.Equal(t, size, 4, "they should be equal")
 
-        ValidateLogin("test", "test")
-        ValidateUid("test1")
-        ResetPassword("test", "test", "test1")
-        ResetPassword("test", "test1", "test")
-        Logout("test")
+        ValidateLogin(xl, "test", "test")
+        ValidateUid(xl, "test1")
+        ResetPassword(xl, "test", "test", "test1")
+        ResetPassword(xl, "test", "test1", "test")
+        Logout(xl, "test")
         info = UserInfo {
                 Uid : "test",
                 Password : "test",
                 RegTime : time.Now().Unix(),
         }
-        DelUser(info, "admin", "linking")
+        DelUser(xl, info, "admin", "linking")
         info = UserInfo {
                 Uid : "test1",
                 Password : "test1",
                 RegTime : time.Now().Unix(),
         }       
-        DelUser(info, "admin", "linking")
+        DelUser(xl, info, "admin", "linking")
         info = UserInfo {
                 Uid : "test2",
                 Password : "test2",
                 RegTime : time.Now().Unix(),
         }       
-        DelUser(info, "admin", "linking")
+        DelUser(xl, info, "admin", "linking")
         info = UserInfo {
                 Uid : "test3",
                 Password : "test3",
                 RegTime : time.Now().Unix(),
         }       
-        DelUser(info, "admin", "linking")
+        DelUser(xl, info, "admin", "linking")
 }
