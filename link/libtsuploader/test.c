@@ -14,7 +14,7 @@ typedef int (*DataCallback)(void *opaque, void *pData, int nDataLen, int nFlag, 
 #define TEST_AAC_NO_ADTS 1
 #define USE_LINK_ACC 1
 
-//#define INPUT_FROM_FFMPEG
+#define INPUT_FROM_FFMPEG
 
 #ifdef INPUT_FROM_FFMPEG
 #ifndef TEST_AAC
@@ -390,9 +390,12 @@ int start_ffmpeg_test(char * _pUrl, DataCallback callback, void *opaque)
         AVFormatContext *pFmtCtx = NULL;
         int ret = avformat_open_input(&pFmtCtx, _pUrl, NULL, NULL);
         if (ret != 0) {
+                char msg[128] = {0};
+                av_strerror(ret, msg, sizeof(msg)) ;
                 return ret;
         }
         
+        AVBSFContext *pBsfCtx = NULL;
         if ((ret = avformat_find_stream_info(pFmtCtx, 0)) < 0) {
                 printf("Failed to retrieve input stream information");
                 goto end;
@@ -417,7 +420,7 @@ int start_ffmpeg_test(char * _pUrl, DataCallback callback, void *opaque)
                 }
                 printf("other type:%d\n", pFmtCtx->streams[i]->codecpar->codec_type);
         }
-        AVBSFContext *pBsfCtx = NULL;
+
         const AVBitStreamFilter *filter = av_bsf_get_by_name("h264_mp4toannexb");
         if(!filter){
                 av_log(NULL,AV_LOG_ERROR,"Unkonw bitstream filter");
@@ -428,10 +431,12 @@ int start_ffmpeg_test(char * _pUrl, DataCallback callback, void *opaque)
         if (ret != 0) {
                 goto end;
         }
+        avcodec_parameters_copy(pBsfCtx->par_in, pFmtCtx->streams[nVideoIndex]->codecpar);
+        av_bsf_init(pBsfCtx);
         
         AVPacket pkt;
         av_init_packet(&pkt);
-        while(av_read_frame(pFmtCtx, &pkt) >= 0){
+        while((ret = av_read_frame(pFmtCtx, &pkt)) == 0){
                 if(nVideoIndex == pkt.stream_index) {
                         ret = av_bsf_send_packet(pBsfCtx, &pkt);
                         if(ret < 0) {
@@ -439,13 +444,17 @@ int start_ffmpeg_test(char * _pUrl, DataCallback callback, void *opaque)
                                 goto end;
                         }
                         ret = av_bsf_receive_packet(pBsfCtx, &pkt);
+                        if (AVERROR(EAGAIN) == ret){
+                                av_packet_unref(&pkt);
+                                continue;
+                        }
                         if(ret < 0){
                                 fprintf(stderr, "av_bsf_receive_packet: %d\n", ret);
                                 goto end;
                         }
                         ret = callback(opaque, pkt.data, pkt.size, THIS_IS_VIDEO, pkt.pts, pkt.flags == 1);
                 } else {
-                        ret = callback(opaque, pkt.data, pkt.size, THIS_IS_AUDIO, pkt.pts, pkt.flags == 1);
+                        ret = callback(opaque, pkt.data, pkt.size, THIS_IS_AUDIO, pkt.pts, 0);
                 }
 
                 av_packet_unref(&pkt);
@@ -516,6 +525,13 @@ int main(int argc, char* argv[])
 
         int ret = 0;
         
+#if LIBAVFORMAT_VERSION_MAJOR < 58
+        //int nFfmpegVersion = avcodec_version();
+        av_register_all();
+#endif
+#ifdef INPUT_FROM_FFMPEG
+        avformat_network_init();
+#endif
         SetLogLevelToDebug();
         
         pthread_t updateTokenThread;
@@ -586,7 +602,9 @@ int main(int argc, char* argv[])
 #endif
 
 #ifdef INPUT_FROM_FFMPEG
-        start_ffmpeg_test("rtmp://live.hkstv.hk.lxdns.com/live/hks", dataCallback, NULL);
+        start_ffmpeg_test("rtmp://localhost:1935/live/movie", dataCallback, NULL);
+        
+        //start_ffmpeg_test("rtmp://live.hkstv.hk.lxdns.com/live/hks", dataCallback, NULL);
 #else
         start_file_test(pAFile, pVFile, dataCallback, NULL);
 #endif
