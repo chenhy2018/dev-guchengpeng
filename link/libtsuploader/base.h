@@ -46,5 +46,7 @@ typedef struct _AvArg{
 #define TK_COND_ERROR MKERRTAG('C','O','N','D')
 #define TK_THREAD_ERROR MKERRTAG('X','C','S','B')
 #define TK_ARG_ERROR MKERRTAG('A','R','G','E')
+#define TK_BUFFER_IS_SMALL ('B','U','F','S')
+#define TK_JSON_FORMAT ('J','S','N','F')
 
 #endif

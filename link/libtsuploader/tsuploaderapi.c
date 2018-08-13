@@ -224,7 +224,7 @@ size_t writeData(void *pTokenStr, size_t size,  size_t nmemb,  void *pUserData) 
         }
         char *pTokenStart = strstr(pTokenStr, "\"token\"");
         if (pTokenStart == NULL) {
-                pToken->nCurlRet = -11;
+                pToken->nCurlRet = TK_JSON_FORMAT;
                 return 0;
         }
         pTokenStart += strlen("\"token\"");
@@ -233,8 +233,11 @@ size_t writeData(void *pTokenStr, size_t size,  size_t nmemb,  void *pUserData) 
         
         char *pTokenEnd = strchr(pTokenStart, '\"');
         if (pTokenEnd == NULL) {
-                pToken->nCurlRet = -11;
+                pToken->nCurlRet = TK_JSON_FORMAT;
                 return 0;
+        }
+        if (pTokenEnd - pTokenStart >= pToken->nDataLen) {
+                pToken->nCurlRet = TK_BUFFER_IS_SMALL;
         }
         memcpy(pToken->pData, pTokenStart, pTokenEnd - pTokenStart);
         return size * nmemb;
