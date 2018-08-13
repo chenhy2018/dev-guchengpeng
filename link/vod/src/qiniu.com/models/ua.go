@@ -5,17 +5,8 @@ import (
         "qiniu.com/db"
         "gopkg.in/mgo.v2"
         "gopkg.in/mgo.v2/bson"
+        "github.com/qiniu/xlog.v1"
         "time"
-)
-
-
-const (
-        UA_COL = "ua"
-        UA_ITEM_UID   = "uid"
-        UA_ITEM_UAID = "uaid"
-        UA_ITEM_DATE   = "date"
-        UA_ITEM_BUCKET_URL = "bucketurl"
-        UA_ITEM_EXPIRE = "remaindays"
 )
 
 type uaModel struct {
@@ -29,19 +20,11 @@ func (m *uaModel) Init() error {
 
 //     index := Index{
 //         Key: []string{"uid"},
-//         Unique: true,
-//         DropDups: true,
-//         Background: true, // See notes.
-//         Sparse: true,
 //     }
-//     err := collection.EnsureIndex(index)
+//     db.collection.EnsureIndex(index)
 
        index := mgo.Index{
            Key: []string{UA_ITEM_UID},
-           Unique: true,
-           DropDups: true,
-           Background: true, // See notes.
-           Sparse: true,
        }
 
         return db.WithCollection(
@@ -52,8 +35,11 @@ func (m *uaModel) Init() error {
         )
 }
 
-func (m *uaModel) Register(req UaInfo) error {
-
+func (m *uaModel) Register(xl *xlog.Logger, req UaInfo) error {
+        /*
+                 db.ua.update( {uid: id, uaid: id, xxx}, {"$set": {"bucketurl": url, "remaindays": time}},
+                 { upsert: true })
+        */
         err := db.WithCollection(
                 UA_COL,
                 func(c *mgo.Collection) error {
@@ -81,8 +67,10 @@ func (m *uaModel) Register(req UaInfo) error {
         return nil;
 }
 
-func (m *uaModel) Delete(uid,uaid string) error {
-
+func (m *uaModel) Delete(xl *xlog.Logger, uid,uaid string) error {
+        /*
+                 db.ua.remove({uid: id, uaid: id})
+        */
         return db.WithCollection(
                 UA_COL,
                 func(c *mgo.Collection) error {
@@ -96,8 +84,10 @@ func (m *uaModel) Delete(uid,uaid string) error {
         )
 }
 
-func (m *uaModel) UpdateRemaindays(uid,uaid string, remaindays int64) error {
-
+func (m *uaModel) UpdateRemaindays(xl *xlog.Logger, uid,uaid string, remaindays int64) error {
+        /*
+                 db.ua.update({uid: id, uaid: id}, bson.M{"$set": "remaindays": time}},
+        */
          return db.WithCollection(
                 UA_COL,
                 func(c *mgo.Collection) error {
@@ -117,15 +107,19 @@ func (m *uaModel) UpdateRemaindays(uid,uaid string, remaindays int64) error {
 }
 
 type UaInfo struct {
-        Uid           string  `bson:"uid"       json:"uid"`
+        Uid           string  `bson:"uid"        json:"uid"`
         UaId          string  `bson:"uaid"       json:"uaid"`
         Regtime       int     `bson:"date"       json:"date"`
         BucketUrl     string  `bson:"bucketurl"  json:"bucketurl"`
         RemainDays    int64   `bson:"remaindays" json:"remaindays"`
 }
 
-func (m *uaModel) GetUaInfo(index, rows int, category, like string) ([]UaInfo, error) {
+func (m *uaModel) GetUaInfo(xl *xlog.Logger, index, rows int, category, like string) ([]UaInfo, error) {
 
+        /*
+                 db.ua.find({category: {"$regex": "*like*"}},
+                 ).sort({"date":1}).limit(rows),skip(rows * index)
+        */
         // query by keywords
         query := bson.M{}
         if like != "" {

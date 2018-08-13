@@ -206,7 +206,7 @@ func (p *MediaPlaylist) MKm3u8() *bytes.Buffer {
     p.addTargetDuraion()
     p.addIframe()
     p.addSegments()
-
+    p.buf.WriteString("#EXT-X-ENDLIST\n")
     return &p.buf
 }
 

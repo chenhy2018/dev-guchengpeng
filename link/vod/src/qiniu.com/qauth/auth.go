@@ -23,7 +23,7 @@ type UserRet struct {
 //------------------------------------------------------
 
 func VerifyOldAccessKey(ak string, ret *UserRet) error {
-	pwd, err := models.GetPwdByUID(ak)
+	pwd, err := models.GetPwdByUID(nil, ak)
 	if err == nil {
 		ret.uid = ak
 		ret.secret = []byte(pwd)
@@ -40,7 +40,7 @@ func VerifyNewAccessKey(ak string, ret *UserRet) error {
 		if err != nil {
 			return err
 		}
-		if err = models.ValidateUid(acc.Email); err != nil {
+		if err = models.ValidateUid(nil, acc.Email); err != nil {
 			return err
 		}
 		ret.uid = acc.Email
@@ -144,11 +144,11 @@ func Authenticate(ctx *gin.Context) (err error) {
 }
 
 func ValidateLoginForOldAccount(sign, uid, pwd string) error {
-	return models.ValidateLogin(uid, pwd)
+	return models.ValidateLogin(nil, uid, pwd)
 }
 
 func ValidateLoginForNewAccount(uid, pwd string) error {
-	if err := models.ValidateUid(uid); err != nil {
+	if err := models.ValidateUid(nil, uid); err != nil {
 		return err
 	}
 	if _, err := GetUserInfo(uid, pwd); err != nil {

@@ -5,17 +5,8 @@ import (
         "qiniu.com/db"
         "gopkg.in/mgo.v2"
         "gopkg.in/mgo.v2/bson"
+        "github.com/qiniu/xlog.v1"
         //"time"
-)
-
-
-const (
-        USER_COL = "user"
-        USER_UUID = "uid"
-        USER_PASSWORD = "password"
-        USER_STATUS = "status"
-        USER_REGTIME = "registertime"
-        USER_IS_SUPERUSER = "issuperuser"
 )
 
 type UserModel struct {
@@ -35,10 +26,10 @@ type UserInfo struct {
 
 // -----------------------------------------------------------------------------------------------------------
 
-func ValidateLogin(uid, pwd string) error {
+func ValidateLogin(xl *xlog.Logger, uid, pwd string) error {
 
         /*
-               db.collection.update( bson.M{ "uid" : uid, "password" : pwd }, bson.M{ "$set": bson.M{ "status" : true} })
+               db.user.update( { "uid" : uid, "password" : pwd }, { "$set": bson.M{ "status" : true} })
         */
         return db.WithCollection(
                 USER_COL,
@@ -62,10 +53,10 @@ func ValidateLogin(uid, pwd string) error {
         )
 }
 
-func ValidateUid(uid string) error {
+func ValidateUid(xl *xlog.Logger, uid string) error {
 
         /*
-               db.collection.Find(bson.M{ "uid" : uid})
+               db.user.Find({ "uid" : uid})
         */
         return db.WithCollection(
                 USER_COL,
@@ -86,10 +77,10 @@ func ValidateUid(uid string) error {
         )
 }
 
-func ResetPassword(uid, opwd, pwd string) error {
+func ResetPassword(xl *xlog.Logger, uid, opwd, pwd string) error {
 
         /*
-               db.collection.update( bson.M{ "uid" : uid, "password" : opwd }, bson.M{ "$set": bson.M{ "password" : pwd} })
+               db.user.update( { "uid" : uid, "password" : opwd }, { "$set": bson.M{ "password" : pwd} })
         */
         return db.WithCollection(
                 USER_COL,
@@ -108,10 +99,10 @@ func ResetPassword(uid, opwd, pwd string) error {
         )
 }
 
-func GetPwdByUID(uid string) (string, error) {
+func GetPwdByUID(xl *xlog.Logger, uid string) (string, error) {
 
         /*
-               db.collection.find( bson.M{ "uid" : uid})
+               db.user.find({ "uid" : uid})
         */
         r := UserInfo{}
         err := db.WithCollection(
@@ -130,10 +121,10 @@ func GetPwdByUID(uid string) (string, error) {
         return r.Password, nil
 }
 
-func Logout(uid string) error {
+func Logout(xl *xlog.Logger, uid string) error {
 
         /*
-               db.collection.update( bson.M{ "uid" : uid, "password" : pwd }, bson.M{ "$set": bson.M{ "status" : false} })
+               db.user.update({ "uid" : uid, "password" : pwd }, { "$set": bson.M{ "status" : false} })
         */
 
         return db.WithCollection(
@@ -153,12 +144,12 @@ func Logout(uid string) error {
         )
 }
 
-func AddUser(info UserInfo, uid, pwd string) error {
+func AddUser(xl *xlog.Logger, info UserInfo, uid, pwd string) error {
 
         /*
-               db.collection.find( bson.M{ "uid" : info.uid, "password" : info.pwd, "issuperuser" : true })
-               db.collection.find( bson.M{ "uid" : uid} )
-               db.collection.update( bson.M{ "uid" : uid}, bson.M{ "$set": bson.M{xxx}}, upsert:true)
+               db.user.find( { "uid" : info.uid, "password" : info.pwd, "issuperuser" : true })
+               db.user.find( { "uid" : uid} )
+               db.user.update( { "uid" : uid}, bson.M{ "$set": bson.M{xxx}}, upsert:true)
         */
 
         return db.WithCollection(
@@ -205,11 +196,11 @@ func AddUser(info UserInfo, uid, pwd string) error {
         )
 }
 
-func DelUser(info UserInfo, uid, pwd string) error {
+func DelUser(xl *xlog.Logger, info UserInfo, uid, pwd string) error {
 
         /*
-               db.collection.find(bson.M{ "uid" : info.uid, "password" : info.pwd, "issuperuser" : true })
-               db.collection.remove(bson.M{ "uid" : uid})
+               db.user.find({ "uid" : info.uid, "password" : info.pwd, "issuperuser" : true })
+               db.user.remove({ "uid" : uid})
         */
 
         return db.WithCollection(
@@ -238,13 +229,13 @@ func DelUser(info UserInfo, uid, pwd string) error {
         )
 }
 
-func GetUserInfo(index, rows int, uid, pwd string, category, like string) ([]UserInfo, error) {
-        
+func GetUserInfo(xl *xlog.Logger, index, rows int, uid, pwd string, category, like string) ([]UserInfo, error) {
+
         /*
-               db.collection.find(bson.M{ "uid" : info.uid, "password" : info.pwd, "issuperuser" : true })
-               db.collection.find(bson.M{category : like}).sort("uid").skip(index * row).limit(rows)
+               db.user.find({ "uid" : info.uid, "password" : info.pwd, "issuperuser" : true })
+               db.user.find({category : like}).sort("uid").skip(index * row).limit(rows)
         */
- 
+
         // query by keywords
         query := bson.M{}
         if like != "" {
