@@ -24,6 +24,8 @@ typedef struct _FFTsMuxUploader{
         TsMuxUploader tsMuxUploader_;
         pthread_mutex_t muxUploaderMutex_;
         char *pToken_;
+        unsigned char *pAACBuf;
+        int nAACBufLen;
         char ak_[64];
         char sk_[64];
         char bucketName_[256];
@@ -161,11 +163,16 @@ static int push(FFTsMuxUploader *pFFTsMuxUploader, char * _pData, int _nDataLen,
                         fixHeader.channel_configuration = pFFTsMuxUploader->avArg.nChannels;
                         int nFreqIdx = getAacFreqIndex(pFFTsMuxUploader->avArg.nSamplerate);
                         fixHeader.sampling_frequency_index = nFreqIdx;
-                        unsigned char * pTmp = (unsigned char *)malloc(varHeader.aac_frame_length);
-                        if(pTmp == NULL || pFFTsMuxUploader->avArg.nChannels < 1 || pFFTsMuxUploader->avArg.nChannels > 2
+                        if (pFFTsMuxUploader->pAACBuf == NULL || pFFTsMuxUploader->nAACBufLen < varHeader.aac_frame_length) {
+                                if (pFFTsMuxUploader->pAACBuf)
+                                        free(pFFTsMuxUploader->pAACBuf);
+                                pFFTsMuxUploader->pAACBuf = (unsigned char *)malloc(varHeader.aac_frame_length);
+                                pFFTsMuxUploader->nAACBufLen = (int)varHeader.aac_frame_length;
+                        }
+                        if(pFFTsMuxUploader->pAACBuf == NULL || pFFTsMuxUploader->avArg.nChannels < 1 || pFFTsMuxUploader->avArg.nChannels > 2
                            || nFreqIdx < 0) {
                                 pthread_mutex_unlock(&pFFTsMuxUploader->muxUploaderMutex_);
-                                if (pTmp == NULL) {
+                                if (pFFTsMuxUploader->pAACBuf == NULL) {
                                         logwarn("malloc %d size memory fail", varHeader.aac_frame_length);
                                         return TK_NO_MEMORY;
                                 } else {
@@ -174,11 +181,11 @@ static int push(FFTsMuxUploader *pFFTsMuxUploader, char * _pData, int _nDataLen,
                                         return TK_ARG_ERROR;
                                 }
                         }
-                        ConvertAdtsHeader2Char(&fixHeader, &varHeader, pTmp);
+                        ConvertAdtsHeader2Char(&fixHeader, &varHeader, pFFTsMuxUploader->pAACBuf);
                         int nHeaderLen = varHeader.aac_frame_length - _nDataLen;
-                        memcpy(pTmp + nHeaderLen, _pData, _nDataLen);
+                        memcpy(pFFTsMuxUploader->pAACBuf + nHeaderLen, _pData, _nDataLen);
                         isAdtsAdded = 1;
-                        pkt.data = (uint8_t *)pTmp;
+                        pkt.data = (uint8_t *)pFFTsMuxUploader->pAACBuf;
                         pkt.size = varHeader.aac_frame_length;
                 }
         }else{
@@ -481,6 +488,7 @@ static int getExpireDays(char * pToken)
         
         char *pExpireStart = strstr(pPlain, "\"deleteAfterDays\"");
         if (pExpireStart == NULL) {
+                free(pPlain);
                 return 0;
         }
         pExpireStart += strlen("\"deleteAfterDays\"");
@@ -503,6 +511,7 @@ static int getExpireDays(char * pToken)
                 pExpireStart++;
         }
         memcpy(days, pDaysStrat, nDaysLen);
+        free(pPlain);
         return atoi(days);
 }
 
@@ -626,6 +635,9 @@ void DestroyTsMuxUploader(TsMuxUploader **_pTsMuxUploader)
         
         pushRecycle(pFFTsMuxUploader);
         if (pFFTsMuxUploader) {
+                if (pFFTsMuxUploader->pAACBuf) {
+                        free(pFFTsMuxUploader);
+                }
                 free(pFFTsMuxUploader);
         }
         return;

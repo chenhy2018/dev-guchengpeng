@@ -60,6 +60,9 @@ void StopMgr()
         if (manager.nIsStarted_) {
                 pthread_join(manager.mgrThreadId_, NULL);
                 manager.nIsStarted_ = 0;
+                if (manager.pQueue_) {
+                        DestroyQueue(&manager.pQueue_);
+                }
         }
         return;
 }

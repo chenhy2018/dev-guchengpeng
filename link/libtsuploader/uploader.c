@@ -366,7 +366,6 @@ void DestroyUploader(TsUploader ** _pUploader)
         DestroyQueue(&pKodoUploader->pQueue_);
 #else
         free(pKodoUploader->pTsData);
-        streamUpload(* _pUploader);
 #endif
         
         free(pKodoUploader);

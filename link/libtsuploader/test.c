@@ -503,7 +503,7 @@ static int dataCallback(void *opaque, void *pData, int nDataLen, int nFlag, int6
 static void * upadateToken() {
         int ret = 0;
         while(1) {
-                sleep(30);
+                sleep(3550);
                 ret = GetUploadToken(gtestToken, sizeof(gtestToken));
                 if (ret != 0) {
                         printf("update token file<<<<<<<<<<<<<\n");
