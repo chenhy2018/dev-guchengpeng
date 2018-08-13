@@ -164,8 +164,10 @@ static int push(FFTsMuxUploader *pFFTsMuxUploader, char * _pData, int _nDataLen,
                         int nFreqIdx = getAacFreqIndex(pFFTsMuxUploader->avArg.nSamplerate);
                         fixHeader.sampling_frequency_index = nFreqIdx;
                         if (pFFTsMuxUploader->pAACBuf == NULL || pFFTsMuxUploader->nAACBufLen < varHeader.aac_frame_length) {
-                                if (pFFTsMuxUploader->pAACBuf)
+                                if (pFFTsMuxUploader->pAACBuf) {
                                         free(pFFTsMuxUploader->pAACBuf);
+                                        pFFTsMuxUploader->pAACBuf = NULL;
+                                }
                                 pFFTsMuxUploader->pAACBuf = (unsigned char *)malloc(varHeader.aac_frame_length);
                                 pFFTsMuxUploader->nAACBufLen = (int)varHeader.aac_frame_length;
                         }
