@@ -638,7 +638,7 @@ void DestroyTsMuxUploader(TsMuxUploader **_pTsMuxUploader)
         pushRecycle(pFFTsMuxUploader);
         if (pFFTsMuxUploader) {
                 if (pFFTsMuxUploader->pAACBuf) {
-                        free(pFFTsMuxUploader);
+                        free(pFFTsMuxUploader->pAACBuf);
                 }
                 free(pFFTsMuxUploader);
         }
