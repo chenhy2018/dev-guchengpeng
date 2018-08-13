@@ -5,8 +5,7 @@ project(tsuploader)
 include_directories("${CMAKE_CURRENT_SOURCE_DIR}/../../third_party/ffmpeg-4.0/")
 include_directories("${CMAKE_CURRENT_SOURCE_DIR}/../../third_party/curl-7.61.0/include")
 include_directories("${CMAKE_CURRENT_SOURCE_DIR}/c-sdk")
-if(APPLE)
-else()
+if(CMAKE_TOOLCHAIN_FILE)
 include_directories("${CMAKE_CURRENT_SOURCE_DIR}/include")
 include_directories("${CMAKE_CURRENT_SOURCE_DIR}/include/ffmpeg")
 endif()
@@ -15,8 +14,7 @@ link_directories("${CMAKE_CURRENT_SOURCE_DIR}/../../third_party/ffmpeg-4.0/libav
 link_directories("${CMAKE_CURRENT_SOURCE_DIR}/../../third_party/ffmpeg-4.0/libavcodec")
 link_directories("${CMAKE_CURRENT_SOURCE_DIR}/../../third_party/ffmpeg-4.0/libavutil")
 link_directories("${CMAKE_CURRENT_SOURCE_DIR}/../../third_party/curl-7.61.0/lib/.libs")
-if(APPLE)
-else()
+if(CMAKE_TOOLCHAIN_FILE)
 link_directories("${CMAKE_CURRENT_SOURCE_DIR}/libs")
 endif()
 
@@ -49,13 +47,13 @@ add_library(tsuploader STATIC
 	tsuploaderapi.h
 )
 
-if(APPLE)
+if(CMAKE_TOOLCHAIN_FILE)
 add_executable(testupload
-    test.c
+    ipc_test.c
 )
 else()
 add_executable(testupload
-    ipc_test.c
+    test.c
 )
 endif()
 
@@ -68,10 +66,18 @@ if(APPLE)
         	target_link_libraries(testupload tsuploader avformat avcodec avutil qiniu curl crypto bz2 lzma iconv z)
         endif()
 else()
+    if(CMAKE_TOOLCHAIN_FILE)
         if(DISABLE_OPENSSL)
         	target_link_libraries(testupload tsuploader avformat avcodec avutil qiniu curl m pthread devsdk tools)
         else()
+        	target_link_libraries(testupload tsuploader avformat avcodec avutil qiniu curl crypto m pthread devsdk tools)
+        endif()
+    else()
+        if(DISABLE_OPENSSL)
+        	target_link_libraries(testupload tsuploader avformat avcodec avutil qiniu curl m pthread)
+        else()
         	target_link_libraries(testupload tsuploader avformat avcodec avutil qiniu curl crypto m pthread)
         endif()
+    endif()
 endif()
 
