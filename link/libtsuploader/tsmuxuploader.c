@@ -267,11 +267,9 @@ static int waitToCompleUploadAndDestroyTsMuxContext(void *_pOpaque)
         
         if (pTsMuxCtx) {
                 if (pTsMuxCtx->pFmtCtx_) {
-                        if (pTsMuxCtx->pFmtCtx_ && !(pTsMuxCtx->pFmtCtx_->oformat->flags & AVFMT_NOFILE)) {
-                                av_freep(&pTsMuxCtx->pFmtCtx_->pb->buffer);
-                                avio_close(pTsMuxCtx->pFmtCtx_->pb);
+                        if (pTsMuxCtx->pFmtCtx_->pb) {
+                                avio_flush(pTsMuxCtx->pFmtCtx_->pb);
                         }
-                        avformat_free_context(pTsMuxCtx->pFmtCtx_);
                 }
                 pTsMuxCtx->pTsUploader_->UploadStop(pTsMuxCtx->pTsUploader_);
 
@@ -280,6 +278,15 @@ static int waitToCompleUploadAndDestroyTsMuxContext(void *_pOpaque)
                 logdebug("uploader push:%d pop:%d remainItemCount:%d", statInfo.nPushDataBytes_,
                          statInfo.nPopDataBytes_, statInfo.nLen_);
                 DestroyUploader(&pTsMuxCtx->pTsUploader_);
+                if (pTsMuxCtx->pFmtCtx_->pb && pTsMuxCtx->pFmtCtx_->pb->buffer)  {
+                        av_free(pTsMuxCtx->pFmtCtx_->pb->buffer);
+                }
+                if (!(pTsMuxCtx->pFmtCtx_->oformat->flags & AVFMT_NOFILE))
+                        avio_close(pTsMuxCtx->pFmtCtx_->pb);
+                if (pTsMuxCtx->pFmtCtx_->pb) {
+                        avio_context_free(&pTsMuxCtx->pFmtCtx_->pb);
+                }
+                avformat_free_context(pTsMuxCtx->pFmtCtx_);
                 free(pTsMuxCtx);
         }
         
@@ -300,6 +307,7 @@ static int newFFTsMuxContext(FFTsMuxContext ** _pTsMuxCtx, AvArg *_pAvArg)
                 return ret;
         }
         
+        uint8_t *pOutBuffer = NULL;
         //Output
         ret = avformat_alloc_output_context2(&pTsMuxCtx->pFmtCtx_, NULL, "mpegts", NULL);
         if (ret < 0) {
@@ -307,7 +315,7 @@ static int newFFTsMuxContext(FFTsMuxContext ** _pTsMuxCtx, AvArg *_pAvArg)
                 goto end;
         }
         AVOutputFormat *pOutFmt = pTsMuxCtx->pFmtCtx_->oformat;
-        uint8_t *pOutBuffer = (unsigned char*)av_malloc(4096);
+        pOutBuffer = (unsigned char*)av_malloc(4096);
         AVIOContext *avio_out = avio_alloc_context(pOutBuffer, 4096, 1, pTsMuxCtx, NULL, ffWriteTsPacketToMem, NULL);
         pTsMuxCtx->pFmtCtx_->pb = avio_out;
         pTsMuxCtx->pFmtCtx_->flags = AVFMT_FLAG_CUSTOM_IO;
@@ -386,6 +394,11 @@ static int newFFTsMuxContext(FFTsMuxContext ** _pTsMuxCtx, AvArg *_pAvArg)
         *_pTsMuxCtx = pTsMuxCtx;
         return 0;
 end:
+        if (pOutBuffer) {
+                av_free(pOutBuffer);
+        }
+        if (pTsMuxCtx->pFmtCtx_->pb)
+                avio_context_free(&pTsMuxCtx->pFmtCtx_->pb);
         if (pTsMuxCtx->pFmtCtx_) {
                 if (pTsMuxCtx->pFmtCtx_ && !(pOutFmt->flags & AVFMT_NOFILE))
                         avio_close(pTsMuxCtx->pFmtCtx_->pb);
