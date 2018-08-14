@@ -18,8 +18,8 @@ func GetSegments(c *gin.Context) {
 		})
 		return
 	}
-
-	if !VerifyToken(xl, params.expire, params.token, c.Request.URL.String(), params.uid) {
+	fullUrl := "http://" + c.Request.Host + c.Request.URL.String()
+	if !VerifyToken(xl, params.expire, params.token, fullUrl, params.uid) {
 		c.JSON(401, gin.H{
 			"error": "bad token",
 		})
@@ -33,6 +33,10 @@ func GetSegments(c *gin.Context) {
 		xl.Errorf("get segments list error, error =%v", err)
 		c.JSON(500, nil)
 		return
+	}
+
+	for _, v := range segs {
+		delete(v, "_id")
 	}
 
 	c.JSON(200, gin.H{
