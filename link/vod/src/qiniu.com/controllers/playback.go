@@ -15,6 +15,7 @@ func GetPlayBackm3u8(c *gin.Context) {
 	xl := xlog.New(c.Writer, c.Request)
 	params, err := ParseRequest(c, xl)
 	if err != nil {
+		xl.Errorf("parse request falied error = %#v", err.Error())
 		c.JSON(500, gin.H{
 			"error": err.Error(),
 		})
@@ -23,6 +24,7 @@ func GetPlayBackm3u8(c *gin.Context) {
 
 	fullUrl := "http://" + c.Request.Host + c.Request.URL.String()
 	if !VerifyToken(xl, params.expire, params.token, fullUrl, params.uid) {
+		xl.Errorf("verify token falied")
 		c.JSON(401, gin.H{
 			"error": "bad token",
 		})

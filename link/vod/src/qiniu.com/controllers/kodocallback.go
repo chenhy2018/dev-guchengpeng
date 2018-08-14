@@ -8,8 +8,9 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/qiniu/api.v7/auth/qbox"
+	"github.com/qiniu/api.v7/storage"
 	xlog "github.com/qiniu/xlog.v1"
-	"qiniu.com/models"
 )
 
 type kodoCallBack struct {
@@ -28,7 +29,7 @@ func UploadTs(c *gin.Context) {
 
 	c.Header("Content-Type", "application/json")
 	if ok, err := VerifyAuth(xl, c.Request); err != nil || ok != true {
-		xl.Infof("verify auth failed %#v", err)
+		xl.Errorf("verify auth failed %#v", err)
 		c.JSON(401, gin.H{
 			"error": "verify auth failed",
 		})
@@ -37,6 +38,7 @@ func UploadTs(c *gin.Context) {
 
 	body, err := ioutil.ReadAll(c.Request.Body)
 	if err != nil {
+		xl.Errorf("parse request body failed, body = %#v", body)
 		c.JSON(500, gin.H{
 			"error": "read callback body failed",
 		})
@@ -46,41 +48,53 @@ func UploadTs(c *gin.Context) {
 	var kodoData kodoCallBack
 	err = json.Unmarshal(body, &kodoData)
 	xl.Infof("%#v", kodoData)
-	fileName := kodoData.Key
-	ids := strings.Split(fileName, "/")
-	if len(ids) < 5 {
+	key := kodoData.Key
+	ids := strings.Split(key, "/")
+	if len(ids) < 12 {
+		xl.Errorf("bad file name, file name = %s", key)
 		c.JSON(500, gin.H{
 			"error": "bad file name",
 		})
 		return
 
 	}
-	segId, err := strconv.ParseInt(ids[3], 10, 64)
-	if err != nil {
-		c.JSON(500, gin.H{"status": "bad file name"})
+	year, _ := strconv.ParseInt(ids[3], 10, 32)
+	month, _ := strconv.ParseInt(ids[4], 10, 32)
+	day, _ := strconv.ParseInt(ids[5], 10, 32)
+	hour, _ := strconv.ParseInt(ids[6], 10, 32)
+	minute, _ := strconv.ParseInt(ids[7], 10, 32)
+	second, _ := strconv.ParseInt(ids[8], 10, 32)
+	milsecond, _ := strconv.ParseInt(ids[9], 10, 32)
+
+	startTime := time.Date(int(year), time.Month(month), int(day), int(hour), int(minute), int(second), int(milsecond)*1000000, nil)
+	duration, err := strconv.ParseFloat(kodoData.Duration, 64)
+	endTime := startTime.UnixNano()/1000000 + int64(duration*1000)
+
+	newFilName := append(ids[:10], append([]string{string(endTime)}, ids[10:]...)...)
+	xl.Infof("oldFileName = %v\n, newFileName = %v", kodoData.Key, strings.Join(newFilName[:], "/"))
+
+	if err := updateTsName(kodoData.Bucket, key, kodoData.Bucket, strings.Join(newFilName[:], "/")); err != nil {
+		xl.Errorf("ts filename update failed err = %#v", err)
+		c.JSON(500, gin.H{
+			"error": "update ts file name failed",
+		})
 		return
 	}
-	expireAfter, _ := strconv.ParseInt(ids[0], 10, 64)
-
-	startTime, err := strconv.ParseInt(strings.TrimRight(ids[4], ".ts"), 10, 64)
-	duration, err := strconv.ParseFloat(kodoData.Duration, 64)
-	endTime := startTime + int64(duration*1000)
-	xl.Infof("start = %v\n, end = %v", startTime, endTime, duration)
-	expireAfterSecond := time.Duration(expireAfter * 24 * 60 * 60)
-	ts := models.SegmentTsInfo{
-		Uid:               ids[1],
-		UaId:              ids[2],
-		StartTime:         startTime,
-		FileName:          fileName,
-		EndTime:           endTime,
-		Expire:            time.Now().Add(expireAfterSecond * time.Second),
-		FragmentStartTime: int64(segId),
-	}
-	segMod := &models.SegmentModel{}
-	segMod.AddSegmentTS(xl, ts)
-
 	c.JSON(200, gin.H{
 		"success": true,
-		"name":    fileName,
+		"name":    key,
 	})
+}
+
+func updateTsName(srcBucket, srcKey, destBucket, destKey string) error {
+	mac := qbox.NewMac(accessKey, secretKey)
+
+	cfg := storage.Config{
+		UseHTTPS: false,
+	}
+
+	bucketManager := storage.NewBucketManager(mac, &cfg)
+
+	force := false
+	return bucketManager.Move(srcBucket, srcKey, destBucket, destKey, force)
 }
