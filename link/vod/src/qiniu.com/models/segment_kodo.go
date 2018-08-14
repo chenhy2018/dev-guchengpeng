@@ -18,6 +18,11 @@ var (
         bucketManager *storage.BucketManager
 )
 
+const (
+        SEGMENT_FILENAME_SUB_LEN = 13
+        FRAGMENT_FILENAME_SUB_LEN = 11
+)
+
 type SegmentKodoModel struct {
 }
 
@@ -88,7 +93,7 @@ func TransferTimeToInt64(s []string) (error, int64) {
 func GetInfoFromFilename(s, sep string) (error, map[string]interface{}) {
         sub := strings.Split(s, sep)
         var info map[string]interface{}
-        if ((sub[0] == "ts" && len(sub) != 13) || (sub[0] == "seg" && len(sub) != 11)) {
+        if ((sub[0] == "ts" && len(sub) != SEGMENT_FILENAME_SUB_LEN) || (sub[0] == "seg" && len(sub) != FRAGMENT_FILENAME_SUB_LEN)) {
                 return fmt.Errorf("the filename is error [%s]", s), info
         }
         //uid := sub[1]
