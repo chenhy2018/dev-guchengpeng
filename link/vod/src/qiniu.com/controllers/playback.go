@@ -15,6 +15,7 @@ func GetPlayBackm3u8(c *gin.Context) {
 	xl := xlog.New(c.Writer, c.Request)
 	params, err := ParseRequest(c, xl)
 	if err != nil {
+		xl.Errorf("parse request falied error = %#v", err.Error())
 		c.JSON(500, gin.H{
 			"error": err.Error(),
 		})
@@ -23,6 +24,7 @@ func GetPlayBackm3u8(c *gin.Context) {
 
 	fullUrl := "http://" + c.Request.Host + c.Request.URL.String()
 	if !VerifyToken(xl, params.expire, params.token, fullUrl, params.uid) {
+		xl.Errorf("verify token falied")
 		c.JSON(401, gin.H{
 			"error": "bad token",
 		})
@@ -31,7 +33,7 @@ func GetPlayBackm3u8(c *gin.Context) {
 	xl.Infof("uid= %v, uaid = %v, from = %v, to = %v", params.uid, params.uaid, time.Unix(params.from, 0), time.Unix(params.to, 0))
 
 	c.Header("Content-Type", "application/x-mpegURL")
-	segMod := &models.SegmentModel{}
+	segMod := &models.SegmentKodoModel{}
 	segs, err := segMod.GetSegmentTsInfo(xl, 0, 0, params.from*1000, params.to*1000, params.uid, params.uaid)
 	if len(segs) == 0 {
 		c.JSON(200, nil)

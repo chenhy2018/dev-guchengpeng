@@ -49,11 +49,11 @@ func (suite *PlayBackTestSuite) TestPlayBackWithoutExpire() {
 func (suite *PlayBackTestSuite) TestPlayBackWithoutToken() {
 	req, _ := http.NewRequest("GET", "/playback/13764829407/12345?from=1532499345&to=1532499345&e=1532499345", nil)
 	w := PerformRequest(suite.r, req)
-	suite.Equal(401, w.Code, "should be 401 for no token")
+	suite.Equal(500, w.Code, "should be 500 for no token")
 }
 
 func (suite *PlayBackTestSuite) TestPlayBack() {
-	req, _ := http.NewRequest("GET", "/playback/13764829407/12345?from=1532499345&to=1532499345&e=1532499345&token=fadsfasddfs", nil)
+	req, _ := http.NewRequest("GET", "/playback/13764829407/12345?from=1532499345&to=1532499345&e=1532499345&token=JAwTPb8dmrbiwt89Eaxa4VsL4_xSIYJoJh4rQfOQ:4ZNcW_AanSVccUmwq6MnA_8SWk8=", nil)
 	w := PerformRequest(suite.r, req)
 	suite.Equal(401, w.Code, "401 for bad token")
 }
