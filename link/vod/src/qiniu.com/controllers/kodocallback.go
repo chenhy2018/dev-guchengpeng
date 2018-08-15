@@ -2,11 +2,9 @@ package controllers
 
 import (
 	"encoding/json"
-	"fmt"
 	"io/ioutil"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/qiniu/api.v7/auth/qbox"
@@ -102,17 +100,7 @@ func UploadTs(c *gin.Context) {
 		})
 		return
 	}
-	/*
-		auth := strings.TrimRight(c.Request.Header.Get("Authorization"), "QBox ")
-		ak := strings.Split(auth, ":")[0]
-		segStartTime, err := strconv.ParseInt(ids[10], 10, 64)
-		segKey := []string{"seg", ids[1], ids[2], models.TransferTimeToString(segStartTime), strconv.FormatInt(endTime, 10)}
 
-
-			if err := redisdb.Set(strings.Join(segKey[:], "/")+"_ts", []string{strconv.FormatInt(endTime, 10), ak, kodoData.Bucket}, 0).Err(); err != nil {
-				xl.Errorf("insert to redis failed, error = %#v", err)
-			}
-	*/
 	c.JSON(200, gin.H{
 		"success": true,
 		"name":    key,
@@ -132,12 +120,10 @@ func updateTsName(srcTsKey, destTsKey, bucket, segPrefix string, endTime int64, 
 	marker := ""
 	force := true
 
-	beforeList := time.Now().UnixNano()
 	entries, _, _, _, err := bucketManager.ListFiles(bucket, segPrefix, delimiter, marker, limit)
 	if err != nil {
 		return
 	}
-	afterList := time.Now().UnixNano()
 
 	ops := make([]string, 0, 3)
 	var segAction string
@@ -150,12 +136,9 @@ func updateTsName(srcTsKey, destTsKey, bucket, segPrefix string, endTime int64, 
 
 	// udpate seg file expire time
 
-	storage.URIDeleteAfterDays(bucket, segPrefix+"/"+strconv.FormatInt(endTime, 10), expire)
 	ops = append(ops, segAction)
 	ops = append(ops, storage.URIMove(bucket, srcTsKey, bucket, destTsKey, force))
 	ops = append(ops, storage.URIDeleteAfterDays(bucket, segPrefix+"/"+strconv.FormatInt(endTime, 10), expire))
 	_, err = bucketManager.Batch(ops)
-	afterBatch := time.Now().UnixNano()
-	fmt.Printf("list spend = %dms, batch spend = %dms\n", (afterList-beforeList)/1000000, (afterBatch-afterList)/1000000)
 	return
 }
