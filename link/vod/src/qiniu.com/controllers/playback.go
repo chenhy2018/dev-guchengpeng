@@ -57,7 +57,7 @@ func GetPlayBackm3u8(c *gin.Context) {
 
 	var total int64
 	for _, v := range segs {
-		start, ok := v[models.SEGMENT_ITEM_END_TIME].(int64)
+		start, ok := v[models.SEGMENT_ITEM_START_TIME].(int64)
 		if !ok {
 			xl.Errorf("start time format error %#v", v)
 			c.JSON(500, nil)
