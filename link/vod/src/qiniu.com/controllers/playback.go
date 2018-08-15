@@ -59,5 +59,5 @@ func GetPlayBackm3u8(c *gin.Context) {
 		}
 	}
 
-	c.String(200, pPlaylist.String())
+	c.String(200, m3u8.Mkm3u8(playlist, xl))
 }
