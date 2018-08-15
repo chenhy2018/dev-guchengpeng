@@ -93,8 +93,10 @@ func TransferTimeToInt64(s []string) (error, int64) {
 func GetInfoFromFilename(s, sep string) (error, map[string]interface{}) {
         sub := strings.Split(s, sep)
         var info map[string]interface{}
+	
+	// some file just upload by IPC but not add endtime by controller, we just skip this file
         if ((sub[0] == "ts" && len(sub) != SEGMENT_FILENAME_SUB_LEN) || (sub[0] == "seg" && len(sub) != FRAGMENT_FILENAME_SUB_LEN)) {
-                return fmt.Errorf("the filename is error [%s]", s), info
+		return nil, info
         }
         //uid := sub[1]
         //uaid := sub[2]
@@ -110,7 +112,7 @@ func GetInfoFromFilename(s, sep string) (error, map[string]interface{}) {
                 info = map[string]interface{} {
                         SEGMENT_ITEM_START_TIME : starttime,
                         SEGMENT_ITEM_END_TIME : endtime,
-                        SEGMENT_ITEM_FILE_NAME : s,
+//                        SEGMENT_ITEM_FILE_NAME : s,
                 }
         } else {
                 fragmentStartTime, err2 := strconv.ParseInt(sub[11], 10, 64)
@@ -194,7 +196,7 @@ func (m *SegmentKodoModel) GetSegmentTsInfo(xl *xlog.Logger, index, rows int, st
         var r []map[string]interface{}
         delimiter := ""
         marker := ""
-        prefix := "7/" + uid + "/" + uaid + "/"
+        prefix := "ts/" + uid + "/" + uaid + "/"
         ctx, cancelFunc := context.WithCancel(context.Background())
         entries, err := bucketManager.ListBucketContext(ctx, bucket, prefix, delimiter, marker)
         if err != nil {
@@ -202,11 +204,14 @@ func (m *SegmentKodoModel) GetSegmentTsInfo(xl *xlog.Logger, index, rows int, st
         }
 
         for listItem1 := range entries {
-                err, info := GetOldInfoFromFilename(listItem1.Item.Key, "/")
+                err, info := GetInfoFromFilename(listItem1.Item.Key, "/")
                 if err != nil {
                         cancelFunc()
                         return r, err
                 }
+		if len(info) == 0 {
+			continue
+		}
                 if (info[SEGMENT_ITEM_END_TIME].(int64) > endtime) {
                         cancelFunc()
                         break;

@@ -43,30 +43,48 @@ func GetPlayBackm3u8(c *gin.Context) {
 
 	c.Header("Content-Type", "application/x-mpegURL")
 	segs, err := SegMod.GetSegmentTsInfo(xl, 0, 0, params.from*1000, params.to*1000, params.uid, params.uaid)
+	if err != nil {
+		xl.Errorf("getTsInfo error, error =  %v", err)
+		c.JSON(500, nil)
+		return
+	}
+
 	if len(segs) == 0 {
 		c.JSON(200, nil)
 		return
 	}
-
-	pPlaylist := new(m3u8.MediaPlaylist)
-	pPlaylist.Init(32, 32)
 	var playlist []map[string]interface{}
 
-	if err == nil {
-		var total int64
-		for _, v := range segs {
-			duration := float64(v[models.SEGMENT_ITEM_END_TIME].(int64)-v[models.SEGMENT_ITEM_START_TIME].(int64)) / 1000
-			total += int64(duration)
-			realUrl := GetUrlWithDownLoadToken(xl, "http://pcgtsa42m.bkt.clouddn.com/", v[models.SEGMENT_ITEM_FILE_NAME].(string), total)
-			pPlaylist.AppendSegment(realUrl, duration, params.uid)
-
-			m := map[string]interface{}{
-				"duration": duration,
-				"url":      realUrl,
-			}
-			playlist = append(playlist, m)
-
+	var total int64
+	for _, v := range segs {
+		start, ok := v[models.SEGMENT_ITEM_END_TIME].(int64)
+		if !ok {
+			xl.Errorf("start time format error %#v", v)
+			c.JSON(500, nil)
+			return
 		}
+		end, ok := v[models.SEGMENT_ITEM_END_TIME].(int64)
+		if !ok {
+			xl.Errorf("end time format error %#v", v)
+			c.JSON(500, nil)
+			return
+		}
+		duration := float64(end-start) / 1000
+		total += int64(duration)
+		filename, ok := v[models.SEGMENT_ITEM_FILE_NAME].(string)
+		if !ok {
+			xl.Errorf("filename format error %#v", v)
+			c.JSON(500, nil)
+			return
+		}
+		realUrl := GetUrlWithDownLoadToken(xl, "http://pcgtsa42m.bkt.clouddn.com/", filename, total)
+
+		m := map[string]interface{}{
+			"duration": duration,
+			"url":      realUrl,
+		}
+		playlist = append(playlist, m)
+
 	}
 
 	c.String(200, m3u8.Mkm3u8(playlist, xl))
