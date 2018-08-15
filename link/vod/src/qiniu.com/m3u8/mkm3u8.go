@@ -6,6 +6,7 @@ import (
     "errors"
     "math"
     "strconv"
+	xlog "github.com/qiniu/xlog.v1"
 )
 
 // MediaType for EXT-X-PLAYLIST-TYPE tag
@@ -195,7 +196,7 @@ func (p *MediaPlaylist) addEndlist ()  {
 }
 
 // Encode Generate output in M3U8 format. Marshal `winsize` elements from bottom of the `segments` queue.
-func (p *MediaPlaylist) MKm3u8() *bytes.Buffer {
+func (p *MediaPlaylist) mkM3u8() *bytes.Buffer {
     if p.buf.Len() > 0 {
         return &p.buf
     }
@@ -214,6 +215,19 @@ func (p *MediaPlaylist) MKm3u8() *bytes.Buffer {
 // For example fmt.Printf("%s", sampleMediaList) will encode
 // playist and print its string representation.
 func (p *MediaPlaylist) String() string {
-    return p.MKm3u8().String()
+    return p.mkM3u8().String()
+}
+
+func Mkm3u8( _segList []map[string]interface{}, _xl *xlog.Logger ) string  {
+    length := len( _segList )
+    pPlaylist := new( MediaPlaylist )
+    pPlaylist.Init( uint(length), uint(length) )
+	_xl.Infof("length = %v", length )
+    for _, v := range _segList {
+        url := v["url"].(string)
+        duration := v["duration"].(float64)
+        pPlaylist.AppendSegment( url, duration, "" )
+    }
+    return pPlaylist.String()
 }
 
