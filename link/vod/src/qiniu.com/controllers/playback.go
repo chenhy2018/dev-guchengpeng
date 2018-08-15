@@ -33,7 +33,7 @@ func GetPlayBackm3u8(c *gin.Context) {
 	xl.Infof("uid= %v, uaid = %v, from = %v, to = %v", params.uid, params.uaid, time.Unix(params.from, 0), time.Unix(params.to, 0))
 
 	c.Header("Content-Type", "application/x-mpegURL")
-	segMod := &models.SegmentModel{}
+	segMod := &models.SegmentKodoModel{}
 	segs, err := segMod.GetSegmentTsInfo(xl, 0, 0, params.from*1000, params.to*1000, params.uid, params.uaid)
 	if len(segs) == 0 {
 		c.JSON(200, nil)
