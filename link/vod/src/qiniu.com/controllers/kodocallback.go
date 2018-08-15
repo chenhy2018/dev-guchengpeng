@@ -143,7 +143,7 @@ func updateTsName(srcTsKey, destTsKey, bucket, segPrefix string, endTime int64, 
 	var segAction string
 	if len(entries) == 0 {
 		// create new seg file if doesn't exist
-		segAction = storage.URICopy(bucket, srcTsKey, bucket, segPrefix+"/"+strconv.FormatInt(endTime, 10), force)
+		segAction = storage.URICopy("string:pdhocuua3.bkt.clouddn.com", "tmpsegfile", bucket, segPrefix+"/"+strconv.FormatInt(endTime, 10), force)
 	} else {
 		segAction = storage.URIMove(bucket, entries[0].Key, bucket, segPrefix+"/"+strconv.FormatInt(endTime, 10), force)
 	}
