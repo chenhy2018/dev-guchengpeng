@@ -21,13 +21,13 @@ func GetPlayBackm3u8(c *gin.Context) {
 		return
 	}
 
-    fullUrl := "http://" + c.Request.Host + c.Request.URL.String()
-    if !VerifyToken(xl, params.expire, params.token, fullUrl, params.uid) {
-        c.JSON(401, gin.H{
-            "error": "bad token",
-        })
-        return
-    }
+	fullUrl := "http://" + c.Request.Host + c.Request.URL.String()
+	if !VerifyToken(xl, params.expire, params.token, fullUrl, params.uid) {
+		c.JSON(401, gin.H{
+			"error": "bad token",
+		})
+		return
+	}
 	xl.Infof("uid= %v, uaid = %v, from = %v, to = %v", params.uid, params.uaid, time.Unix(params.from, 0), time.Unix(params.to, 0))
 
 	c.Header("Content-Type", "application/x-mpegURL")
@@ -59,5 +59,5 @@ func GetPlayBackm3u8(c *gin.Context) {
 		}
 	}
 
-    c.String( 200, m3u8.Mkm3u8( playlist, xl ) )
+	c.String(200, m3u8.Mkm3u8(playlist, xl))
 }
