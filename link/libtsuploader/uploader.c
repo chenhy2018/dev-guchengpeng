@@ -5,10 +5,12 @@
 #include <sys/time.h>
 #include <pthread.h>
 #include "servertime.h"
+#include <time.h>
 
 size_t getDataCallback(void* buffer, size_t size, size_t n, void* rptr);
 
 #define TS_DIVIDE_LEN 4096
+//#define UPLOAD_SEG_INFO
 
 static char gUid[64];
 static char gDeviceId[64];
@@ -159,27 +161,48 @@ static void * streamUpload(void *_pOpaque)
         
         //segmentid(time)
         int64_t curTime = GetCurrentNanosecond();
+        // ts/uid/ua_id/yyyy/mm/dd/hh/mm/ss/mmm/fragment_start_ts/expiry.ts
+        time_t secs = curTime / 1000000000;
+        struct tm tm;
+        localtime_r(&secs, &tm);
         if ((curTime - nLastUploadTsTime) > 30 * 1000000000ll) {
                 nSegmentId = curTime;
+#ifdef UPLOAD_SEG_INFO
+                sprintf(key, "seg/%s/%s/%04d/%02d/%02d/%02d/%0d/%02d/%03d", gUid, gDeviceId,
+                        tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec,
+                        (int)(nSegmentId / 1000000)%1000);
+                Qiniu_Error segErr = Qiniu_Io_PutBuffer(&client, &putRet, uptoken, key, "", 0, NULL);
+                if (segErr.code != 200) {
+                        pUploader->state = TK_UPLOAD_FAIL;
+                        logerror("upload seg file %s:%s code:%d curl_error:%s kodo_error:%s", pUploader->bucketName_, key,
+                                 segErr.code, segErr.message,Qiniu_Buffer_CStr(&client.b));
+                        //debug_log(&client, error);
+                } else {
+                        pUploader->state = TK_UPLOAD_OK;
+                        logdebug("upload seg file %s: key:%s success", pUploader->bucketName_, key);
+                }
+#endif
         }
         nLastUploadTsTime = curTime;
+        
+        memset(key, 0, sizeof(key));
+        sprintf(key, "ts/%s/%s/%04d/%02d/%02d/%02d/%0d/%02d/%03d/%lld/%d.ts", gUid, gDeviceId,
+                tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec,
+                (int)(nSegmentId / 1000000)%1000, nSegmentId / 1000000, pUploader->deleteAfterDays_);
 #ifdef TK_STREAM_UPLOAD
-        sprintf(key, "%d/%s/%s/%lld/%lld.ts",pUploader->deleteAfterDays_, gUid, gDeviceId, nSegmentId / 1000000, curTime / 1000000);
         Qiniu_Error error = Qiniu_Io_PutStream(&client, &putRet, uptoken, key, pUploader, -1, getDataCallback, &putExtra);
 #else
-        sprintf(key, "%s_%s_%lld_%lld.ts", gUid, gDeviceId, pUploader->nSegmentId, pUploader->nFirstFrameTimestamp,
-                pUploader->nLastFrameTimestamp);
         Qiniu_Error error = Qiniu_Io_PutBuffer(&client, &putRet, uptoken, key, (const char*)pUploader->pTsData,
                                                pUploader->nTsDataLen, &putExtra);
 #endif
         if (error.code != 200) {
                 pUploader->state = TK_UPLOAD_FAIL;
-                logerror("upload file %s:%s code:%d curl_error:%s kodo_error:%s", pUploader->bucketName_, key,
+                logerror("upload ts file %s:%s code:%d curl_error:%s kodo_error:%s", pUploader->bucketName_, key,
                          error.code, error.message,Qiniu_Buffer_CStr(&client.b));
                 //debug_log(&client, error);
         } else {
                 pUploader->state = TK_UPLOAD_OK;
-                logdebug("upload file %s: key:%s success", pUploader->bucketName_, key);
+                logdebug("upload ts file %s: key:%s success", pUploader->bucketName_, key);
         }
 END:
         if (canFreeToken) {
