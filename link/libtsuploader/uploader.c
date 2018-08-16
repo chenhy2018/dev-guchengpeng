@@ -168,7 +168,7 @@ static void * streamUpload(void *_pOpaque)
         if ((curTime - nLastUploadTsTime) > 30 * 1000000000ll) {
                 nSegmentId = curTime;
 #ifdef UPLOAD_SEG_INFO
-                sprintf(key, "seg/%s/%s/%04d/%02d/%02d/%02d/%0d/%02d/%03d", gUid, gDeviceId,
+                sprintf(key, "seg/%s/%s/%04d/%02d/%02d/%02d/%02d/%02d/%03d", gUid, gDeviceId,
                         tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec,
                         (int)(nSegmentId / 1000000)%1000);
                 Qiniu_Error segErr = Qiniu_Io_PutBuffer(&client, &putRet, uptoken, key, "", 0, NULL);
