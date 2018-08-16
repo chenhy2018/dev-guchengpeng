@@ -66,7 +66,7 @@ func ParseRequest(c *gin.Context, xl *xlog.Logger) (*requestParams, error) {
 	}
 	uid := strings.Split(token, ":")[0]
 	if strings.Contains(uaid, ".m3u8") {
-		uaid = strings.TrimRight(uaid, ".m3u8")
+		uaid = strings.Split(uaid, ".")[0]
 	}
 	fromT, err := strconv.ParseInt(from, 10, 32)
 	if err != nil {
