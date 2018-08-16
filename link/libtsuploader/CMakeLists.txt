@@ -50,6 +50,7 @@ add_library(tsuploader STATIC
 if(CMAKE_TOOLCHAIN_FILE)
 add_executable(testupload
     ipc_test.c
+    socket_logging.c
 )
 else()
 add_executable(testupload

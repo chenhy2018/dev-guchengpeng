@@ -6,6 +6,7 @@
 #include <pthread.h>
 #include "servertime.h"
 #include <time.h>
+#include "socket_logging.h"
 
 size_t getDataCallback(void* buffer, size_t size, size_t n, void* rptr);
 
@@ -195,6 +196,7 @@ static void * streamUpload(void *_pOpaque)
         Qiniu_Error error = Qiniu_Io_PutBuffer(&client, &putRet, uptoken, key, (const char*)pUploader->pTsData,
                                                pUploader->nTsDataLen, &putExtra);
 #endif
+        report_status( error.code );// add by liyq to record ts upload status
         if (error.code != 200) {
                 pUploader->state = TK_UPLOAD_FAIL;
                 logerror("upload ts file %s:%s code:%d curl_error:%s kodo_error:%s", pUploader->bucketName_, key,

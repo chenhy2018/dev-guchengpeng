@@ -12,6 +12,7 @@
 #define LINE() printf("%s %s ------ %d \n", __FILE__, __FUNCTION__, __LINE__)
 #define DBG_LOG( args... ) BASIC();printf(args)
 #define DBG_ERROR( args... ) BASIC();printf("[ ERROR ] ");printf(args)
+DevSdkAudioType audio_type =  AUDIO_TYPE_AAC;
 
 static MediaStreamConfig gAjMediaStreamConfig = {0};
 char gtestToken[1024] = {0};
@@ -41,22 +42,43 @@ int AudioGetFrameCb( char *_pFrame, int _nLen, double _dTimeStamp,
                      unsigned long _nFrameIndex, void *_pContext )
 {
     static int first = 1;
-    static double last = 0, interval = 0;
-    int i = 0;
-    static int count = 0;
+    static double localTimeStamp = 0, timeStamp;
+    double diff = 0;
+    static double min=0, max=0;
+    int ret = 0;
+    static int total = 0, error = 0;
 
     if ( first == 1 ) {
         printf("++++++++ audio thread id %ld\n", pthread_self() );
+        localTimeStamp = _dTimeStamp;
         first = 0;
+    } else {
+        localTimeStamp += 40;
     }
 
-    DBG_LOG("_dTimeStamp = %f, _nLen = %d\n", _dTimeStamp, _nLen );
-    interval = _dTimeStamp - last;
-    if ( interval <= 0 ) {
-        DBG_ERROR("audio time interval : %f\n", interval );
+    /*DBG_LOG("localTimeStamp = %f\n", localTimeStamp );*/
+    diff = localTimeStamp - _dTimeStamp;
+    if ( min > diff ) {
+        min = diff;
     }
-    last = _dTimeStamp;
-    PushAudio( _pFrame, _nLen, (int64_t)_dTimeStamp );
+
+    if ( max < diff ) {
+        max = diff;
+    }
+
+    /*DBG_LOG("diff = %f, min = %f, max = %f\n", diff, min, max );*/
+    if ( audio_type = AUDIO_TYPE_AAC ) {
+        timeStamp = _dTimeStamp;
+    } else {
+        timeStamp = localTimeStamp;
+    }
+    ret = PushAudio( _pFrame, _nLen, (int64_t)timeStamp );
+    total++;
+    if ( ret != 0 ) {
+        DBG_ERROR("ret = %d\n", ret );
+        error++;
+    }
+
     return 0;
 }
 
@@ -78,7 +100,7 @@ static int InitIPC( )
     dev_sdk_get_AudioConfig( &audioConfig );
     DBG_LOG("audioConfig.audioEncode.enable = %d\n", audioConfig.audioEncode.enable );
     if ( audioConfig.audioEncode.enable ) {
-        dev_sdk_start_audio_play( AUDIO_TYPE_AAC );
+        dev_sdk_start_audio_play( audio_type );
         dev_sdk_start_audio( 0, 1, AudioGetFrameCb, NULL );
     } else {
         DBG_ERROR("not enabled\n");
@@ -100,9 +122,15 @@ int InitKodo()
     int ret = 0;
     AvArg avArg;
 
-    avArg.nAudioFormat = TK_AUDIO_PCMU;
-    avArg.nChannels = 1;
-    avArg.nSamplerate = 8000;
+    if ( audio_type == AUDIO_TYPE_AAC ) {
+        avArg.nAudioFormat = TK_AUDIO_AAC;
+        avArg.nChannels = 1;
+        avArg.nSamplerate = 16000;
+    } else {
+        avArg.nAudioFormat = TK_AUDIO_PCMU;
+        avArg.nChannels = 1;
+        avArg.nSamplerate = 8000;
+    }
     avArg.nVideoFormat = TK_VIDEO_H264;
 
     SetLogLevelToDebug();
@@ -113,11 +141,13 @@ int InitKodo()
     SetBucketName("ipcamera");
 
     ret = GetUploadToken(gtestToken, sizeof(gtestToken));
-    if (ret != 0)
-        return ret;
-
-    ret = InitUploader("testuid5", "testdeviceid5", gtestToken, &avArg);
     if (ret != 0) {
+        return ret;
+    }
+
+    ret = InitUploader("testuid10", "testdeviceid10", gtestToken, &avArg);
+    if (ret != 0) {
+        DBG_ERROR("InitUploader error\n");
         return ret;
     }
 
@@ -162,6 +192,7 @@ int main()
 
     DBG_LOG("compile tile : %s %s \n", __DATE__, __TIME__ );
 
+    socket_init();
     ret = InitKodo();
     if ( ret < 0 ) {
         DBG_ERROR("ret = %d\n",ret );
