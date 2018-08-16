@@ -1,4 +1,4 @@
-// Last Update:2018-08-16 15:21:08
+// Last Update:2018-08-16 17:17:01
 /**
  * @file socket_logging.h
  * @brief 
@@ -9,6 +9,12 @@
 
 #ifndef SOCKET_LOGGING_H
 #define SOCKET_LOGGING_H
+
+typedef struct {
+    int connecting;
+    int retrying;
+    int retry_count;
+} socket_status;
 
 extern int log_send( char *message );
 extern int log_send( char *message );
