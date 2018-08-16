@@ -70,6 +70,7 @@ int InitUploader(char * _pUid, char *_pDeviceId, char * _pToken, AvArg *_pAvArg)
         if (nProcStatus) {
                 return 0;
         }
+	setenv("TZ", "GMT-8", 1);
 
         Qiniu_Global_Init(-1);
 
