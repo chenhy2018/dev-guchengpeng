@@ -10,6 +10,7 @@ import (
 	"github.com/qiniu/api.v7/auth/qbox"
 	"github.com/qiniu/api.v7/storage"
 	xlog "github.com/qiniu/xlog.v1"
+	rpc "qiniupkg.com/x/rpc.v7"
 	//	redis "gopkg.in/redis.v5"
 	"qiniu.com/models"
 )
@@ -93,7 +94,7 @@ func UploadTs(c *gin.Context) {
 
 	segPrefix := strings.Join([]string{"seg", ids[1], ids[2], models.TransferTimeToString(segStart)}, "/")
 
-	if err := updateTsName(key, strings.Join(newFilName[:], "/"), kodoData.Bucket, segPrefix, endTime, int(tsExpire)); err != nil {
+	if err := updateTsName(xl, key, strings.Join(newFilName[:], "/"), kodoData.Bucket, segPrefix, endTime, int(tsExpire)); err != nil {
 		xl.Errorf("ts filename update failed err = %#v", err)
 		c.JSON(500, gin.H{
 			"error": "update ts file name failed",
@@ -107,7 +108,7 @@ func UploadTs(c *gin.Context) {
 	})
 }
 
-func updateTsName(srcTsKey, destTsKey, bucket, segPrefix string, endTime int64, expire int) (err error) {
+func updateTsName(xl *xlog.Logger, srcTsKey, destTsKey, bucket, segPrefix string, endTime int64, expire int) (err error) {
 	mac := qbox.NewMac(accessKey, secretKey)
 
 	cfg := storage.Config{
@@ -130,8 +131,10 @@ func updateTsName(srcTsKey, destTsKey, bucket, segPrefix string, endTime int64, 
 	if len(entries) == 0 {
 		// create new seg file if doesn't exist
 		segAction = storage.URICopy(bucket, "tmpsegfile", bucket, segPrefix+"/"+strconv.FormatInt(endTime, 10), force)
+		xl.Info("tmpsegfile---->", segPrefix+"/"+strconv.FormatInt(endTime, 10))
 	} else {
 		segAction = storage.URIMove(bucket, entries[0].Key, bucket, segPrefix+"/"+strconv.FormatInt(endTime, 10), force)
+		xl.Info(entries[0].Key, "---->", segPrefix+"/"+strconv.FormatInt(endTime, 10))
 	}
 
 	// udpate seg file expire time
@@ -139,6 +142,20 @@ func updateTsName(srcTsKey, destTsKey, bucket, segPrefix string, endTime int64, 
 	ops = append(ops, segAction)
 	ops = append(ops, storage.URIMove(bucket, srcTsKey, bucket, destTsKey, force))
 	ops = append(ops, storage.URIDeleteAfterDays(bucket, segPrefix+"/"+strconv.FormatInt(endTime, 10), expire))
-	_, err = bucketManager.Batch(ops)
+	rets, err := bucketManager.Batch(ops)
+
+	// check batch error
+	if err != nil {
+		if _, ok := err.(*rpc.ErrorInfo); ok {
+			for _, ret := range rets {
+				if ret.Code != 200 {
+					xl.Error(ret.Data.Error)
+				}
+			}
+
+		} else {
+			xl.Error("batch error, %s", err)
+		}
+	}
 	return
 }
