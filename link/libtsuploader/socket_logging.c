@@ -1,4 +1,4 @@
-// Last Update:2018-08-16 18:09:27
+// Last Update:2018-08-17 15:02:15
 /**
  * @file socket_logging.c
  * @brief 
@@ -30,7 +30,10 @@ int socket_init()
     char message[1000] , server_reply[2000];
     int ret = 0;
 
-    gStatus.retrying = 0;
+    if ( gsock != -1 ) {
+        DBG_LOG("close last sock\n");
+        close( gsock );
+    }
     gsock = socket(AF_INET , SOCK_STREAM , 0);
     if (gsock == -1) {
         DBG_LOG("Could not create socket\b");
@@ -92,6 +95,7 @@ int log_send( char *message )
         pthread_t thread;
 
         gStatus.retrying = 1;
+        DBG_LOG("start socket_reconnect_task\n");
         pthread_create( &thread, NULL, socket_reconnect_task, NULL );
     }
 
