@@ -68,15 +68,18 @@ func ParseRequest(c *gin.Context, xl *xlog.Logger) (*requestParams, error) {
 	if strings.Contains(uaid, ".m3u8") {
 		uaid = strings.Split(uaid, ".")[0]
 	}
-	fromT, err := strconv.ParseInt(from, 10, 32)
+	fromT, err := strconv.ParseInt(from, 10, 64)
 	if err != nil {
 		return nil, errors.New("Parse from time failed")
 	}
-	toT, err := strconv.ParseInt(to, 10, 32)
+	toT, err := strconv.ParseInt(to, 10, 64)
 	if err != nil {
 		return nil, errors.New("Parse to time failed")
 	}
-	expireT, err := strconv.ParseInt(expire, 10, 32)
+	if fromT >= toT {
+		return nil, errors.New("bad from/to time")
+	}
+	expireT, err := strconv.ParseInt(expire, 10, 64)
 	if err != nil {
 		return nil, errors.New("Parse expire time failed")
 	}
