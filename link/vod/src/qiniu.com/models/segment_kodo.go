@@ -18,6 +18,11 @@ var (
         cfg storage.Config
 )
 
+type Segment interface {
+        GetSegmentTsInfo(xl *xlog.Logger, index, rows int, starttime,endtime int64, uid,uaid string) ([]map[string]interface{}, error)
+        GetFragmentTsInfo(xl *xlog.Logger, index, rows int, starttime,endtime int64, uid,uaid string) ([]map[string]interface{}, error)
+}
+
 const (
         SEGMENT_FILENAME_SUB_LEN = 13
         FRAGMENT_FILENAME_SUB_LEN = 11
@@ -26,9 +31,9 @@ const (
 type SegmentKodoModel struct {
 }
 
-var (
-        KodoSegment *SegmentKodoModel
-)
+//var (
+//        KodoSegment *SegmentKodoModel
+//)
 
 //TODO AKSK should be get in packet
 func (m *SegmentKodoModel) Init() error {
@@ -162,21 +167,14 @@ func GetOldInfoFromFilename(s, sep string) (error, map[string]interface{}) {
 
 // Calculate prefix starttime list.
 // Return []yyyy/mm/dd, if same day and same hour, return [1]yyyy/mm/dd/hh
-func CalculatePrefixList(xl *xlog.Logger, index,days int, starttime,endtime int64) ([]string) {
+func CalculatePrefixList(xl *xlog.Logger, starttime,endtime int64) ([]string) {
         var str []string
         starttm := time.Unix(starttime / 1000 , starttime % 1000 * 1000000)
         endtm := time.Unix(endtime / 1000 , endtime % 1000 * 1000000)
-        if (index > 0) {
-                starttm = starttm.AddDate(0, 0, index)
-                if (starttm.Unix() > endtm.Unix()) {
-                        xl.Infof("index is too big %d", index)
-                        return str
-                }
-        }
 
         var prefix string
         if (starttm.Year() == endtm.Year() &&  starttm.Month() == endtm.Month() && starttm.Day() == endtm.Day()) {
-                if (starttm.Hour() == endtm.Hour() && index == 0) {
+                if (starttm.Hour() == endtm.Hour()) {
                         prefix = fmt.Sprintf("%04d/%02d/%02d/%02d", starttm.Year(), starttm.Month(), starttm.Day(), starttm.Hour())
                 } else {
                         prefix = fmt.Sprintf("%04d/%02d/%02d", starttm.Year(), starttm.Month(), starttm.Day())
@@ -193,17 +191,13 @@ func CalculatePrefixList(xl *xlog.Logger, index,days int, starttime,endtime int6
                         }
                         
                         starttm = starttm.AddDate(0, 0, 1)
-                        days--
-                        if (days <= 0) {
-                                return str
-                        }
                 }
         }
         return str
 }
 
 // Get Segment Ts info List.
-func (m *SegmentKodoModel) GetSegmentTsInfo(xl *xlog.Logger, index, days int, starttime,endtime int64, uid,uaid string) ([]map[string]interface{}, error) {
+func (m *SegmentKodoModel) GetSegmentTsInfo(xl *xlog.Logger, starttime,endtime int64, uid,uaid string) ([]map[string]interface{}, error) {
         //todo change to get aksk
         mac := qbox.NewMac(accessKey, secretKey)
         // 指定空间所在的区域，如果不指定将自动探测
@@ -215,7 +209,7 @@ func (m *SegmentKodoModel) GetSegmentTsInfo(xl *xlog.Logger, index, days int, st
         delimiter := ""
         marker := ""
         prefix := "ts/" + uid + "/" + uaid + "/"
-        prefix1 := CalculatePrefixList(xl, index, days, starttime, endtime)
+        prefix1 := CalculatePrefixList(xl, starttime, endtime)
         for count := 0; count < len(prefix1); count++ {
                 ctx, cancelFunc := context.WithCancel(context.Background())
                 xl.Infof("%s \n", prefix + prefix1[count])
@@ -253,7 +247,7 @@ func (m *SegmentKodoModel) GetSegmentTsInfo(xl *xlog.Logger, index, days int, st
 }
 
 // Get Fragment Ts info List.
-func (m *SegmentKodoModel) GetFragmentTsInfo(xl *xlog.Logger, index, days int, starttime,endtime int64, uid,uaid string) ([]map[string]interface{}, error) {
+func (m *SegmentKodoModel) GetFragmentTsInfo(xl *xlog.Logger, count int, starttime,endtime int64, uid,uaid,mark string) ([]map[string]interface{},string, error) {
         pre := time.Now().UnixNano()
         //todo change to get aksk
         mac := qbox.NewMac(accessKey, secretKey)
@@ -263,29 +257,43 @@ func (m *SegmentKodoModel) GetFragmentTsInfo(xl *xlog.Logger, index, days int, s
         bucketManager := storage.NewBucketManager(mac, &cfg)
         var r []map[string]interface{}
         delimiter := ""
+        num := 0
         marker := ""
+        total := 0
+        sub := strings.Split(mark, "/")
+        if (len(sub) == 2) {
+                index, err := strconv.Atoi(sub[0])
+                if (err != nil) {
+                        num = 0
+                        marker = ""
+                } else {
+                        num = index
+                        marker = sub[1]
+                }
+        }
         prefix := "seg/" + uid + "/" + uaid + "/"
-        prefix1 := CalculatePrefixList(xl, index, days, starttime, endtime)
-        
-        for count := 0; count < len(prefix1); count++ {
-                xl.Infof("%s \n", prefix + prefix1[count])
+        prefix1 := CalculatePrefixList(xl, starttime, endtime)
+
+        for ; num < len(prefix1); num++ {
+                xl.Infof("%s \n", prefix + prefix1[num])
                 ctx, cancelFunc := context.WithCancel(context.Background())
-                entries, err := bucketManager.ListBucketContext(ctx, bucket, prefix + prefix1[count], delimiter, marker)
+                entries, err := bucketManager.ListBucketContext(ctx, bucket, prefix + prefix1[num], delimiter, marker)
+                marker = ""
                 if err != nil {
                         xl.Errorf("GetFragmentTsInfo ListBucketContext %#v", err)
                         info := err.(*storage.ErrorInfo)
-                        if (info.Code ==200) {
-                                return r, nil
+                        if (info.Code == 200) {
+                                return r, "", nil
                         } else {
-                                return r, err
+                                return r, "", err
                         }
                 }
                 for listItem1 := range entries {
-                
+
                         err, info := GetInfoFromFilename(listItem1.Item.Key, "/")
                         if err != nil {
                                 cancelFunc()
-                                return r, err
+                                return r, "", err
                         }
                         if (info[SEGMENT_ITEM_END_TIME].(int64) > endtime) {
                                 cancelFunc()
@@ -294,8 +302,13 @@ func (m *SegmentKodoModel) GetFragmentTsInfo(xl *xlog.Logger, index, days int, s
                         if (info[SEGMENT_ITEM_START_TIME].(int64) > starttime) {
                                 r = append(r, info)
                         }
+                        total++
+                        if (total >= count && count != 0) {
+                                next := fmt.Sprintf("%d/%s", num, listItem1.Marker)
+                                return r, next, nil
+                        } 
                 }
         }
         xl.Infof("find fragment need %d ms\n", (time.Now().UnixNano() - pre) / 1000000)
-        return r, nil
+        return r, "",  nil
 }

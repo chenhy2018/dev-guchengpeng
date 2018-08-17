@@ -12,9 +12,9 @@ import (
 type SegmentModel struct {
 }
 
-var (
-        Segment *SegmentModel
-)
+//var (
+//        Segment *SegmentModel
+//)
 
 func (m *SegmentModel) Init() error {
         /*
@@ -46,6 +46,7 @@ type SegmentTsInfo struct {
         EndTime             int64  `bson:"endtime"            json:"endtime"`
         Expire              time.Time  `bson:"expireAt"           json:"expireAt"`
 }
+
 func (m *SegmentModel) AddSegmentTS(xl *xlog.Logger, req SegmentTsInfo) error {
         /*
                  collection.update({"_id": req.Uid + "." + req.UaId + "." + strconv.FormatInt(req.StartTime,10) },
@@ -137,7 +138,7 @@ func (m *SegmentModel) UpdateSegmentTSExpire(xl *xlog.Logger, uid,uaid string, s
         )
 }
 
-func (m *SegmentModel) GetSegmentTsInfo(xl *xlog.Logger, index, rows int, starttime,endtime int64, uid,uaid string) ([]map[string]interface{}, error) {
+func (m *SegmentModel) GetSegmentTsInfo(xl *xlog.Logger, starttime,endtime int64, uid,uaid string) ([]map[string]interface{}, error) {
 
         /*
                  db.collection.find(bson.M{"_id": {"$gte": uid + "." + uaid + ".", "$lte": uid + "." + uaid + "/"},
@@ -151,8 +152,8 @@ func (m *SegmentModel) GetSegmentTsInfo(xl *xlog.Logger, index, rows int, startt
                SEGMENT_ITEM_START_TIME : bson.M{ "$gte" : starttime},
                SEGMENT_ITEM_END_TIME : bson.M{ "$lte" :  endtime},
         }
-        skip := rows * index
-        limit := rows
+        skip := 0
+        limit := 0
         var r []map[string]interface{}
 
         err := db.WithCollection(
@@ -169,6 +170,7 @@ func (m *SegmentModel) GetSegmentTsInfo(xl *xlog.Logger, index, rows int, startt
         )
 	return r, err
 }
+
 func (m *SegmentModel) GetLastSegmentTsInfo(xl *xlog.Logger, uid,uaid string) (map[string]interface{}, error) {
         /*
                  db.collection.find( {"_id": {"$gte": uid + "." + uaid + ".", "$lte": uid + "." + uaid + "/"},
@@ -191,7 +193,7 @@ func (m *SegmentModel) GetLastSegmentTsInfo(xl *xlog.Logger, uid,uaid string) (m
         return r, err
 }
 
-func (m *SegmentModel) GetFragmentTsInfo(xl *xlog.Logger, index, rows int, starttime,endtime int64, uid,uaid string) ([]map[string]interface{}, error) {
+func (m *SegmentModel) GetFragmentTsInfo(xl *xlog.Logger, count int, starttime,endtime int64, uid,uaid,mark string) ([]map[string]interface{}, string, error) {
 
         /*
                  query ={
@@ -212,16 +214,21 @@ func (m *SegmentModel) GetFragmentTsInfo(xl *xlog.Logger, index, rows int, start
                  db.collection.aggregate(query)
         */
         // query by keywords
-        skip := rows * index
-        limit := rows
-        if (rows == 0) {
-              limit = 200
+        skip ,errS := strconv.Atoi(mark) 
+        if (errS != nil) {
+                skip = 0
+                xl.Infof("mark is invaild")
+        }
+        limit := count
+        if (limit == 0) {
+                limit = 65535
         }
         var r []map[string]interface{}
 
         err := db.WithCollection(
                 SEGMENT_COL,
                 func(c *mgo.Collection) error {
+                        
                         err := c.Pipe(
                                 []bson.M{
                                         {"$match": bson.M{
@@ -244,5 +251,8 @@ func (m *SegmentModel) GetFragmentTsInfo(xl *xlog.Logger, index, rows int, start
                         return nil
                  },
         )
-        return r, err
+        if (len(r) == limit) {
+                 return r, strconv.Itoa(len(r)), err
+        }
+        return r, "", err
 }

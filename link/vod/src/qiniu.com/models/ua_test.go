@@ -30,7 +30,7 @@ func TestUa(t *testing.T) {
         for count := 0; count < 100; count++ {
                         p := UaInfo{
                         Uid : "UserTest",
-                        UaId : fmt.Sprintf("daaa%2d", count),
+                        UaId : fmt.Sprintf("daaa%03d", count),
                         BucketUrl : "www.qiniu.io/test/",
                         RemainDays : int64(count),
                 }
@@ -47,14 +47,14 @@ func TestUa(t *testing.T) {
         for count := 0; count < 100; count++ {
                 assert.Equal(t, r[count].RemainDays, int64(count), "they should be equal") 
         }
-        model.UpdateRemaindays(xl, "UserTest", "daaa99", 1000000);
-        r_1, err_1 := model.GetUaInfo(xl, 0,0,UA_ITEM_UAID, "daaa99")
+        model.UpdateRemaindays(xl, "UserTest", "daaa099", 1000000);
+        r_1, err_1 := model.GetUaInfo(xl, 0,0,UA_ITEM_UAID, "daaa099")
         assert.Equal(t, err_1, nil, "they should be equal")
         size_1 := len(r_1)
         assert.Equal(t, size_1, 1, "they should be equal")
         assert.Equal(t, r_1[0].RemainDays, int64(1000000), "they should be equal")
         for count := 0; count < 100; count++ {
-                model.Delete(xl, "UserTest", fmt.Sprintf("daaa%d", count))
+                model.Delete(xl, "UserTest", fmt.Sprintf("daaa%03d", count))
         }
 }
 
@@ -83,7 +83,7 @@ func TestWrongPriUrl(t *testing.T) {
         for count := 0; count < 100; count++ {
                 p := UaInfo{
                         Uid : "UserTest",
-                        UaId : fmt.Sprintf("daaa%d", count),
+                        UaId : fmt.Sprintf("daaa%03d", count),
                         BucketUrl : "www.qiniu.io/test/",
                         RemainDays : int64(count),
                 }
@@ -96,4 +96,7 @@ func TestWrongPriUrl(t *testing.T) {
         assert.Equal(t, err, nil, "they should be equal")
         size := len(r)
         assert.Equal(t, size, 100, "they should be equal")
+        for count := 0; count < 100; count++ {
+                model.Delete(xl, "UserTest", fmt.Sprintf("daaa%03d", count))
+        }
 }
