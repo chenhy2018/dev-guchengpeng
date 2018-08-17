@@ -44,9 +44,6 @@ func TestUa(t *testing.T) {
         size := len(r)
         assert.Equal(t, size, 100, "they should be equal")
 
-        for count := 0; count < 100; count++ {
-                assert.Equal(t, r[count].RemainDays, int64(count), "they should be equal") 
-        }
         model.UpdateRemaindays(xl, "UserTest", "daaa099", 1000000);
         r_1, err_1 := model.GetUaInfo(xl, 0,0,UA_ITEM_UAID, "daaa099")
         assert.Equal(t, err_1, nil, "they should be equal")

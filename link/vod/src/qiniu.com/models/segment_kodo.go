@@ -43,9 +43,9 @@ func (m *SegmentKodoModel) Init() error {
 
 // time should be int64 to []string "yyyy/mm/dd/hh/mm/ss/mmm"
 func TransferTimeToString(date int64) (string) {
-        location, _ := time.LoadLocation("Asia/Shanghai")
+        //location, _ := time.LoadLocation("Asia/Shanghai")
         tm := time.Unix(date / 1000 , date % 1000 * 1000000)
-        tm = tm.In(location)
+        //tm = tm.In(location)
         return fmt.Sprintf("%04d/%02d/%02d/%02d/%02d/%02d/%03d", tm.Year(), tm.Month(), tm.Day(), tm.Hour(), tm.Minute(), tm.Second(), tm.Nanosecond() /1000000)
 }
 
@@ -166,8 +166,9 @@ func GetOldInfoFromFilename(s, sep string) (error, map[string]interface{}) {
 func CalculatePrefixList(xl *xlog.Logger, starttime,endtime int64) ([]string) {
         var str []string
         starttm := time.Unix(starttime / 1000 , starttime % 1000 * 1000000)
+        
         endtm := time.Unix(endtime / 1000 , endtime % 1000 * 1000000)
-
+        fmt.Printf("end time %04d/%02d/%02d  %d\n", endtm.Year(), endtm.Month(), endtm.Day(), endtime)
         var prefix string
         if (starttm.Year() == endtm.Year() &&  starttm.Month() == endtm.Month() && starttm.Day() == endtm.Day()) {
                 if (starttm.Hour() == endtm.Hour()) {
@@ -182,7 +183,7 @@ func CalculatePrefixList(xl *xlog.Logger, starttime,endtime int64) ([]string) {
                         prefix = fmt.Sprintf("%04d/%02d/%02d", starttm.Year(), starttm.Month(), starttm.Day())
                         fmt.Printf("%04d/%02d/%02d \n", starttm.Year(), starttm.Month(), starttm.Day())
                         str = append(str, prefix)
-                        if (starttm.Unix() > endtm.Unix()) {
+                        if (starttm.Year() == endtm.Year() &&  starttm.Month() == endtm.Month() && starttm.Day() == endtm.Day()) {
                                 return str
                         }
                         
@@ -214,7 +215,7 @@ func (m *SegmentKodoModel) GetSegmentTsInfo(xl *xlog.Logger, starttime,endtime i
                         xl.Errorf("GetSegmentTsInfo ListBucketContext %#v", err)
                         info := err.(*storage.ErrorInfo)
                         if (info.Code == 200) {
-                                return r, nil
+                                continue
                         } else {
                                 return r, err
                         }
@@ -238,7 +239,7 @@ func (m *SegmentKodoModel) GetSegmentTsInfo(xl *xlog.Logger, starttime,endtime i
                         }
                 }
         }
-        xl.Infof("find fragment need %d ms", (time.Now().UnixNano() - pre) / 1000000)
+        xl.Infof("find segment need %d ms", (time.Now().UnixNano() - pre) / 1000000)
         return r, nil
 }
 
@@ -279,7 +280,7 @@ func (m *SegmentKodoModel) GetFragmentTsInfo(xl *xlog.Logger, count int, startti
                         xl.Errorf("GetFragmentTsInfo ListBucketContext %#v", err)
                         info := err.(*storage.ErrorInfo)
                         if (info.Code == 200) {
-                                return r, "", nil
+                                continue
                         } else {
                                 return r, "", err
                         }

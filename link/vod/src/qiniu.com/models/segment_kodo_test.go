@@ -74,8 +74,9 @@ func TestKodoSegment(t *testing.T) {
                 assert.Equal(t, arr[i], test, "they should be equal")
         }
 
-        infos, err4 = model.GetSegmentTsInfo(xl, int64(1533783079678), int64(1533783076489), "testuid", "testdeviceid")
+        infos, err4 = model.GetSegmentTsInfo(xl, int64(1534414484000), int64(1534500884000), "testuid10", "testdeviceid10")
         assert.Equal(t, err4, nil, "they should be equal")
+        assert.Equal(t, 12026, len(infos), "they should be equal")
         // filename should be seg/uid/ua_id/yyyy/mm/dd/hh/mm/ss/mmm/endts
         infoF, markF,  errF := model.GetFragmentTsInfo(xl, 0, int64(1534385684000), int64(1534472084000), "testuid5", "testdeviceid5", "")
         assert.Equal(t, errF, nil, "they should be equal")
@@ -91,4 +92,8 @@ func TestKodoSegment(t *testing.T) {
         infoF, markF,  errF = model.GetFragmentTsInfo(xl, 10, int64(1534385684000), int64(1534472084000), "testuid5", "testdeviceid5", markF)
         assert.Equal(t, errF, nil, "they should be equal")
         assert.Equal(t, len(infoF), 8, "they should be equal")
+
+        infoF, markF,  errF = model.GetFragmentTsInfo(xl, 0, int64(1534443284000), int64(1534500884000), "testuid10", "testdeviceid10", "")
+        assert.Equal(t, errF, nil, "they should be equal")
+        assert.Equal(t, len(infoF), 10, "they should be equal")
 }
