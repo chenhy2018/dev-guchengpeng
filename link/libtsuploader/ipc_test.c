@@ -145,7 +145,7 @@ int InitKodo()
         return ret;
     }
 
-    ret = InitUploader("testuid9", "testdeviceid9", gtestToken, &avArg);
+    ret = InitUploader("testuid10", "testdeviceid10", gtestToken, &avArg);
     if (ret != 0) {
         DBG_ERROR("InitUploader error\n");
         return ret;

@@ -62,9 +62,6 @@ void *socket_reconnect_task( void * arg )
     gStatus.retry_count = 0;
 
     while ( gStatus.retrying && !gStatus.connecting ) {
-        if ( !gsock ) {
-            return NULL;
-        }
 
         ret = socket_init();
         if ( ret < 0 ) {
