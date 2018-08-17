@@ -142,7 +142,7 @@ func (m *uaModel) GetUaInfo(xl *xlog.Logger, index, rows int, category, like str
                 UA_COL,
                 func(c *mgo.Collection) error {
                         var err error
-                        if err = c.Find(query).Sort(UA_ITEM_DATE).Skip(skip).Limit(limit).All(&r); err != nil {
+                        if err = c.Find(query).Sort(UA_ITEM_UID).Skip(skip).Limit(limit).All(&r); err != nil {
                                 return fmt.Errorf("query failed")
                         }
                         if count, err = c.Find(query).Count(); err != nil {

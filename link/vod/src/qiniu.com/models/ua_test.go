@@ -30,7 +30,7 @@ func TestUa(t *testing.T) {
         for count := 0; count < 100; count++ {
                         p := UaInfo{
                         Uid : "UserTest",
-                        UaId : fmt.Sprintf("daaa%d", count),
+                        UaId : fmt.Sprintf("daaa%2d", count),
                         BucketUrl : "www.qiniu.io/test/",
                         RemainDays : int64(count),
                 }

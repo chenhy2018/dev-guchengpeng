@@ -15,7 +15,7 @@ var (
         accessKey = "JAwTPb8dmrbiwt89Eaxa4VsL4_xSIYJoJh4rQfOQ"
         secretKey = "G5mtjT3QzG4Lf7jpCAN5PZHrGeoSH9jRdC96ecYS"
         bucket    = "ipcamera"
-        bucketManager *storage.BucketManager
+        cfg storage.Config
 )
 
 const (
@@ -32,22 +32,19 @@ var (
 
 //TODO AKSK should be get in packet
 func (m *SegmentKodoModel) Init() error {
-        mac := qbox.NewMac(accessKey, secretKey)
 
-        cfg := storage.Config{
+        cfg = storage.Config{
                 // 是否使用https域名进行资源管理
                 UseHTTPS: false,
         }
-        // 指定空间所在的区域，如果不指定将自动探测
-        // 如果没有特殊需求，默认不需要指定
-        //cfg.Zone=&storage.ZoneHuabei
-        bucketManager = storage.NewBucketManager(mac, &cfg)
         return nil;
 }
 
 // time should be int64 to []string "yyyy/mm/dd/hh/mm/ss/mmm"
 func TransferTimeToString(date int64) (string) {
+        location, _ := time.LoadLocation("Asia/Shanghai")
         tm := time.Unix(date / 1000 , date % 1000 * 1000000)
+        tm = tm.In(location)
         return fmt.Sprintf("%04d/%02d/%02d/%02d/%02d/%02d/%03d", tm.Year(), tm.Month(), tm.Day(), tm.Hour(), tm.Minute(), tm.Second(), tm.Nanosecond() /1000000)
 }
 
@@ -84,7 +81,8 @@ func TransferTimeToInt64(s []string) (error, int64) {
         if (err6 != nil) {
                  return fmt.Errorf("start time:  parser millisecond is error [%s]", s), int64(0)
         }
-        t := time.Date( int(year), time.Month(month), int(day), int(hour), int(minute), int(second), int(millisecond*1000000), time.UTC)
+        location, _ := time.LoadLocation("Asia/Shanghai")
+        t := time.Date( int(year), time.Month(month), int(day), int(hour), int(minute), int(second), int(millisecond*1000000), location)
         return nil, t.UnixNano() / 1000000
 }
 
@@ -164,13 +162,21 @@ func GetOldInfoFromFilename(s, sep string) (error, map[string]interface{}) {
 
 // Calculate prefix starttime list.
 // Return []yyyy/mm/dd, if same day and same hour, return [1]yyyy/mm/dd/hh
-func CalculatePrefixList(starttime,endtime int64) ([]string) {
+func CalculatePrefixList(xl *xlog.Logger, index,days int, starttime,endtime int64) ([]string) {
         var str []string
         starttm := time.Unix(starttime / 1000 , starttime % 1000 * 1000000)
         endtm := time.Unix(endtime / 1000 , endtime % 1000 * 1000000)
+        if (index > 0) {
+                starttm = starttm.AddDate(0, 0, index)
+                if (starttm.Unix() > endtm.Unix()) {
+                        xl.Infof("index is too big %d", index)
+                        return str
+                }
+        }
+
         var prefix string
         if (starttm.Year() == endtm.Year() &&  starttm.Month() == endtm.Month() && starttm.Day() == endtm.Day()) {
-                if (starttm.Hour() == endtm.Hour()) {
+                if (starttm.Hour() == endtm.Hour() && index == 0) {
                         prefix = fmt.Sprintf("%04d/%02d/%02d/%02d", starttm.Year(), starttm.Month(), starttm.Day(), starttm.Hour())
                 } else {
                         prefix = fmt.Sprintf("%04d/%02d/%02d", starttm.Year(), starttm.Month(), starttm.Day())
@@ -180,65 +186,99 @@ func CalculatePrefixList(starttime,endtime int64) ([]string) {
         } else {
                 for {
                         prefix = fmt.Sprintf("%04d/%02d/%02d", starttm.Year(), starttm.Month(), starttm.Day())
+                        fmt.Printf("%04d/%02d/%02d \n", starttm.Year(), starttm.Month(), starttm.Day())
                         str = append(str, prefix)
                         if (starttm.Unix() > endtm.Unix()) {
                                 return str
                         }
+                        
                         starttm = starttm.AddDate(0, 0, 1)
+                        days--
+                        if (days <= 0) {
+                                return str
+                        }
                 }
         }
         return str
 }
 
 // Get Segment Ts info List.
-func (m *SegmentKodoModel) GetSegmentTsInfo(xl *xlog.Logger, index, rows int, starttime,endtime int64, uid,uaid string) ([]map[string]interface{}, error) {
+func (m *SegmentKodoModel) GetSegmentTsInfo(xl *xlog.Logger, index, days int, starttime,endtime int64, uid,uaid string) ([]map[string]interface{}, error) {
+        //todo change to get aksk
+        mac := qbox.NewMac(accessKey, secretKey)
+        // 指定空间所在的区域，如果不指定将自动探测
+        // 如果没有特殊需求，默认不需要指定
+        //cfg.Zone=&storage.ZoneHuabei
+        bucketManager := storage.NewBucketManager(mac, &cfg)
         pre := time.Now().UnixNano()
         var r []map[string]interface{}
         delimiter := ""
         marker := ""
         prefix := "ts/" + uid + "/" + uaid + "/"
-        ctx, cancelFunc := context.WithCancel(context.Background())
-        entries, err := bucketManager.ListBucketContext(ctx, bucket, prefix, delimiter, marker)
-        if err != nil {
-                return r, err
-        }
-
-        for listItem1 := range entries {
-                err, info := GetInfoFromFilename(listItem1.Item.Key, "/")
+        prefix1 := CalculatePrefixList(xl, index, days, starttime, endtime)
+        for count := 0; count < len(prefix1); count++ {
+                ctx, cancelFunc := context.WithCancel(context.Background())
+                xl.Infof("%s \n", prefix + prefix1[count])
+                entries, err := bucketManager.ListBucketContext(ctx, bucket, prefix + prefix1[count], delimiter, marker)
                 if err != nil {
-                        cancelFunc()
-                        return r, err
+                        xl.Errorf("GetSegmentTsInfo ListBucketContext %#v", err)
+                        info := err.(*storage.ErrorInfo)
+                        if (info.Code == 200) {
+                                return r, nil
+                        } else {
+                                return r, err
+                        }
                 }
-		if len(info) == 0 {
-			continue
-		}
-                if (info[SEGMENT_ITEM_END_TIME].(int64) > endtime) {
-                        cancelFunc()
-                        break;
-                }
-                if (info[SEGMENT_ITEM_START_TIME].(int64) > starttime) {
-                        r = append(r, info)
+
+                for listItem1 := range entries {
+                        err, info := GetInfoFromFilename(listItem1.Item.Key, "/")
+                        if err != nil {
+                                cancelFunc()
+                                return r, err
+                        }
+		        if len(info) == 0 {
+			        continue
+		        }
+                        if (info[SEGMENT_ITEM_END_TIME].(int64) > endtime) {
+                                cancelFunc()
+                                break;
+                        }
+                        if (info[SEGMENT_ITEM_START_TIME].(int64) > starttime) {
+                                r = append(r, info)
+                        }
                 }
         }
-        
         xl.Infof("find fragment need %d ms", (time.Now().UnixNano() - pre) / 1000000)
-        return r, err
+        return r, nil
 }
 
 // Get Fragment Ts info List.
-func (m *SegmentKodoModel) GetFragmentTsInfo(xl *xlog.Logger, index, rows int, starttime,endtime int64, uid,uaid string) ([]map[string]interface{}, error) {
+func (m *SegmentKodoModel) GetFragmentTsInfo(xl *xlog.Logger, index, days int, starttime,endtime int64, uid,uaid string) ([]map[string]interface{}, error) {
         pre := time.Now().UnixNano()
+        //todo change to get aksk
+        mac := qbox.NewMac(accessKey, secretKey)
+        // 指定空间所在的区域，如果不指定将自动探测
+        // 如果没有特殊需求，默认不需要指定
+        //cfg.Zone=&storage.ZoneHuabei
+        bucketManager := storage.NewBucketManager(mac, &cfg)
         var r []map[string]interface{}
         delimiter := ""
         marker := ""
         prefix := "seg/" + uid + "/" + uaid + "/"
-        prefix1 := CalculatePrefixList(starttime,endtime)
+        prefix1 := CalculatePrefixList(xl, index, days, starttime, endtime)
         
         for count := 0; count < len(prefix1); count++ {
+                xl.Infof("%s \n", prefix + prefix1[count])
                 ctx, cancelFunc := context.WithCancel(context.Background())
-                entries, err := bucketManager.ListBucketContext(ctx, bucket, prefix, delimiter, marker)
+                entries, err := bucketManager.ListBucketContext(ctx, bucket, prefix + prefix1[count], delimiter, marker)
                 if err != nil {
-                        return r, err
+                        xl.Errorf("GetFragmentTsInfo ListBucketContext %#v", err)
+                        info := err.(*storage.ErrorInfo)
+                        if (info.Code ==200) {
+                                return r, nil
+                        } else {
+                                return r, err
+                        }
                 }
                 for listItem1 := range entries {
                 
