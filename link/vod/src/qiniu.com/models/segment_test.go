@@ -77,6 +77,16 @@ func TestSegment(t *testing.T) {
         assert.Equal(t, r1[1]["starttime"], int64(100))
         assert.Equal(t, r1[1]["endtime"], int64(200))
 
+        r1, mark, err1 = model.GetFragmentTsInfo(xl, 1, int64(0), int64(150), "UserTest", "dev001", "0")
+        assert.Equal(t, err1, nil, "they should be equal")
+        assert.Equal(t, mark, "1", "they should be equal")
+        assert.Equal(t, len(r1), 1, "they should be equal")
+
+        r1, mark, err1 = model.GetFragmentTsInfo(xl, 2, int64(0), int64(150), "UserTest", "dev001", mark)
+        assert.Equal(t, err1, nil, "they should be equal")
+        assert.Equal(t, mark, "", "they should be equal")
+        assert.Equal(t, len(r1), 1, "they should be equal")
+
         // Get segment from start time 0 to end time 150. only get 0 - 50 count.
         r_1, err_1 := model.GetSegmentTsInfo(xl, int64(0), int64(150), "UserTest", "dev001")
         assert.Equal(t, err_1, nil, "they should be equal")

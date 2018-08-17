@@ -31,10 +31,6 @@ const (
 type SegmentKodoModel struct {
 }
 
-//var (
-//        KodoSegment *SegmentKodoModel
-//)
-
 //TODO AKSK should be get in packet
 func (m *SegmentKodoModel) Init() error {
 
@@ -212,7 +208,7 @@ func (m *SegmentKodoModel) GetSegmentTsInfo(xl *xlog.Logger, starttime,endtime i
         prefix1 := CalculatePrefixList(xl, starttime, endtime)
         for count := 0; count < len(prefix1); count++ {
                 ctx, cancelFunc := context.WithCancel(context.Background())
-                xl.Infof("%s \n", prefix + prefix1[count])
+                xl.Infof("GetSegmentTsInfo prefix %s \n", prefix + prefix1[count])
                 entries, err := bucketManager.ListBucketContext(ctx, bucket, prefix + prefix1[count], delimiter, marker)
                 if err != nil {
                         xl.Errorf("GetSegmentTsInfo ListBucketContext %#v", err)
@@ -275,7 +271,7 @@ func (m *SegmentKodoModel) GetFragmentTsInfo(xl *xlog.Logger, count int, startti
         prefix1 := CalculatePrefixList(xl, starttime, endtime)
 
         for ; num < len(prefix1); num++ {
-                xl.Infof("%s \n", prefix + prefix1[num])
+                xl.Infof("GetFragmentTsInfo prefix  %s \n", prefix + prefix1[num])
                 ctx, cancelFunc := context.WithCancel(context.Background())
                 entries, err := bucketManager.ListBucketContext(ctx, bucket, prefix + prefix1[num], delimiter, marker)
                 marker = ""

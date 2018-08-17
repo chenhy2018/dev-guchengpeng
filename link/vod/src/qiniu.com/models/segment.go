@@ -12,10 +12,6 @@ import (
 type SegmentModel struct {
 }
 
-//var (
-//        Segment *SegmentModel
-//)
-
 func (m *SegmentModel) Init() error {
         /*
              index := Index{
