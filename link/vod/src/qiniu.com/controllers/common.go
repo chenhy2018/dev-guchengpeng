@@ -25,6 +25,8 @@ type requestParams struct {
 	to     int64
 	expire int64
 	token  string
+	limit  int
+	marker string
 }
 
 func VerifyAuth(xl *xlog.Logger, req *http.Request) (bool, error) {
@@ -60,6 +62,8 @@ func ParseRequest(c *gin.Context, xl *xlog.Logger) (*requestParams, error) {
 	to := c.Query("to")
 	expire := c.Query("e")
 	token := c.Query("token")
+	limit := c.DefaultQuery("limit", "1000")
+	marker := c.DefaultQuery("marker", "")
 	splitedToken := strings.Split(token, ":")
 	if len(splitedToken) < 2 {
 		return nil, errors.New("invalid token")
@@ -83,7 +87,13 @@ func ParseRequest(c *gin.Context, xl *xlog.Logger) (*requestParams, error) {
 	if err != nil {
 		return nil, errors.New("Parse expire time failed")
 	}
-
+	limitT, err := strconv.ParseInt(limit, 10, 32)
+	if err != nil {
+		return nil, errors.New("Parse expire time failed")
+	}
+	if limitT > 1000 {
+		limitT = 1000
+	}
 	params := &requestParams{
 		uid:    uid,
 		uaid:   uaid,
@@ -91,6 +101,8 @@ func ParseRequest(c *gin.Context, xl *xlog.Logger) (*requestParams, error) {
 		to:     toT,
 		expire: expireT,
 		token:  token,
+		limit:  int(limitT),
+		marker: marker,
 	}
 
 	return params, nil

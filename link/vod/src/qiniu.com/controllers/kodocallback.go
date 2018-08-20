@@ -1,6 +1,8 @@
 package controllers
 
 import (
+	"bytes"
+	"context"
 	"encoding/json"
 	"io/ioutil"
 	"strconv"
@@ -116,34 +118,48 @@ func updateTsName(xl *xlog.Logger, srcTsKey, destTsKey, bucket, segPrefix string
 	}
 	bucketManager := storage.NewBucketManager(mac, &cfg)
 
-	limit := 1
 	delimiter := ""
 	marker := ""
 	force := true
-
+	limit := 1000
+	// list seg file by segment id
 	entries, _, _, _, err := bucketManager.ListFiles(bucket, segPrefix, delimiter, marker, limit)
 	if err != nil {
 		return
 	}
 
-	ops := make([]string, 0, 3)
+	ops := []string{}
 	var segAction string
+	newSegName := segPrefix + "/" + strconv.FormatInt(endTime, 10)
 	if len(entries) == 0 {
 		// create new seg file if doesn't exist
-		segAction = storage.URICopy(bucket, "tmpsegfile", bucket, segPrefix+"/"+strconv.FormatInt(endTime, 10), force)
-		xl.Info("tmpsegfile---->", segPrefix+"/"+strconv.FormatInt(endTime, 10))
+		if err := createNewsegFile(newSegName, bucket, mac); err != nil {
+			xl.Errorf("create seg file error, err = %#v", err)
+		}
+		xl.Info("create new seg file file name =%#v", newSegName)
 	} else {
-		segAction = storage.URIMove(bucket, entries[0].Key, bucket, segPrefix+"/"+strconv.FormatInt(endTime, 10), force)
-		xl.Info(entries[0].Key, "---->", segPrefix+"/"+strconv.FormatInt(endTime, 10))
+		// in some bad case if first two ts files arrived at same time, we
+		// may create two seg file. we should make sure only one seg file
+		// exist for current segment
+
+		// update one seg file endtime
+		ops = append(ops, storage.URIMove(bucket, entries[0].Key, bucket, newSegName, force))
+		// udpate seg file expire time
+		ops = append(ops, storage.URIDeleteAfterDays(bucket, segPrefix+"/"+strconv.FormatInt(endTime, 10), expire))
+		xl.Info(entries[0].Key, "---->", newSegName)
+
+		// delete other files
+		for i := 1; i < len(entries); i++ {
+			segAction = storage.URIDelete(bucket, entries[i].Key)
+			ops = append(ops, segAction)
+			xl.Info("delete file = ", entries[i])
+		}
 	}
 
-	// udpate seg file expire time
-
-	ops = append(ops, segAction)
+	// add endtime for ts file
 	ops = append(ops, storage.URIMove(bucket, srcTsKey, bucket, destTsKey, force))
-	ops = append(ops, storage.URIDeleteAfterDays(bucket, segPrefix+"/"+strconv.FormatInt(endTime, 10), expire))
-	rets, err := bucketManager.Batch(ops)
 
+	rets, err := bucketManager.Batch(ops)
 	// check batch error
 	if err != nil {
 		if _, ok := err.(*rpc.ErrorInfo); ok {
@@ -154,8 +170,32 @@ func updateTsName(xl *xlog.Logger, srcTsKey, destTsKey, bucket, segPrefix string
 			}
 
 		} else {
-			xl.Error("batch error, %s", err)
+			xl.Errorf("batch error, %#v", err)
 		}
 	}
 	return
+}
+
+func createNewsegFile(filename, bucket string, mac *qbox.Mac) error {
+
+	putPolicy := storage.PutPolicy{
+		Scope: bucket,
+	}
+
+	upToken := putPolicy.UploadToken(mac)
+
+	cfg := storage.Config{}
+	// 空间对应的机房
+	//cfg.Zone = &storage.ZoneHuadong
+	// 是否使用https域名
+	cfg.UseHTTPS = false
+	// 上传是否使用CDN上传加速
+	cfg.UseCdnDomains = false
+
+	formUploader := storage.NewFormUploader(&cfg)
+	ret := storage.PutRet{}
+	putExtra := storage.PutExtra{}
+
+	data := []byte{}
+	return formUploader.Put(context.Background(), &ret, upToken, filename, bytes.NewReader(data), 0, &putExtra)
 }
