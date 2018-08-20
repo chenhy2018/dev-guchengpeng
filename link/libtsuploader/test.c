@@ -3,6 +3,7 @@
 #include <assert.h>
 #include <sys/time.h>
 #include <unistd.h>
+#include <signal.h>
 #include "tsuploaderapi.h"
 #include "adts.h"
 AvArg avArg;
@@ -11,7 +12,7 @@ typedef int (*DataCallback)(void *opaque, void *pData, int nDataLen, int nFlag, 
 #define THIS_IS_AUDIO 1
 #define THIS_IS_VIDEO 2
 #define TEST_AAC 1
-#define TEST_AAC_NO_ADTS 1
+//#define TEST_AAC_NO_ADTS 1
 #define USE_LINK_ACC 1
 
 #define INPUT_FROM_FFMPEG
@@ -392,6 +393,7 @@ int start_ffmpeg_test(char * _pUrl, DataCallback callback, void *opaque)
         if (ret != 0) {
                 char msg[128] = {0};
                 av_strerror(ret, msg, sizeof(msg)) ;
+                printf("ffmpeg err:%s\n", msg);
                 return ret;
         }
         
@@ -519,6 +521,10 @@ static void * upadateToken() {
         return NULL;
 }
 
+void signalHander(int s){
+        UninitUploader();
+        exit(0);
+}
 
 int main(int argc, char* argv[])
 {
@@ -533,6 +539,7 @@ int main(int argc, char* argv[])
         avformat_network_init();
 #endif
         SetLogLevelToDebug();
+        signal(SIGINT, signalHander);
         
         pthread_t updateTokenThread;
         pthread_attr_t attr;
