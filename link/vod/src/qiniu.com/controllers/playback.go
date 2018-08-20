@@ -45,7 +45,7 @@ func GetPlayBackm3u8(c *gin.Context) {
 	if (params.to - params.from) > dayInSec {
 		xl.Errorf("bad from/to time, from = %v, to = %v", params.from, params.to)
 		c.JSON(500, gin.H{
-			"error": "bad from/to time",
+			"error": "bad from/to time, currently we only support playback in 24 hours",
 		})
 		return
 	}
