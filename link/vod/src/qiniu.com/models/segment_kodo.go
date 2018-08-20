@@ -261,13 +261,23 @@ func (m *SegmentKodoModel) GetFragmentTsInfo(xl *xlog.Logger, count int, startti
         if (len(sub) == 2) {
                 index, err := strconv.Atoi(sub[0])
                 if (err != nil) {
+                        xl.Errorf("parse marker error, marke = %#v, err = %#v", mark, err)
                         num = 0
                         marker = ""
                 } else {
                         num = index
                         marker = sub[1]
                 }
+        } else if (len(sub) == 1) {
+                index, err := strconv.Atoi(sub[0])
+                if (err != nil) {
+                        num = 0
+                        marker = ""
+                } else {
+                        num = index
+                }
         }
+
         prefix := "seg/" + uid + "/" + uaid + "/"
         prefix1 := CalculatePrefixList(xl, starttime, endtime)
 
@@ -298,9 +308,12 @@ func (m *SegmentKodoModel) GetFragmentTsInfo(xl *xlog.Logger, count int, startti
                         }
                         if (info[SEGMENT_ITEM_START_TIME].(int64) > starttime) {
                                 r = append(r, info)
+                                total++
                         }
-                        total++
                         if (total >= count && count != 0) {
+                                if (listItem1.Marker == "") {
+                                        num++
+                                }
                                 next := fmt.Sprintf("%d/%s", num, listItem1.Marker)
                                 return r, next, nil
                         } 
