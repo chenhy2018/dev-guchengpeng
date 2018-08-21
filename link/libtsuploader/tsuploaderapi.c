@@ -70,18 +70,20 @@ int InitUploader(char * _pUid, char *_pDeviceId, char * _pToken, AvArg *_pAvArg)
         if (nProcStatus) {
                 return 0;
         }
-	setenv("TZ", "GMT-8", 1);
+        setenv("TZ", "GMT-8", 1);
 
         Qiniu_Global_Init(-1);
 
         int ret = 0;
         ret = InitTime();
         if (ret != 0) {
-                return ret;
+                logerror("gettime from server fail:%d", ret);
+                return TK_HTTP_TIME;
         }
         ret = pthread_mutex_init(&gToken.tokenMutex_, NULL);
         if (ret != 0) {
-                return ret;
+                logerror("pthread_mutex_init error:%d", ret);
+                return TK_MUTEX_ERROR;
         }
 
         if (_pToken != NULL) {

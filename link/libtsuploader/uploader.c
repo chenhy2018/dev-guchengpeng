@@ -97,6 +97,32 @@ static void setToken(TsUploader* _pUploader, char *_pToken)
         pKodoUploader->pToken_ = _pToken;
 }
 
+static char * getErrorMsg(const char *_pJson, char *_pBuf, int _nBufLen)
+{
+        const char * pStart = _pJson;
+        pStart = strstr(pStart, "\\\"error\\\"");
+        printf("\\\"error\\\"");
+        if (pStart == NULL)
+                return NULL;
+        pStart += strlen("\\\"error\\\"");
+
+        while(*pStart != '"') {
+                pStart++;
+        }
+        pStart++;
+
+        const char * pEnd = strchr(pStart+1, '\\');
+        if (pEnd == NULL)
+                return NULL;
+        int nLen = pEnd - pStart;
+        if(nLen > _nBufLen - 1) {
+                nLen = _nBufLen - 1;
+        }
+        memcpy(_pBuf, pStart, nLen);
+        _pBuf[nLen] = 0;
+        return _pBuf;
+}
+
 static void * streamUpload(void *_pOpaque)
 {
         KodoUploader * pUploader = (KodoUploader *)_pOpaque;
@@ -199,8 +225,21 @@ static void * streamUpload(void *_pOpaque)
         report_status( error.code );// add by liyq to record ts upload status
         if (error.code != 200) {
                 pUploader->state = TK_UPLOAD_FAIL;
-                logerror("upload ts file %s:%s code:%d curl_error:%s kodo_error:%s", pUploader->bucketName_, key,
-                         error.code, error.message,Qiniu_Buffer_CStr(&client.b));
+                if (error.code == 401) {
+                        logerror("upload file :%s httpcode=%d errmsg=%s", key, error.code, Qiniu_Buffer_CStr(&client.b));
+                } else if (error.code >= 500) {
+                        const char * pFullErrMsg = Qiniu_Buffer_CStr(&client.b);
+                        char errMsg[256];
+                        char *pMsg = getErrorMsg(pFullErrMsg, errMsg, sizeof(errMsg));
+                        if (pMsg) {
+                                logerror("upload file :%s httpcode=%d errmsg={\"error\":\"%s\"}", key, error.code, pMsg);
+                        }else {
+                                logerror("upload file :%s httpcode=%d errmsg=%s", key, error.code,
+                                         pFullErrMsg);
+                        }
+                } else {
+                        logerror("upload file :%s errorcode=%d errmsg={\"error\":\"server not response\"}", key, error.code);
+                }
                 //debug_log(&client, error);
         } else {
                 pUploader->state = TK_UPLOAD_OK;
