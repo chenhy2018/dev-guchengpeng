@@ -95,9 +95,15 @@ static int InitIPC( )
         DBG_ERROR("dev_sdk_init error, s32Ret = %d\n", s32Ret );
         return -1;
     }
-	GetMediaStreamConfig(&gAjMediaStreamConfig);
+    GetMediaStreamConfig(&gAjMediaStreamConfig);
     ret = dev_sdk_start_video( 0, 0, VideoGetFrameCb, &context );
     dev_sdk_get_AudioConfig( &audioConfig );
+    DBG_LOG("channels = %d\n", audioConfig.audioCapture.channels );
+    DBG_LOG("bitspersample = %d\n", audioConfig.audioCapture.bitspersample );
+    DBG_LOG("samplerate = %d\n", audioConfig.audioCapture.samplerate );
+    DBG_LOG("volume_capture = %d\n", audioConfig.audioCapture.volume_capture );
+    DBG_LOG("amplify = %d\n", audioConfig.audioCapture.amplify );
+    DBG_LOG("ra_answer = %d\n", audioConfig.audioCapture.ra_answer );
     DBG_LOG("audioConfig.audioEncode.enable = %d\n", audioConfig.audioEncode.enable );
     if ( audioConfig.audioEncode.enable ) {
         dev_sdk_start_audio_play( audio_type );
@@ -145,7 +151,7 @@ int InitKodo()
         return ret;
     }
 
-    ret = InitUploader("testuid10", "testdeviceid10", gtestToken, &avArg);
+    ret = InitUploader("testuid6", "testdeviceid6", gtestToken, &avArg);
     if (ret != 0) {
         DBG_ERROR("InitUploader error\n");
         return ret;
