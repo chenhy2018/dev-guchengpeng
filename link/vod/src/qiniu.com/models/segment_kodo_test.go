@@ -16,6 +16,7 @@ func TestKodoSegment(t *testing.T) {
         model := SegmentKodoModel{}
         model.Init()
 
+
         xl.Infof("Test TransferTimeToInt64") 
         str := []string{ "2018", "01", "02", "12", "12", "12", "033"}
         err, starttime := TransferTimeToInt64(str)
@@ -95,5 +96,25 @@ func TestKodoSegment(t *testing.T) {
 
         infoF, markF,  errF = model.GetFragmentTsInfo(xl, 0, int64(1534443284000), int64(1534500884000), "testuid10", "testdeviceid10", "")
         assert.Equal(t, errF, nil, "they should be equal")
-        assert.Equal(t, len(infoF), 10, "they should be equal")
+        assert.Equal(t, len(infoF), 9, "they should be equal")
+
+        infoF, markF,  errF = model.GetFragmentTsInfo(xl, 1, int64(1534412096000), int64(1534729559000), "testuid10", "testdeviceid10", "")
+        assert.Equal(t, errF, nil, "they should be equal")
+        assert.Equal(t, len(infoF), 1, "they should be equal")
+        xl.Infof("1 0 mark %s", markF)
+        infoF, markF,  errF = model.GetFragmentTsInfo(xl, 1, int64(1534412096000), int64(1534729559000), "testuid10", "testdeviceid10", markF)
+        assert.Equal(t, errF, nil, "they should be equal")
+        assert.Equal(t, len(infoF), 1, "they should be equal")
+        assert.Equal(t, infos[0][SEGMENT_ITEM_END_TIME].(int64), int64(1534414490692), "they should be equal")
+        xl.Infof("1 1 mark %s", markF)
+
+        infoF, markF,  errF = model.GetFragmentTsInfo(xl, 5, int64(1534412096000), int64(1534729559000), "testuid10", "testdeviceid10", markF)
+        assert.Equal(t, errF, nil, "they should be equal")
+        assert.Equal(t, len(infoF), 5, "they should be equal")
+        assert.Equal(t, infos[0][SEGMENT_ITEM_END_TIME].(int64), int64(1534414490692), "they should be equal")
+        xl.Infof("1 2 mark %s", markF)
+
+        infoF, markF,  errF = model.GetFragmentTsInfo(xl, 7, int64(1534412096000), int64(1534729559000), "testuid10", "testdeviceid10", markF)
+        assert.Equal(t, errF, nil, "they should be equal")
+        assert.Equal(t, len(infoF), 3, "they should be equal")
 }

@@ -259,6 +259,7 @@ func (m *SegmentKodoModel) GetFragmentTsInfo(xl *xlog.Logger, count int, startti
         total := 0
         sub := strings.Split(mark, "/")
         if (len(sub) == 2) {
+                xl.Infof("GetFragmentTsInfo %s \n", mark)
                 index, err := strconv.Atoi(sub[0])
                 if (err != nil) {
                         num = 0
@@ -267,7 +268,17 @@ func (m *SegmentKodoModel) GetFragmentTsInfo(xl *xlog.Logger, count int, startti
                         num = index
                         marker = sub[1]
                 }
+        } else if (len(sub) == 1) {
+                xl.Infof("GetFragmentTsInfo 111111 %s \n", mark)
+                index, err := strconv.Atoi(sub[0])
+                if (err != nil) {
+                        num = 0
+                        marker = ""
+                } else {
+                        num = index
+                }
         }
+
         prefix := "seg/" + uid + "/" + uaid + "/"
         prefix1 := CalculatePrefixList(xl, starttime, endtime)
 
@@ -297,10 +308,15 @@ func (m *SegmentKodoModel) GetFragmentTsInfo(xl *xlog.Logger, count int, startti
                                 break;
                         }
                         if (info[SEGMENT_ITEM_START_TIME].(int64) > starttime) {
+                                xl.Infof("GetFragmentTsInfo info[SEGMENT_ITEM_START_TIME] %d \n", info[SEGMENT_ITEM_START_TIME].(int64))
+                                xl.Infof("GetFragmentTsInfo info[SEGMENT_ITEM_END_TIME] %d \n", info[SEGMENT_ITEM_END_TIME].(int64))
                                 r = append(r, info)
+                                total++
                         }
-                        total++
                         if (total >= count && count != 0) {
+                                if (listItem1.Marker == "") {
+                                        num++
+                                }
                                 next := fmt.Sprintf("%d/%s", num, listItem1.Marker)
                                 return r, next, nil
                         } 
