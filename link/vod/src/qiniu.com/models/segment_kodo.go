@@ -262,6 +262,7 @@ func (m *SegmentKodoModel) GetFragmentTsInfo(xl *xlog.Logger, count int, startti
                 xl.Infof("GetFragmentTsInfo %s \n", mark)
                 index, err := strconv.Atoi(sub[0])
                 if (err != nil) {
+                        xl.Errorf("parse marker error, marke = %#v, err = %#v", mark, err)
                         num = 0
                         marker = ""
                 } else {
@@ -269,7 +270,6 @@ func (m *SegmentKodoModel) GetFragmentTsInfo(xl *xlog.Logger, count int, startti
                         marker = sub[1]
                 }
         } else if (len(sub) == 1) {
-                xl.Infof("GetFragmentTsInfo 111111 %s \n", mark)
                 index, err := strconv.Atoi(sub[0])
                 if (err != nil) {
                         num = 0

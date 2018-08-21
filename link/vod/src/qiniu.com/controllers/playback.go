@@ -41,10 +41,18 @@ func GetPlayBackm3u8(c *gin.Context) {
 	}
 	xl.Infof("uid= %v, uaid = %v, from = %v, to = %v", params.uid, params.uaid, time.Unix(params.from, 0), time.Unix(params.to, 0))
 
+	dayInSec := int64((24 * time.Hour).Seconds())
+	if (params.to - params.from) > dayInSec {
+		xl.Errorf("bad from/to time, from = %v, to = %v", params.from, params.to)
+		c.JSON(500, gin.H{
+			"error": "bad from/to time",
+		})
+		return
+	}
 	c.Header("Content-Type", "application/x-mpegURL")
-	segs, err := SegMod.GetSegmentTsInfo(xl, 0, 0, params.from*1000, params.to*1000, params.uid, params.uaid)
+	segs, err := SegMod.GetSegmentTsInfo(xl, params.from*1000, params.to*1000, params.uid, params.uaid)
 	if err != nil {
-		xl.Errorf("getTsInfo error, error =  %v", err)
+		xl.Errorf("getTsInfo error, error =  %#v", err)
 		c.JSON(500, nil)
 		return
 	}
@@ -72,6 +80,7 @@ func GetPlayBackm3u8(c *gin.Context) {
 		duration := float64(end-start) / 1000
 		total += int64(duration)
 		filename, ok := v[models.SEGMENT_ITEM_FILE_NAME].(string)
+
 		if !ok {
 			xl.Errorf("filename format error %#v", v)
 			c.JSON(500, nil)
