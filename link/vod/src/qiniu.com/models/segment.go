@@ -58,14 +58,14 @@ func (m *SegmentModel) AddSegmentTS(xl *xlog.Logger, req SegmentTsInfo) error {
                 func(c *mgo.Collection) error {
                         _, err := c.Upsert(
                                 bson.M{
-                                        SEGMENT_ITEM_ID: req.Uid + "." + req.UaId + "." + strconv.FormatInt(req.StartTime,10),
+                                        ITEM_ID: req.Uid + "." + req.UaId + "." + strconv.FormatInt(req.StartTime,10),
                                         SEGMENT_ITEM_FRAGMENT_START_TIME: req.FragmentStartTime,
                                         SEGMENT_ITEM_START_TIME: req.StartTime,
                                         SEGMENT_ITEM_END_TIME: req.EndTime,
                                 },
                                 bson.M{
                                         "$set": bson.M{
-                                                SEGMENT_ITEM_ID: req.Uid + "." + req.UaId + "." + strconv.FormatInt(req.StartTime,10),
+                                                ITEM_ID: req.Uid + "." + req.UaId + "." + strconv.FormatInt(req.StartTime,10),
                                                 SEGMENT_ITEM_FRAGMENT_START_TIME: req.FragmentStartTime,
                                                 SEGMENT_ITEM_START_TIME: req.StartTime,
                                                 SEGMENT_ITEM_END_TIME: req.EndTime,
@@ -97,7 +97,7 @@ func (m *SegmentModel) DeleteSegmentTS(xl *xlog.Logger, uid,uaid string, startti
                 func(c *mgo.Collection) error {
                         c.RemoveAll(
                                 bson.M{
-                                        SEGMENT_ITEM_ID: bson.M{"$gte": uid + "." + uaid + ".", "$lte": uid + "." + uaid + "/"},
+                                        ITEM_ID: bson.M{"$gte": uid + "." + uaid + ".", "$lte": uid + "." + uaid + "/"},
                                         SEGMENT_ITEM_START_TIME : bson.M{"$gte" : starttime},
                                         SEGMENT_ITEM_END_TIME : bson.M{"$lte" :  endtime},
                                 },
@@ -120,7 +120,7 @@ func (m *SegmentModel) UpdateSegmentTSExpire(xl *xlog.Logger, uid,uaid string, s
 		func(c *mgo.Collection) error {
                         return c.Update(
                                 bson.M{
-                                        SEGMENT_ITEM_ID: bson.M{"$gte": uid + "." + uaid + ".", "$lte": uid + "." + uaid + "/"},
+                                        ITEM_ID: bson.M{"$gte": uid + "." + uaid + ".", "$lte": uid + "." + uaid + "/"},
                                         SEGMENT_ITEM_START_TIME : bson.M{ "$gte" : starttime},
                                         SEGMENT_ITEM_END_TIME : bson.M{ "$lte" :  endtime},
                                 },
@@ -144,7 +144,7 @@ func (m *SegmentModel) GetSegmentTsInfo(xl *xlog.Logger, starttime,endtime int64
         */
 	// query by keywords
         query := bson.M{
-               SEGMENT_ITEM_ID: bson.M{"$gte": uid + "." + uaid + ".", "$lte": uid + "." + uaid + "/"},
+               ITEM_ID: bson.M{"$gte": uid + "." + uaid + ".", "$lte": uid + "." + uaid + "/"},
                SEGMENT_ITEM_START_TIME : bson.M{ "$gte" : starttime},
                SEGMENT_ITEM_END_TIME : bson.M{ "$lte" :  endtime},
         }
@@ -176,7 +176,7 @@ func (m *SegmentModel) GetLastSegmentTsInfo(xl *xlog.Logger, uid,uaid string) (m
         */
         // query by keywords
         query := bson.M{
-                SEGMENT_ITEM_ID: bson.M{"$gte": uid + "." + uaid + ".", "$lte": uid + "." + uaid + "/"},
+                ITEM_ID: bson.M{"$gte": uid + "." + uaid + ".", "$lte": uid + "." + uaid + "/"},
         }
         var r map[string]interface{}
         err := db.WithCollection(
@@ -211,12 +211,12 @@ func (m *SegmentModel) GetFragmentTsInfo(xl *xlog.Logger, count int, starttime,e
         */
         // query by keywords
         skip ,errS := strconv.Atoi(mark) 
-        if (errS != nil) {
+        if errS != nil {
                 skip = 0
                 xl.Infof("mark is invaild")
         }
         limit := count
-        if (limit == 0) {
+        if limit == 0 {
                 limit = 65535
         }
         var r []map[string]interface{}
@@ -228,7 +228,7 @@ func (m *SegmentModel) GetFragmentTsInfo(xl *xlog.Logger, count int, starttime,e
                         err := c.Pipe(
                                 []bson.M{
                                         {"$match": bson.M{
-                                                 SEGMENT_ITEM_ID: bson.M{"$gte": uid + "." + uaid + ".", "$lte": uid + "." + uaid + "/"},
+                                                 ITEM_ID: bson.M{"$gte": uid + "." + uaid + ".", "$lte": uid + "." + uaid + "/"},
                                                  SEGMENT_ITEM_FRAGMENT_START_TIME: bson.M{"$gte":starttime, "$lte": endtime},},
                                         },
                                         {"$group": bson.M{
@@ -247,7 +247,7 @@ func (m *SegmentModel) GetFragmentTsInfo(xl *xlog.Logger, count int, starttime,e
                         return nil
                  },
         )
-        if (len(r) == limit) {
+        if len(r) == limit {
                  return r, strconv.Itoa(len(r)), err
         }
         return r, "", err
