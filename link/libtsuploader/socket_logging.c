@@ -1,4 +1,4 @@
-// Last Update:2018-08-17 15:02:15
+// Last Update:2018-08-21 18:16:45
 /**
  * @file socket_logging.c
  * @brief 
@@ -12,12 +12,15 @@
 #include<arpa/inet.h> //inet_addr
 #include <pthread.h>
 #include <errno.h>
+#include <time.h>
 #include "socket_logging.h"
+#include "devsdk.h"
 
 #define BASIC() printf("[ %s %s() %d ] ", __FILE__, __FUNCTION__, __LINE__ )
 #define DBG_ERROR(args...) BASIC();printf(args)
 #define DBG_LOG(args...) BASIC();printf(args)
 
+extern MediaStreamConfig gAjMediaStreamConfig;
 static socket_status gStatus;
 
 char *host = "39.107.247.14";
@@ -27,7 +30,7 @@ int gsock = 0;
 int socket_init()
 {
     struct sockaddr_in server;
-    char message[1000] , server_reply[2000];
+    char message[1000] = { 0 } ;
     int ret = 0;
 
     if ( gsock != -1 ) {
@@ -53,7 +56,10 @@ int socket_init()
         return -1;
     }
 
+
     gStatus.connecting = 1;
+    sprintf( message, "tsupload_%s_%s.log", gAjMediaStreamConfig.rtmpConfig.streamid, gAjMediaStreamConfig.rtmpConfig.server );
+    log_send( message );
     DBG_LOG("connet to %s:%d sucdefully\n", host, port  );
     return 0;
 }
@@ -106,15 +112,57 @@ int report_status( int code )
 {
     static int total = 0, error = 0;
     char message[512] = { 0 };
+    char now[200] = { 0 };
 
     memset( message, 0, sizeof(message) );
     if ( code != 200 ) {
         error ++;
     }
     total++;
-    sprintf( message, "upload ts total : %d error : %d percent %%%d\n", total, error, error/total*100 ); 
+    memset( now, 0, sizeof(now) );
+    get_current_time( now );
+    sprintf( message, "[ %s ] [ %s ] [ %s ] upload ts [ total : %d ] [ error : %d ] [ percent : %%%f ]\n", 
+             now,
+             gAjMediaStreamConfig.rtmpConfig.streamid,
+             gAjMediaStreamConfig.rtmpConfig.server,
+             total, error, error*1.0/total*100 ); 
     log_send( message );
 
     return 0;
 }
+
+int GetTimeDiff( struct timeval *_pStartTime, struct timeval *_pEndTime )
+{
+    int time = 0;
+
+    if ( _pEndTime->tv_sec < _pStartTime->tv_sec ) {
+        return -1;
+    }
+
+    if ( _pEndTime->tv_usec < _pStartTime->tv_usec ) {
+        time = (_pEndTime->tv_sec - 1 - _pStartTime->tv_sec) +
+            ((1000000-_pStartTime->tv_usec) + _pEndTime->tv_usec)/1000000;
+    } else {
+        time = (_pEndTime->tv_sec - _pStartTime->tv_sec) +
+            (_pEndTime->tv_usec - _pStartTime->tv_usec)/1000000;
+    }
+
+    return ( time );
+
+}
+
+int get_current_time( char *now_time )
+{
+    time_t now;
+    struct tm *tm_now = NULL;
+    char mytime[200];
+
+    time(&now);
+    tm_now = localtime(&now);
+    strftime( now_time, 200, "%Y-%m-%d %H:%M:%S", tm_now);
+
+    return(0);
+}
+
+
 
