@@ -74,8 +74,8 @@ type NamespaceInfo struct {
 func (m *namespaceModel) GetNamespaceInfo(xl *xlog.Logger, index, rows int, category, like string) ([]NamespaceInfo, error) {
 
         /*
-                 db.ua.find({category: {"$regex": "*like*"}},
-                 ).sort({"date":1}).limit(rows),skip(rows * index)
+                 db.namespace.find({category: {"$regex": "*like*"}},
+                 ).sort({"_id":1}).limit(rows),skip(rows * index)
         */
         // query by keywords
         query := bson.M{}
