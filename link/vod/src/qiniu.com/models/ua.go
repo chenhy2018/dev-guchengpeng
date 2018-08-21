@@ -37,7 +37,7 @@ func (m *uaModel) Init() error {
 
 func (m *uaModel) Register(xl *xlog.Logger, req UaInfo) error {
         /*
-                 db.ua.update( {uid: id, uaid: id, xxx}, {"$set": {"bucketurl": url, "remaindays": time}},
+                 db.ua.update( {uid: id, uaid: id, xxx}, {"$set": {"namespace": space, "password": password}},
                  { upsert: true })
         */
         err := db.WithCollection(
@@ -52,9 +52,9 @@ func (m *uaModel) Register(xl *xlog.Logger, req UaInfo) error {
                                         "$set": bson.M{
                                                 UA_ITEM_UID:  req.Uid,
                                                 UA_ITEM_UAID: req.UaId,
+                                                UA_ITEM_PASSWORD: req.Password,
                                                 UA_ITEM_DATE: time.Now().Unix(),
-                                                UA_ITEM_BUCKET_URL: req.BucketUrl,
-                                                UA_ITEM_EXPIRE : req.RemainDays,
+                                                UA_ITEM_NAMESPACE: req.Namespace,
                                         },
                                 },
                         )
@@ -84,34 +84,12 @@ func (m *uaModel) Delete(xl *xlog.Logger, uid,uaid string) error {
         )
 }
 
-func (m *uaModel) UpdateRemaindays(xl *xlog.Logger, uid,uaid string, remaindays int64) error {
-        /*
-                 db.ua.update({uid: id, uaid: id}, bson.M{"$set": "remaindays": time}},
-        */
-         return db.WithCollection(
-                UA_COL,
-                func(c *mgo.Collection) error {
-                        return c.Update(
-                                bson.M{
-                                        UA_ITEM_UID:  uid,
-                                        UA_ITEM_UAID: uaid,
-                                },
-                                bson.M{
-                                        "$set": bson.M{
-                                                UA_ITEM_EXPIRE: remaindays,
-                                        },
-                                },
-                        )
-                },
-        )
-}
-
 type UaInfo struct {
         Uid           string  `bson:"uid"        json:"uid"`
         UaId          string  `bson:"uaid"       json:"uaid"`
+        Password      string  `bson:"password"   json:"password"`
         Regtime       int     `bson:"date"       json:"date"`
-        BucketUrl     string  `bson:"bucketurl"  json:"bucketurl"`
-        RemainDays    int64   `bson:"remaindays" json:"remaindays"`
+        Namespace     string  `bson:"namespace"  json:"namespace"`
 }
 
 func (m *uaModel) GetUaInfo(xl *xlog.Logger, index, rows int, category, like string) ([]UaInfo, error) {
@@ -155,5 +133,31 @@ func (m *uaModel) GetUaInfo(xl *xlog.Logger, index, rows int, category, like str
                return []UaInfo{}, err
         }
         return r, nil
+}
+
+func (m *uaModel) UpdateUa(xl *xlog.Logger, uid,uaid string, info UaInfo) error {
+        /*
+                 db.ua.update({uid: id, uaid: id}, bson.M{"$set":{"namespace": space, "password": password}}),
+        */
+         return db.WithCollection(
+                UA_COL,
+                func(c *mgo.Collection) error {
+                        return c.Update(
+                                bson.M{
+                                        UA_ITEM_UID:  uid,
+                                        UA_ITEM_UAID: uaid,
+                                },
+                                bson.M{
+                                        "$set": bson.M{
+                                                UA_ITEM_UID:  info.Uid,
+                                                UA_ITEM_UAID: info.UaId,
+                                                UA_ITEM_PASSWORD: info.Password,
+                                                UA_ITEM_DATE: time.Now().Unix(),
+                                                UA_ITEM_NAMESPACE: info.Namespace,
+                                        },
+                                },
+                        )
+                },
+        )
 }
 
