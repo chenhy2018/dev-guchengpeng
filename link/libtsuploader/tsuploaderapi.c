@@ -112,10 +112,16 @@ int InitUploader(char * _pUid, char *_pDeviceId, char * _pToken, AvArg *_pAvArg)
         logdebug("main thread id:%ld\n", (long)pthread_self());
 
         gAvArg = *_pAvArg;
+        if (gAvArg.nAudioFormat != 0) {
+                if (gAvArg.nChannels == 0) {
+                        logwarn("nChannels default to 2");
+                        gAvArg.nChannels = 2;
+                }
+        }
         ret = NewTsMuxUploader(&gpTsMuxUploader, &gAvArg);
         if (ret != 0) {
                 StopMgr();
-                logerror("NewTsMuxUploader fail\n");
+                logerror("NewTsMuxUploader fail");
                 return ret;
         }
 
