@@ -1,13 +1,10 @@
 package models
   
 import (
-        "fmt"
-        //"strconv"
         "testing"
         "github.com/qiniu/xlog.v1"
         "github.com/stretchr/testify/assert"
         "time"
-        //"strings"
 )
 
 func TestKodoSegment(t *testing.T) {
@@ -67,13 +64,6 @@ func TestKodoSegment(t *testing.T) {
         }
 */
         assert.Equal(t, err4, nil, "they should be equal")
-
-        xl.Infof("Test CalculatePrefixList")
-        arr := CalculatePrefixList(xl, int64(1533783079678), int64(1534893076489))
-        for i := 0; i < len(arr); i++ {
-                test := fmt.Sprintf("2018/08/%02d", 9+i);
-                assert.Equal(t, arr[i], test, "they should be equal")
-        }
 
         infos, err4 = model.GetSegmentTsInfo(xl, int64(1534414484000), int64(1534500884000), "testuid10", "testdeviceid10")
         assert.Equal(t, err4, nil, "they should be equal")

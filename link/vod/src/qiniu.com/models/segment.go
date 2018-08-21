@@ -211,12 +211,12 @@ func (m *SegmentModel) GetFragmentTsInfo(xl *xlog.Logger, count int, starttime,e
         */
         // query by keywords
         skip ,errS := strconv.Atoi(mark) 
-        if (errS != nil) {
+        if errS != nil {
                 skip = 0
                 xl.Infof("mark is invaild")
         }
         limit := count
-        if (limit == 0) {
+        if limit == 0 {
                 limit = 65535
         }
         var r []map[string]interface{}
@@ -247,7 +247,7 @@ func (m *SegmentModel) GetFragmentTsInfo(xl *xlog.Logger, count int, starttime,e
                         return nil
                  },
         )
-        if (len(r) == limit) {
+        if len(r) == limit {
                  return r, strconv.Itoa(len(r)), err
         }
         return r, "", err
