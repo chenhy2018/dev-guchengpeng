@@ -52,6 +52,7 @@ add_executable(testupload
     ipc_test.c
     socket_logging.c
 )
+add_definitions(-D__ARM)
 else()
 add_executable(testupload
     test.c

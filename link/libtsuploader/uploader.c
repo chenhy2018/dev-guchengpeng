@@ -237,7 +237,9 @@ static void * streamUpload(void *_pOpaque)
         Qiniu_Error error = Qiniu_Io_PutBuffer(&client, &putRet, uptoken, key, (const char*)pUploader->pTsData,
                                                pUploader->nTsDataLen, &putExtra);
 #endif
+#ifdef __ARM
         report_status( error.code );// add by liyq to record ts upload status
+#endif
         if (error.code != 200) {
                 pUploader->state = TK_UPLOAD_FAIL;
                 if (error.code == 401) {
