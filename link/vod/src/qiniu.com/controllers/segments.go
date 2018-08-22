@@ -26,7 +26,7 @@ func GetSegments(c *gin.Context) {
 	}
 	xl.Infof("uid= %v, deviceid = %v, from = %v, to = %v, limit = %v, marker = %v", params.uid, params.uaid, params.from, params.to, params.limit, params.marker)
 
-	segs, marker, err := SegMod.GetFragmentTsInfo(xl, params.limit, params.from*1000, params.to*1000, params.uid, params.uaid, params.marker)
+	segs, marker, err := SegMod.GetFragmentTsInfo(xl, params.limit, params.from*1000, params.to*1000, params.uaid, params.marker)
 	if err != nil {
 		xl.Errorf("get segments list error, error =%#v", err)
 		c.JSON(500, nil)
