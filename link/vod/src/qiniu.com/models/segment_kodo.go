@@ -22,13 +22,13 @@ var (
 )
 
 type Segment interface {
-        GetSegmentTsInfo(xl *xlog.Logger, index, rows int, starttime,endtime int64, uid,uaid string) ([]map[string]interface{}, error)
-        GetFragmentTsInfo(xl *xlog.Logger, index, rows int, starttime,endtime int64, uid,uaid string) ([]map[string]interface{}, error)
+        GetSegmentTsInfo(xl *xlog.Logger, index, rows int, starttime,endtime int64, uaid string) ([]map[string]interface{}, error)
+        GetFragmentTsInfo(xl *xlog.Logger, index, rows int, starttime,endtime int64, uaid string) ([]map[string]interface{}, error)
 }
 
 const (
-        SEGMENT_FILENAME_SUB_LEN = 13
-        FRAGMENT_FILENAME_SUB_LEN = 11
+        SEGMENT_FILENAME_SUB_LEN = 12
+        FRAGMENT_FILENAME_SUB_LEN = 10
 )
 
 type SegmentKodoModel struct {
@@ -90,8 +90,8 @@ func TransferTimeToInt64(s []string) (error, int64) {
         return nil, t.UnixNano() / 1000000
 }
 
-// segment filename should be ts/uid/ua_id/yyyy/mm/dd/hh/mm/ss/mmm/endts/fragment_start_ts/expiry.ts
-// fragment filename should be seg/uid/ua_id/yyyy/mm/dd/hh/mm/ss/mmm/seg_end_ts
+// segment filename should be ts/uaid/yyyy/mm/dd/hh/mm/ss/mmm/endts/fragment_start_ts/expiry.ts
+// fragment filename should be seg/uaid/yyyy/mm/dd/hh/mm/ss/mmm/seg_end_ts
 func GetInfoFromFilename(s, sep string) (error, map[string]interface{}) {
         sub := strings.Split(s, sep)
         var info map[string]interface{}
@@ -120,11 +120,11 @@ func GetInfoFromFilename(s, sep string) (error, map[string]interface{}) {
                 if err2 != nil {
                         return err2, info
                 }
-                expriy := strings.Split(sub[12], ".")
-                if len(expriy) != 2 {
-                        return fmt.Errorf("the filename is error [%s]", sub[12]), info
-                }
-                exprie, err3 := strconv.ParseInt(expriy[0], 10, 64)
+                //expriy := strings.Split(sub[12], ".")
+                //if len(expriy) != 2 {
+                //        return fmt.Errorf("the filename is error [%s]", sub[12]), info
+                //}
+                exprie, err3 := strconv.ParseInt(sub[12], 10, 64)
                 if err3 != nil {
                         return err3, info
                 }
@@ -141,9 +141,9 @@ func GetInfoFromFilename(s, sep string) (error, map[string]interface{}) {
 
 // Calculate mark.
 // Return []yyyy/mm/dd, if same day and same hour, return [1]yyyy/mm/dd/hh
-func calculateMark(xl *xlog.Logger, starttime int64, uid, uaid, head string) (string) {
+func calculateMark(xl *xlog.Logger, starttime int64, uaid, head string) (string) {
         starttm := time.Unix(starttime / 1000 , starttime % 1000 * 1000000)
-        k2 := fmt.Sprintf("%s/%s/%s/%04d/%02d/%02d/%02d/%02d/%02d", head, uid, uaid, starttm.Year(), starttm.Month(), starttm.Day(), starttm.Hour(), starttm.Minute(), starttm.Second() -1)
+        k2 := fmt.Sprintf("%s/%s/%04d/%02d/%02d/%02d/%02d/%02d", head, uaid, starttm.Year(), starttm.Month(), starttm.Day(), starttm.Hour(), starttm.Minute(), starttm.Second() -1)
         xl.Infof("CalculateMark k %s", k2)
 
         m := map[string]interface{}{
@@ -159,7 +159,7 @@ func calculateMark(xl *xlog.Logger, starttime int64, uid, uaid, head string) (st
 }
 
 // Get Segment Ts info List.
-func (m *SegmentKodoModel) GetSegmentTsInfo(xl *xlog.Logger, starttime,endtime int64, uid,uaid string) ([]map[string]interface{}, error) {
+func (m *SegmentKodoModel) GetSegmentTsInfo(xl *xlog.Logger, starttime,endtime int64, uaid string) ([]map[string]interface{}, error) {
         //todo change to get aksk
         mac := qbox.NewMac(accessKey, secretKey)
         // 指定空间所在的区域，如果不指定将自动探测
@@ -169,8 +169,8 @@ func (m *SegmentKodoModel) GetSegmentTsInfo(xl *xlog.Logger, starttime,endtime i
         pre := time.Now().UnixNano()
         var r []map[string]interface{}
         delimiter := ""
-        marker := calculateMark(xl, starttime, uid, uaid, "ts")
-        prefix := "ts/" + uid + "/" + uaid + "/"
+        marker := calculateMark(xl, starttime, uaid, "ts")
+        prefix := "ts/" + uaid + "/"
         ctx, cancelFunc := context.WithCancel(context.Background())
         xl.Infof("GetSegmentTsInfo prefix ********* %s \n", prefix)
         entries, err := bucketManager.ListBucketContext(ctx, bucket, prefix, delimiter, marker)
@@ -182,6 +182,7 @@ func (m *SegmentKodoModel) GetSegmentTsInfo(xl *xlog.Logger, starttime,endtime i
         for listItem1 := range entries {
                 err, info := GetInfoFromFilename(listItem1.Item.Key, "/")
                 if err != nil {
+                        fmt.Println(err)
                         cancelFunc()
                         break
                 }
@@ -193,6 +194,7 @@ func (m *SegmentKodoModel) GetSegmentTsInfo(xl *xlog.Logger, starttime,endtime i
                         break
                 }
                 if (info[SEGMENT_ITEM_START_TIME].(int64) > starttime) {
+                        xl.Infof("GetTsInfo info[SEGMENT_ITEM_START_TIME] %d \n", info[SEGMENT_ITEM_START_TIME].(int64))
                         r = append(r, info)
                 }
         }
@@ -201,7 +203,7 @@ func (m *SegmentKodoModel) GetSegmentTsInfo(xl *xlog.Logger, starttime,endtime i
 }
 
 // Get Fragment Ts info List.
-func (m *SegmentKodoModel) GetFragmentTsInfo(xl *xlog.Logger, count int, starttime,endtime int64, uid,uaid,mark string) ([]map[string]interface{},string, error) {
+func (m *SegmentKodoModel) GetFragmentTsInfo(xl *xlog.Logger, count int, starttime,endtime int64, uaid,mark string) ([]map[string]interface{},string, error) {
         pre := time.Now().UnixNano()
         //todo change to get aksk
         mac := qbox.NewMac(accessKey, secretKey)
@@ -217,9 +219,9 @@ func (m *SegmentKodoModel) GetFragmentTsInfo(xl *xlog.Logger, count int, startti
         if mark != "" {
                 marker = mark
         } else {
-                marker = calculateMark(xl, starttime, uid,uaid, "seg")
+                marker = calculateMark(xl, starttime, uaid, "seg")
         }
-        prefix := "seg/" + uid + "/" + uaid + "/"
+        prefix := "seg/" + uaid + "/"
         xl.Infof("GetFragmentTsInfo prefix  %s \n", prefix)
         ctx, cancelFunc := context.WithCancel(context.Background())
         entries, err := bucketManager.ListBucketContext(ctx, bucket, prefix, delimiter, marker)
