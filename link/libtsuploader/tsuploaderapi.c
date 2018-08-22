@@ -65,7 +65,7 @@ void SetBucketName(char *_pName)
         return;
 }
 
-int InitUploader(char * _pUid, char *_pDeviceId, char * _pToken, AvArg *_pAvArg)
+int InitUploader(char *_pDeviceId, char * _pToken, AvArg *_pAvArg)
 {
         if (nProcStatus) {
                 return 0;
@@ -91,11 +91,6 @@ int InitUploader(char * _pUid, char *_pDeviceId, char * _pToken, AvArg *_pAvArg)
                 if (ret != 0) {
                         return ret;
                 }
-        }
-
-        ret = SetUid(_pUid);
-        if (ret != 0) {
-                return ret;
         }
         
         ret = SetDeviceId(_pDeviceId);

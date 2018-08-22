@@ -12,13 +12,13 @@
 #endif
 
 typedef enum {
-        TK_VIDEO_H264,
-        TK_VIDEO_H265
+        TK_VIDEO_H264 = 1,
+        TK_VIDEO_H265 = 2
 }TkVideoFormat;
 typedef enum {
-        TK_AUDIO_PCMU,
-        TK_AUDIO_PCMA,
-        TK_AUDIO_AAC
+        TK_AUDIO_PCMU = 1,
+        TK_AUDIO_PCMA = 2,
+        TK_AUDIO_AAC = 3
 }TkAudioFormat;
 
 typedef enum {

@@ -13,7 +13,6 @@ size_t getDataCallback(void* buffer, size_t size, size_t n, void* rptr);
 #define TS_DIVIDE_LEN 4096
 //#define UPLOAD_SEG_INFO
 
-static char gUid[64];
 static char gDeviceId[64];
 static int64_t nSegmentId;
 static int64_t nLastUploadTsTime;
@@ -123,6 +122,9 @@ static char * getErrorMsg(const char *_pJson, char *_pBuf, int _nBufLen)
         return _pBuf;
 }
 
+#ifdef MULTI_SEG_TEST
+static int newSegCount = 0;
+#endif
 static void * streamUpload(void *_pOpaque)
 {
         KodoUploader * pUploader = (KodoUploader *)_pOpaque;
@@ -192,10 +194,18 @@ static void * streamUpload(void *_pOpaque)
         time_t secs = curTime / 1000000000;
         struct tm tm;
         localtime_r(&secs, &tm);
+#ifndef MULTI_SEG_TEST
         if ((curTime - nLastUploadTsTime) > 30 * 1000000000ll) {
+#else
+        if (newSegCount % 10 == 0) {
+                if (newSegCount == 0)
+                        newSegCount++;
+                else
+                        newSegCount = 0;
+#endif
                 nSegmentId = curTime;
 #ifdef UPLOAD_SEG_INFO
-                sprintf(key, "seg/%s/%s/%04d/%02d/%02d/%02d/%02d/%02d/%03d", gUid, gDeviceId,
+                sprintf(key, "seg/%s/%04d/%02d/%02d/%02d/%02d/%02d/%03d", gDeviceId,
                         tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec,
                         (int)(nSegmentId / 1000000)%1000);
                 Qiniu_Error segErr = Qiniu_Io_PutBuffer(&client, &putRet, uptoken, key, "", 0, NULL);
@@ -210,10 +220,15 @@ static void * streamUpload(void *_pOpaque)
                 }
 #endif
         }
+#ifdef MULTI_SEG_TEST
+	else {
+                newSegCount++;
+        }
+#endif
         nLastUploadTsTime = curTime;
         
         memset(key, 0, sizeof(key));
-        sprintf(key, "ts/%s/%s/%04d/%02d/%02d/%02d/%0d/%02d/%03d/%lld/%d.ts", gUid, gDeviceId,
+        sprintf(key, "ts/%s/%04d/%02d/%02d/%02d/%0d/%02d/%03d/%lld/%d.ts", gDeviceId,
                 tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec,
                 (int)(nSegmentId / 1000000)%1000, nSegmentId / 1000000, pUploader->deleteAfterDays_);
 #ifdef TK_STREAM_UPLOAD
@@ -243,7 +258,7 @@ static void * streamUpload(void *_pOpaque)
                 //debug_log(&client, error);
         } else {
                 pUploader->state = TK_UPLOAD_OK;
-                logdebug("upload ts file %s: key:%s success", pUploader->bucketName_, key);
+                logdebug("upload file %s: key:%s success", pUploader->bucketName_, key);
         }
 END:
         if (canFreeToken) {
@@ -435,19 +450,6 @@ void DestroyUploader(TsUploader ** _pUploader)
         free(pKodoUploader);
         * _pUploader = NULL;
         return;
-}
-
-int SetUid(char *_pUid)
-{
-        int ret = 0;
-        ret = snprintf(gUid, sizeof(gUid), "%s", _pUid);
-        assert(ret > 0);
-        if (ret == sizeof(gUid)) {
-                logerror("uid:%s is too long", _pUid);
-                return TK_ARG_ERROR;
-        }
-        
-        return 0;
 }
 
 int SetDeviceId(char *_pDeviceId)

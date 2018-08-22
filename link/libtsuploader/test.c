@@ -581,7 +581,14 @@ int main(int argc, char* argv[])
 #endif
         avArg.nVideoFormat = TK_VIDEO_H264;
 
-        ret = InitUploader("testuid3", "testdeviceid", gtestToken, &avArg);
+        /*
+        //token过期测试
+        memset(gtestToken, 0, sizeof(gtestToken));
+        strcpy(gtestToken, "JAwTPb8dmrbiwt89Eaxa4VsL4_xSIYJoJh4rQfOQ:5Zq-f4f4ItNZsb7Isbl9CkwmN50=:eyJzY29wZSI6ImlwY2FtZXJhIiwiZGVhZGxpbmUiOjE1MzQ3NzExMzksImNhbGxiYWNrVXJsIjoiaHR0cDovLzM5LjEwNy4yNDcuMTQ6ODA4OC9xaW5pdS91cGxvYWQvY2FsbGJhY2siLCJjYWxsYmFja0JvZHkiOiJ7XCJrZXlcIjpcIiQoa2V5KVwiLFwiaGFzaFwiOlwiJChldGFnKVwiLFwiZnNpemVcIjokKGZzaXplKSxcImJ1Y2tldFwiOlwiJChidWNrZXQpXCIsXCJuYW1lXCI6XCIkKHg6bmFtZSlcIiwgXCJkdXJhdGlvblwiOlwiJChhdmluZm8uZm9ybWF0LmR1cmF0aW9uKVwifSIsImNhbGxiYWNrQm9keVR5cGUiOiJhcHBsaWNhdGlvbi9qc29uIiwiZGVsZXRlQWZ0ZXJEYXlzIjo3fQ==");
+        //end test
+        */
+        //gtestToken[100]='1'; //wrong token
+        ret = InitUploader("testdeviceid", gtestToken, &avArg);
         if (ret != 0) {
                 return ret;
         }
