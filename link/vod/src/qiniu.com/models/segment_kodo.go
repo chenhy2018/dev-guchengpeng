@@ -100,13 +100,12 @@ func GetInfoFromFilename(s, sep string) (error, map[string]interface{}) {
         if (sub[0] == "ts" && len(sub) != SEGMENT_FILENAME_SUB_LEN) || (sub[0] == "seg" && len(sub) != FRAGMENT_FILENAME_SUB_LEN) {
 		return nil, info
         }
-        //uid := sub[1]
-        //uaid := sub[2]
-        err, starttime := TransferTimeToInt64(sub[3:10])
+        //uaid := sub[1]
+        err, starttime := TransferTimeToInt64(sub[2:9])
         if err != nil {
                  return err, info
         }
-        endtime, err1 := strconv.ParseInt(sub[10], 10, 64)
+        endtime, err1 := strconv.ParseInt(sub[9], 10, 64)
         if err1 != nil {
                  return err1, info
         }
@@ -116,15 +115,15 @@ func GetInfoFromFilename(s, sep string) (error, map[string]interface{}) {
                         SEGMENT_ITEM_END_TIME : endtime,
                 }
         } else {
-                fragmentStartTime, err2 := strconv.ParseInt(sub[11], 10, 64)
+                fragmentStartTime, err2 := strconv.ParseInt(sub[10], 10, 64)
                 if err2 != nil {
                         return err2, info
                 }
-                //expriy := strings.Split(sub[12], ".")
-                //if len(expriy) != 2 {
-                //        return fmt.Errorf("the filename is error [%s]", sub[12]), info
-                //}
-                exprie, err3 := strconv.ParseInt(sub[12], 10, 64)
+                expriy := strings.Split(sub[11], ".")
+                if len(expriy) != 2 {
+                        return fmt.Errorf("the filename is error [%s]", sub[11]), info
+                }
+                exprie, err3 := strconv.ParseInt(expriy[0], 10, 64)
                 if err3 != nil {
                         return err3, info
                 }
