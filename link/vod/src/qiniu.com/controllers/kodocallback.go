@@ -53,8 +53,8 @@ func UploadTs(c *gin.Context) {
 	xl.Infof("%#v", kodoData)
 	key := kodoData.Key
 	ids := strings.Split(key, "/")
-	// key  =  ts/uid/ua_id/start_ts/fragment_start_ts/expiry.ts
-	if len(ids) < 6 {
+	// key  =  ts/ua_id/start_ts/fragment_start_ts/expiry.ts
+	if len(ids) < 5 {
 		xl.Errorf("bad file name, file name = %s", key)
 		c.JSON(500, gin.H{
 			"error": "bad file name",
@@ -62,9 +62,9 @@ func UploadTs(c *gin.Context) {
 		return
 
 	}
-	startTime, err := strconv.ParseInt(ids[3], 10, 64)
+	startTime, err := strconv.ParseInt(ids[2], 10, 64)
 	if err != nil {
-		xl.Errorf("parse ts file name failed, filename = %#v", ids[2:9])
+		xl.Errorf("parse ts file name failed, filename = %#v", ids[2])
 		c.JSON(500, gin.H{
 			"error": "parse ts file name failed",
 		})
@@ -79,20 +79,28 @@ func UploadTs(c *gin.Context) {
 		return
 	}
 	endTime := startTime + int64(duration*1000)
-	tsExpire, err := strconv.ParseInt(ids[5], 10, 32)
-
-	if err != nil {
-		xl.Errorf("parse segment start failed, body = %#v", ids[9])
+	expire := strings.Split(ids[4], ".")
+	if len(expire) != 2 {
+		xl.Errorf("upload file name, expire = %#v", ids[4])
 		c.JSON(500, gin.H{
-			"error": "parse segment start failed",
+			"error": "parse expire failed",
 		})
 		return
 	}
-	// key -->ts/uid/ua_id/start_ts/endts/segment_start_ts/expiry.ts
-	newFilName := append(ids[:5], append([]string{strconv.FormatInt(endTime, 10)}, ids[5:]...)...)
+	tsExpire, err := strconv.ParseInt(expire[0], 10, 32)
+
+	if err != nil {
+		xl.Errorf("parse ts expire failed tsExpire = %#v", ids[4])
+		c.JSON(500, gin.H{
+			"error": "parse expire failed",
+		})
+		return
+	}
+	// key -->ts/ua_id/start_ts/endts/segment_start_ts/expiry.ts
+	newFilName := append(ids[:3], append([]string{strconv.FormatInt(endTime, 10)}, ids[3:]...)...)
 	xl.Infof("oldFileName = %v, newFileName = %v", kodoData.Key, strings.Join(newFilName[:], "/"))
 
-	segPrefix := strings.Join([]string{"seg", ids[1], ids[2], ids[4]}, "/")
+	segPrefix := strings.Join([]string{"seg", ids[1], ids[2]}, "/")
 
 	if err := updateTsName(xl, key, strings.Join(newFilName[:], "/"), kodoData.Bucket, segPrefix, endTime, int(tsExpire)); err != nil {
 		xl.Errorf("ts filename update failed err = %#v", err)
