@@ -618,9 +618,6 @@ int TsMuxUploaderStart(TsMuxUploader *_pTsMuxUploader)
                                                                      pFFTsMuxUploader->bucketName_, strlen(pFFTsMuxUploader->bucketName_));
                 pFFTsMuxUploader->pTsMuxCtx->pTsUploader_->SetCallbackUrl(pFFTsMuxUploader->pTsMuxCtx->pTsUploader_,
                                                                           pFFTsMuxUploader->callback_, strlen(pFFTsMuxUploader->callback_));
-                if (pFFTsMuxUploader->deleteAfterDays_ == 0) {
-                        pFFTsMuxUploader->deleteAfterDays_  = 7;
-                }
         } else {
                 pFFTsMuxUploader->pTsMuxCtx->pTsUploader_->SetToken(pFFTsMuxUploader->pTsMuxCtx->pTsUploader_, pFFTsMuxUploader->pToken_);
         }
