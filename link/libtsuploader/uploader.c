@@ -194,8 +194,6 @@ static void * streamUpload(void *_pOpaque)
         int64_t curTime = GetCurrentNanosecond();
         // ts/uid/ua_id/yyyy/mm/dd/hh/mm/ss/mmm/fragment_start_ts/expiry.ts
         time_t secs = curTime / 1000000000;
-        struct tm tm;
-        localtime_r(&secs, &tm);
 #ifndef MULTI_SEG_TEST
         if ((curTime - nLastUploadTsTime) > 30 * 1000000000ll) {
 #else
@@ -207,9 +205,8 @@ static void * streamUpload(void *_pOpaque)
 #endif
                 nSegmentId = curTime;
 #ifdef UPLOAD_SEG_INFO
-                sprintf(key, "seg/%s/%04d/%02d/%02d/%02d/%02d/%02d/%03d", gDeviceId,
-                        tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec,
-                        (int)(nSegmentId / 1000000)%1000);
+                // seg/segid 目前在服务端生成seg文件
+                sprintf(key, "seg/%lld", gDeviceId, nSegmentId / 1000000);
                 Qiniu_Error segErr = Qiniu_Io_PutBuffer(&client, &putRet, uptoken, key, "", 0, NULL);
                 if (segErr.code != 200) {
                         pUploader->state = TK_UPLOAD_FAIL;
@@ -230,9 +227,9 @@ static void * streamUpload(void *_pOpaque)
         nLastUploadTsTime = curTime;
         
         memset(key, 0, sizeof(key));
-        sprintf(key, "ts/%s/%04d/%02d/%02d/%02d/%0d/%02d/%03d/%lld/%d.ts", gDeviceId,
-                tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec,
-                (int)(nSegmentId / 1000000)%1000, nSegmentId / 1000000, pUploader->deleteAfterDays_);
+        //ts/uaid/startts/fragment_start_ts/expiry.ts
+        sprintf(key, "ts/%s/%lld/%lld/%d.ts", gDeviceId,
+                curTime / 1000000, nSegmentId / 1000000, pUploader->deleteAfterDays_);
 #ifdef TK_STREAM_UPLOAD
         Qiniu_Error error = Qiniu_Io_PutStream(&client, &putRet, uptoken, key, pUploader, -1, getDataCallback, &putExtra);
 #else
