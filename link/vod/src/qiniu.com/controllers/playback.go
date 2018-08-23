@@ -49,7 +49,7 @@ func GetPlayBackm3u8(c *gin.Context) {
 		return
 	}
 	c.Header("Content-Type", "application/x-mpegURL")
-	segs, err := SegMod.GetSegmentTsInfo(xl, params.from*1000, params.to*1000, params.uaid)
+	segs, err := SegMod.GetSegmentTsInfo(xl, params.from*1000, params.to*1000, "ipcamera", params.uaid)
 	if err != nil {
 		xl.Errorf("getTsInfo error, error =  %#v", err)
 		c.JSON(500, nil)
