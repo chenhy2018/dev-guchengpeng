@@ -6,7 +6,9 @@
 #include <pthread.h>
 #include "servertime.h"
 #include <time.h>
+#ifdef __ARM
 #include "socket_logging.h"
+#endif
 
 size_t getDataCallback(void* buffer, size_t size, size_t n, void* rptr);
 
@@ -221,7 +223,7 @@ static void * streamUpload(void *_pOpaque)
 #endif
         }
 #ifdef MULTI_SEG_TEST
-	else {
+        else {
                 newSegCount++;
         }
 #endif
@@ -284,8 +286,11 @@ static int streamUploadStart(TsUploader * _pUploader)
         int ret = pthread_create(&pKodoUploader->workerId_, NULL, streamUpload, _pUploader);
         if (ret == 0) {
                 pKodoUploader->isThreadStarted_ = 1;
+                return 0;
+        } else {
+                logerror("start upload thread fail:%d", ret);
+                return TK_THREAD_ERROR;
         }
-        return ret;
 }
 
 static void streamUploadStop(TsUploader * _pUploader)

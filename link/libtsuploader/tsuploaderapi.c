@@ -36,6 +36,9 @@ int UpdateToken(char * pToken)
         int nTokenLen = strlen(pToken);
         if (gToken.pToken_ == NULL) {
                 gToken.pToken_ = malloc(nTokenLen + 1);
+                if (gToken.pToken_  == NULL) {
+                        return TK_NO_MEMORY;
+                }
         }else {
                 if (gToken.pPrevToken_ != NULL) {
                         free(gToken.pPrevToken_);
@@ -44,6 +47,9 @@ int UpdateToken(char * pToken)
                 gToken.nPrevTokenLen_ = gToken.nTokenLen_;
                 
                 gToken.pToken_ = malloc(nTokenLen + 1);
+                if (gToken.pToken_  == NULL) {
+                        return TK_NO_MEMORY;
+                }
         }
         memcpy(gToken.pToken_, pToken, nTokenLen);
         gToken.nTokenLen_ = nTokenLen;
@@ -77,12 +83,12 @@ int InitUploader(char *_pDeviceId, char * _pToken, AvArg *_pAvArg)
         int ret = 0;
         ret = InitTime();
         if (ret != 0) {
-                logerror("gettime from server fail:%d", ret);
+                logerror("InitUploader gettime from server fail:%d", ret);
                 return TK_HTTP_TIME;
         }
         ret = pthread_mutex_init(&gToken.tokenMutex_, NULL);
         if (ret != 0) {
-                logerror("pthread_mutex_init error:%d", ret);
+                logerror("InitUploader pthread_mutex_init error:%d", ret);
                 return TK_MUTEX_ERROR;
         }
 
@@ -100,11 +106,11 @@ int InitUploader(char *_pDeviceId, char * _pToken, AvArg *_pAvArg)
         
         ret = StartMgr();
         if (ret != 0) {
-                logerror("StartMgr fail\n");
-                return 0;
+                logerror("StartMgr fail");
+                return ret;
         }
-        logdebug("main thread id:%ld\n", (long)pthread_self());
-        logdebug("main thread id:%ld\n", (long)pthread_self());
+        logdebug("main thread id:%ld", (long)pthread_self());
+        logdebug("main thread id:%ld", (long)pthread_self());
 
         gAvArg = *_pAvArg;
         if (gAvArg.nAudioFormat != 0) {
@@ -133,7 +139,7 @@ int InitUploader(char *_pDeviceId, char * _pToken, AvArg *_pAvArg)
         if (ret != 0){
                 StopMgr();
                 DestroyTsMuxUploader(&gpTsMuxUploader);
-                logerror("UploadStart fail:%d\n", ret);
+                logerror("UploadStart fail:%d", ret);
                 return ret;
         }
 

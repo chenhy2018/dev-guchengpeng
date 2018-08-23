@@ -302,6 +302,9 @@ static int waitToCompleUploadAndDestroyTsMuxContext(void *_pOpaque)
         return 0;
 }
 
+#define getFFmpegErrorMsg(errcode) char msg[128];\
+                av_strerror(errcode, msg, sizeof(msg))
+
 static int newFFTsMuxContext(FFTsMuxContext ** _pTsMuxCtx, AvArg *_pAvArg)
 {
         FFTsMuxContext * pTsMuxCtx = (FFTsMuxContext *)malloc(sizeof(FFTsMuxContext));
@@ -320,7 +323,9 @@ static int newFFTsMuxContext(FFTsMuxContext ** _pTsMuxCtx, AvArg *_pAvArg)
         //Output
         ret = avformat_alloc_output_context2(&pTsMuxCtx->pFmtCtx_, NULL, "mpegts", NULL);
         if (ret < 0) {
-                logerror("Could not create output context\n");
+                getFFmpegErrorMsg(ret);
+                logerror("Could not create output context:%d(%s)", ret, msg);
+                ret = TK_NO_MEMORY;
                 goto end;
         }
         AVOutputFormat *pOutFmt = pTsMuxCtx->pFmtCtx_->oformat;
@@ -336,8 +341,9 @@ static int newFFTsMuxContext(FFTsMuxContext ** _pTsMuxCtx, AvArg *_pAvArg)
         //add video
         AVStream *pOutStream = avformat_new_stream(pTsMuxCtx->pFmtCtx_, NULL);
         if (!pOutStream) {
-                logerror("Failed allocating output stream\n");
-                ret = AVERROR_UNKNOWN;
+                getFFmpegErrorMsg(ret);
+                logerror("Failed allocating output stream:%d(%s)", ret, msg);
+                ret = TK_NO_MEMORY;
                 goto end;
         }
         pOutStream->time_base.num = 1;
@@ -354,8 +360,9 @@ static int newFFTsMuxContext(FFTsMuxContext ** _pTsMuxCtx, AvArg *_pAvArg)
         //add audio
         pOutStream = avformat_new_stream(pTsMuxCtx->pFmtCtx_, NULL);
         if (!pOutStream) {
-                logerror("Failed allocating output stream\n");
-                ret = AVERROR_UNKNOWN;
+                getFFmpegErrorMsg(ret);
+                logerror("Failed allocating output stream:%d(%s)", ret, msg);
+                ret = TK_NO_MEMORY;
                 goto end;
         }
         pOutStream->time_base.num = 1;
@@ -385,17 +392,19 @@ static int newFFTsMuxContext(FFTsMuxContext ** _pTsMuxCtx, AvArg *_pAvArg)
 
         //Open output file
         if (!(pOutFmt->flags & AVFMT_NOFILE)) {
-                if (avio_open(&pTsMuxCtx->pFmtCtx_->pb, "xx.ts", AVIO_FLAG_WRITE) < 0) {
-                        logerror("Could not open output file '%s'", "xx.ts");
+                if ((ret = avio_open(&pTsMuxCtx->pFmtCtx_->pb, "xx.ts", AVIO_FLAG_WRITE)) < 0) {
+                        getFFmpegErrorMsg(ret);
+                        logerror("Could not open output:%d(%s)", ret, msg);
+                        ret = TK_OPEN_TS_ERR;
                         goto end;
                 }
         }
         //Write file header
         int erno = 0;
         if ((erno = avformat_write_header(pTsMuxCtx->pFmtCtx_, NULL)) < 0) {
-                char errstr[512] = { 0 };
-                av_strerror(erno, errstr, sizeof(errstr));
-                logerror("Error occurred when opening output file:%s\n", errstr);
+                getFFmpegErrorMsg(erno);
+                logerror("fail to write ts header:%d(%s)", erno, msg);
+                ret = TK_WRITE_TS_ERR;
                 goto end;
         }
         
@@ -412,10 +421,6 @@ end:
                 if (pTsMuxCtx->pFmtCtx_ && !(pOutFmt->flags & AVFMT_NOFILE))
                         avio_close(pTsMuxCtx->pFmtCtx_->pb);
                 avformat_free_context(pTsMuxCtx->pFmtCtx_);
-                if (ret < 0 && ret != AVERROR_EOF) {
-                        logerror("Error occurred.\n");
-                        return -1;
-                }
         }
         
         return ret;

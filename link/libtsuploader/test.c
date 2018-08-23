@@ -11,11 +11,11 @@ AvArg avArg;
 typedef int (*DataCallback)(void *opaque, void *pData, int nDataLen, int nFlag, int64_t timestamp, int nIsKeyFrame);
 #define THIS_IS_AUDIO 1
 #define THIS_IS_VIDEO 2
-#define TEST_AAC 1
+//#define TEST_AAC 1
 //#define TEST_AAC_NO_ADTS 1
 #define USE_LINK_ACC 1
 
-#define INPUT_FROM_FFMPEG
+//#define INPUT_FROM_FFMPEG
 
 #ifdef INPUT_FROM_FFMPEG
 #ifndef TEST_AAC
@@ -344,10 +344,10 @@ int start_file_test(char * _pAudioFile, char * _pVideoFile, DataCallback callbac
                                         }
                                         //printf("%d------------->%d\n",dlen, type);
                                         if(hevctype == HEVC_I || hevctype == HEVC_B ){
-                                                if (type == 20) {
-                                                        nNonIDR++;
-                                                } else {
+                                                if (hevctype == HEVC_I) {
                                                         nIDR++;
+                                                } else {
+                                                        nNonIDR++;
                                                 }
                                                 //printf("send one video(%d) frame packet:%ld", type, end - sendp);
                                                 cbRet = callback(opaque, sendp, end - sendp, THIS_IS_VIDEO, nNextVideoTime-nSysTimeBase, hevctype == HEVC_I);
@@ -530,13 +530,14 @@ int main(int argc, char* argv[])
 {
 
         int ret = 0;
-        
+#ifdef INPUT_FROM_FFMPEG
 #if LIBAVFORMAT_VERSION_MAJOR < 58
         //int nFfmpegVersion = avcodec_version();
         av_register_all();
 #endif
 #ifdef INPUT_FROM_FFMPEG
         avformat_network_init();
+#endif
 #endif
         SetLogLevelToDebug();
         signal(SIGINT, signalHander);
@@ -579,7 +580,7 @@ int main(int argc, char* argv[])
         avArg.nChannels = 1;
         avArg.nSamplerate = 8000;
 #endif
-        avArg.nVideoFormat = TK_VIDEO_H264;
+        avArg.nVideoFormat = TK_VIDEO_H265;
 
         /*
         //token过期测试
