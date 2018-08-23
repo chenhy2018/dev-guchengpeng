@@ -87,12 +87,11 @@ func (m *uaModel) Delete(xl *xlog.Logger, uid,uaid string) error {
 type UaInfo struct {
         Uid           string  `bson:"uid"        json:"uid"`
         UaId          string  `bson:"uaid"       json:"uaid"`
-        Password      string  `bson:"password"   json:"password"`
-        Regtime       int     `bson:"date"       json:"date"`
+        Password      string  `bson:"password"   json:"password"` //options
         Namespace     string  `bson:"namespace"  json:"namespace"`
 }
 
-func (m *uaModel) GetUaInfo(xl *xlog.Logger, index, rows int, category, like string) ([]UaInfo, error) {
+func (m *uaModel) GetUaInfos(xl *xlog.Logger, index, rows int, category, like string) ([]UaInfo, error) {
 
         /*
                  db.ua.find({category: {"$regex": "*like*"}},
@@ -135,7 +134,39 @@ func (m *uaModel) GetUaInfo(xl *xlog.Logger, index, rows int, category, like str
         return r, nil
 }
 
-func (m *uaModel) UpdateUa(xl *xlog.Logger, uid,uaid string, info UaInfo) error {
+func (m *uaModel) GetUaInfo(xl *xlog.Logger, uid,uaid string) ([]UaInfo, error) {
+        /*
+                 db.ua.find({uid: id, uaid: id},
+                 ).sort({"date":1}).limit(rows),skip(rows * index)
+        */
+        // query by keywords
+        query := bson.M{
+                UA_ITEM_UID: uid,
+                UA_ITEM_UAID: uaid,
+        }
+        
+        // direct to specific page
+        limit := 1
+        
+        // query
+        r := []UaInfo{}
+        err := db.WithCollection(
+                UA_COL, 
+                func(c *mgo.Collection) error {
+                        var err error
+                        if err = c.Find(query).Limit(limit).One(&r); err != nil {
+                                return fmt.Errorf("query failed")
+                        }
+                        return nil
+                },
+        )
+        if err != nil {
+               return []UaInfo{}, err
+        }
+        return r, nil
+}
+
+func (m *uaModel) UpdateUa(xl *xlog.Logger, info UaInfo) error {
         /*
                  db.ua.update({uid: id, uaid: id}, bson.M{"$set":{"namespace": space, "password": password}}),
         */
@@ -144,8 +175,8 @@ func (m *uaModel) UpdateUa(xl *xlog.Logger, uid,uaid string, info UaInfo) error 
                 func(c *mgo.Collection) error {
                         return c.Update(
                                 bson.M{
-                                        UA_ITEM_UID:  uid,
-                                        UA_ITEM_UAID: uaid,
+                                        UA_ITEM_UID:  info.Uid,
+                                        UA_ITEM_UAID: info.UaId,
                                 },
                                 bson.M{
                                         "$set": bson.M{
