@@ -531,13 +531,7 @@ int main(int argc, char* argv[])
 
         int ret = 0;
 #ifdef INPUT_FROM_FFMPEG
-#if LIBAVFORMAT_VERSION_MAJOR < 58
-        //int nFfmpegVersion = avcodec_version();
-        av_register_all();
-#endif
-#ifdef INPUT_FROM_FFMPEG
         avformat_network_init();
-#endif
 #endif
         SetLogLevelToDebug();
         signal(SIGINT, signalHander);
