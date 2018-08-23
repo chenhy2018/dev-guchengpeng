@@ -14,7 +14,6 @@ import (
 	xlog "github.com/qiniu/xlog.v1"
 	rpc "qiniupkg.com/x/rpc.v7"
 	//	redis "gopkg.in/redis.v5"
-	"qiniu.com/models"
 )
 
 type kodoCallBack struct {
@@ -54,8 +53,8 @@ func UploadTs(c *gin.Context) {
 	xl.Infof("%#v", kodoData)
 	key := kodoData.Key
 	ids := strings.Split(key, "/")
-	// key  =  ts/uid/ua_id/yyyy/mm/dd/hh/mm/ss/mmm/fragment_start_ts/expiry.ts
-	if len(ids) < 12 {
+	// key  =  ts/uid/ua_id/start_ts/fragment_start_ts/expiry.ts
+	if len(ids) < 6 {
 		xl.Errorf("bad file name, file name = %s", key)
 		c.JSON(500, gin.H{
 			"error": "bad file name",
@@ -63,7 +62,7 @@ func UploadTs(c *gin.Context) {
 		return
 
 	}
-	err, startTime := models.TransferTimeToInt64(ids[3:10])
+	startTime, err := strconv.ParseInt(ids[3], 10, 64)
 	if err != nil {
 		xl.Errorf("parse ts file name failed, filename = %#v", ids[3:10])
 		c.JSON(500, gin.H{
@@ -80,8 +79,7 @@ func UploadTs(c *gin.Context) {
 		return
 	}
 	endTime := startTime + int64(duration*1000)
-	segStart, err := strconv.ParseInt(ids[10], 10, 64)
-	tsExpire, _ := strconv.ParseInt(ids[11], 10, 32)
+	tsExpire, _ := strconv.ParseInt(ids[5], 10, 32)
 
 	if err != nil {
 		xl.Errorf("parse segment start failed, body = %#v", ids[10])
@@ -90,11 +88,11 @@ func UploadTs(c *gin.Context) {
 		})
 		return
 	}
-	// key -->ts/uid/ua_id/yyyy/mm/dd/hh/mm/ss/mmm/endts/segment_start_ts/expiry.ts
-	newFilName := append(ids[:10], append([]string{strconv.FormatInt(endTime, 10)}, ids[10:]...)...)
+	// key -->ts/uid/ua_id/start_ts/endts/segment_start_ts/expiry.ts
+	newFilName := append(ids[:5], append([]string{strconv.FormatInt(endTime, 10)}, ids[5:]...)...)
 	xl.Infof("oldFileName = %v, newFileName = %v", kodoData.Key, strings.Join(newFilName[:], "/"))
 
-	segPrefix := strings.Join([]string{"seg", ids[1], ids[2], models.TransferTimeToString(segStart)}, "/")
+	segPrefix := strings.Join([]string{"seg", ids[1], ids[2], ids[4]}, "/")
 
 	if err := updateTsName(xl, key, strings.Join(newFilName[:], "/"), kodoData.Bucket, segPrefix, endTime, int(tsExpire)); err != nil {
 		xl.Errorf("ts filename update failed err = %#v", err)
