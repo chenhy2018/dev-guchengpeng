@@ -39,12 +39,12 @@ func TestUa(t *testing.T) {
         }
         xl.Infof("DB Register done")
         // Get ua.
-        r, err := model.GetUaInfo(xl, 0,0,"uid", "UserTest")
+        r, err := model.GetUaInfos(xl, 0,0,"uid", "UserTest")
         assert.Equal(t, err, nil, "they should be equal")
         size := len(r)
         assert.Equal(t, size, 100, "they should be equal")
 
-        r_1, err_1 := model.GetUaInfo(xl, 0,0,UA_ITEM_UAID, "daaa099")
+        r_1, err_1 := model.GetUaInfos(xl, 0,0,UA_ITEM_UAID, "daaa099")
         assert.Equal(t, err_1, nil, "they should be equal")
         size_1 := len(r_1)
         assert.Equal(t, size_1, 1, "they should be equal")
@@ -88,7 +88,7 @@ func TestWrongPriUrl(t *testing.T) {
         }
 
         // Get ua.
-        r, err := model.GetUaInfo(xl, 0,0,"uid", "UserTest")
+        r, err := model.GetUaInfos(xl, 0,0,"uid", "UserTest")
         assert.Equal(t, err, nil, "they should be equal")
         size := len(r)
         assert.Equal(t, size, 100, "they should be equal")

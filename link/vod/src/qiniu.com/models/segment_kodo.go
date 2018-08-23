@@ -22,13 +22,14 @@ var (
 )
 
 type Segment interface {
-        GetSegmentTsInfo(xl *xlog.Logger, index, rows int, starttime,endtime int64, uaid string) ([]map[string]interface{}, error)
-        GetFragmentTsInfo(xl *xlog.Logger, index, rows int, starttime,endtime int64, uaid string) ([]map[string]interface{}, error)
+        GetSegmentTsInfo(xl *xlog.Logger, index, rows int, starttime,endtime int64, bucketurl,uaid,mark string) ([]map[string]interface{}, error)
+        GetFragmentTsInfo(xl *xlog.Logger, index, rows int, starttime,endtime int64, bucketurl,uaid,mark string) ([]map[string]interface{}, error)
 }
 
 const (
-        SEGMENT_FILENAME_SUB_LEN = 12
-        FRAGMENT_FILENAME_SUB_LEN = 10
+        SEGMENT_FILENAME_SUB_LEN = 6
+        FRAGMENT_FILENAME_SUB_LEN = 4
+        FRAME_FILENAME_SUB_LEN = 4
 )
 
 type SegmentKodoModel struct {
@@ -44,84 +45,47 @@ func (m *SegmentKodoModel) Init() error {
         return nil;
 }
 
-// time should be int64 to []string "yyyy/mm/dd/hh/mm/ss/mmm"
-func TransferTimeToString(date int64) (string) {
-        //location, _ := time.LoadLocation("Asia/Shanghai")
-        tm := time.Unix(date / 1000 , date % 1000 * 1000000)
-        //tm = tm.In(location)
-        return fmt.Sprintf("%04d/%02d/%02d/%02d/%02d/%02d/%03d", tm.Year(), tm.Month(), tm.Day(), tm.Hour(), tm.Minute(), tm.Second(), tm.Nanosecond() /1000000)
-}
-
-// s should be []string "yyyy" "mm" "dd" "hh" "mm" "ss" "mmm" to int64
-func TransferTimeToInt64(s []string) (error, int64) {
-        if len(s) != 7 {
-                return fmt.Errorf("start time: format is error [%s]", s), int64(0)
-        }
-        year, err := strconv.ParseInt(s[0], 10, 32)
-        if err != nil {
-                 return fmt.Errorf("start time:  parser year is error [%s]", s), int64(0)
-        }
-        month, err1 := strconv.ParseInt(s[1], 10, 32)
-        if err1 != nil || (month > 12 || month < 1) {
-                 return fmt.Errorf("start time:  parser month is error [%s]", s), int64(0)
-        }
-        day, err2 := strconv.ParseInt(s[2], 10, 32)
-        if err2 != nil {
-                 return fmt.Errorf("start time:  parser day is error [%s]", s), int64(0)
-        }
-        hour, err3 := strconv.ParseInt(s[3], 10, 32)
-        if err3 != nil {
-                 return fmt.Errorf("start time:  parser hour is error [%s]", s), int64(0)
-        }
-        minute, err4 := strconv.ParseInt(s[4], 10, 32)
-        if err4 != nil {
-                 return fmt.Errorf("start time:  parser minute is error [%s]", s), int64(0)
-        }
-        second, err5 := strconv.ParseInt(s[5], 10, 32)
-        if err5 != nil {
-                 return fmt.Errorf("start time:  parser second is error [%s]", s), int64(0)
-        }
-        millisecond, err6 := strconv.ParseInt(s[6], 10, 32)
-        if err6 != nil {
-                 return fmt.Errorf("start time:  parser millisecond is error [%s]", s), int64(0)
-        }
-        location, _ := time.LoadLocation("Asia/Shanghai")
-        t := time.Date( int(year), time.Month(month), int(day), int(hour), int(minute), int(second), int(millisecond*1000000), location)
-        return nil, t.UnixNano() / 1000000
-}
-
-// segment filename should be ts/uaid/yyyy/mm/dd/hh/mm/ss/mmm/endts/fragment_start_ts/expiry.ts
-// fragment filename should be seg/uaid/yyyy/mm/dd/hh/mm/ss/mmm/seg_end_ts
+// segment filename should be ts/uaid/startts/endts/fragment_start_ts/expiry.ts
+// fragment filename should be seg/uaid/startts/seg_end_ts
 func GetInfoFromFilename(s, sep string) (error, map[string]interface{}) {
         sub := strings.Split(s, sep)
         var info map[string]interface{}
 	
 	// some file just upload by IPC but not add endtime by controller, we just skip this file
-        if (sub[0] == "ts" && len(sub) != SEGMENT_FILENAME_SUB_LEN) || (sub[0] == "seg" && len(sub) != FRAGMENT_FILENAME_SUB_LEN) {
-		return nil, info
+        if (sub[0] == "ts" && len(sub) != SEGMENT_FILENAME_SUB_LEN) || (sub[0] == "seg" && len(sub) != FRAGMENT_FILENAME_SUB_LEN) || (sub[0] == "frame" && len(sub) != FRAME_FILENAME_SUB_LEN) {
+                return nil, info
         }
+
         //uaid := sub[1]
-        err, starttime := TransferTimeToInt64(sub[2:9])
-        if err != nil {
-                 return err, info
-        }
-        endtime, err1 := strconv.ParseInt(sub[9], 10, 64)
-        if err1 != nil {
-                 return err1, info
-        }
-        if len(sub) == 11 {
+        if len(sub) == FRAGMENT_FILENAME_SUB_LEN && sub[0] == "seg" {
+                starttime, err := strconv.ParseInt(sub[2], 10, 64)
+                if err != nil {
+                        return err, info
+                }
+                endtime, err1 := strconv.ParseInt(sub[3], 10, 64)
+                if err1 != nil {
+                        return err1, info
+                }
                 info = map[string]interface{} {
                         SEGMENT_ITEM_START_TIME : starttime,
                         SEGMENT_ITEM_END_TIME : endtime,
                 }
-        } else {
-                fragmentStartTime, err2 := strconv.ParseInt(sub[10], 10, 64)
+        } else if len(sub) == SEGMENT_FILENAME_SUB_LEN && sub[0] == "ts" {
+                starttime, err := strconv.ParseInt(sub[2], 10, 64)
+                if err != nil {
+                        return err, info
+                }
+                endtime, err1 := strconv.ParseInt(sub[3], 10, 64)
+                if err1 != nil {
+                        return err1, info
+                }
+                fragmentStartTime, err2 := strconv.ParseInt(sub[4], 10, 64)
                 if err2 != nil {
                         return err2, info
                 }
-                expriy := strings.Split(sub[11], ".")
+                expriy := strings.Split(sub[5], ".")
                 if len(expriy) != 2 {
-                        return fmt.Errorf("the filename is error [%s]", sub[11]), info
+                        return fmt.Errorf("the filename is error [%s]", sub[5]), info
                 }
                 exprie, err3 := strconv.ParseInt(expriy[0], 10, 64)
                 if err3 != nil {
@@ -134,6 +98,20 @@ func GetInfoFromFilename(s, sep string) (error, map[string]interface{}) {
                         SEGMENT_ITEM_FILE_NAME : s,
                         SEGMENT_ITEM_EXPIRE : exprie,
                 }
+        } else if len(sub) == FRAME_FILENAME_SUB_LEN && sub[0] == "frame" {
+                starttime, err := strconv.ParseInt(sub[2], 10, 64)
+                if err != nil {
+                        return err, info
+                }
+                fragmentStartTime, err2 := strconv.ParseInt(sub[3], 10, 64)
+                if err2 != nil {
+                        return err2, info
+                }
+                info = map[string]interface{} {
+                        SEGMENT_ITEM_FRAGMENT_START_TIME : fragmentStartTime,
+                        SEGMENT_ITEM_START_TIME : starttime,
+                        SEGMENT_ITEM_FILE_NAME : s,
+                }
         }
         return nil, info
 }
@@ -141,11 +119,10 @@ func GetInfoFromFilename(s, sep string) (error, map[string]interface{}) {
 // Calculate mark.
 // Return []yyyy/mm/dd, if same day and same hour, return [1]yyyy/mm/dd/hh
 func calculateMark(xl *xlog.Logger, starttime int64, uaid, head string) (string) {
-        starttm := time.Unix(starttime / 1000 , starttime % 1000 * 1000000)
-        k2 := fmt.Sprintf("%s/%s/%04d/%02d/%02d/%02d/%02d/%02d", head, uaid, starttm.Year(), starttm.Month(), starttm.Day(), starttm.Hour(), starttm.Minute(), starttm.Second() -1)
+        k2 := fmt.Sprintf("%s/%s/%d", head, uaid, starttime / 1000 - 1)
         xl.Infof("CalculateMark k %s", k2)
 
-        m := map[string]interface{}{
+        m := map[string]interface{} {
                  "k" : k2,
         }
         b, err := json.Marshal(m)
@@ -157,8 +134,8 @@ func calculateMark(xl *xlog.Logger, starttime int64, uaid, head string) (string)
         return encodeString
 }
 
-// Get Segment Ts info List.
-func (m *SegmentKodoModel) GetSegmentTsInfo(xl *xlog.Logger, starttime,endtime int64, uaid string) ([]map[string]interface{}, error) {
+// Get Segment TS info List.
+func (m *SegmentKodoModel) GetSegmentTsInfo(xl *xlog.Logger, starttime,endtime int64, bucketurl,uaid string) ([]map[string]interface{}, error) {
         //todo change to get aksk
         mac := qbox.NewMac(accessKey, secretKey)
         // 指定空间所在的区域，如果不指定将自动探测
@@ -202,7 +179,7 @@ func (m *SegmentKodoModel) GetSegmentTsInfo(xl *xlog.Logger, starttime,endtime i
 }
 
 // Get Fragment Ts info List.
-func (m *SegmentKodoModel) GetFragmentTsInfo(xl *xlog.Logger, count int, starttime,endtime int64, uaid,mark string) ([]map[string]interface{},string, error) {
+func (m *SegmentKodoModel) GetFragmentTsInfo(xl *xlog.Logger, count int, starttime,endtime int64, bucketurl,uaid,mark string) ([]map[string]interface{},string, error) {
         pre := time.Now().UnixNano()
         //todo change to get aksk
         mac := qbox.NewMac(accessKey, secretKey)
@@ -257,4 +234,50 @@ func (m *SegmentKodoModel) GetFragmentTsInfo(xl *xlog.Logger, count int, startti
         }
         xl.Infof("find fragment need %d ms\n", (time.Now().UnixNano() - pre) / 1000000)
         return r, nextMarker, err
+}
+
+// Get Frame info List.
+func (m *SegmentKodoModel) GetFrameInfo(xl *xlog.Logger, starttime,endtime int64, bucketurl,uaid string) ([]map[string]interface{}, error) {
+        pre := time.Now().UnixNano()
+        //todo change to get aksk
+        mac := qbox.NewMac(accessKey, secretKey)
+        // 指定空间所在的区域，如果不指定将自动探测
+        // 如果没有特殊需求，默认不需要指定
+        //cfg.Zone=&storage.ZoneHuabei
+        bucketManager := storage.NewBucketManager(mac, &cfg)
+        var r []map[string]interface{}
+        delimiter := ""
+        total := 0
+        marker := calculateMark(xl, starttime, uaid, "frame")
+        prefix := "frame/" + uaid + "/"
+        xl.Infof("GetFragmentTsInfo prefix  %s \n", prefix)
+        ctx, cancelFunc := context.WithCancel(context.Background())
+        entries, err := bucketManager.ListBucketContext(ctx, bucket, prefix, delimiter, marker)
+        if err != nil {
+                xl.Errorf("GetFrameTsInfo ListBucketContext %#v", err)
+                info := err.(*storage.ErrorInfo)
+                if (info.Code == 200) {
+                       return r, nil
+                } else {
+                       return r, err
+                }
+        }
+        for listItem1 := range entries {
+
+                err, info := GetInfoFromFilename(listItem1.Item.Key, "/")
+                if err != nil {
+                        // if one file is not correct, continue to next
+                        continue;
+                }
+                if info[SEGMENT_ITEM_START_TIME].(int64) > endtime {
+                        cancelFunc()
+                        break
+                }
+                if info[SEGMENT_ITEM_START_TIME].(int64) > starttime {
+                        r = append(r, info)
+                        total++
+                }
+        }
+        xl.Infof("find frame need %d ms\n", (time.Now().UnixNano() - pre) / 1000000)
+        return r, err
 }
