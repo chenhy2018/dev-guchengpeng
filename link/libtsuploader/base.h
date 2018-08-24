@@ -12,13 +12,13 @@
 #endif
 
 typedef enum {
-        TK_VIDEO_H264,
-        TK_VIDEO_H265
+        TK_VIDEO_H264 = 1,
+        TK_VIDEO_H265 = 2
 }TkVideoFormat;
 typedef enum {
-        TK_AUDIO_PCMU,
-        TK_AUDIO_PCMA,
-        TK_AUDIO_AAC
+        TK_AUDIO_PCMU = 1,
+        TK_AUDIO_PCMA = 2,
+        TK_AUDIO_AAC = 3
 }TkAudioFormat;
 
 typedef enum {
@@ -36,15 +36,17 @@ typedef struct _AvArg{
 
 #define TK_STREAM_UPLOAD 1
 
-#define MKTAG(a,b,c,d) ((a) | ((b) << 8) | ((c) << 16) | ((unsigned)(d) << 24))
-#define MKERRTAG(a, b, c, d) (-(int)MKTAG(a, b, c, d))
-
-#define TK_NO_MEMORY MKERRTAG('N','M','E','M')
-#define TK_TIMEOUT MKERRTAG('T','M','O','T')
-#define TK_NO_PUSH MKERRTAG('N','P','S','H')
-#define TK_MUTEX_ERROR MKERRTAG('M','U','T','X')
-#define TK_COND_ERROR MKERRTAG('C','O','N','D')
-#define TK_THREAD_ERROR MKERRTAG('X','C','S','B')
-#define TK_ARG_ERROR MKERRTAG('A','R','G','E')
+#define TK_NO_MEMORY       -1000
+#define TK_MUTEX_ERROR     -1100
+#define TK_COND_ERROR      -1101
+#define TK_THREAD_ERROR    -1102
+#define TK_TIMEOUT         -2000
+#define TK_NO_PUSH         -2001
+#define TK_BUFFER_IS_SMALL -2003
+#define TK_ARG_ERROR       -2100
+#define TK_JSON_FORMAT     -2200
+#define TK_HTTP_TIME       -2300
+#define TK_OPEN_TS_ERR     -2400
+#define TK_WRITE_TS_ERR    -2401
 
 #endif

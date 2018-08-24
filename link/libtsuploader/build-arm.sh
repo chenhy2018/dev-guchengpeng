@@ -8,3 +8,5 @@ fi
 
 cmake . -DCMAKE_TOOLCHAIN_FILE=./toolchain.cmake
 make
+arm-linux-gnueabihf-strip testupload
+cp -rvf testupload /home/share/

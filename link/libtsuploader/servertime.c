@@ -18,7 +18,7 @@ static int64_t getUptime()
 #ifdef USE_CLOCK
         struct timespec tp;
         clock_gettime(CLOCK_MONOTONIC, &tp);
-        return (int64_t)(tp.tv_sec * 1000000000 + tp.tv_nsec / tmResolution.tv_nsec);
+        return (int64_t)(tp.tv_sec * 1000000000ll + tp.tv_nsec / tmResolution.tv_nsec);
 #else
         char str[33];
         if(uptimefd < 0) {
@@ -97,7 +97,7 @@ static int getTimeFromServer(int64_t *pStime) {
         return ret;
 }
 
-int64_t GetCurrentMillisecond()
+int64_t GetCurrentNanosecond()
 {
         int64_t nUptime = getUptime();
         return (nUptime - nLocalupTimestamp)+nServerTimestamp;

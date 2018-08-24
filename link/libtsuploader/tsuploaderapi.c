@@ -5,6 +5,7 @@
 #include <pthread.h>
 #include <curl/curl.h>
 #include "servertime.h"
+#include <libavformat/avformat.h>
 
 static char gAk[65] = {0};
 static char gSk[65] = {0};
@@ -36,6 +37,9 @@ int UpdateToken(char * pToken)
         int nTokenLen = strlen(pToken);
         if (gToken.pToken_ == NULL) {
                 gToken.pToken_ = malloc(nTokenLen + 1);
+                if (gToken.pToken_  == NULL) {
+                        return TK_NO_MEMORY;
+                }
         }else {
                 if (gToken.pPrevToken_ != NULL) {
                         free(gToken.pPrevToken_);
@@ -44,6 +48,9 @@ int UpdateToken(char * pToken)
                 gToken.nPrevTokenLen_ = gToken.nTokenLen_;
                 
                 gToken.pToken_ = malloc(nTokenLen + 1);
+                if (gToken.pToken_  == NULL) {
+                        return TK_NO_MEMORY;
+                }
         }
         memcpy(gToken.pToken_, pToken, nTokenLen);
         gToken.nTokenLen_ = nTokenLen;
@@ -65,32 +72,35 @@ void SetBucketName(char *_pName)
         return;
 }
 
-int InitUploader(char * _pUid, char *_pDeviceId, char * _pToken, AvArg *_pAvArg)
+int InitUploader(char *_pDeviceId, char * _pToken, AvArg *_pAvArg)
 {
         if (nProcStatus) {
                 return 0;
         }
+#if LIBAVFORMAT_VERSION_MAJOR < 58
+        av_register_all();
+#endif
+        setenv("TZ", "GMT-8", 1);
 
         Qiniu_Global_Init(-1);
 
         int ret = 0;
         ret = InitTime();
         if (ret != 0) {
-                return ret;
+                logerror("InitUploader gettime from server fail:%d", ret);
+                return TK_HTTP_TIME;
         }
         ret = pthread_mutex_init(&gToken.tokenMutex_, NULL);
         if (ret != 0) {
-                return ret;
+                logerror("InitUploader pthread_mutex_init error:%d", ret);
+                return TK_MUTEX_ERROR;
         }
 
-        ret = UpdateToken(_pToken);
-        if (ret != 0) {
-                return ret;
-        }
-
-        ret = SetUid(_pUid);
-        if (ret != 0) {
-                return ret;
+        if (_pToken != NULL) {
+                ret = UpdateToken(_pToken);
+                if (ret != 0) {
+                        return ret;
+                }
         }
         
         ret = SetDeviceId(_pDeviceId);
@@ -100,27 +110,40 @@ int InitUploader(char * _pUid, char *_pDeviceId, char * _pToken, AvArg *_pAvArg)
         
         ret = StartMgr();
         if (ret != 0) {
-                logerror("StartMgr fail\n");
-                return 0;
+                logerror("StartMgr fail");
+                return ret;
         }
-        logdebug("main thread id:%ld\n", (long)pthread_self());
-        logdebug("main thread id:%ld\n", (long)pthread_self());
+        logdebug("main thread id:%ld", (long)pthread_self());
+        logdebug("main thread id:%ld", (long)pthread_self());
 
         gAvArg = *_pAvArg;
+        if (gAvArg.nAudioFormat != 0) {
+                if (gAvArg.nChannels == 0) {
+                        logwarn("nChannels default to 2");
+                        gAvArg.nChannels = 2;
+                }
+        }
         ret = NewTsMuxUploader(&gpTsMuxUploader, &gAvArg);
         if (ret != 0) {
                 StopMgr();
-                logerror("NewTsMuxUploader fail\n");
+                logerror("NewTsMuxUploader fail");
                 return ret;
         }
 
-        gpTsMuxUploader->SetToken(gpTsMuxUploader, gToken.pToken_);
-        gpTsMuxUploader->SetCallbackUrl(gpTsMuxUploader, CALLBACK_URL, strlen(CALLBACK_URL));
+        if (_pToken != NULL) {
+                gpTsMuxUploader->SetToken(gpTsMuxUploader, gToken.pToken_);
+        } else {
+                gpTsMuxUploader->SetAccessKey(gpTsMuxUploader, gAk, sizeof(gAk));
+                gpTsMuxUploader->SetSecretKey(gpTsMuxUploader, gSk, sizeof(gSk));
+                gpTsMuxUploader->SetDeleteAfterDays(gpTsMuxUploader, nDeleteAfterDays);
+                gpTsMuxUploader->SetBucket(gpTsMuxUploader, gBucket, sizeof(gBucket));
+                gpTsMuxUploader->SetCallbackUrl(gpTsMuxUploader, gCallbackUrl, strlen(gCallbackUrl));
+        }
         ret = TsMuxUploaderStart(gpTsMuxUploader);
         if (ret != 0){
                 StopMgr();
                 DestroyTsMuxUploader(&gpTsMuxUploader);
-                logerror("UploadStart fail:%d\n", ret);
+                logerror("UploadStart fail:%d", ret);
                 return ret;
         }
 
@@ -215,7 +238,7 @@ size_t writeData(void *pTokenStr, size_t size,  size_t nmemb,  void *pUserData) 
         }
         char *pTokenStart = strstr(pTokenStr, "\"token\"");
         if (pTokenStart == NULL) {
-                pToken->nCurlRet = -11;
+                pToken->nCurlRet = TK_JSON_FORMAT;
                 return 0;
         }
         pTokenStart += strlen("\"token\"");
@@ -224,8 +247,11 @@ size_t writeData(void *pTokenStr, size_t size,  size_t nmemb,  void *pUserData) 
         
         char *pTokenEnd = strchr(pTokenStart, '\"');
         if (pTokenEnd == NULL) {
-                pToken->nCurlRet = -11;
+                pToken->nCurlRet = TK_JSON_FORMAT;
                 return 0;
+        }
+        if (pTokenEnd - pTokenStart >= pToken->nDataLen) {
+                pToken->nCurlRet = TK_BUFFER_IS_SMALL;
         }
         memcpy(pToken->pData, pTokenStart, pTokenEnd - pTokenStart);
         return size * nmemb;

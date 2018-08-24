@@ -3,6 +3,7 @@
 #include <assert.h>
 #include <sys/time.h>
 #include <unistd.h>
+#include <signal.h>
 #include "tsuploaderapi.h"
 #include "adts.h"
 AvArg avArg;
@@ -11,8 +12,16 @@ typedef int (*DataCallback)(void *opaque, void *pData, int nDataLen, int nFlag, 
 #define THIS_IS_AUDIO 1
 #define THIS_IS_VIDEO 2
 //#define TEST_AAC 1
-#define TEST_AAC_NO_ADTS 1
+//#define TEST_AAC_NO_ADTS 1
 #define USE_LINK_ACC 1
+
+//#define INPUT_FROM_FFMPEG
+
+#ifdef INPUT_FROM_FFMPEG
+#ifndef TEST_AAC
+#define TEST_AAC 1
+#endif
+#endif
 
 
 FILE *outTs;
@@ -335,10 +344,10 @@ int start_file_test(char * _pAudioFile, char * _pVideoFile, DataCallback callbac
                                         }
                                         //printf("%d------------->%d\n",dlen, type);
                                         if(hevctype == HEVC_I || hevctype == HEVC_B ){
-                                                if (type == 20) {
-                                                        nNonIDR++;
-                                                } else {
+                                                if (hevctype == HEVC_I) {
                                                         nIDR++;
+                                                } else {
+                                                        nNonIDR++;
                                                 }
                                                 //printf("send one video(%d) frame packet:%ld", type, end - sendp);
                                                 cbRet = callback(opaque, sendp, end - sendp, THIS_IS_VIDEO, nNextVideoTime-nSysTimeBase, hevctype == HEVC_I);
@@ -377,6 +386,96 @@ int start_file_test(char * _pAudioFile, char * _pVideoFile, DataCallback callbac
         return 0;
 }
 
+int start_ffmpeg_test(char * _pUrl, DataCallback callback, void *opaque)
+{
+        AVFormatContext *pFmtCtx = NULL;
+        int ret = avformat_open_input(&pFmtCtx, _pUrl, NULL, NULL);
+        if (ret != 0) {
+                char msg[128] = {0};
+                av_strerror(ret, msg, sizeof(msg)) ;
+                printf("ffmpeg err:%s\n", msg);
+                return ret;
+        }
+        
+        AVBSFContext *pBsfCtx = NULL;
+        if ((ret = avformat_find_stream_info(pFmtCtx, 0)) < 0) {
+                printf("Failed to retrieve input stream information");
+                goto end;
+        }
+
+        printf("===========Input Information==========\n");
+        av_dump_format(pFmtCtx, 0, _pUrl, 0);
+        printf("======================================\n");
+        
+        int nAudioIndex = 0;
+        int nVideoIndex = 0;
+        for (size_t i = 0; i < pFmtCtx->nb_streams; ++i) {
+                if (pFmtCtx->streams[i]->codecpar->codec_type == AVMEDIA_TYPE_AUDIO) {
+                        printf("find audio\n");
+                        nAudioIndex = i;
+                        continue;
+                }
+                if (pFmtCtx->streams[i]->codecpar->codec_type == AVMEDIA_TYPE_VIDEO) {
+                        printf("find video\n");
+                        nVideoIndex = i;
+                        continue;
+                }
+                printf("other type:%d\n", pFmtCtx->streams[i]->codecpar->codec_type);
+        }
+
+        const AVBitStreamFilter *filter = av_bsf_get_by_name("h264_mp4toannexb");
+        if(!filter){
+                av_log(NULL,AV_LOG_ERROR,"Unkonw bitstream filter");
+                goto end;
+        }
+        
+        ret = av_bsf_alloc(filter, &pBsfCtx);
+        if (ret != 0) {
+                goto end;
+        }
+        avcodec_parameters_copy(pBsfCtx->par_in, pFmtCtx->streams[nVideoIndex]->codecpar);
+        av_bsf_init(pBsfCtx);
+        
+        AVPacket pkt;
+        av_init_packet(&pkt);
+        while((ret = av_read_frame(pFmtCtx, &pkt)) == 0){
+                if(nVideoIndex == pkt.stream_index) {
+                        ret = av_bsf_send_packet(pBsfCtx, &pkt);
+                        if(ret < 0) {
+                                fprintf(stderr, "av_bsf_send_packet fail: %d\n", ret);
+                                goto end;
+                        }
+                        ret = av_bsf_receive_packet(pBsfCtx, &pkt);
+                        if (AVERROR(EAGAIN) == ret){
+                                av_packet_unref(&pkt);
+                                continue;
+                        }
+                        if(ret < 0){
+                                fprintf(stderr, "av_bsf_receive_packet: %d\n", ret);
+                                goto end;
+                        }
+                        ret = callback(opaque, pkt.data, pkt.size, THIS_IS_VIDEO, pkt.pts, pkt.flags == 1);
+                } else {
+                        ret = callback(opaque, pkt.data, pkt.size, THIS_IS_AUDIO, pkt.pts, 0);
+                }
+
+                av_packet_unref(&pkt);
+        }
+
+end:
+        if (pBsfCtx)
+                av_bsf_free(&pBsfCtx);
+        if (pFmtCtx)
+                avformat_close_input(&pFmtCtx);
+        /* close output */
+        if (ret < 0 && ret != AVERROR_EOF) {
+                printf("Error occurred.\n");
+                return -1;
+        }
+        
+        return 0;
+}
+
 static int64_t firstTimeStamp = -1;
 static int segStartCount = 0;
 static int nByteCount = 0;
@@ -406,7 +505,7 @@ static int dataCallback(void *opaque, void *pData, int nDataLen, int nFlag, int6
 static void * upadateToken() {
         int ret = 0;
         while(1) {
-                sleep(30);
+                sleep(3550);
                 ret = GetUploadToken(gtestToken, sizeof(gtestToken));
                 if (ret != 0) {
                         printf("update token file<<<<<<<<<<<<<\n");
@@ -422,13 +521,20 @@ static void * upadateToken() {
         return NULL;
 }
 
+void signalHander(int s){
+        UninitUploader();
+        exit(0);
+}
 
 int main(int argc, char* argv[])
 {
 
         int ret = 0;
-        
+#ifdef INPUT_FROM_FFMPEG
+        avformat_network_init();
+#endif
         SetLogLevelToDebug();
+        signal(SIGINT, signalHander);
         
         pthread_t updateTokenThread;
         pthread_attr_t attr;
@@ -468,9 +574,16 @@ int main(int argc, char* argv[])
         avArg.nChannels = 1;
         avArg.nSamplerate = 8000;
 #endif
-        avArg.nVideoFormat = TK_VIDEO_H264;
+        avArg.nVideoFormat = TK_VIDEO_H265;
 
-        ret = InitUploader("testuid3", "testdeviceid", gtestToken, &avArg);
+        /*
+        //token过期测试
+        memset(gtestToken, 0, sizeof(gtestToken));
+        strcpy(gtestToken, "JAwTPb8dmrbiwt89Eaxa4VsL4_xSIYJoJh4rQfOQ:5Zq-f4f4ItNZsb7Isbl9CkwmN50=:eyJzY29wZSI6ImlwY2FtZXJhIiwiZGVhZGxpbmUiOjE1MzQ3NzExMzksImNhbGxiYWNrVXJsIjoiaHR0cDovLzM5LjEwNy4yNDcuMTQ6ODA4OC9xaW5pdS91cGxvYWQvY2FsbGJhY2siLCJjYWxsYmFja0JvZHkiOiJ7XCJrZXlcIjpcIiQoa2V5KVwiLFwiaGFzaFwiOlwiJChldGFnKVwiLFwiZnNpemVcIjokKGZzaXplKSxcImJ1Y2tldFwiOlwiJChidWNrZXQpXCIsXCJuYW1lXCI6XCIkKHg6bmFtZSlcIiwgXCJkdXJhdGlvblwiOlwiJChhdmluZm8uZm9ybWF0LmR1cmF0aW9uKVwifSIsImNhbGxiYWNrQm9keVR5cGUiOiJhcHBsaWNhdGlvbi9qc29uIiwiZGVsZXRlQWZ0ZXJEYXlzIjo3fQ==");
+        //end test
+        */
+        //gtestToken[100]='1'; //wrong token
+        ret = InitUploader("testdeviceid", gtestToken, &avArg);
         if (ret != 0) {
                 return ret;
         }
@@ -484,8 +597,6 @@ int main(int argc, char* argv[])
         if (avArg.nVideoFormat == TK_VIDEO_H265) {
                 pVFile = "/Users/liuye/Documents/material/h265_aac_1_16000_v.h265";
         }
-        start_file_test(pAFile, pVFile, dataCallback, NULL);
-
 #else
 
         char * pVFile = "/liuye/Documents/material/h265_aac_1_16000_h264.h264";
@@ -497,6 +608,13 @@ int main(int argc, char* argv[])
         if (avArg.nVideoFormat == TK_VIDEO_H265) {
                 pVFile = "/liuye/Documents/material/h265_aac_1_16000_v.h265";
         }
+#endif
+
+#ifdef INPUT_FROM_FFMPEG
+        start_ffmpeg_test("rtmp://localhost:1935/live/movie", dataCallback, NULL);
+        
+        //start_ffmpeg_test("rtmp://live.hkstv.hk.lxdns.com/live/hks", dataCallback, NULL);
+#else
         start_file_test(pAFile, pVFile, dataCallback, NULL);
 #endif
         

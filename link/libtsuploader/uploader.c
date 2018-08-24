@@ -5,12 +5,16 @@
 #include <sys/time.h>
 #include <pthread.h>
 #include "servertime.h"
+#include <time.h>
+#ifdef __ARM
+#include "socket_logging.h"
+#endif
 
 size_t getDataCallback(void* buffer, size_t size, size_t n, void* rptr);
 
 #define TS_DIVIDE_LEN 4096
+//#define UPLOAD_SEG_INFO
 
-static char gUid[64];
 static char gDeviceId[64];
 static int64_t nSegmentId;
 static int64_t nLastUploadTsTime;
@@ -94,6 +98,35 @@ static void setToken(TsUploader* _pUploader, char *_pToken)
         pKodoUploader->pToken_ = _pToken;
 }
 
+static char * getErrorMsg(const char *_pJson, char *_pBuf, int _nBufLen)
+{
+        const char * pStart = _pJson;
+        pStart = strstr(pStart, "\\\"error\\\"");
+        printf("\\\"error\\\"");
+        if (pStart == NULL)
+                return NULL;
+        pStart += strlen("\\\"error\\\"");
+
+        while(*pStart != '"') {
+                pStart++;
+        }
+        pStart++;
+
+        const char * pEnd = strchr(pStart+1, '\\');
+        if (pEnd == NULL)
+                return NULL;
+        int nLen = pEnd - pStart;
+        if(nLen > _nBufLen - 1) {
+                nLen = _nBufLen - 1;
+        }
+        memcpy(_pBuf, pStart, nLen);
+        _pBuf[nLen] = 0;
+        return _pBuf;
+}
+
+#ifdef MULTI_SEG_TEST
+static int newSegCount = 0;
+#endif
 static void * streamUpload(void *_pOpaque)
 {
         KodoUploader * pUploader = (KodoUploader *)_pOpaque;
@@ -158,24 +191,71 @@ static void * streamUpload(void *_pOpaque)
         }
         
         //segmentid(time)
-        int64_t curTime = GetCurrentMillisecond();
+        int64_t curTime = GetCurrentNanosecond();
+        // ts/uid/ua_id/yyyy/mm/dd/hh/mm/ss/mmm/fragment_start_ts/expiry.ts
+        time_t secs = curTime / 1000000000;
+#ifndef MULTI_SEG_TEST
         if ((curTime - nLastUploadTsTime) > 30 * 1000000000ll) {
+#else
+        if (newSegCount % 10 == 0) {
+                if (newSegCount == 0)
+                        newSegCount++;
+                else
+                        newSegCount = 0;
+#endif
                 nSegmentId = curTime;
+#ifdef UPLOAD_SEG_INFO
+                // seg/segid 目前在服务端生成seg文件
+                sprintf(key, "seg/%lld", gDeviceId, nSegmentId / 1000000);
+                Qiniu_Error segErr = Qiniu_Io_PutBuffer(&client, &putRet, uptoken, key, "", 0, NULL);
+                if (segErr.code != 200) {
+                        pUploader->state = TK_UPLOAD_FAIL;
+                        logerror("upload seg file %s:%s code:%d curl_error:%s kodo_error:%s", pUploader->bucketName_, key,
+                                 segErr.code, segErr.message,Qiniu_Buffer_CStr(&client.b));
+                        //debug_log(&client, error);
+                } else {
+                        pUploader->state = TK_UPLOAD_OK;
+                        logdebug("upload seg file %s: key:%s success", pUploader->bucketName_, key);
+                }
+#endif
         }
+#ifdef MULTI_SEG_TEST
+        else {
+                newSegCount++;
+        }
+#endif
         nLastUploadTsTime = curTime;
+        
+        memset(key, 0, sizeof(key));
+        //ts/uaid/startts/fragment_start_ts/expiry.ts
+        sprintf(key, "ts/%s/%lld/%lld/%d.ts", gDeviceId,
+                curTime / 1000000, nSegmentId / 1000000, pUploader->deleteAfterDays_);
 #ifdef TK_STREAM_UPLOAD
-        sprintf(key, "%d/%s/%s/%lld/%lld.ts",pUploader->deleteAfterDays_, gUid, gDeviceId, nSegmentId / 1000000, curTime / 1000000);
         Qiniu_Error error = Qiniu_Io_PutStream(&client, &putRet, uptoken, key, pUploader, -1, getDataCallback, &putExtra);
 #else
-        sprintf(key, "%s_%s_%lld_%lld.ts", gUid, gDeviceId, pUploader->nSegmentId, pUploader->nFirstFrameTimestamp,
-                pUploader->nLastFrameTimestamp);
         Qiniu_Error error = Qiniu_Io_PutBuffer(&client, &putRet, uptoken, key, (const char*)pUploader->pTsData,
                                                pUploader->nTsDataLen, &putExtra);
 #endif
+#ifdef __ARM
+        report_status( error.code );// add by liyq to record ts upload status
+#endif
         if (error.code != 200) {
                 pUploader->state = TK_UPLOAD_FAIL;
-                logerror("upload file %s:%s code:%d curl_error:%s kodo_error:%s", pUploader->bucketName_, key,
-                         error.code, error.message,Qiniu_Buffer_CStr(&client.b));
+                if (error.code == 401) {
+                        logerror("upload file :%s httpcode=%d errmsg=%s", key, error.code, Qiniu_Buffer_CStr(&client.b));
+                } else if (error.code >= 500) {
+                        const char * pFullErrMsg = Qiniu_Buffer_CStr(&client.b);
+                        char errMsg[256];
+                        char *pMsg = getErrorMsg(pFullErrMsg, errMsg, sizeof(errMsg));
+                        if (pMsg) {
+                                logerror("upload file :%s httpcode=%d errmsg={\"error\":\"%s\"}", key, error.code, pMsg);
+                        }else {
+                                logerror("upload file :%s httpcode=%d errmsg=%s", key, error.code,
+                                         pFullErrMsg);
+                        }
+                } else {
+                        logerror("upload file :%s errorcode=%d errmsg={\"error\":\"server not response\"}", key, error.code);
+                }
                 //debug_log(&client, error);
         } else {
                 pUploader->state = TK_UPLOAD_OK;
@@ -203,13 +283,24 @@ static int streamUploadStart(TsUploader * _pUploader)
         int ret = pthread_create(&pKodoUploader->workerId_, NULL, streamUpload, _pUploader);
         if (ret == 0) {
                 pKodoUploader->isThreadStarted_ = 1;
+                return 0;
+        } else {
+                logerror("start upload thread fail:%d", ret);
+                return TK_THREAD_ERROR;
         }
-        return ret;
 }
 
 static void streamUploadStop(TsUploader * _pUploader)
 {
         KodoUploader * pKodoUploader = (KodoUploader *)_pUploader;
+        if(pKodoUploader->nWaitFirstMutexLocked_ == WF_LOCKED) {
+                pKodoUploader->nWaitFirstMutexLocked_ = WF_QUIT;
+                pthread_mutex_unlock(&pKodoUploader->waitFirstMutex_);
+        }
+        pthread_mutex_lock(&pKodoUploader->waitFirstMutex_);
+        pKodoUploader->nWaitFirstMutexLocked_ = WF_QUIT;
+        pthread_mutex_unlock(&pKodoUploader->waitFirstMutex_);
+        
         if (pKodoUploader->isThreadStarted_) {
                 pKodoUploader->pQueue_->StopPush(pKodoUploader->pQueue_);
                 pthread_join(pKodoUploader->workerId_, NULL);
@@ -349,13 +440,6 @@ int NewUploader(TsUploader ** _pUploader, enum CircleQueuePolicy _policy, int _n
 void DestroyUploader(TsUploader ** _pUploader)
 {
         KodoUploader * pKodoUploader = (KodoUploader *)(*_pUploader);
-        if(pKodoUploader->nWaitFirstMutexLocked_ == WF_LOCKED) {
-                pKodoUploader->nWaitFirstMutexLocked_ = WF_QUIT;
-                pthread_mutex_unlock(&pKodoUploader->waitFirstMutex_);
-        }
-        pthread_mutex_lock(&pKodoUploader->waitFirstMutex_);
-        pKodoUploader->nWaitFirstMutexLocked_ = WF_QUIT;
-        pthread_mutex_unlock(&pKodoUploader->waitFirstMutex_);
         
         pthread_mutex_destroy(&pKodoUploader->waitFirstMutex_);
 #ifdef TK_STREAM_UPLOAD
@@ -365,25 +449,11 @@ void DestroyUploader(TsUploader ** _pUploader)
         DestroyQueue(&pKodoUploader->pQueue_);
 #else
         free(pKodoUploader->pTsData);
-        streamUpload(* _pUploader);
 #endif
         
         free(pKodoUploader);
         * _pUploader = NULL;
         return;
-}
-
-int SetUid(char *_pUid)
-{
-        int ret = 0;
-        ret = snprintf(gUid, sizeof(gUid), "%s", _pUid);
-        assert(ret > 0);
-        if (ret == sizeof(gUid)) {
-                logerror("uid:%s is too long", _pUid);
-                return TK_ARG_ERROR;
-        }
-        
-        return 0;
 }
 
 int SetDeviceId(char *_pDeviceId)

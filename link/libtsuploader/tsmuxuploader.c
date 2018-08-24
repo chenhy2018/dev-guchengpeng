@@ -24,6 +24,8 @@ typedef struct _FFTsMuxUploader{
         TsMuxUploader tsMuxUploader_;
         pthread_mutex_t muxUploaderMutex_;
         char *pToken_;
+        unsigned char *pAACBuf;
+        int nAACBufLen;
         char ak_[64];
         char sk_[64];
         char bucketName_[256];
@@ -161,11 +163,18 @@ static int push(FFTsMuxUploader *pFFTsMuxUploader, char * _pData, int _nDataLen,
                         fixHeader.channel_configuration = pFFTsMuxUploader->avArg.nChannels;
                         int nFreqIdx = getAacFreqIndex(pFFTsMuxUploader->avArg.nSamplerate);
                         fixHeader.sampling_frequency_index = nFreqIdx;
-                        unsigned char * pTmp = (unsigned char *)malloc(varHeader.aac_frame_length);
-                        if(pTmp == NULL || pFFTsMuxUploader->avArg.nChannels < 1 || pFFTsMuxUploader->avArg.nChannels > 2
+                        if (pFFTsMuxUploader->pAACBuf == NULL || pFFTsMuxUploader->nAACBufLen < varHeader.aac_frame_length) {
+                                if (pFFTsMuxUploader->pAACBuf) {
+                                        free(pFFTsMuxUploader->pAACBuf);
+                                        pFFTsMuxUploader->pAACBuf = NULL;
+                                }
+                                pFFTsMuxUploader->pAACBuf = (unsigned char *)malloc(varHeader.aac_frame_length);
+                                pFFTsMuxUploader->nAACBufLen = (int)varHeader.aac_frame_length;
+                        }
+                        if(pFFTsMuxUploader->pAACBuf == NULL || pFFTsMuxUploader->avArg.nChannels < 1 || pFFTsMuxUploader->avArg.nChannels > 2
                            || nFreqIdx < 0) {
                                 pthread_mutex_unlock(&pFFTsMuxUploader->muxUploaderMutex_);
-                                if (pTmp == NULL) {
+                                if (pFFTsMuxUploader->pAACBuf == NULL) {
                                         logwarn("malloc %d size memory fail", varHeader.aac_frame_length);
                                         return TK_NO_MEMORY;
                                 } else {
@@ -174,11 +183,11 @@ static int push(FFTsMuxUploader *pFFTsMuxUploader, char * _pData, int _nDataLen,
                                         return TK_ARG_ERROR;
                                 }
                         }
-                        ConvertAdtsHeader2Char(&fixHeader, &varHeader, pTmp);
+                        ConvertAdtsHeader2Char(&fixHeader, &varHeader, pFFTsMuxUploader->pAACBuf);
                         int nHeaderLen = varHeader.aac_frame_length - _nDataLen;
-                        memcpy(pTmp + nHeaderLen, _pData, _nDataLen);
+                        memcpy(pFFTsMuxUploader->pAACBuf + nHeaderLen, _pData, _nDataLen);
                         isAdtsAdded = 1;
-                        pkt.data = (uint8_t *)pTmp;
+                        pkt.data = (uint8_t *)pFFTsMuxUploader->pAACBuf;
                         pkt.size = varHeader.aac_frame_length;
                 }
         }else{
@@ -267,9 +276,9 @@ static int waitToCompleUploadAndDestroyTsMuxContext(void *_pOpaque)
         
         if (pTsMuxCtx) {
                 if (pTsMuxCtx->pFmtCtx_) {
-                        if (pTsMuxCtx->pFmtCtx_ && !(pTsMuxCtx->pFmtCtx_->oformat->flags & AVFMT_NOFILE))
-                                avio_close(pTsMuxCtx->pFmtCtx_->pb);
-                        avformat_free_context(pTsMuxCtx->pFmtCtx_);
+                        if (pTsMuxCtx->pFmtCtx_->pb) {
+                                avio_flush(pTsMuxCtx->pFmtCtx_->pb);
+                        }
                 }
                 pTsMuxCtx->pTsUploader_->UploadStop(pTsMuxCtx->pTsUploader_);
 
@@ -278,11 +287,23 @@ static int waitToCompleUploadAndDestroyTsMuxContext(void *_pOpaque)
                 logdebug("uploader push:%d pop:%d remainItemCount:%d", statInfo.nPushDataBytes_,
                          statInfo.nPopDataBytes_, statInfo.nLen_);
                 DestroyUploader(&pTsMuxCtx->pTsUploader_);
+                if (pTsMuxCtx->pFmtCtx_->pb && pTsMuxCtx->pFmtCtx_->pb->buffer)  {
+                        av_free(pTsMuxCtx->pFmtCtx_->pb->buffer);
+                }
+                if (!(pTsMuxCtx->pFmtCtx_->oformat->flags & AVFMT_NOFILE))
+                        avio_close(pTsMuxCtx->pFmtCtx_->pb);
+                if (pTsMuxCtx->pFmtCtx_->pb) {
+                        avio_context_free(&pTsMuxCtx->pFmtCtx_->pb);
+                }
+                avformat_free_context(pTsMuxCtx->pFmtCtx_);
                 free(pTsMuxCtx);
         }
         
         return 0;
 }
+
+#define getFFmpegErrorMsg(errcode) char msg[128];\
+                av_strerror(errcode, msg, sizeof(msg))
 
 static int newFFTsMuxContext(FFTsMuxContext ** _pTsMuxCtx, AvArg *_pAvArg)
 {
@@ -298,14 +319,17 @@ static int newFFTsMuxContext(FFTsMuxContext ** _pTsMuxCtx, AvArg *_pAvArg)
                 return ret;
         }
         
+        uint8_t *pOutBuffer = NULL;
         //Output
         ret = avformat_alloc_output_context2(&pTsMuxCtx->pFmtCtx_, NULL, "mpegts", NULL);
         if (ret < 0) {
-                logerror("Could not create output context\n");
+                getFFmpegErrorMsg(ret);
+                logerror("Could not create output context:%d(%s)", ret, msg);
+                ret = TK_NO_MEMORY;
                 goto end;
         }
         AVOutputFormat *pOutFmt = pTsMuxCtx->pFmtCtx_->oformat;
-        uint8_t *pOutBuffer = (unsigned char*)av_malloc(4096);
+        pOutBuffer = (unsigned char*)av_malloc(4096);
         AVIOContext *avio_out = avio_alloc_context(pOutBuffer, 4096, 1, pTsMuxCtx, NULL, ffWriteTsPacketToMem, NULL);
         pTsMuxCtx->pFmtCtx_->pb = avio_out;
         pTsMuxCtx->pFmtCtx_->flags = AVFMT_FLAG_CUSTOM_IO;
@@ -317,8 +341,9 @@ static int newFFTsMuxContext(FFTsMuxContext ** _pTsMuxCtx, AvArg *_pAvArg)
         //add video
         AVStream *pOutStream = avformat_new_stream(pTsMuxCtx->pFmtCtx_, NULL);
         if (!pOutStream) {
-                logerror("Failed allocating output stream\n");
-                ret = AVERROR_UNKNOWN;
+                getFFmpegErrorMsg(ret);
+                logerror("Failed allocating output stream:%d(%s)", ret, msg);
+                ret = TK_NO_MEMORY;
                 goto end;
         }
         pOutStream->time_base.num = 1;
@@ -335,8 +360,9 @@ static int newFFTsMuxContext(FFTsMuxContext ** _pTsMuxCtx, AvArg *_pAvArg)
         //add audio
         pOutStream = avformat_new_stream(pTsMuxCtx->pFmtCtx_, NULL);
         if (!pOutStream) {
-                logerror("Failed allocating output stream\n");
-                ret = AVERROR_UNKNOWN;
+                getFFmpegErrorMsg(ret);
+                logerror("Failed allocating output stream:%d(%s)", ret, msg);
+                ret = TK_NO_MEMORY;
                 goto end;
         }
         pOutStream->time_base.num = 1;
@@ -366,17 +392,19 @@ static int newFFTsMuxContext(FFTsMuxContext ** _pTsMuxCtx, AvArg *_pAvArg)
 
         //Open output file
         if (!(pOutFmt->flags & AVFMT_NOFILE)) {
-                if (avio_open(&pTsMuxCtx->pFmtCtx_->pb, "xx.ts", AVIO_FLAG_WRITE) < 0) {
-                        logerror("Could not open output file '%s'", "xx.ts");
+                if ((ret = avio_open(&pTsMuxCtx->pFmtCtx_->pb, "xx.ts", AVIO_FLAG_WRITE)) < 0) {
+                        getFFmpegErrorMsg(ret);
+                        logerror("Could not open output:%d(%s)", ret, msg);
+                        ret = TK_OPEN_TS_ERR;
                         goto end;
                 }
         }
         //Write file header
         int erno = 0;
         if ((erno = avformat_write_header(pTsMuxCtx->pFmtCtx_, NULL)) < 0) {
-                char errstr[512] = { 0 };
-                av_strerror(erno, errstr, sizeof(errstr));
-                logerror("Error occurred when opening output file:%s\n", errstr);
+                getFFmpegErrorMsg(erno);
+                logerror("fail to write ts header:%d(%s)", erno, msg);
+                ret = TK_WRITE_TS_ERR;
                 goto end;
         }
         
@@ -384,14 +412,15 @@ static int newFFTsMuxContext(FFTsMuxContext ** _pTsMuxCtx, AvArg *_pAvArg)
         *_pTsMuxCtx = pTsMuxCtx;
         return 0;
 end:
+        if (pOutBuffer) {
+                av_free(pOutBuffer);
+        }
+        if (pTsMuxCtx->pFmtCtx_->pb)
+                avio_context_free(&pTsMuxCtx->pFmtCtx_->pb);
         if (pTsMuxCtx->pFmtCtx_) {
                 if (pTsMuxCtx->pFmtCtx_ && !(pOutFmt->flags & AVFMT_NOFILE))
                         avio_close(pTsMuxCtx->pFmtCtx_->pb);
                 avformat_free_context(pTsMuxCtx->pFmtCtx_);
-                if (ret < 0 && ret != AVERROR_EOF) {
-                        logerror("Error occurred.\n");
-                        return -1;
-                }
         }
         
         return ret;
@@ -466,6 +495,7 @@ static int getExpireDays(char * pToken)
         
         char *pExpireStart = strstr(pPlain, "\"deleteAfterDays\"");
         if (pExpireStart == NULL) {
+                free(pPlain);
                 return 0;
         }
         pExpireStart += strlen("\"deleteAfterDays\"");
@@ -488,6 +518,7 @@ static int getExpireDays(char * pToken)
                 pExpireStart++;
         }
         memcpy(days, pDaysStrat, nDaysLen);
+        free(pPlain);
         return atoi(days);
 }
 
@@ -587,9 +618,6 @@ int TsMuxUploaderStart(TsMuxUploader *_pTsMuxUploader)
                                                                      pFFTsMuxUploader->bucketName_, strlen(pFFTsMuxUploader->bucketName_));
                 pFFTsMuxUploader->pTsMuxCtx->pTsUploader_->SetCallbackUrl(pFFTsMuxUploader->pTsMuxCtx->pTsUploader_,
                                                                           pFFTsMuxUploader->callback_, strlen(pFFTsMuxUploader->callback_));
-                if (pFFTsMuxUploader->deleteAfterDays_ == 0) {
-                        pFFTsMuxUploader->deleteAfterDays_  = 7;
-                }
         } else {
                 pFFTsMuxUploader->pTsMuxCtx->pTsUploader_->SetToken(pFFTsMuxUploader->pTsMuxCtx->pTsUploader_, pFFTsMuxUploader->pToken_);
         }
@@ -611,6 +639,9 @@ void DestroyTsMuxUploader(TsMuxUploader **_pTsMuxUploader)
         
         pushRecycle(pFFTsMuxUploader);
         if (pFFTsMuxUploader) {
+                if (pFFTsMuxUploader->pAACBuf) {
+                        free(pFFTsMuxUploader->pAACBuf);
+                }
                 free(pFFTsMuxUploader);
         }
         return;
