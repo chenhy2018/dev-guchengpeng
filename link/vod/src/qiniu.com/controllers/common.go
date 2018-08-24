@@ -19,18 +19,18 @@ const (
 )
 
 type requestParams struct {
-	uid    string
-	uaid   string
-	from   int64
-	to     int64
-	expire int64
-	token  string
-	limit  int
-	marker string
+	uid       string
+	uaid      string
+	from      int64
+	to        int64
+	expire    int64
+	token     string
+	limit     int
+	marker    string
+	namespace string
 }
 
 func VerifyAuth(xl *xlog.Logger, req *http.Request) (bool, error) {
-
 	mac := qbox.NewMac(accessKey, secretKey)
 	return mac.VerifyCallback(req)
 }
@@ -51,24 +51,27 @@ func VerifyToken(xl *xlog.Logger, expire int64, realToken, url, uid string) bool
 	}
 	tokenIndex := strings.Index(url, "&token=")
 
-	mac := qbox.NewMac(uid, uid)
+	mac := qbox.NewMac(accessKey, secretKey)
 	token := mac.Sign([]byte(url[0:tokenIndex]))
 	return token == realToken
 }
 
 func ParseRequest(c *gin.Context, xl *xlog.Logger) (*requestParams, error) {
+	/*	uaidT, err := base64.StdEncoding.DecodeString(c.Param("uaid"))
+		if err != nil {
+			return nil, errors.New("decode uaid error")
+		}
+		uaid := string(uaidT)
+	*/
 	uaid := c.Param("uaid")
+	namespace := c.Param("namespace")
 	from := c.Query("from")
 	to := c.Query("to")
-	expire := c.Query("e")
+	expire := c.DefaultQuery("e", "0")
 	token := c.Query("token")
 	limit := c.DefaultQuery("limit", "1000")
 	marker := c.DefaultQuery("marker", "")
-	splitedToken := strings.Split(token, ":")
-	if len(splitedToken) < 2 {
-		return nil, errors.New("invalid token")
-	}
-	uid := strings.Split(token, ":")[0]
+
 	if strings.Contains(uaid, ".m3u8") {
 		uaid = strings.Split(uaid, ".")[0]
 	}
@@ -95,14 +98,14 @@ func ParseRequest(c *gin.Context, xl *xlog.Logger) (*requestParams, error) {
 		limitT = 1000
 	}
 	params := &requestParams{
-		uid:    uid,
-		uaid:   uaid,
-		from:   fromT,
-		to:     toT,
-		expire: expireT,
-		token:  token,
-		limit:  int(limitT),
-		marker: marker,
+		uaid:      uaid,
+		from:      fromT,
+		to:        toT,
+		expire:    expireT,
+		token:     token,
+		limit:     int(limitT),
+		marker:    marker,
+		namespace: namespace,
 	}
 
 	return params, nil

@@ -39,8 +39,8 @@ func GetPlayBackm3u8(c *gin.Context) {
 		})
 		return
 	}
-	xl.Infof("uid= %v, uaid = %v, from = %v, to = %v", params.uid, params.uaid, time.Unix(params.from, 0), time.Unix(params.to, 0))
-	dayInSec := int64((24 * time.Hour).Seconds())
+	xl.Infof("uid= %v, uaid = %v, from = %v, to = %v, namespace = %v", params.uid, params.uaid, time.Unix(params.from/1000, 0), time.Unix(params.to/1000, 0), params.namespace)
+	dayInSec := int64((24 * time.Hour).Seconds() * 1000)
 	if (params.to - params.from) > dayInSec {
 		xl.Errorf("bad from/to time, from = %v, to = %v", params.from, params.to)
 		c.JSON(500, gin.H{
@@ -48,8 +48,7 @@ func GetPlayBackm3u8(c *gin.Context) {
 		})
 		return
 	}
-	c.Header("Content-Type", "application/x-mpegURL")
-	segs, err := SegMod.GetSegmentTsInfo(xl, params.from*1000, params.to*1000, "ipcamera", params.uaid)
+	segs, err := SegMod.GetSegmentTsInfo(xl, params.from, params.to, params.namespace, params.uaid)
 	if err != nil {
 		xl.Errorf("getTsInfo error, error =  %#v", err)
 		c.JSON(500, nil)
@@ -94,6 +93,7 @@ func GetPlayBackm3u8(c *gin.Context) {
 		playlist = append(playlist, m)
 
 	}
-
+	c.Header("Content-Type", "application/x-mpegURL")
+	c.Header("Access-Control-Allow-Origin", "*")
 	c.String(200, m3u8.Mkm3u8(playlist, xl))
 }

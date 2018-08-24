@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"strconv"
 	"strings"
@@ -81,7 +82,7 @@ func UploadTs(c *gin.Context) {
 	endTime := startTime + int64(duration*1000)
 	expire := strings.Split(ids[4], ".")
 	if len(expire) != 2 {
-		xl.Errorf("upload file name, expire = %#v", ids[4])
+		xl.Errorf("bad file name, expire = %#v", key)
 		c.JSON(500, gin.H{
 			"error": "parse expire failed",
 		})
@@ -100,9 +101,9 @@ func UploadTs(c *gin.Context) {
 	newFilName := append(ids[:3], append([]string{strconv.FormatInt(endTime, 10)}, ids[3:]...)...)
 	xl.Infof("oldFileName = %v, newFileName = %v", kodoData.Key, strings.Join(newFilName[:], "/"))
 
+	mac := qbox.NewMac(accessKey, secretKey)
 	segPrefix := strings.Join([]string{"seg", ids[1], ids[2]}, "/")
-
-	if err := updateTsName(xl, key, strings.Join(newFilName[:], "/"), kodoData.Bucket, segPrefix, endTime, int(tsExpire)); err != nil {
+	if err := updateTsName(xl, key, strings.Join(newFilName[:], "/"), kodoData.Bucket, segPrefix, endTime, int(tsExpire), mac); err != nil {
 		xl.Errorf("ts filename update failed err = %#v", err)
 		c.JSON(500, gin.H{
 			"error": "update ts file name failed",
@@ -110,15 +111,21 @@ func UploadTs(c *gin.Context) {
 		return
 	}
 
+	jpegName := strings.Join([]string{"frame", ids[1], ids[2], ids[3]}, "/")
+	if err = fop(strings.Join(newFilName[:], "/"), kodoData.Bucket, jpegName+".jpeg", mac); err != nil {
+		xl.Errorf("fop operation failed err = %#v", err)
+		c.JSON(500, gin.H{
+			"error": "fop failed failed",
+		})
+		return
+	}
 	c.JSON(200, gin.H{
 		"success": true,
 		"name":    key,
 	})
 }
 
-func updateTsName(xl *xlog.Logger, srcTsKey, destTsKey, bucket, segPrefix string, endTime int64, expire int) (err error) {
-	mac := qbox.NewMac(accessKey, secretKey)
-
+func updateTsName(xl *xlog.Logger, srcTsKey, destTsKey, bucket, segPrefix string, endTime int64, expire int, mac *qbox.Mac) (err error) {
 	cfg := storage.Config{
 		UseHTTPS: false,
 	}
@@ -204,4 +211,16 @@ func createNewsegFile(filename, bucket string, mac *qbox.Mac) error {
 
 	data := []byte{}
 	return formUploader.Put(context.Background(), &ret, upToken, filename, bytes.NewReader(data), 0, &putExtra)
+}
+
+func fop(filename, bucket, jpegName string, mac *qbox.Mac) error {
+	cfg := storage.Config{
+		UseHTTPS: false,
+	}
+	operationManager := storage.NewOperationManager(mac, &cfg)
+
+	fopVframe := fmt.Sprintf("vframe/jpg/offset/0|saveas/%s",
+		storage.EncodedEntry(bucket, jpegName))
+	_, err := operationManager.Pfop(bucket, filename, fopVframe, "", "", true)
+	return err
 }

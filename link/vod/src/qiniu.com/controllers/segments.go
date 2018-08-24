@@ -16,17 +16,17 @@ func GetSegments(c *gin.Context) {
 		})
 		return
 	}
-	fullUrl := "http://" + c.Request.Host + c.Request.URL.String()
-	if !VerifyToken(xl, params.expire, params.token, fullUrl, params.uid) {
-		xl.Errorf("verify token failed")
+	if ok, err := VerifyAuth(xl, c.Request); err != nil || ok != true {
+		xl.Errorf("verify auth failed %#v", err)
 		c.JSON(401, gin.H{
-			"error": "bad token",
+			"error": "verify auth failed",
 		})
 		return
 	}
-	xl.Infof("uid= %v, deviceid = %v, from = %v, to = %v, limit = %v, marker = %v", params.uid, params.uaid, params.from, params.to, params.limit, params.marker)
 
-	segs, marker, err := SegMod.GetFragmentTsInfo(xl, params.limit, params.from*1000, params.to*1000, "ipcamera", params.uaid, params.marker)
+	xl.Infof("uid= %v, deviceid = %v, from = %v, to = %v, limit = %v, marker = %v, namespace = %v", params.uid, params.uaid, params.from, params.to, params.limit, params.marker, params.namespace)
+
+	segs, marker, err := SegMod.GetFragmentTsInfo(xl, params.limit, params.from, params.to, params.namespace, params.uaid, params.marker)
 	if err != nil {
 		xl.Errorf("get segments list error, error =%#v", err)
 		c.JSON(500, nil)
