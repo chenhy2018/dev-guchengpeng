@@ -1,4 +1,4 @@
-GOVERSIONGT15 := $(shell expr `go version | cut -f3 -d ' '` \>= "go1.5")
+GOVERSIONGT15 := $(shell go version | grep version >/dev/null && echo 1 || expr `go version | cut -f3 -d ' '` \>= "go1.5")
 ifeq "$(GOVERSIONGT15)" "1"
         LDFLAGS := "-X 'github.com/qiniu/version.version=${BUILD_NUMBER} ${BUILD_ID} ${BUILD_URL}' -X 'github.com/qiniu/version.pkgName=${PACKAGE_NAME}'"
 else
