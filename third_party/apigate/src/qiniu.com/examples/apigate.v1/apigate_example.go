@@ -64,9 +64,9 @@ func (p *Service) PostFoo_Bar(args *fooBarArgs, env *authstub.Env) (ret fooBarRe
 	id := args.A + "." + args.B
 	p.foos[id] = fooInfo{
 		Foo: args.CmdArgs[0],
-		A: args.A,
-		B: args.B,
-		Id: id,
+		A:   args.A,
+		B:   args.B,
+		Id:  id,
 	}
 	return fooBarRet{Id: id}, nil
 }
@@ -102,5 +102,29 @@ func (p *Service) GetFoo_(args *reqArgs, env *authstub.Env) (ret fooInfo, err er
 	return
 }
 
-// ---------------------------------------------------------------------------
+/*
+请求包：
 
+```
+GET /playback/<FooId>
+```
+
+返回包：
+
+```
+200 OK
+
+{a: <A>, b: <B>, foo: <Foo>, id: <FooId>}
+```
+*/
+func (p *Service) GetPlayback_(args *reqArgs, env *authstub.Env) (ret fooInfo, err error) {
+
+	id := args.CmdArgs[0]
+	if foo, ok := p.foos[id]; ok {
+		return foo, nil
+	}
+	err = httputil.NewError(404, "id not found")
+	return
+}
+
+// ---------------------------------------------------------------------------

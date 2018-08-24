@@ -3,6 +3,7 @@ package gateapp
 import (
 	"net/http"
 	"runtime"
+	"strings"
 
 	"qbox.us/cc/config"
 
@@ -43,6 +44,31 @@ type Config struct {
 	MaxProcs   int      `json:"max_procs"`
 	DebugLevel int      `json:"debug_level"`
 	Reqid      string   `json:"reqid"`
+}
+
+type QueryTokenAuth struct {
+	http.Handler
+	mode int
+}
+
+func (qa *QueryTokenAuth) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+
+	prefix := "/playback/"
+	if qa.mode != Apigate_Default {
+		prefix = "/v1/playback/"
+	}
+	if strings.HasPrefix(r.RequestURI, prefix) {
+		r.ParseForm()
+		token := r.Form.Get("token")
+		log.Info("token:", token)
+		if qa.mode == Apigate_Default {
+			r.Header.Add("Authorization", "qbox/mac "+token)
+		} else {
+			r.Header.Add("Authorization", "QiniuStub uid=1&ut=4")
+		}
+
+	}
+	qa.Handler.ServeHTTP(w, r)
 }
 
 func Main(mode int) {
@@ -115,14 +141,15 @@ func Main(mode int) {
 		}
 		return service
 	}
-	svr := graceful.New(svrCreator)
+	gatesvr := graceful.New(svrCreator)
+	svr := &QueryTokenAuth{Handler: gatesvr, mode: mode}
 
 	if prom != nil {
 		go prom.Run()
 	}
 
 	// process signal
-	go svr.ProcessSignals(conf.QuitWaitTimeoutMs)
+	go gatesvr.ProcessSignals(conf.QuitWaitTimeoutMs)
 
 	// run Service
 	log.Info("Starting apigate ...")

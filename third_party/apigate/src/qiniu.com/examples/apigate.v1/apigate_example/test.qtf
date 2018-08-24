@@ -10,6 +10,9 @@ ret 200
 echo $(resp)
 json '{"id": $(id)}'
 
+get http://foo.com/v1/playback/testdeviceid10.m3u8?from=1535010378&to=1535014378&e=1535018092&token=testuid10:s95PezTVaURkLcR2nZe_KwgF57U=
+ret 404
+
 get http://foo.com/v1/foo/$(id)
 auth qinutest
 ret 200
