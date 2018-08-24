@@ -3,10 +3,11 @@ package m3u8
 import (
 	"bytes"
 	"errors"
-	xlog "github.com/qiniu/xlog.v1"
 	"math"
 	"strconv"
 	"time"
+
+	xlog "github.com/qiniu/xlog.v1"
 )
 
 // MediaType for EXT-X-PLAYLIST-TYPE tag
@@ -110,6 +111,11 @@ func (p *MediaPlaylist) addVersion() {
 	p.buf.WriteRune('\n')
 }
 
+func (p *MediaPlaylist) addCacheInfo() {
+	p.buf.WriteString("#EXT-X-ALLOW-CACHE:NO")
+	p.buf.WriteRune('\n')
+}
+
 func (p *MediaPlaylist) addPlaylistType() {
 	if p.MediaType > 0 {
 		p.buf.WriteString("#EXT-X-PLAYLIST-TYPE:")
@@ -125,7 +131,10 @@ func (p *MediaPlaylist) addPlaylistType() {
 
 func (p *MediaPlaylist) addMediaSequence() {
 	p.buf.WriteString("#EXT-X-MEDIA-SEQUENCE:")
-	p.buf.WriteString(strconv.FormatUint(p.SeqNo, 10))
+	p.buf.WriteString(strconv.FormatUint(1, 10))
+	p.buf.WriteRune('\n')
+
+	p.buf.WriteString("#EXT-X-DISCONTINUITY")
 	p.buf.WriteRune('\n')
 }
 
@@ -202,9 +211,10 @@ func (p *MediaPlaylist) mkM3u8() *bytes.Buffer {
 	}
 
 	p.addVersion()
+	p.addCacheInfo()
 	p.addPlaylistType()
-	p.addMediaSequence()
 	p.addTargetDuraion()
+	p.addMediaSequence()
 	p.addIframe()
 	p.addSegments()
 	p.buf.WriteString("#EXT-X-ENDLIST\n")

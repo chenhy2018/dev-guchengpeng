@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+
 	"github.com/gin-gonic/gin"
 	"qiniu.com/controllers"
 	"qiniu.com/db"
@@ -20,10 +21,10 @@ func main() {
 	}
 	initDb()
 
-	r.GET("/playback/:uaid", controllers.GetPlayBackm3u8)
-	r.GET("/segments/:uaid", controllers.GetSegments)
+	r.GET("/v1/namespaces/:namespace/uas/:uaid/playback", controllers.GetPlayBackm3u8)
+	r.GET("/v1/namespaces/:namespace/uas/:uaid/segments", controllers.GetSegments)
+	r.GET("/v1/namespaces/:namespace/uas/:uaid/frames", controllers.GetFrames)
 	r.POST("/qiniu/upload/callback", controllers.UploadTs)
-	//	r.POST("/qiniu/notify/*action", controllers.FopNotify)
 	r.Run(Config.Bind) // listen and serve on 0.0.0.0:8080
 
 }
