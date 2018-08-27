@@ -38,7 +38,7 @@ func (m *UaModel) Init() error {
 
 func (m *UaModel) Register(xl *xlog.Logger, req UaInfo) error {
         /*
-                 db.ua.update( {uid: id, namespace: space, xxx}, {"$set": {"namespace": space, "password": password}},
+                 db.ua.update( {uaid: id, namespace: space, xxx}, {"$set": {"namespace": space, "password": password}},
                  { upsert: true })
         */
         err := db.WithCollection(
@@ -46,7 +46,7 @@ func (m *UaModel) Register(xl *xlog.Logger, req UaInfo) error {
                 func(c *mgo.Collection) error {
                         _, err := c.Upsert(
                                 bson.M{
-                                        UA_ITEM_UID:  req.Uid,
+                                        UA_ITEM_UAID:  req.UaId,
                                         UA_ITEM_NAMESPACE: req.Namespace,
                                 },
                                 bson.M{
@@ -98,8 +98,8 @@ type UaInfo struct {
 func (m *UaModel) GetUaInfos(xl *xlog.Logger, limit int, mark, namespace, category, like string) ([]UaInfo, string, error) {
 
         /*
-                 db.ua.find({category: {"$regex": "*like*"}},
-                 ).sort({"date":1}).limit(rows),skip(rows * index)
+                 db.ua.find({"namespace": namespace, {category: {"$regex": "*like*"}},}
+                 ).sort({"date":1}).limit(limit),skip(mark)
         */
         // query by keywords
         query := bson.M{

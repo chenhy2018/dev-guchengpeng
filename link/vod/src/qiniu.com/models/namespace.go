@@ -23,7 +23,7 @@ func (m *NamespaceModel) Init() error {
 
 func (m *NamespaceModel) Register(xl *xlog.Logger, req NamespaceInfo) error {
         /*
-                 db.namespace.update( {"space": req.Space}, {"$set": {"bucketurl": req.Bucketurl}},
+                 db.namespace.update( {"uid":req.Uid,  "namespace": req.Space}, {"$set": {"bucketurl": req.Bucketurl}},
                  { upsert: true })
         */
         err := db.WithCollection(
@@ -32,6 +32,7 @@ func (m *NamespaceModel) Register(xl *xlog.Logger, req NamespaceInfo) error {
                         _, err := c.Upsert(
                                 bson.M{
                                         NAMESPACE_ITEM_ID:  req.Space,
+                                        NAMESPACE_ITEM_UID : req.Uid,
                                 },
                                 bson.M{
                                         "$set": bson.M{
@@ -54,7 +55,7 @@ func (m *NamespaceModel) Register(xl *xlog.Logger, req NamespaceInfo) error {
 
 func (m *NamespaceModel) Delete(xl *xlog.Logger, uid,id string) error {
         /*
-                 db.namespace.remove({"space": id})
+                 db.namespace.remove({"uid": uid,  "namespace": id})
         */
         return db.WithCollection(
                 NAMESPACE_COL,
@@ -79,7 +80,7 @@ type NamespaceInfo struct {
 
 func (m *NamespaceModel) GetNamespaceInfo(xl *xlog.Logger,uid, namespace string) (NamespaceInfo, error) {
         /*
-                 db.namespace.find({"space": namespace})
+                 db.namespace.find({"uid":uid, "namespace": namespace})
         */
         r := NamespaceInfo{}
         err := db.WithCollection(
@@ -99,8 +100,8 @@ func (m *NamespaceModel) GetNamespaceInfo(xl *xlog.Logger,uid, namespace string)
 func (m *NamespaceModel) GetNamespaceInfos(xl *xlog.Logger, limit int, mark, uid, category, like string) ([]NamespaceInfo, string, error) {
 
         /*
-                 db.namespace.find({category: {"$regex": "*like*"}},
-                 ).sort({"_id":1}).limit(limit),skip(mark)
+                 db.namespace.find({"uid" : uid, { category: {"$regex": "*like*"}}},
+                 ).sort({"namespace":1}).limit(limit),skip(mark)
         */
         // query by keywords
         query := bson.M{
@@ -145,7 +146,7 @@ func (m *NamespaceModel) GetNamespaceInfos(xl *xlog.Logger, limit int, mark, uid
 
 func (m *NamespaceModel) UpdateNamespace(xl *xlog.Logger, uid, space string, info NamespaceInfo) error {
         /*
-                 db.namespace.update({"space": id}, bson.M{"$set":{"bucketurl": info.BucketUrl}}),
+                 db.namespace.update({"uid": uid, "namespace": space}, bson.M{"$set":{"bucketurl": info.BucketUrl}}),
         */
          return db.WithCollection(
                 NAMESPACE_COL,
@@ -153,7 +154,7 @@ func (m *NamespaceModel) UpdateNamespace(xl *xlog.Logger, uid, space string, inf
                         return c.Update(
                                 bson.M{
                                         NAMESPACE_ITEM_ID:  space,
-                                        NAMESPACE_ITEM_UID : info.Uid,
+                                        NAMESPACE_ITEM_UID : uid,
                                 },
                                 bson.M{
                                         "$set": bson.M{
