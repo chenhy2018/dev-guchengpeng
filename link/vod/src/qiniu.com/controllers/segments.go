@@ -17,7 +17,7 @@ func GetSegments(c *gin.Context) {
 	params, err := ParseRequest(c, xl)
 	if err != nil {
 		xl.Errorf("parse request falied error = %#v", err.Error())
-		c.JSON(500, gin.H{
+		c.JSON(400, gin.H{
 			"error": err.Error(),
 		})
 		return
@@ -60,8 +60,8 @@ func GetSegments(c *gin.Context) {
 			c.JSON(500, nil)
 			return
 		}
-		seg := segInfo{StartTime: starttime,
-			EndTime: endtime}
+		seg := segInfo{StartTime: starttime / 1000,
+			EndTime: endtime / 1000}
 		segs = append(segs, seg)
 	}
 

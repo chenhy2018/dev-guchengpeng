@@ -99,9 +99,9 @@ func ParseRequest(c *gin.Context, xl *xlog.Logger) (*requestParams, error) {
 	}
 	params := &requestParams{
 		uaid:      uaid,
-		from:      fromT,
-		to:        toT,
-		expire:    expireT,
+		from:      fromT * 1000,
+		to:        toT * 1000,
+		expire:    expireT * 1000,
 		token:     token,
 		limit:     int(limitT),
 		marker:    marker,
