@@ -1,0 +1,16 @@
+{
+	"func_comment": false,
+	"file_line": 800,
+	"func_line": 90,
+	"max_indent": 5,
+	"formated": false,
+	"ignore":[
+	],
+	"fatal":[
+		"formated",
+		"file_line",
+		"func_line",
+		"max_indent"
+	]
+}
+

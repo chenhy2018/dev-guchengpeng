@@ -25,7 +25,7 @@ func GetPlayBackm3u8(c *gin.Context) {
 	params, err := ParseRequest(c, xl)
 	if err != nil {
 		xl.Errorf("parse request falied error = %#v", err.Error())
-		c.JSON(500, gin.H{
+		c.JSON(400, gin.H{
 			"error": err.Error(),
 		})
 		return
@@ -39,11 +39,11 @@ func GetPlayBackm3u8(c *gin.Context) {
 		})
 		return
 	}
-	xl.Infof("uid= %v, uaid = %v, from = %v, to = %v, namespace = %v", params.uid, params.uaid, time.Unix(params.from/1000, 0), time.Unix(params.to/1000, 0), params.namespace)
+	xl.Infof("uid= %v, uaid = %v, from = %v, to = %v, namespace = %v", params.uid, params.uaid, params.from, params.to, params.namespace)
 	dayInSec := int64((24 * time.Hour).Seconds() * 1000)
 	if (params.to - params.from) > dayInSec {
 		xl.Errorf("bad from/to time, from = %v, to = %v", params.from, params.to)
-		c.JSON(500, gin.H{
+		c.JSON(400, gin.H{
 			"error": "bad from/to time, currently we only support playback in 24 hours",
 		})
 		return
