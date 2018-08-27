@@ -28,6 +28,7 @@ type requestParams struct {
 	limit     int
 	marker    string
 	namespace string
+        regular   string
 }
 
 func VerifyAuth(xl *xlog.Logger, req *http.Request) (bool, error) {
@@ -65,12 +66,14 @@ func ParseRequest(c *gin.Context, xl *xlog.Logger) (*requestParams, error) {
 	*/
 	uaid := c.Param("uaid")
 	namespace := c.Param("namespace")
-	from := c.Query("from")
-	to := c.Query("to")
+        uid := c.Param("uid")
+	from := c.DefaultQuery("from", "0")
+	to := c.DefaultQuery("to", "1")
 	expire := c.DefaultQuery("e", "0")
 	token := c.Query("token")
 	limit := c.DefaultQuery("limit", "1000")
 	marker := c.DefaultQuery("marker", "")
+        regular := c.DefaultQuery("regular", "")
 
 	if strings.Contains(uaid, ".m3u8") {
 		uaid = strings.Split(uaid, ".")[0]
@@ -98,14 +101,16 @@ func ParseRequest(c *gin.Context, xl *xlog.Logger) (*requestParams, error) {
 		limitT = 1000
 	}
 	params := &requestParams{
-		uaid:      uaid,
-		from:      fromT,
-		to:        toT,
-		expire:    expireT,
-		token:     token,
-		limit:     int(limitT),
-		marker:    marker,
-		namespace: namespace,
+                uid:       uid,
+                uaid:      uaid,
+                from:      fromT,
+                to:        toT,
+                expire:    expireT,
+                token:     token,
+                limit:     int(limitT),
+                marker:    marker,
+                namespace: namespace,
+                regular:   regular,
 	}
 
 	return params, nil

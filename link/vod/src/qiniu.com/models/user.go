@@ -6,7 +6,7 @@ import (
         "gopkg.in/mgo.v2"
         "gopkg.in/mgo.v2/bson"
         "github.com/qiniu/xlog.v1"
-        //"time"
+        "time"
 )
 
 type UserModel struct {
@@ -17,11 +17,12 @@ var (
 )
 
 type UserInfo struct {
-        Uid       string         `bson:"uid"        json:"uid"`
-        Password  string         `bson:"password"   json:"password"`
-        Status    bool           `bson:"status"      json:"status"`
-        RegTime   int64          `bson:"registertime"  json:"registertime"`
-        IsSuperuser bool         `bson:"issuperuser"  json:"issuperuser"`
+        Uid         string         `bson:"uid"        json:"uid"`
+        Password    string         `bson:"password"   json:"password"`
+        Status      bool           `bson:"status"      json:"status"`
+        CreateAt    int64          `bson:"createdAt"   json:"createdAt"`
+        UpdateAt    int64          `bson:"updatedAt"   json:"updatedAt"`
+        IsSuperuser bool           `bson:"issuperuser"  json:"issuperuser"`
 }
 
 // -----------------------------------------------------------------------------------------------------------
@@ -92,6 +93,7 @@ func ResetPassword(xl *xlog.Logger, uid, opwd, pwd string) error {
                         update := bson.M{
                                 "$set": bson.M{
                                         USER_PASSWORD: pwd,
+                                        ITEM_UPDATA_TIME : time.Now().Unix(),
                                 },
                         }
                         return c.Update(query, update)
@@ -187,7 +189,8 @@ func AddUser(xl *xlog.Logger, info UserInfo, uid, pwd string) error {
                                                 USER_PASSWORD: info.Password,
                                                 USER_IS_SUPERUSER : false,
                                                 USER_STATUS : false,
-                                                USER_REGTIME : info.RegTime,
+                                                ITEM_CREATE_TIME : time.Now().Unix(),
+                                                ITEM_UPDATA_TIME : time.Now().Unix(),
                                         },
                                 },
                         )

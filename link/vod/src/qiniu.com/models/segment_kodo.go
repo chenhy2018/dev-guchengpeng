@@ -103,7 +103,11 @@ func GetInfoFromFilename(s, sep string) (error, map[string]interface{}) {
                 if err != nil {
                         return err, info
                 }
-                fragmentStartTime, err2 := strconv.ParseInt(sub[3], 10, 64)
+                r := strings.Split(sub[3], ".")
+                if len(r) != 2 {
+                        return fmt.Errorf("the filename is error [%s]", sub[3]), info
+                }
+                fragmentStartTime, err2 := strconv.ParseInt(r[0], 10, 64)
                 if err2 != nil {
                         return err2, info
                 }
@@ -267,6 +271,7 @@ func (m *SegmentKodoModel) GetFrameInfo(xl *xlog.Logger, starttime,endtime int64
                 err, info := GetInfoFromFilename(listItem1.Item.Key, "/")
                 if err != nil {
                         // if one file is not correct, continue to next
+                        xl.Infof("GetFrameInfo err  %s \n", err)
                         continue;
                 }
                 if info[SEGMENT_ITEM_START_TIME].(int64) > endtime {

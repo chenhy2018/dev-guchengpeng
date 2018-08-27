@@ -3,6 +3,8 @@ package models
 const (
         SEGMENT_COL = "segment"
         ITEM_ID   = "_id"
+        ITEM_CREATE_TIME = "createdAt"
+        ITEM_UPDATA_TIME = "updatedAt"
         SEGMENT_ITEM_FRAGMENT_START_TIME = "fragmentstarttime"
         SEGMENT_ITEM_START_TIME = "starttime"
         SEGMENT_ITEM_END_TIME = "endtime"
@@ -11,7 +13,6 @@ const (
         UA_COL = "ua"
         UA_ITEM_UID   = "uid"
         UA_ITEM_UAID = "uaid"
-        UA_ITEM_DATE   = "date"
         UA_ITEM_NAMESPACE = "namespace"
         UA_ITEM_PASSWORD = "password"
         USER_COL = "user"
@@ -21,6 +22,7 @@ const (
         USER_REGTIME = "registertime"
         USER_IS_SUPERUSER = "issuperuser"
         NAMESPACE_COL = "namespace"
-        NAMESPACE_ITEM_DATE = "date"
-        NAMESPACE_ITEM_BUCKETURL = "bucketurl"
+        NAMESPACE_ITEM_ID = "namespace"
+        NAMESPACE_ITEM_BUCKET = "bucket"
+        NAMESPACE_ITEM_UID = "uid"
 )

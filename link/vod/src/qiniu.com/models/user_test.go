@@ -5,7 +5,6 @@ import (
         "qiniu.com/db"
         "github.com/stretchr/testify/assert"
         "github.com/qiniu/xlog.v1"
-        "time"
 )
 
 func TestUser(t *testing.T) {
@@ -26,14 +25,12 @@ func TestUser(t *testing.T) {
         info := UserInfo {
                 Uid : "test",
                 Password : "test",
-                RegTime : time.Now().Unix(),
         }
         err := AddUser(xl, info, "admin", "linking")
         assert.Equal(t, err, nil, "they should be equal")
         info = UserInfo {
                 Uid : "test1",
                 Password : "test1",
-                RegTime : time.Now().Unix(),
         }
         err = AddUser(xl, info, "admin", "linking")
         assert.Equal(t, err, nil, "they should be equal")
@@ -41,7 +38,6 @@ func TestUser(t *testing.T) {
         info = UserInfo {
                 Uid : "test2",
                 Password : "test2",
-                RegTime : time.Now().Unix(),
         }
         err = AddUser(xl, info, "admin", "linking")
         assert.Equal(t, err, nil, "they should be equal")
@@ -49,7 +45,6 @@ func TestUser(t *testing.T) {
         info = UserInfo {
                 Uid : "test3",
                 Password : "test3",
-                RegTime : time.Now().Unix(),
         }
         AddUser(xl, info, "admin", "linking")
         assert.Equal(t, err, nil, "they should be equal")
@@ -67,25 +62,21 @@ func TestUser(t *testing.T) {
         info = UserInfo {
                 Uid : "test",
                 Password : "test",
-                RegTime : time.Now().Unix(),
         }
         DelUser(xl, info, "admin", "linking")
         info = UserInfo {
                 Uid : "test1",
                 Password : "test1",
-                RegTime : time.Now().Unix(),
         }       
         DelUser(xl, info, "admin", "linking")
         info = UserInfo {
                 Uid : "test2",
                 Password : "test2",
-                RegTime : time.Now().Unix(),
         }       
         DelUser(xl, info, "admin", "linking")
         info = UserInfo {
                 Uid : "test3",
                 Password : "test3",
-                RegTime : time.Now().Unix(),
         }       
         DelUser(xl, info, "admin", "linking")
 }

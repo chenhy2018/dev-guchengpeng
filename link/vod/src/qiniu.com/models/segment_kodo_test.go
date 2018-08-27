@@ -78,4 +78,8 @@ func TestKodoSegment(t *testing.T) {
         infoF, markF,  errF = model.GetFragmentTsInfo(xl, 7, int64(1534412096000), int64(1534729559000), bucket, "testdeviceid10", markF)
         assert.Equal(t, errF, nil, "they should be equal")
         assert.Equal(t, len(infoF), 3, "they should be equal")
+
+        infoF,  errF = model.GetFrameInfo(xl, int64(1535358330000), int64(1535359621000), bucket, "testdeviceid6")
+        assert.Equal(t, errF, nil, "they should be equal")
+        assert.Equal(t, len(infoF), 3, "they should be equal")
 }

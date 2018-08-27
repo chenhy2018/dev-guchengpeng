@@ -24,6 +24,18 @@ func main() {
 	r.GET("/v1/namespaces/:namespace/uas/:uaid/playback", controllers.GetPlayBackm3u8)
 	r.GET("/v1/namespaces/:namespace/uas/:uaid/segments", controllers.GetSegments)
 	r.GET("/v1/namespaces/:namespace/uas/:uaid/frames", controllers.GetFrames)
+        r.POST("/v1/namespaces/:namespace/uas", controllers.RegisterUa)
+        r.DELETE("/v1/namespaces/:namespace/uas/:uaid", controllers.DeleteUa)
+        r.PUT("/v1/namespaces/:namespace/uas/:uaid", controllers.UpdateUa)
+        r.GET("/v1/namespaces/:namespace/uas/:uaid", controllers.GetUaInfo)
+        r.GET("/v1/namespaces/:namespace/uas", controllers.GetUaInfos)
+
+        r.POST("/v1/uids/:uid/namespaces", controllers.RegisterNamespace)
+        r.DELETE("/v1/uids/:uid/namespaces/:namespace", controllers.DeleteNamespace)
+        r.PUT("/v1/uids/:uid/namespaces/:namespace", controllers.UpdateNamespace)
+        r.GET("/v1/uids/:uid/namespaces/:namespace", controllers.GetNamespaceInfo)
+        r.GET("/v1/uids/:uid/namespaces", controllers.GetNamespaceInfos)
+
 	r.POST("/qiniu/upload/callback", controllers.UploadTs)
 	r.Run(Config.Bind) // listen and serve on 0.0.0.0:8080
 
