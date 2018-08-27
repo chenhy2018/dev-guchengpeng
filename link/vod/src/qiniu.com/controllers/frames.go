@@ -19,8 +19,8 @@ func GetFrames(c *gin.Context) {
 	xl := xlog.New(c.Writer, c.Request)
 	params, err := ParseRequest(c, xl)
 	if err != nil {
-		xl.Errorf("parse request falied error = %#v", err.Error())
-		c.JSON(500, gin.H{
+		xl.Errorf("parse request parameter falied, error = %#v", err.Error())
+		c.JSON(400, gin.H{
 			"error": err.Error(),
 		})
 		return
@@ -44,7 +44,11 @@ func GetFrames(c *gin.Context) {
 	xl.Infof("uid= %v, uaid = %v, from = %v, to = %v, namespace = %v", params.uid, params.uaid, params.from, params.to, params.namespace)
 
 	frames, err := SegMod.GetFrameInfo(xl, params.from, params.to, params.namespace, params.uaid)
-
+	if err != nil {
+		xl.Error("get FrameInfo falied, error = %#v", err)
+		c.JSON(500, nil)
+		return
+	}
 	if frames == nil {
 		c.JSON(200, gin.H{
 			"frames": []string{},
@@ -68,7 +72,7 @@ func GetFrames(c *gin.Context) {
 			return
 		}
 		frame := FrameInfo{DownloadUr: realUrl,
-			Timestamp: starttime}
+			Timestamp: starttime / 1000}
 		framesWithToken = append(framesWithToken, frame)
 	}
 
