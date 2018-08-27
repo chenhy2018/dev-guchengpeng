@@ -2,6 +2,7 @@ package models
 
 import (
         "fmt"
+        "strconv"
         "qiniu.com/db"
         "gopkg.in/mgo.v2"
         "gopkg.in/mgo.v2/bson"
@@ -9,14 +10,14 @@ import (
         "time"
 )
 
-type uaModel struct {
+type UaModel struct {
 }
 
 var (
-        Ua *uaModel
+        Ua *UaModel
 )
 
-func (m *uaModel) Init() error {
+func (m *UaModel) Init() error {
 
 //     index := Index{
 //         Key: []string{"uid"},
@@ -35,9 +36,9 @@ func (m *uaModel) Init() error {
         )
 }
 
-func (m *uaModel) Register(xl *xlog.Logger, req UaInfo) error {
+func (m *UaModel) Register(xl *xlog.Logger, req UaInfo) error {
         /*
-                 db.ua.update( {uid: id, uaid: id, xxx}, {"$set": {"namespace": space, "password": password}},
+                 db.ua.update( {uaid: id, namespace: space, xxx}, {"$set": {"namespace": space, "password": password}},
                  { upsert: true })
         */
         err := db.WithCollection(
@@ -45,16 +46,17 @@ func (m *uaModel) Register(xl *xlog.Logger, req UaInfo) error {
                 func(c *mgo.Collection) error {
                         _, err := c.Upsert(
                                 bson.M{
-                                        UA_ITEM_UID:  req.Uid,
-                                        UA_ITEM_UAID: req.UaId,
+                                        UA_ITEM_UAID:  req.UaId,
+                                        UA_ITEM_NAMESPACE: req.Namespace,
                                 },
                                 bson.M{
                                         "$set": bson.M{
                                                 UA_ITEM_UID:  req.Uid,
                                                 UA_ITEM_UAID: req.UaId,
                                                 UA_ITEM_PASSWORD: req.Password,
-                                                UA_ITEM_DATE: time.Now().Unix(),
+                                                ITEM_CREATE_TIME: time.Now().Unix(),
                                                 UA_ITEM_NAMESPACE: req.Namespace,
+                                                ITEM_UPDATA_TIME : time.Now().Unix(),
                                         },
                                 },
                         )
@@ -67,16 +69,16 @@ func (m *uaModel) Register(xl *xlog.Logger, req UaInfo) error {
         return nil;
 }
 
-func (m *uaModel) Delete(xl *xlog.Logger, uid,uaid string) error {
+func (m *UaModel) Delete(xl *xlog.Logger, namespace,uaid string) error {
         /*
-                 db.ua.remove({uid: id, uaid: id})
+                 db.ua.remove({space: namespace, uaid: id})
         */
         return db.WithCollection(
                 UA_COL,
                 func(c *mgo.Collection) error {
 			return c.Remove(
 				bson.M{
-					UA_ITEM_UID: uid,
+                                        UA_ITEM_NAMESPACE: namespace,
                                         UA_ITEM_UAID: uaid,
 				},
                         )
@@ -89,37 +91,41 @@ type UaInfo struct {
         UaId          string  `bson:"uaid"       json:"uaid"`
         Password      string  `bson:"password"   json:"password"` //options
         Namespace     string  `bson:"namespace"  json:"namespace"`
+        CreateAt      int64   `bson:"createdAt"  json:"createdAt"`
+        UpdatedAt     int64   `bson:"updateAt"   json:"updateAt"`
 }
 
-func (m *uaModel) GetUaInfos(xl *xlog.Logger, index, rows int, category, like string) ([]UaInfo, error) {
+func (m *UaModel) GetUaInfos(xl *xlog.Logger, limit int, mark, namespace, category, like string) ([]UaInfo, string, error) {
 
         /*
-                 db.ua.find({category: {"$regex": "*like*"}},
-                 ).sort({"date":1}).limit(rows),skip(rows * index)
+                 db.ua.find({"namespace": namespace, {category: {"$regex": "*like*"}},}
+                 ).sort({"date":1}).limit(limit),skip(mark)
         */
         // query by keywords
-        query := bson.M{}
-        if like != "" {
-                query[category] = bson.M{
-                        "$regex": ".*" + like + ".*",
-                }
+        query := bson.M{
+                 UA_ITEM_NAMESPACE : namespace,
+                 category : bson.M {"$regex": ".*" + like + ".*"},
+        }
+        // direct to specific page
+        nextMark := ""
+        // direct to specific page
+        skip, err := strconv.ParseInt(mark, 10, 32)
+        if err != nil {
+                skip = 0
         }
 
-        // direct to specific page
-        skip := rows * index
-        limit := rows
-        if limit > 100 {
-                limit = 100
+        if limit == 0 {
+                limit = 65535
         }
 
         // query
         r := []UaInfo{}
         count := 0
-        err := db.WithCollection(
+        err = db.WithCollection(
                 UA_COL,
                 func(c *mgo.Collection) error {
                         var err error
-                        if err = c.Find(query).Sort(UA_ITEM_UID).Skip(skip).Limit(limit).All(&r); err != nil {
+                        if err = c.Find(query).Sort(UA_ITEM_UID).Skip(int(skip)).Limit(limit).All(&r); err != nil {
                                 return fmt.Errorf("query failed")
                         }
                         if count, err = c.Find(query).Count(); err != nil {
@@ -129,61 +135,61 @@ func (m *uaModel) GetUaInfos(xl *xlog.Logger, index, rows int, category, like st
                 },
         )
         if err != nil {
-               return []UaInfo{}, err
+               return []UaInfo{}, "", err
         }
-        return r, nil
+       if (count == limit) {
+               nextMark = fmt.Sprintf("%d", count)
+        }
+        return r, nextMark, nil
 }
 
-func (m *uaModel) GetUaInfo(xl *xlog.Logger, uid,uaid string) ([]UaInfo, error) {
+func (m *UaModel) GetUaInfo(xl *xlog.Logger, namespace,uaid string) (UaInfo, error) {
         /*
-                 db.ua.find({uid: id, uaid: id},
-                 ).sort({"date":1}).limit(rows),skip(rows * index)
+                 db.ua.find({namespace: namespace, uaid: id})
         */
         // query by keywords
         query := bson.M{
-                UA_ITEM_UID: uid,
                 UA_ITEM_UAID: uaid,
+                UA_ITEM_NAMESPACE: namespace,
         }
         
-        // direct to specific page
-        limit := 1
         
         // query
-        r := []UaInfo{}
+        r := UaInfo{}
         err := db.WithCollection(
                 UA_COL, 
                 func(c *mgo.Collection) error {
                         var err error
-                        if err = c.Find(query).Limit(limit).One(&r); err != nil {
+                        if err = c.Find(query).One(&r); err != nil {
                                 return fmt.Errorf("query failed")
                         }
                         return nil
                 },
         )
         if err != nil {
-               return []UaInfo{}, err
+               return UaInfo{}, err
         }
         return r, nil
 }
 
-func (m *uaModel) UpdateUa(xl *xlog.Logger, info UaInfo) error {
+func (m *UaModel) UpdateUa(xl *xlog.Logger, namespace,uaid string, info UaInfo) error {
         /*
-                 db.ua.update({uid: id, uaid: id}, bson.M{"$set":{"namespace": space, "password": password}}),
+                 db.ua.update({namespace: space, uaid: uaid}, bson.M{"$set":{"namespace": space, "password": password}}),
         */
          return db.WithCollection(
                 UA_COL,
                 func(c *mgo.Collection) error {
                         return c.Update(
                                 bson.M{
-                                        UA_ITEM_UID:  info.Uid,
-                                        UA_ITEM_UAID: info.UaId,
+                                        UA_ITEM_NAMESPACE: namespace,
+                                        UA_ITEM_UAID: uaid,
                                 },
                                 bson.M{
                                         "$set": bson.M{
                                                 UA_ITEM_UID:  info.Uid,
                                                 UA_ITEM_UAID: info.UaId,
                                                 UA_ITEM_PASSWORD: info.Password,
-                                                UA_ITEM_DATE: time.Now().Unix(),
+                                                ITEM_UPDATA_TIME: time.Now().Unix(),
                                                 UA_ITEM_NAMESPACE: info.Namespace,
                                         },
                                 },
@@ -191,4 +197,3 @@ func (m *uaModel) UpdateUa(xl *xlog.Logger, info UaInfo) error {
                 },
         )
 }
-

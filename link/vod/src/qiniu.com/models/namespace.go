@@ -7,22 +7,23 @@ import (
         "gopkg.in/mgo.v2/bson"
         "github.com/qiniu/xlog.v1"
         "time"
+        "strconv"
 )
 
-type namespaceModel struct {
+type NamespaceModel struct {
 }
 
 var (
-        Namespace *namespaceModel
+        Namespace *NamespaceModel
 )
 
-func (m *namespaceModel) Init() error {
+func (m *NamespaceModel) Init() error {
         return nil
 }
 
-func (m *namespaceModel) Register(xl *xlog.Logger, req NamespaceInfo) error {
+func (m *NamespaceModel) Register(xl *xlog.Logger, req NamespaceInfo) error {
         /*
-                 db.namespace.update( {_id: req.Id}, {"$set": {"bucketurl": req.Bucketurl}},
+                 db.namespace.update( {"uid":req.Uid,  "namespace": req.Space}, {"$set": {"bucketurl": req.Bucketurl}},
                  { upsert: true })
         */
         err := db.WithCollection(
@@ -30,13 +31,16 @@ func (m *namespaceModel) Register(xl *xlog.Logger, req NamespaceInfo) error {
                 func(c *mgo.Collection) error {
                         _, err := c.Upsert(
                                 bson.M{
-                                        ITEM_ID:  req.Id,
+                                        NAMESPACE_ITEM_ID:  req.Space,
+                                        NAMESPACE_ITEM_UID : req.Uid,
                                 },
                                 bson.M{
                                         "$set": bson.M{
-                                                ITEM_ID:  req.Id,
-                                                NAMESPACE_ITEM_DATE: time.Now().Unix(),
-                                                NAMESPACE_ITEM_BUCKETURL: req.BucketUrl,
+                                                NAMESPACE_ITEM_ID:  req.Space,
+                                                ITEM_CREATE_TIME: time.Now().Unix(),
+                                                NAMESPACE_ITEM_BUCKET: req.Bucket,
+                                                ITEM_UPDATA_TIME : time.Now().Unix(),
+                                                NAMESPACE_ITEM_UID : req.Uid,
                                         },
                                 },
                         )
@@ -49,16 +53,17 @@ func (m *namespaceModel) Register(xl *xlog.Logger, req NamespaceInfo) error {
         return nil;
 }
 
-func (m *namespaceModel) Delete(xl *xlog.Logger, id string) error {
+func (m *NamespaceModel) Delete(xl *xlog.Logger, uid,id string) error {
         /*
-                 db.namespace.remove({"_id": id})
+                 db.namespace.remove({"uid": uid,  "namespace": id})
         */
         return db.WithCollection(
                 NAMESPACE_COL,
                 func(c *mgo.Collection) error {
 			return c.Remove(
 				bson.M{
-					ITEM_ID: id,
+					NAMESPACE_ITEM_ID: id,
+                                        NAMESPACE_ITEM_UID : uid,
 				},
                         )
                 },
@@ -66,40 +71,62 @@ func (m *namespaceModel) Delete(xl *xlog.Logger, id string) error {
 }
 
 type NamespaceInfo struct {
-        Id            string  `bson:"_id"        json:"_id"`
-        Regtime       int     `bson:"date"       json:"date"`
-        BucketUrl     string  `bson:"bucketurl"  json:"bucketurl"`
+        Space         string  `bson:"namespace"  json:"namespace"`
+        Regtime       int64   `bson:"createdAt"  json:"createdAt"`
+        UpdateTime    int64   `bson:"updatedAt"  json:"updatedAt"`  
+        Bucket        string  `bson:"bucket"     json:"bucket"`
+        Uid           string  `bson:"uid"        json:"uid"`
 }
 
-func (m *namespaceModel) GetNamespaceInfo(xl *xlog.Logger, index, rows int, category, like string) ([]NamespaceInfo, error) {
+func (m *NamespaceModel) GetNamespaceInfo(xl *xlog.Logger,uid, namespace string) (NamespaceInfo, error) {
+        /*
+                 db.namespace.find({"uid":uid, "namespace": namespace})
+        */
+        r := NamespaceInfo{}
+        err := db.WithCollection(
+                NAMESPACE_COL,
+                func(c *mgo.Collection) error {
+                        return c.Find(
+                                bson.M{
+                                        NAMESPACE_ITEM_ID:  namespace,
+                                        NAMESPACE_ITEM_UID : uid,
+                                },
+                        ).One(&r)
+                },
+        )
+        return r, err 
+}
+
+func (m *NamespaceModel) GetNamespaceInfos(xl *xlog.Logger, limit int, mark, uid, category, like string) ([]NamespaceInfo, string, error) {
 
         /*
-                 db.namespace.find({category: {"$regex": "*like*"}},
-                 ).sort({"_id":1}).limit(rows),skip(rows * index)
+                 db.namespace.find({"uid" : uid, { category: {"$regex": "*like*"}}},
+                 ).sort({"namespace":1}).limit(limit),skip(mark)
         */
         // query by keywords
-        query := bson.M{}
-        if like != "" {
-                query[category] = bson.M{
-                        "$regex": ".*" + like + ".*",
-                }
+        query := bson.M{
+                NAMESPACE_ITEM_UID : uid,
+                category : bson.M{ "$regex": ".*" + like + ".*", },
+        }
+        nextMark := ""
+        // direct to specific page
+        skip , err := strconv.ParseInt(mark, 10, 32)
+        if err != nil {
+                skip = 0
         }
 
-        // direct to specific page
-        skip := rows * index
-        limit := rows
-        if limit > 100 {
-                limit = 100
+        if limit == 0 {
+                limit = 65535
         }
 
         // query
         r := []NamespaceInfo{}
         count := 0
-        err := db.WithCollection(
+        err = db.WithCollection(
                 NAMESPACE_COL,
                 func(c *mgo.Collection) error {
                         var err error
-                        if err = c.Find(query).Sort(ITEM_ID).Skip(skip).Limit(limit).All(&r); err != nil {
+                        if err = c.Find(query).Sort(NAMESPACE_ITEM_ID).Skip(int(skip)).Limit(limit).All(&r); err != nil {
                                 return fmt.Errorf("query failed")
                         }
                         if count, err = c.Find(query).Count(); err != nil {
@@ -109,29 +136,35 @@ func (m *namespaceModel) GetNamespaceInfo(xl *xlog.Logger, index, rows int, cate
                 },
         )
         if err != nil {
-               return []NamespaceInfo{}, err
+               return []NamespaceInfo{}, "", err
         }
-        return r, nil
+        if (count == limit) {
+               nextMark = fmt.Sprintf("%d", count)
+        }
+        return r, nextMark, nil
 }
 
-func (m *namespaceModel) UpdateNamespace(xl *xlog.Logger, info NamespaceInfo) error {
+func (m *NamespaceModel) UpdateNamespace(xl *xlog.Logger, uid, space string, info NamespaceInfo) error {
         /*
-                 db.namespace.update({"_id": id}, bson.M{"$set":{"bucketurl": info.BucketUrl}}),
+                 db.namespace.update({"uid": uid, "namespace": space}, bson.M{"$set":{"bucketurl": info.BucketUrl}}),
         */
          return db.WithCollection(
                 NAMESPACE_COL,
                 func(c *mgo.Collection) error {
                         return c.Update(
                                 bson.M{
-                                        ITEM_ID:  info.Id,
+                                        NAMESPACE_ITEM_ID:  space,
+                                        NAMESPACE_ITEM_UID : uid,
                                 },
                                 bson.M{
                                         "$set": bson.M{
-                                                NAMESPACE_ITEM_BUCKETURL: info.BucketUrl,
+                                                NAMESPACE_ITEM_ID:  info.Space,
+                                                NAMESPACE_ITEM_BUCKET: info.Bucket,
+                                                ITEM_UPDATA_TIME : time.Now().Unix(),
+                                                NAMESPACE_ITEM_UID : info.Uid,
                                         },
                                 },
                         )
                 },
         )
 }
-

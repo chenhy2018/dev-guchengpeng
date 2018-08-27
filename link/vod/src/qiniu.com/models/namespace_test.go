@@ -24,29 +24,29 @@ func TestNamespace(t *testing.T) {
         xl.Infof("TestNamespace")
         db.InitDb(&config)
         assert.Equal(t, 0, 0, "they should be equal")
-        model := namespaceModel{}
+        model := NamespaceModel{}
         // Add ua, count size 100, from 0 to 100. 
         for count := 0; count < 100; count++ {
                 p := NamespaceInfo{
-                        Id : fmt.Sprintf("test/%03d",count),
-                        BucketUrl : "www.qiniu.com/112sss",
+                        Space : fmt.Sprintf("test%03d",count),
+                        Bucket : "www.qiniu.com/112sss",
+                        Uid: fmt.Sprintf("Uid%03d",count),
                 }
                 err := model.Register(xl, p)
                 assert.Equal(t, err, nil, "they should be equal")
         }
         xl.Infof("DB Namespace Register done")
         // Get Namespace.
-        r, err := model.GetNamespaceInfo(xl, 0,0,"_id", "test/")
+        r, err := model.GetNamespaceInfo(xl, "Uid099", "test099")
         assert.Equal(t, err, nil, "they should be equal")
-        size := len(r)
-        assert.Equal(t, size, 100, "they should be equal")
+        assert.Equal(t, r.Space, "test099", "they should be equal")
 
-        r_1, err_1 := model.GetNamespaceInfo(xl, 0,0,"_id", "test/099")
+        r_1, _,err_1 := model.GetNamespaceInfos(xl, 0, "", "Uid099", "namespace", "test099")
         assert.Equal(t, err_1, nil, "they should be equal")
         size_1 := len(r_1)
         assert.Equal(t, size_1, 1, "they should be equal")
-        assert.Equal(t, r_1[0].Id, "test/099", "they should be equal")
+        assert.Equal(t, r_1[0].Space, "test099", "they should be equal")
         for count := 0; count < 100; count++ {
-                model.Delete(xl, fmt.Sprintf("daaa%03d", count))
+                model.Delete(xl, "Uid099", fmt.Sprintf("daaa%03d", count))
         }
 }
