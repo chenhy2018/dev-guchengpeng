@@ -143,7 +143,7 @@ func (m *UaModel) GetUaInfos(xl *xlog.Logger, limit int, mark, namespace, catego
         return r, nextMark, nil
 }
 
-func (m *UaModel) GetUaInfo(xl *xlog.Logger, namespace,uaid string) (UaInfo, error) {
+func (m *UaModel) GetUaInfo(xl *xlog.Logger, namespace,uaid string) ([]UaInfo, error) {
         /*
                  db.ua.find({namespace: namespace, uaid: id})
         */
@@ -155,7 +155,7 @@ func (m *UaModel) GetUaInfo(xl *xlog.Logger, namespace,uaid string) (UaInfo, err
         
         
         // query
-        r := UaInfo{}
+        r := []UaInfo{}
         err := db.WithCollection(
                 UA_COL, 
                 func(c *mgo.Collection) error {
@@ -167,7 +167,7 @@ func (m *UaModel) GetUaInfo(xl *xlog.Logger, namespace,uaid string) (UaInfo, err
                 },
         )
         if err != nil {
-               return UaInfo{}, err
+               return []UaInfo{}, err
         }
         return r, nil
 }

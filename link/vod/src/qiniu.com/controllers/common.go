@@ -28,7 +28,8 @@ type requestParams struct {
         limit     int
         marker    string
         namespace string
-        regular   string
+        regex     string
+        exact     bool
 }
 
 func VerifyAuth(xl *xlog.Logger, req *http.Request) (bool, error) {
@@ -66,14 +67,16 @@ func ParseRequest(c *gin.Context, xl *xlog.Logger) (*requestParams, error) {
         */
         uaid := c.Param("uaid")
         namespace := c.Param("namespace")
-        uid := c.Param("uid")
+        // TODO use ak or body uid.
+        uid := c.DefaultQuery("uid", "link")
         from := c.DefaultQuery("from", "0")
         to := c.DefaultQuery("to", "1")
         expire := c.DefaultQuery("e", "0")
         token := c.Query("token")
         limit := c.DefaultQuery("limit", "1000")
         marker := c.DefaultQuery("marker", "")
-        regular := c.DefaultQuery("regular", "")
+        regex := c.DefaultQuery("regex", "")
+        exact := c.DefaultQuery("exact", "false")
 
         if strings.Contains(uaid, ".m3u8") {
                 uaid = strings.Split(uaid, ".")[0]
@@ -100,6 +103,11 @@ func ParseRequest(c *gin.Context, xl *xlog.Logger) (*requestParams, error) {
         if limitT > 1000 {
                 limitT = 1000
         }
+        exactT, err := strconv.ParseBool(exact)
+        if err != nil {
+                return nil, errors.New("Parse exact failed")
+        }
+
         params := &requestParams{
                 uid:       uid,
                 uaid:      uaid,
@@ -110,7 +118,8 @@ func ParseRequest(c *gin.Context, xl *xlog.Logger) (*requestParams, error) {
                 limit:     int(limitT),
                 marker:    marker,
                 namespace: namespace,
-                regular:   regular,
+                regex:     regex,
+                exact:     exactT,
         }
 
         return params, nil

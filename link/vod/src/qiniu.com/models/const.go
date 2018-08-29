@@ -25,4 +25,5 @@ const (
         NAMESPACE_ITEM_ID = "namespace"
         NAMESPACE_ITEM_BUCKET = "bucket"
         NAMESPACE_ITEM_UID = "uid"
+        NAMESPACE_ITEM_DOMAIN = "domain"
 )

@@ -173,34 +173,7 @@ func UpdateUa(c *gin.Context) {
         }
 }
 
-// sample requset url = /v1/namespaces/<Namespace>/uas&regular=<Regular>&limit=<Limit>&marker=<Marker>
-func GetUaInfos(c *gin.Context) {
-        xl := xlog.New(c.Writer, c.Request)
-        params, err := ParseRequest(c, xl)
-        if err != nil {
-                xl.Errorf("parse request falied error = %#v", err.Error())
-                c.JSON(500, gin.H{
-                        "error": err.Error(),
-                })
-                return
-        }
-        xl.Infof("limit %d, marker %s, regular %s namespace %s", params.limit, params.marker, params.regular, params.namespace)
-        r, nextMark, err1 := UaMod.GetUaInfos(xl, params.limit, params.marker,params.namespace, models.UA_ITEM_UAID, params.regular)
-        if err1 != nil {
-                xl.Errorf("Update falied error = %#v", err1.Error())
-                c.JSON(500, gin.H{
-                        "error": err.Error(),
-                })
-                return
-        } else {
-                c.Header("Content-Type", "application/json")
-                c.Header("Access-Control-Allow-Origin", "*")
-                c.JSON(200, gin.H{ "item" : r,
-                                   "marker" : nextMark, })
-        }
-}
-
-// sample requset url = /v1/namespaces/<Namespace>/uas/<EncodedUa>
+// sample requset url = /v1/namespaces/<Namespace>/uas&regex=<Regex>&limit=<Limit>&marker=<Marker>
 func GetUaInfo(c *gin.Context) {
         xl := xlog.New(c.Writer, c.Request)
         params, err := ParseRequest(c, xl)
@@ -211,23 +184,24 @@ func GetUaInfo(c *gin.Context) {
                 })
                 return
         }
-        r, err1 := UaMod.GetUaInfo(xl, params.namespace, params.uaid)
-        if err1 != nil {
-                xl.Errorf("Update falied error = %#v", err1.Error())
+        var nextMark = ""
+        var r []models.UaInfo
+        xl.Infof("limit %d, marker %s, regex %s namespace %s", params.limit, params.marker, params.regex, params.namespace)
+        if params.exact {
+                r, err = UaMod.GetUaInfo(xl, params.namespace, params.regex)
+        } else {
+                r, nextMark, err = UaMod.GetUaInfos(xl, params.limit, params.marker, params.namespace, models.UA_ITEM_UAID, params.regex)
+        }
+        if err != nil {
+                xl.Errorf("Update falied error = %#v", err.Error())
                 c.JSON(500, gin.H{
-                        "error": err1.Error(),
+                        "error": err.Error(),
                 })
                 return
         } else {
-                str, err2 := json.Marshal(r)
-                if err2 != nil {
-                        xl.Errorf("Update falied error = %#v", err2.Error())
-                        c.JSON(500, gin.H{
-                                "error": err2.Error(),
-                        })
-                }
                 c.Header("Content-Type", "application/json")
                 c.Header("Access-Control-Allow-Origin", "*")
-                c.String(200, string(str))
+                c.JSON(200, gin.H{ "item" : r,
+                                   "marker" : nextMark, })
         }
 }
