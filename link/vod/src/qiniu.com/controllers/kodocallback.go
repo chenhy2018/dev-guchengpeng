@@ -102,7 +102,7 @@ func UploadTs(c *gin.Context) {
 	xl.Infof("oldFileName = %v, newFileName = %v", kodoData.Key, strings.Join(newFilName[:], "/"))
 
 	mac := qbox.NewMac(accessKey, secretKey)
-	segPrefix := strings.Join([]string{"seg", ids[1], ids[2]}, "/")
+	segPrefix := strings.Join([]string{"seg", ids[1], ids[3]}, "/")
 	if err := updateTsName(xl, key, strings.Join(newFilName[:], "/"), kodoData.Bucket, segPrefix, endTime, int(tsExpire), mac); err != nil {
 		xl.Errorf("ts filename update failed err = %#v", err)
 		c.JSON(500, gin.H{
