@@ -113,12 +113,10 @@ func TestGetUa(t *testing.T) {
 	}
 	c.Params = append(c.Params, param)
 	GetUaInfo(c)
-	fmt.Printf("write %v \n", recoder.Body)
 	body, err := ioutil.ReadAll(recoder.Body)
 	if err != nil {
 		fmt.Errorf("parse request body failed, body = %#v", body)
 	}
-	fmt.Printf("%s \n", body)
 	//{"item":[{"namespace":"test1","createdAt":1535539324,"updatedAt":1535539324,"bucket":"ipcamera","uid":"link","domain":"pdwjeyj6v.bkt.clouddn.com"}],"marker":""}
 	assert.Equal(t, c.Writer.Status(), 200, "they should be equal")
 
@@ -132,12 +130,10 @@ func TestGetUa(t *testing.T) {
 	c.Params = append(c.Params, param)
 	c.Request = req
 	GetUaInfo(c)
-	fmt.Printf("write %v \n", recoder.Body)
 	body, err = ioutil.ReadAll(recoder.Body)
 	if err != nil {
 		fmt.Errorf("parse request body failed, body = %#v", body)
 	}
-	fmt.Printf("%s \n", body)
 	//{"item":[],"marker":""}
 	bodye := []uint8([]byte{0x7b, 0x22, 0x69, 0x74, 0x65, 0x6d, 0x22, 0x3a, 0x5b, 0x5d, 0x2c, 0x22, 0x6d, 0x61, 0x72, 0x6b, 0x65, 0x72, 0x22, 0x3a, 0x22, 0x22, 0x7d})
 	assert.Equal(t, c.Writer.Status(), 200, "they should be equal")
@@ -153,12 +149,10 @@ func TestGetUa(t *testing.T) {
 	c.Params = append(c.Params, param)
 	c.Request = req
 	GetUaInfo(c)
-	fmt.Printf("write %v \n", recoder.Body)
 	body, err = ioutil.ReadAll(recoder.Body)
 	if err != nil {
 		fmt.Errorf("parse request body failed, body = %#v", body)
 	}
-	fmt.Printf("%s \n", body)
 	//{"item":[],"marker":""}
 	assert.Equal(t, c.Writer.Status(), 200, "they should be equal")
 }

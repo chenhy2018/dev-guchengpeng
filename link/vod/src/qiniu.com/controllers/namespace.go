@@ -41,12 +41,10 @@ func getDomain(xl *xlog.Logger, bucket string) (string, error) {
 	token, _ := mac.SignRequest(request)
 
 	request.Header.Set("Authorization", "QBox "+token)
-	xl.Infof("%#v", request)
 	resp, err := client.Do(request)
 	if err != nil {
 		return "", err
 	}
-	xl.Infof("%#v", resp)
 	body, err := ioutil.ReadAll(resp.Body)
 	var domain []string
 	err = json.Unmarshal(body, &domain)
@@ -57,7 +55,6 @@ func getDomain(xl *xlog.Logger, bucket string) (string, error) {
 }
 
 func checkbucket(xl *xlog.Logger, bucket string) error {
-	xl.Infof("bucket %s", bucket)
 	info, err := namespaceMod.GetNamespaceByBucket(xl, bucket)
 	if err != nil {
 		xl.Infof("%s", err.Error())
@@ -90,10 +87,8 @@ func RegisterNamespace(c *gin.Context) {
 		})
 		return
 	}
-	xl.Infof("%s", body)
 	var namespaceData namespacebody
 	err = json.Unmarshal(body, &namespaceData)
-	xl.Infof("%#v", namespaceData)
 
 	if err != nil {
 		xl.Errorf("parse request body failed, body = %#v", body)
@@ -102,7 +97,6 @@ func RegisterNamespace(c *gin.Context) {
 		})
 		return
 	}
-	xl.Infof("%s %s", namespaceData.Namespace, params.namespace)
 	err = checkbucket(xl, namespaceData.Bucket)
 	if err != nil {
 		xl.Errorf("bucket is already register, err = %#v", err)
@@ -120,7 +114,6 @@ func RegisterNamespace(c *gin.Context) {
 		})
 		return
 	}
-	xl.Infof("domain %s", domain)
 	namespace := models.NamespaceInfo{
 		Uid:    params.uid,
 		Space:  params.namespace,
@@ -218,7 +211,6 @@ func UpdateNamespace(c *gin.Context) {
 	}
 
 	body, err := ioutil.ReadAll(c.Request.Body)
-	xl.Infof("%s", body)
 	var namespaceData namespacebody
 	err = json.Unmarshal(body, &namespaceData)
 	if err != nil || namespaceData.Uid == "" {
@@ -237,7 +229,6 @@ func UpdateNamespace(c *gin.Context) {
 		})
 		return
 	}
-	xl.Infof("%#v", namespaceData)
 	/*
 	   namespace := models.NamespaceInfo{
 	           Uid  : namespaceData.Uid,
@@ -246,7 +237,6 @@ func UpdateNamespace(c *gin.Context) {
 	           Domain : domain,
 	   }
 	*/
-	xl.Infof("%s %s", params.uid, params.namespace)
 	oldinfo, err := namespaceMod.GetNamespaceInfo(xl, params.uid, params.namespace)
 	if err != nil || len(oldinfo) == 0 {
 		xl.Errorf("Can't find namespace")

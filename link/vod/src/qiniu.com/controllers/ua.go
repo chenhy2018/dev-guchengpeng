@@ -75,10 +75,8 @@ func RegisterUa(c *gin.Context) {
 	}
 
 	body, err := ioutil.ReadAll(c.Request.Body)
-	xl.Infof("%s", body)
 	var uaData uabody
 	err = json.Unmarshal(body, &uaData)
-	xl.Infof("%#v", uaData)
 
 	if err != nil {
 		xl.Errorf("parse request body failed, body = %#v", body)
@@ -87,7 +85,6 @@ func RegisterUa(c *gin.Context) {
 		})
 		return
 	}
-	xl.Infof("%s %s", uaData.Uaid, params.namespace)
 
 	ua := models.UaInfo{
 		Uid:       params.uid,
@@ -97,7 +94,6 @@ func RegisterUa(c *gin.Context) {
 	}
 	model := models.NamespaceModel{}
 	r, err := model.GetNamespaceInfo(xl, params.uid, params.namespace)
-	xl.Errorf("namespace is %#v", r)
 	if err != nil || len(r) == 0 {
 		xl.Errorf("namespace is not correct")
 		c.JSON(400, gin.H{
@@ -163,7 +159,6 @@ func UpdateUa(c *gin.Context) {
 	}
 
 	body, err := ioutil.ReadAll(c.Request.Body)
-	xl.Infof("%s", body)
 	var uaData uabody
 	err = json.Unmarshal(body, &uaData)
 	if err != nil || uaData.Uid == "" || uaData.Uaid == "" || uaData.Namespace == "" {
@@ -174,7 +169,6 @@ func UpdateUa(c *gin.Context) {
 		return
 	}
 
-	xl.Infof("%#v", uaData)
 	ua := models.UaInfo{
 		Uid:       uaData.Uid,
 		UaId:      uaData.Uaid,

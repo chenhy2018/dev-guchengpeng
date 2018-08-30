@@ -2,10 +2,7 @@ package controllers
 
 import (
 	"errors"
-<<<<<<< HEAD
-=======
 	"fmt"
->>>>>>> 94452fef8d5fa327844f0f95aca5b69c9eaf771c
 	"net/http"
 	"strconv"
 	"strings"
@@ -75,7 +72,6 @@ func ParseRequest(c *gin.Context, xl *xlog.Logger) (*requestParams, error) {
 	// TODO use ak or body uid.
 	uid := c.DefaultQuery("uid", "link")
 	from := c.DefaultQuery("from", "0")
-	from := c.DefaultQuery("from", "0")
 	to := c.DefaultQuery("to", "0")
 	expire := c.DefaultQuery("e", "0")
 	token := c.Query("token")
@@ -94,9 +90,6 @@ func ParseRequest(c *gin.Context, xl *xlog.Logger) (*requestParams, error) {
 	toT, err := strconv.ParseInt(to, 10, 64)
 	if err != nil {
 		return nil, errors.New("Parse to time failed")
-	}
-	if fromT >= toT {
-		return nil, errors.New("bad from/to time")
 	}
 	expireT, err := strconv.ParseInt(expire, 10, 64)
 	if err != nil {
