@@ -2,6 +2,10 @@ package controllers
 
 import (
 	"errors"
+<<<<<<< HEAD
+=======
+	"fmt"
+>>>>>>> 94452fef8d5fa327844f0f95aca5b69c9eaf771c
 	"net/http"
 	"strconv"
 	"strings"
@@ -41,6 +45,7 @@ func GetUrlWithDownLoadToken(xl *xlog.Logger, domain, fname string, tsExpire int
 	mac := qbox.NewMac(accessKey, secretKey)
 	expireT := time.Now().Add(time.Hour).Unix() + tsExpire
 	realUrl := storage.MakePrivateURL(mac, domain, fname, expireT)
+	fmt.Println(realUrl)
 	return realUrl
 }
 
@@ -70,7 +75,8 @@ func ParseRequest(c *gin.Context, xl *xlog.Logger) (*requestParams, error) {
 	// TODO use ak or body uid.
 	uid := c.DefaultQuery("uid", "link")
 	from := c.DefaultQuery("from", "0")
-	to := c.DefaultQuery("to", "1")
+	from := c.DefaultQuery("from", "0")
+	to := c.DefaultQuery("to", "0")
 	expire := c.DefaultQuery("e", "0")
 	token := c.Query("token")
 	limit := c.DefaultQuery("limit", "1000")

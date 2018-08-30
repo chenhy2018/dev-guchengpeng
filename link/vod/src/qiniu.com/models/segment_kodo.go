@@ -5,12 +5,13 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"github.com/qiniu/api.v7/auth/qbox"
-	"github.com/qiniu/api.v7/storage"
-	"github.com/qiniu/xlog.v1"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/qiniu/api.v7/auth/qbox"
+	"github.com/qiniu/api.v7/storage"
+	"github.com/qiniu/xlog.v1"
 )
 
 var (
@@ -221,12 +222,14 @@ func (m *SegmentKodoModel) GetFragmentTsInfo(xl *xlog.Logger, count int, startti
 			// if one file is not correct, continue to next
 			continue
 		}
+
 		if info[SEGMENT_ITEM_START_TIME].(int64) > starttime {
 			xl.Infof("GetFragmentTsInfo info[SEGMENT_ITEM_START_TIME] %d \n", info[SEGMENT_ITEM_START_TIME].(int64))
 			xl.Infof("GetFragmentTsInfo info[SEGMENT_ITEM_END_TIME] %d \n", info[SEGMENT_ITEM_END_TIME].(int64))
 			r = append(r, info)
 			total++
 		}
+
 		if info[SEGMENT_ITEM_END_TIME].(int64) > endtime {
 			cancelFunc()
 			break
@@ -285,11 +288,4 @@ func (m *SegmentKodoModel) GetFrameInfo(xl *xlog.Logger, starttime, endtime int6
 	}
 	xl.Infof("find frame need %d ms\n", (time.Now().UnixNano()-pre)/1000000)
 	return r, err
-}
-
-func Zone(bucket string) ( /*z *storage.Zone*/ z []string, err error) {
-	mac := qbox.NewMac(accessKey, secretKey)
-	bucketManager := storage.NewBucketManager(mac, &cfg)
-	return bucketManager.Buckets(true)
-	//return bucketManager.Zone(bucket)
 }

@@ -30,6 +30,13 @@ func GetPlayBackm3u8(c *gin.Context) {
 		})
 		return
 	}
+	if params.to <= params.from {
+		xl.Errorf("bad from/to time, from = %v, to = %v", params.from, params.to)
+		c.JSON(400, gin.H{
+			"error": "bad from/to time, from great or equal to",
+		})
+		return
+	}
 
 	fullUrl := "http://" + c.Request.Host + c.Request.URL.String()
 	if !VerifyToken(xl, params.expire, params.token, fullUrl, params.uid) {
@@ -40,8 +47,8 @@ func GetPlayBackm3u8(c *gin.Context) {
 		return
 	}
 	xl.Infof("uid= %v, uaid = %v, from = %v, to = %v, namespace = %v", params.uid, params.uaid, params.from, params.to, params.namespace)
-	dayInSec := int64((24 * time.Hour).Seconds() * 1000)
-	if (params.to - params.from) > dayInSec {
+	dayInMilliSec := int64((24 * time.Hour).Seconds() * 1000)
+	if (params.to - params.from) > dayInMilliSec {
 		xl.Errorf("bad from/to time, from = %v, to = %v", params.from, params.to)
 		c.JSON(400, gin.H{
 			"error": "bad from/to time, currently we only support playback in 24 hours",
@@ -84,7 +91,7 @@ func GetPlayBackm3u8(c *gin.Context) {
 			c.JSON(500, nil)
 			return
 		}
-		realUrl := GetUrlWithDownLoadToken(xl, "http://pcgtsa42m.bkt.clouddn.com/", filename, total)
+		realUrl := GetUrlWithDownLoadToken(xl, "http://pdwjeyj6v.bkt.clouddn.com/", filename, total)
 
 		m := map[string]interface{}{
 			"duration": duration,
