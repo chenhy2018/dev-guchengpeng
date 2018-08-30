@@ -21,17 +21,15 @@ func main() {
         }
         initDb()
 
-        r.POST("/v1/namespaces/:namespace/uas", controllers.RegisterUa)
+        r.POST("/v1/namespaces/:namespace/uas/:uaid", controllers.RegisterUa)
         r.DELETE("/v1/namespaces/:namespace/uas/:uaid", controllers.DeleteUa)
         r.PUT("/v1/namespaces/:namespace/uas/:uaid", controllers.UpdateUa)
-        r.GET("/v1/namespaces/:namespace/uas/:uaid", controllers.GetUaInfo)
-        r.GET("/v1/namespaces/:namespace/uas", controllers.GetUaInfos)
+        r.GET("/v1/namespaces/:namespace/uas", controllers.GetUaInfo)
 
-        r.POST("/v1/uids/:uid/namespaces", controllers.RegisterNamespace)
-        r.DELETE("/v1/uids/:uid/namespaces/:namespace", controllers.DeleteNamespace)
-        r.PUT("/v1/uids/:uid/namespaces/:namespace", controllers.UpdateNamespace)
-        r.GET("/v1/uids/:uid/namespaces/:namespace", controllers.GetNamespaceInfo)
-        r.GET("/v1/uids/:uid/namespaces", controllers.GetNamespaceInfos)
+        r.POST("/v1/namespaces/:namespace", controllers.RegisterNamespace)
+        r.DELETE("/v1/namespaces/:namespace", controllers.DeleteNamespace)
+        r.PUT("/v1/namespaces/:namespace", controllers.UpdateNamespace)
+        r.GET("/v1/namespaces", controllers.GetNamespaceInfo)
 
 	r.GET("/v1/namespaces/:namespace/uas/:uaid/playback", controllers.GetPlayBackm3u8)
 	r.GET("/v1/namespaces/:namespace/uas/:uaid/segments", controllers.GetSegments)
