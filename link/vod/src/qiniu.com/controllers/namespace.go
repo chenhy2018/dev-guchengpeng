@@ -77,7 +77,7 @@ func RegisterNamespace(c *gin.Context) {
         params, err := ParseRequest(c, xl)
         if err != nil {
                 xl.Errorf("parse request falied error = %#v", err.Error())
-                c.JSON(500, gin.H{
+                c.JSON(400, gin.H{
                         "error": err.Error(),
                 })
                 return
@@ -85,7 +85,7 @@ func RegisterNamespace(c *gin.Context) {
         body, err := ioutil.ReadAll(c.Request.Body)
         if err != nil {
                 xl.Errorf("parse request body failed, body = %#v", body)
-                c.JSON(500, gin.H{
+                c.JSON(400, gin.H{
                         "error": "read callback body failed",
                 })
                 return
@@ -97,7 +97,7 @@ func RegisterNamespace(c *gin.Context) {
 
         if err != nil {
                 xl.Errorf("parse request body failed, body = %#v", body)
-                c.JSON(500, gin.H{
+                c.JSON(400, gin.H{
                         "error": "read callback body failed",
                 })
                 return
@@ -128,10 +128,9 @@ func RegisterNamespace(c *gin.Context) {
                 Domain : domain,
         }
         err = namespaceMod.Register(xl, namespace)
-        xl.Infof("Register ******")
         if err != nil {
                 xl.Errorf("Register falied error = %#v", err.Error())
-                c.JSON(500, gin.H{
+                c.JSON(400, gin.H{
                         "error": err.Error(),
                 })
                 return
@@ -146,7 +145,7 @@ func DeleteNamespace(c *gin.Context) {
         params, err := ParseRequest(c, xl)
         if err != nil {
                 xl.Errorf("parse request falied error = %#v", err.Error())
-                c.JSON(500, gin.H{
+                c.JSON(400, gin.H{
                         "error": err.Error(),
                 })
                 return
@@ -154,7 +153,7 @@ func DeleteNamespace(c *gin.Context) {
         err = namespaceMod.Delete(xl, params.uid, params.namespace)
         if err != nil {
                 xl.Errorf("Register falied error = %#v", err.Error())
-                c.JSON(500, gin.H{
+                c.JSON(400, gin.H{
                         "error": err.Error(),
                 })
                 return
@@ -163,13 +162,56 @@ func DeleteNamespace(c *gin.Context) {
         }
 }
 
+//need test.
+func updateNamespace(xl *xlog.Logger, uid, space, newSpace string) error {
+        if space != newSpace && newSpace != "" {
+                err := namespaceMod.UpdateNamespace(xl, uid, space, newSpace)
+                if err != nil {
+                        return err
+                }
+                model := models.UaModel{}
+                mark := ""
+                for {
+                	uas, nextmark, err := model.GetUaInfos(xl, 0, mark, space, models.UA_ITEM_UAID, "")
+               		if err != nil {
+                        	return err
+                	}
+			for i:=0; i < len(uas); i++ {
+                                model.UpdateNamespace(xl, uas[i].Namespace, uas[i].UaId, newSpace)
+                        }
+                        if nextmark != "" {
+                                mark = nextmark;
+                        } else {
+                                break;
+                        }
+                }
+        }
+        return nil
+}
+
+func updateBucket(xl *xlog.Logger, uid, space, bucket,newBucket,domain string) error {
+        if bucket != newBucket && newBucket != "" {
+                err := checkbucket(xl, newBucket)
+                if err != nil {
+                        xl.Errorf("bucket is already register, err = %#v", err)
+                        return err
+                }
+                err = namespaceMod.UpdateBucket(xl, uid, space, bucket, domain)
+                if err != nil {
+                        xl.Errorf("Update falied error = %#v", err.Error())
+                        return err
+                }
+        }
+        return nil
+}
+
 // sample requset url = /v1/namespaces/<Namespace>
 func UpdateNamespace(c *gin.Context) {
         xl := xlog.New(c.Writer, c.Request)
         params, err := ParseRequest(c, xl)
         if err != nil {
                 xl.Errorf("parse request falied error = %#v", err.Error())
-                c.JSON(500, gin.H{
+                c.JSON(400, gin.H{
                         "error": err.Error(),
                 })
                 return
@@ -181,7 +223,7 @@ func UpdateNamespace(c *gin.Context) {
         err = json.Unmarshal(body, &namespaceData)
         if err != nil || namespaceData.Uid=="" {
                 xl.Errorf("parse request body failed, body = %#v", body)
-                c.JSON(500, gin.H{
+                c.JSON(400, gin.H{
                         "error": "read callback body failed",
                 })
                 return
@@ -208,39 +250,26 @@ func UpdateNamespace(c *gin.Context) {
         oldinfo, err := namespaceMod.GetNamespaceInfo(xl, params.uid, params.namespace)
         if err != nil || len(oldinfo) == 0 {
                 xl.Errorf("Can't find namespace")
-                c.JSON(500, gin.H{
+                c.JSON(400, gin.H{
                         "error": "Can't find namespace info",
                 })
                 return
         }
-
-        if oldinfo[0].Space != namespaceData.Namespace && namespaceData.Namespace != "" {
-                err = namespaceMod.UpdateNamespace(xl, params.uid, params.namespace, namespaceData.Namespace)
-                if err != nil {
-                        xl.Errorf("Update falied error = %#v", err.Error())
-                        c.JSON(500, gin.H{
-                                "error": err.Error(),
-                        })
-                        return
-                }
+        err = updateNamespace(xl, params.uid, params.namespace, namespaceData.Namespace)
+        if err != nil {
+                xl.Errorf("update namespace failed, err = %#v", err)
+                c.JSON(400, gin.H{
+                        "error": "update namespace failed",
+                })
+                return
         }
-        if oldinfo[0].Bucket != namespaceData.Bucket && namespaceData.Bucket != "" {
-                err = checkbucket(xl, namespaceData.Bucket)
-                if err != nil {
-                        xl.Errorf("bucket is already register, err = %#v", err)
-                        c.JSON(403, gin.H{
-                                "error": "bucket is already register",
-                        })
-                        return
-                }
-                err = namespaceMod.UpdateBucket(xl, params.uid, params.namespace, namespaceData.Bucket, domain)
-                if err != nil {
-                        xl.Errorf("Update falied error = %#v", err.Error())
-                        c.JSON(500, gin.H{
-                                "error": err.Error(),
-                        })
-                        return  
-                }
+        err = updateBucket(xl, params.uid, params.namespace, oldinfo[0].Bucket, namespaceData.Bucket, domain)
+        if err != nil {
+                xl.Errorf("update bucket failed, err = %#v", err)
+                c.JSON(400, gin.H{
+                        "error": "update bucket failed",
+                })
+                return
         }
         c.JSON(200, gin.H{ "success": true })
 }
@@ -251,7 +280,7 @@ func GetNamespaceInfo(c *gin.Context) {
         params, err := ParseRequest(c, xl)
         if err != nil {
                 xl.Errorf("parse request falied error = %#v", err.Error())
-                c.JSON(500, gin.H{
+                c.JSON(400, gin.H{
                         "error": err.Error(),
                 })
                 return
@@ -266,7 +295,7 @@ func GetNamespaceInfo(c *gin.Context) {
         }
         if err != nil {
                 xl.Errorf("Update falied error = %#v", err.Error())
-                c.JSON(500, gin.H{
+                c.JSON(400, gin.H{
                         "error": err.Error(),
                 })
                 return

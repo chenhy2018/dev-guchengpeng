@@ -53,12 +53,12 @@ func TestRegisterNamespace(t *testing.T) {
         c.Request = req
         RegisterNamespace(c)
 
-        // bucket already exit. return 500
+        // bucket already exit. return 400
         req, _ = http.NewRequest("POST", "/v1/namespaces/test1", bodyT)
         c, _ = gin.CreateTestContext(httptest.NewRecorder())
         c.Request = req
         RegisterNamespace(c) 
-        assert.Equal(t, c.Writer.Status(), 500, "they should be equal")  
+        assert.Equal(t, c.Writer.Status(), 400, "they should be equal")  
 
         // bucket is not correct. return 403
         body = namespacebody{
@@ -88,7 +88,7 @@ func TestRegisterNamespace(t *testing.T) {
         c, _ = gin.CreateTestContext(httptest.NewRecorder())
         c.Request = req
         RegisterNamespace(c)
-        assert.Equal(t, c.Writer.Status(), 500, "they should be equal")   
+        assert.Equal(t, c.Writer.Status(), 400, "they should be equal")   
 }
 
 func TestGetNamespace(t *testing.T) {
@@ -164,7 +164,7 @@ func TestUpdateNamespace(t *testing.T) {
         c.Params = append(c.Params, param)
 
         UpdateNamespace(c)
-        assert.Equal(t, c.Writer.Status(), 500, "they should be equal")
+        assert.Equal(t, c.Writer.Status(), 400, "they should be equal")
 
         // Change namespace to aab
         body = namespacebody{
@@ -210,7 +210,7 @@ func TestUpdateNamespace(t *testing.T) {
         UpdateNamespace(c)
         assert.Equal(t, c.Writer.Status(), 403, "they should be equal")
 
-        // invaild body. return 500
+        // invaild body. return 400
         body1 := "asddhjk"
         bodyBuffer,_ = json.Marshal(body1)
         bodyT = bytes.NewBuffer(bodyBuffer)
@@ -225,7 +225,7 @@ func TestUpdateNamespace(t *testing.T) {
         c.Params = append(c.Params, param)
         c.Request = req
         UpdateNamespace(c)
-        assert.Equal(t, c.Writer.Status(), 500, "they should be equal")
+        assert.Equal(t, c.Writer.Status(), 400, "they should be equal")
 
         // Change namespace to test1
         body = namespacebody{
@@ -252,7 +252,7 @@ func TestUpdateNamespace(t *testing.T) {
 
 func TestDeleteNamespace(t *testing.T) {
         initDb()
-        // remove invaild namespace aab, return 500
+        // remove invaild namespace aab, return 400
         req, _ := http.NewRequest("Put", "/v1/namespaces/aab", nil)
         recoder := httptest.NewRecorder()
         c, _ := gin.CreateTestContext(recoder)
@@ -263,7 +263,7 @@ func TestDeleteNamespace(t *testing.T) {
         c.Params = append(c.Params, param)
         c.Request = req
         DeleteNamespace(c)
-        assert.Equal(t, c.Writer.Status(), 500, "they should be equal")
+        assert.Equal(t, c.Writer.Status(), 400, "they should be equal")
 
         // remove namespace test1, return 200
 

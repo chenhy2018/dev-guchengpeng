@@ -125,7 +125,7 @@ func (m *UaModel) GetUaInfos(xl *xlog.Logger, limit int, mark, namespace, catego
                 UA_COL,
                 func(c *mgo.Collection) error {
                         var err error
-                        if err = c.Find(query).Sort(UA_ITEM_UID).Skip(int(skip)).Limit(limit).All(&r); err != nil {
+                        if err = c.Find(query).Sort(UA_ITEM_UAID).Skip(int(skip)).Limit(limit).All(&r); err != nil {
                                 return fmt.Errorf("query failed")
                         }
                         if count, err = c.Find(query).Count(); err != nil {
@@ -160,7 +160,7 @@ func (m *UaModel) GetUaInfo(xl *xlog.Logger, namespace,uaid string) ([]UaInfo, e
                 UA_COL, 
                 func(c *mgo.Collection) error {
                         var err error
-                        if err = c.Find(query).One(&r); err != nil {
+                        if err = c.Find(query).All(&r); err != nil {
                                 return fmt.Errorf("query failed")
                         }
                         return nil
@@ -191,6 +191,29 @@ func (m *UaModel) UpdateUa(xl *xlog.Logger, namespace,uaid string, info UaInfo) 
                                                 UA_ITEM_PASSWORD: info.Password,
                                                 ITEM_UPDATA_TIME: time.Now().Unix(),
                                                 UA_ITEM_NAMESPACE: info.Namespace,
+                                        },
+                                },
+                        )
+                },
+        )
+}
+
+func (m *UaModel) UpdateNamespace(xl *xlog.Logger, namespace,uaid, newNamespace string) error {
+        /*
+                 db.ua.update({namespace: space, uaid: uaid}, bson.M{"$set":{"namespace": space}}),
+        */
+         return db.WithCollection(
+                UA_COL,
+                func(c *mgo.Collection) error {
+                        return c.Update(
+                                bson.M{
+                                        UA_ITEM_NAMESPACE: namespace,
+                                        UA_ITEM_UAID: uaid,
+                                },
+                                bson.M{
+                                        "$set": bson.M{
+                                                ITEM_UPDATA_TIME: time.Now().Unix(),
+                                                UA_ITEM_NAMESPACE: newNamespace,
                                         },
                                 },
                         )

@@ -68,7 +68,7 @@ func RegisterUa(c *gin.Context) {
         params, err := ParseRequest(c, xl)
         if err != nil {
                 xl.Errorf("parse request falied error = %#v", err.Error())
-                c.JSON(500, gin.H{
+                c.JSON(400, gin.H{
                         "error": err.Error(),
                 })
                 return
@@ -82,7 +82,7 @@ func RegisterUa(c *gin.Context) {
 
         if err != nil {
                 xl.Errorf("parse request body failed, body = %#v", body)
-                c.JSON(500, gin.H{
+                c.JSON(400, gin.H{
                         "error": "read callback body failed",
                 })
                 return
@@ -95,10 +95,30 @@ func RegisterUa(c *gin.Context) {
                 Namespace : params.namespace,
                 Password  : uaData.Password,
         }
+        model := models.NamespaceModel{}
+        r, err := model.GetNamespaceInfo(xl, params.uid, params.namespace)
+        xl.Errorf("namespace is %#v",r)
+        if err != nil || len(r) == 0 {
+                xl.Errorf("namespace is not correct")
+                c.JSON(400, gin.H{
+                        "error": "namespace is not correct",
+                })
+                return
+        }
+
+        info, err := UaMod.GetUaInfo(xl, uaData.Namespace, uaData.Uaid)
+        if len(info) != 0 {
+                xl.Errorf("ua is exist")
+                c.JSON(400, gin.H{
+                        "error": "us is exist",
+                })
+                return
+        }
+
         err = UaMod.Register(xl, ua)
         if err != nil {
                 xl.Errorf("Register falied error = %#v", err.Error())
-                c.JSON(500, gin.H{
+                c.JSON(400, gin.H{
                         "error": err.Error(),
                 })
                 return
@@ -113,7 +133,7 @@ func DeleteUa(c *gin.Context) {
         params, err := ParseRequest(c, xl)
         if err != nil {
                 xl.Errorf("parse request falied error = %#v", err.Error())
-                c.JSON(500, gin.H{
+                c.JSON(400, gin.H{
                         "error": err.Error(),
                 })
                 return
@@ -121,7 +141,7 @@ func DeleteUa(c *gin.Context) {
         err = UaMod.Delete(xl, params.namespace, params.uaid)
         if err != nil {
                 xl.Errorf("Register falied error = %#v", err.Error())
-                c.JSON(500, gin.H{
+                c.JSON(400, gin.H{
                         "error": err.Error(),
                 })
                 return
@@ -136,7 +156,7 @@ func UpdateUa(c *gin.Context) {
         params, err := ParseRequest(c, xl)
         if err != nil {
                 xl.Errorf("parse request falied error = %#v", err.Error())
-                c.JSON(500, gin.H{
+                c.JSON(400, gin.H{
                         "error": err.Error(),
                 })
                 return
@@ -148,7 +168,7 @@ func UpdateUa(c *gin.Context) {
         err = json.Unmarshal(body, &uaData)
         if err != nil || uaData.Uid=="" || uaData.Uaid=="" || uaData.Namespace=="" {
                 xl.Errorf("parse request body failed, body = %#v", body)
-                c.JSON(500, gin.H{
+                c.JSON(400, gin.H{
                         "error": "read callback body failed",
                 })
                 return
@@ -161,10 +181,31 @@ func UpdateUa(c *gin.Context) {
                 Namespace : uaData.Namespace,
                 Password  : uaData.Password,
         }
+
+        model := models.NamespaceModel{}
+        r, err := model.GetNamespaceInfo(xl, uaData.Uid, uaData.Namespace)
+        if err != nil || len(r) == 0 {
+                xl.Errorf("namespace is not correct")
+                c.JSON(400, gin.H{
+                        "error": "namespace is not correct",
+                })
+                return
+        }
+
+        if uaData.Namespace != params.namespace {
+        	info, _ := UaMod.GetUaInfo(xl, uaData.Namespace, uaData.Uaid)
+        	if len(info) != 0 {
+                	xl.Errorf("ua is exist")
+                	c.JSON(400, gin.H{
+                        	"error": "us is exist",
+                	})
+                	return
+        	}
+	}
         err = UaMod.UpdateUa(xl, params.namespace, params.uaid, ua)
         if err != nil {
                 xl.Errorf("Update falied error = %#v", err.Error())
-                c.JSON(500, gin.H{
+                c.JSON(400, gin.H{
                         "error": err.Error(),
                 })
                 return
@@ -173,13 +214,13 @@ func UpdateUa(c *gin.Context) {
         }
 }
 
-// sample requset url = /v1/namespaces/<Namespace>/uas&regex=<Regex>&limit=<Limit>&marker=<Marker>
+// sample requset url = /v1/namespaces/<Namespace>/uas?regex=<Regex>&limit=<Limit>&marker=<Marker>&exact=<Exact>
 func GetUaInfo(c *gin.Context) {
         xl := xlog.New(c.Writer, c.Request)
         params, err := ParseRequest(c, xl)
         if err != nil {
                 xl.Errorf("parse request falied error = %#v", err.Error())
-                c.JSON(500, gin.H{
+                c.JSON(400, gin.H{
                         "error": err.Error(),
                 })
                 return
@@ -193,8 +234,8 @@ func GetUaInfo(c *gin.Context) {
                 r, nextMark, err = UaMod.GetUaInfos(xl, params.limit, params.marker, params.namespace, models.UA_ITEM_UAID, params.regex)
         }
         if err != nil {
-                xl.Errorf("Update falied error = %#v", err.Error())
-                c.JSON(500, gin.H{
+                xl.Errorf("Get falied error = %#v", err.Error())
+                c.JSON(400, gin.H{
                         "error": err.Error(),
                 })
                 return
