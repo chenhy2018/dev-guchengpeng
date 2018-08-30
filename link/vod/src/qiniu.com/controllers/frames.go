@@ -1,8 +1,7 @@
 package controllers
 
 import (
-	"fmt"
-	"net/http/httputil"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	xlog "github.com/qiniu/xlog.v1"
@@ -26,12 +25,22 @@ func GetFrames(c *gin.Context) {
 		return
 	}
 
-	requestDump, err := httputil.DumpRequest(c.Request, true)
-	if err != nil {
-		fmt.Println(err)
-
+	if params.to <= params.from {
+		xl.Errorf("bad from/to time, from = %v, to = %v", params.from, params.to)
+		c.JSON(400, gin.H{
+			"error": "bad from/to time, from great or equal to",
+		})
+		return
 	}
-	fmt.Println(string(requestDump))
+
+	dayInMilliSec := int64((24 * time.Hour).Seconds() * 1000)
+	if (params.to - params.from) > dayInMilliSec {
+		xl.Errorf("bad from/to time, from = %v, to = %v", params.from, params.to)
+		c.JSON(400, gin.H{
+			"error": "bad from/to time, currently we only support playback in 24 hours",
+		})
+		return
+	}
 
 	if ok, err := VerifyAuth(xl, c.Request); err != nil || ok != true {
 		xl.Errorf("verify auth failed %#v", err)
@@ -45,7 +54,7 @@ func GetFrames(c *gin.Context) {
 
 	frames, err := SegMod.GetFrameInfo(xl, params.from, params.to, params.namespace, params.uaid)
 	if err != nil {
-		xl.Error("get FrameInfo falied, error = %#v", err)
+		xl.Errorf("get FrameInfo falied, error = %#v", err)
 		c.JSON(500, nil)
 		return
 	}
