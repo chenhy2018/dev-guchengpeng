@@ -53,11 +53,8 @@ type QueryTokenAuth struct {
 
 func (qa *QueryTokenAuth) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
-	prefix := "/playback/"
-	if qa.mode != Apigate_Default {
-		prefix = "/v1/playback/"
-	}
-	if strings.HasPrefix(r.RequestURI, prefix) {
+	playback := "playback"
+	if strings.Contains(r.RequestURI, playback) {
 		r.ParseForm()
 		token := r.Form.Get("token")
 		log.Info("token:", token)

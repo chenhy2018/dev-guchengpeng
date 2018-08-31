@@ -65,8 +65,8 @@ func (suite *PlayBackTestSuite) TestPlayBack() {
 	monkey.Patch(VerifyToken, func(xl *xlog.Logger, expire int64, realToken, url, uid string) bool { return true })
 	monkey.PatchInstanceMethod(
 		reflect.TypeOf((*models.SegmentKodoModel)(nil)), "GetSegmentTsInfo", func(ss *models.SegmentKodoModel,
-			xl *xlog.Logger, starttime, endtime int64, bucketurl, uaid string) ([]map[string]interface{}, error) {
-			return nil, nil
+			xl *xlog.Logger, starttime, endtime int64, bucketurl, uaid string, limit int, marker string) ([]map[string]interface{}, string, error) {
+			return nil, "", nil
 		})
 
 	w := PerformRequest(suite.r, req)

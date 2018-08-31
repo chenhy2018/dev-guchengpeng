@@ -1,9 +1,10 @@
 package models
 
 import (
+	"testing"
+
 	"github.com/qiniu/xlog.v1"
 	"github.com/stretchr/testify/assert"
-	"testing"
 )
 
 func TestKodoSegment(t *testing.T) {
@@ -24,7 +25,7 @@ func TestKodoSegment(t *testing.T) {
 
 	// Test get 2018/8/16 - 2018/8/17 segment count. It should be 2767.
 	xl.Infof("SegmentTsInfo 1")
-	infos, err4 := model.GetSegmentTsInfo(xl, int64(1534385684000), int64(1534472084000), bucket, "testdeviceid5")
+	infos, _, err4 := model.GetSegmentTsInfo(xl, int64(1534385684000), int64(1534472084000), bucket, "testdeviceid5", 0, "")
 	assert.Equal(t, len(infos), 2767, "they should be equal")
 	/*
 	   for i := 0; i < len(infos); i++ {
@@ -34,7 +35,7 @@ func TestKodoSegment(t *testing.T) {
 	*/
 	assert.Equal(t, err4, nil, "they should be equal")
 
-	infos, err4 = model.GetSegmentTsInfo(xl, int64(1534848606000), int64(1534859606000), bucket, "testdeviceid10")
+	infos, _, err4 = model.GetSegmentTsInfo(xl, int64(1534848606000), int64(1534859606000), bucket, "testdeviceid10", 0, "")
 
 	//infos, err4 = model.GetSegmentTsInfo(xl, int64(1534414484000), int64(1534500884000), bucket,"testdeviceid10")
 	//assert.Equal(t, err4, nil, "they should be equal")

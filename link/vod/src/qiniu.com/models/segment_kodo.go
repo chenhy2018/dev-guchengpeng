@@ -140,7 +140,7 @@ func calculateMark(xl *xlog.Logger, starttime int64, uaid, head string) string {
 }
 
 // Get Segment TS info List.
-func (m *SegmentKodoModel) GetSegmentTsInfo(xl *xlog.Logger, starttime, endtime int64, bucketurl, uaid string) ([]map[string]interface{}, error) {
+func (m *SegmentKodoModel) GetSegmentTsInfo(xl *xlog.Logger, starttime, endtime int64, bucketurl, uaid string, limit int, mark string) ([]map[string]interface{}, string, error) {
 	//todo change to get aksk
 	mac := qbox.NewMac(accessKey, secretKey)
 	// 指定空间所在的区域，如果不指定将自动探测
@@ -150,14 +150,22 @@ func (m *SegmentKodoModel) GetSegmentTsInfo(xl *xlog.Logger, starttime, endtime 
 	pre := time.Now().UnixNano()
 	var r []map[string]interface{}
 	delimiter := ""
-	marker := calculateMark(xl, starttime, uaid, "ts")
+	marker := ""
+	nextMarker := ""
+	total := 0
+	if mark != "" {
+		marker = mark
+	} else {
+		marker = calculateMark(xl, starttime, uaid, "ts")
+	}
+
 	prefix := "ts/" + uaid + "/"
 	ctx, cancelFunc := context.WithCancel(context.Background())
 	xl.Infof("GetSegmentTsInfo prefix ********* %s \n", prefix)
 	entries, err := bucketManager.ListBucketContext(ctx, bucket, prefix, delimiter, marker)
 	if err != nil {
 		xl.Errorf("GetSegmentTsInfo ListBucketContext %#v", err)
-		return r, err
+		return r, "", err
 	}
 
 	for listItem1 := range entries {
@@ -174,13 +182,18 @@ func (m *SegmentKodoModel) GetSegmentTsInfo(xl *xlog.Logger, starttime, endtime 
 			cancelFunc()
 			break
 		}
-		if info[SEGMENT_ITEM_START_TIME].(int64) > starttime {
+		if info[SEGMENT_ITEM_START_TIME].(int64) >= starttime {
 			xl.Infof("GetTsInfo info[SEGMENT_ITEM_START_TIME] %d \n", info[SEGMENT_ITEM_START_TIME].(int64))
 			r = append(r, info)
+			total++
+		}
+		if total >= limit && limit != 0 {
+			nextMarker = listItem1.Marker
+			break
 		}
 	}
 	xl.Infof("find segment need %d ms ******", (time.Now().UnixNano()-pre)/1000000)
-	return r, nil
+	return r, nextMarker, nil
 }
 
 // Get Fragment Ts info List.
@@ -222,8 +235,7 @@ func (m *SegmentKodoModel) GetFragmentTsInfo(xl *xlog.Logger, count int, startti
 			// if one file is not correct, continue to next
 			continue
 		}
-
-		if info[SEGMENT_ITEM_START_TIME].(int64) > starttime {
+		if info[SEGMENT_ITEM_START_TIME].(int64) >= starttime {
 			xl.Infof("GetFragmentTsInfo info[SEGMENT_ITEM_START_TIME] %d \n", info[SEGMENT_ITEM_START_TIME].(int64))
 			xl.Infof("GetFragmentTsInfo info[SEGMENT_ITEM_END_TIME] %d \n", info[SEGMENT_ITEM_END_TIME].(int64))
 			r = append(r, info)
