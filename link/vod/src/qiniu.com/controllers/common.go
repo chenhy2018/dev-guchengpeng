@@ -3,15 +3,15 @@ package controllers
 import (
 	"errors"
 	"fmt"
-	"net/http"
-	"strconv"
-	"strings"
-	"time"
-        "qiniu.com/models"
 	"github.com/gin-gonic/gin"
 	"github.com/qiniu/api.v7/auth/qbox"
 	"github.com/qiniu/api.v7/storage"
 	xlog "github.com/qiniu/xlog.v1"
+	"net/http"
+	"qiniu.com/models"
+	"strconv"
+	"strings"
+	"time"
 )
 
 const (
@@ -46,16 +46,16 @@ func GetUrlWithDownLoadToken(xl *xlog.Logger, domain, fname string, tsExpire int
 	return realUrl
 }
 
-func IsAutoCreateUa(xl *xlog.Logger, uid,namespace string) (bool, error) {
+func IsAutoCreateUa(xl *xlog.Logger, uid, namespace string) (bool, error) {
 	namespaceMod = &models.NamespaceModel{}
-        info, err := namespaceMod.GetNamespaceInfo(xl, uid, namespace)
-        if err != nil {
+	info, err := namespaceMod.GetNamespaceInfo(xl, uid, namespace)
+	if err != nil {
 		return false, err
 	}
 	if len(info) == 0 {
-		return false, errors.New("can't find namespace")	
+		return false, errors.New("can't find namespace")
 	}
-        return info[0].AutoCreateUa, nil
+	return info[0].AutoCreateUa, nil
 }
 
 func VerifyToken(xl *xlog.Logger, expire int64, realToken, url, uid string) bool {
