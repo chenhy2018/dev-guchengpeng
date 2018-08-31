@@ -3,15 +3,15 @@ package controllers
 import (
 	"errors"
 	"fmt"
-	"github.com/gin-gonic/gin"
-	"github.com/qiniu/api.v7/auth/qbox"
-	"github.com/qiniu/api.v7/storage"
-	xlog "github.com/qiniu/xlog.v1"
 	"net/http"
 	"qiniu.com/models"
 	"strconv"
 	"strings"
 	"time"
+        "github.com/gin-gonic/gin"
+        "github.com/qiniu/api.v7/auth/qbox"
+        "github.com/qiniu/api.v7/storage"
+        xlog "github.com/qiniu/xlog.v1"
 )
 
 const (

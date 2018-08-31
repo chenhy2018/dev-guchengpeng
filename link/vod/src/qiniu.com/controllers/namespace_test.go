@@ -10,7 +10,7 @@ import (
 	"testing"
 
 	"github.com/gin-gonic/gin"
-        "github.com/qiniu/xlog.v1"
+	"github.com/qiniu/xlog.v1"
 	"github.com/stretchr/testify/assert"
 	"qiniu.com/db"
 )
