@@ -39,7 +39,7 @@ func TestNamespace(t *testing.T) {
 	// Get Namespace.
 	r, err := model.GetNamespaceInfo(xl, "Uid099", "test099")
 	assert.Equal(t, err, nil, "they should be equal")
-	assert.Equal(t, r.Space, "test099", "they should be equal")
+	assert.Equal(t, r[0].Space, "test099", "they should be equal")
 
 	r_1, _, err_1 := model.GetNamespaceInfos(xl, 0, "", "Uid099", "namespace", "test099")
 	assert.Equal(t, err_1, nil, "they should be equal")

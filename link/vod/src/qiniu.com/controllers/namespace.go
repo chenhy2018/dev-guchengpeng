@@ -1,5 +1,6 @@
 package controllers
 
+
 import (
 	"encoding/json"
 	"fmt"
@@ -15,23 +16,27 @@ var (
 	namespaceMod *models.NamespaceModel
 )
 
+const (
+        DOMAIN_URL = "http://api.qiniu.com/v6/domain/list?tbl="
+)
 func init() {
 	namespaceMod = &models.NamespaceModel{}
 	namespaceMod.Init()
 }
 
 type namespacebody struct {
-	Uid       string `json:"uid"`
-	Bucket    string `json:"bucket"`
-	Domain    string `json:"domain"`
-	Namespace string `json:"namespace"`
-	CreatedAt int64  `json:"createdAt"`
-	UpdatedAt int64  `json:"updatedAt"`
+	Uid          string `json:"uid"`
+	Bucket       string `json:"bucket"`
+	Domain       string `json:"domain"`
+	Namespace    string `json:"namespace"`
+	CreatedAt    int64  `json:"createdAt"`
+	UpdatedAt    int64  `json:"updatedAt"`
+        AutoCreateUa bool   `json:"auto"`
 }
 
 func getDomain(xl *xlog.Logger, bucket string) (string, error) {
 	client := http.Client{}
-	url := fmt.Sprintf("http://api.qiniu.com/v6/domain/list?tbl=%s", bucket)
+	url := fmt.Sprintf("%s%s", DOMAIN_URL, bucket)
 	request, err := http.NewRequest("GET", url, nil)
 
 	if err != nil {
@@ -119,6 +124,7 @@ func RegisterNamespace(c *gin.Context) {
 		Space:  params.namespace,
 		Bucket: namespaceData.Bucket,
 		Domain: domain,
+                AutoCreateUa : namespaceData.AutoCreateUa,
 	}
 	err = namespaceMod.Register(xl, namespace)
 	if err != nil {
@@ -198,6 +204,18 @@ func updateBucket(xl *xlog.Logger, uid, space, bucket, newBucket, domain string)
 	return nil
 }
 
+func updateAutoCreateUa(xl *xlog.Logger, uid, space string, auto, newauto bool) error {
+        if auto != newauto  {
+                namespaceMod := models.NamespaceModel{}
+                err := namespaceMod.UpdateAutoCreateUa(xl, uid, space, newauto)
+                if err != nil {
+                        xl.Errorf("Update falied error = %#v", err.Error())
+                        return err
+                }
+        }
+        return nil
+}
+
 // sample requset url = /v1/namespaces/<Namespace>
 func UpdateNamespace(c *gin.Context) {
 	xl := xlog.New(c.Writer, c.Request)
@@ -261,6 +279,14 @@ func UpdateNamespace(c *gin.Context) {
 		})
 		return
 	}
+        err = updateAutoCreateUa(xl, params.uid, params.namespace, oldinfo[0].AutoCreateUa, namespaceData.AutoCreateUa)
+        if err != nil {
+                xl.Errorf("update auto create ua failed")
+                c.JSON(400, gin.H{
+                        "error": "update auto create ca failed",
+                })
+                return
+        }
 	c.JSON(200, gin.H{"success": true})
 }
 
