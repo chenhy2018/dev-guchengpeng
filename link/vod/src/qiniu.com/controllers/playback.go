@@ -55,7 +55,7 @@ func GetPlayBackm3u8(c *gin.Context) {
 		})
 		return
 	}
-	segs, err := SegMod.GetSegmentTsInfo(xl, params.from, params.to, params.namespace, params.uaid)
+	segs, _, err := SegMod.GetSegmentTsInfo(xl, params.from, params.to, params.namespace, params.uaid, 0, "")
 	if err != nil {
 		xl.Errorf("getTsInfo error, error =  %#v", err)
 		c.JSON(500, nil)

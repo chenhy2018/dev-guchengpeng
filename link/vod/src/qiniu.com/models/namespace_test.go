@@ -2,10 +2,11 @@ package models
 
 import (
 	"fmt"
+	"testing"
+
 	"github.com/qiniu/xlog.v1"
 	"github.com/stretchr/testify/assert"
 	"qiniu.com/db"
-	"testing"
 )
 
 func TestNamespace(t *testing.T) {
