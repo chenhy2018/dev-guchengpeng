@@ -8,10 +8,10 @@ import (
 	"strconv"
 	"strings"
 	"time"
-        "github.com/gin-gonic/gin"
-        "github.com/qiniu/api.v7/auth/qbox"
-        "github.com/qiniu/api.v7/storage"
-        xlog "github.com/qiniu/xlog.v1"
+	"github.com/gin-gonic/gin"
+	"github.com/qiniu/api.v7/auth/qbox"
+	"github.com/qiniu/api.v7/storage"
+	xlog "github.com/qiniu/xlog.v1"
 )
 
 const (
