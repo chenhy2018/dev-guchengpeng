@@ -52,40 +52,47 @@ func GetSegments(c *gin.Context) {
 
 	xl.Infof("uid= %v, deviceid = %v, from = %v, to = %v, limit = %v, marker = %v, namespace = %v", params.uid, params.uaid, params.from, params.to, params.limit, params.marker, params.namespace)
 
-	segs, marker := []segInfo{}, params.marker
-	for {
-		var ret []map[string]interface{}
-		ret, marker, err = SegMod.GetFragmentTsInfo(xl, params.limit-len(segs), params.from-dayInMilliSec, params.to, params.namespace, params.uaid, marker)
-		if err != nil {
-			xl.Errorf("get segments list error, error =%#v", err)
-			c.JSON(500, nil)
-			return
-		}
-		if ret == nil {
-			c.JSON(200, gin.H{
-				"segments": []string{},
-				"marker":   marker,
-			})
-			return
-		}
-
-		segs, err = filterSegs(ret, params)
-		if err != nil {
-			xl.Error("parse seg start/end failed")
-			c.JSON(500, gin.H{
-				"error": "parse seg start/end failed",
-			})
-			return
-		}
-		if marker == "" || len(segs) == params.limit {
-			break
-		}
+	newFrom := getFristTsAfterFrom(xl, params.from, params.to, params.namespace, params.uaid)
+	ret, marker, err := SegMod.GetFragmentTsInfo(xl, params.limit, newFrom, params.to, params.namespace, params.uaid, params.marker)
+	if err != nil {
+		xl.Errorf("get segments list error, error =%#v", err)
+		c.JSON(500, nil)
+		return
 	}
+	if ret == nil {
+		c.JSON(200, gin.H{
+			"segments": []string{},
+			"marker":   marker,
+		})
+		return
+	}
+
+	segs, err := filterSegs(ret, params)
+	if err != nil {
+		xl.Error("parse seg start/end failed")
+		c.JSON(500, gin.H{
+			"error": "parse seg start/end failed",
+		})
+		return
+	}
+
 	c.JSON(200, gin.H{
 		"segments": segs,
 		"marker":   marker,
 	})
 
+}
+func getFristTsAfterFrom(xl *xlog.Logger, from, to int64, namespace, uaid string) int64 {
+
+	segs, _, err := SegMod.GetSegmentTsInfo(xl, from, to, namespace, uaid, 1, "")
+	if err != nil || segs == nil {
+		return from
+	}
+	newFrom, ok := segs[0][models.SEGMENT_ITEM_FRAGMENT_START_TIME].(int64)
+	if !ok {
+		return from
+	}
+	return newFrom
 }
 
 func filterSegs(ret []map[string]interface{}, params *requestParams) (segs []segInfo, err error) {
