@@ -1,6 +1,7 @@
 #include "log.h"
 
 int nLogLevel = LOG_LEVEL_INFO;
+LogFunc logFunc = NULL;
 
 void SetLogLevelToTrace()
 {
@@ -25,4 +26,23 @@ void SetLogLevelToWarn()
 void SetLogLevelToError()
 {
         nLogLevel = LOG_LEVEL_ERROR;
+}
+
+void SetLogCallback(LogFunc f)
+{
+	logFunc = f;
+}
+
+void Log(int nLevel, char * pFmt, ...)
+{
+	if (nLevel >= nLogLevel){
+	        va_list ap;
+                va_start(ap, pFmt);
+                if (logFunc == NULL) {
+                        vprintf(pFmt, ap); 
+		} else {
+                        logFunc(pFmt, ap);
+		}
+                va_end(ap);
+	}
 }
