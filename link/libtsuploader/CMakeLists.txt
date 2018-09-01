@@ -45,6 +45,10 @@ add_library(tsuploader STATIC
 	tsmuxuploader.h
 	tsuploaderapi.c
 	tsuploaderapi.h
+        tsmux.h
+        tsmux.c
+        mpegts.c
+        mpegts.h
 )
 
 if(CMAKE_TOOLCHAIN_FILE)
