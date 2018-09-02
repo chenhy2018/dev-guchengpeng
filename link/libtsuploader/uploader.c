@@ -274,7 +274,20 @@ END:
 size_t getDataCallback(void* buffer, size_t size, size_t n, void* rptr)
 {
         KodoUploader * pUploader = (KodoUploader *) rptr;
-        return pUploader->pQueue_->Pop(pUploader->pQueue_, buffer, size * n);
+        int nPopLen = 0;
+        nPopLen = pUploader->pQueue_->Pop(pUploader->pQueue_, buffer, size * n);
+        if (nPopLen == 0)
+                return 0;
+
+        int nTmp = 0;
+        char *pBuf = (char *)buffer;
+        while (size * n - nPopLen > 0) {
+                nTmp = pUploader->pQueue_->Pop(pUploader->pQueue_, pBuf + nPopLen, size * n - nPopLen);
+                if (nTmp == 0)
+                        break;
+                nPopLen += nTmp;
+        }
+        return nPopLen;
 }
 
 static int streamUploadStart(TsUploader * _pUploader)

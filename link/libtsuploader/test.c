@@ -1,5 +1,7 @@
 #include <stdio.h>
+#ifndef USE_OWN_TSMUX
 #include <libavformat/avformat.h>
+#endif
 #include <assert.h>
 #include <sys/time.h>
 #include <unistd.h>
@@ -15,7 +17,7 @@ typedef int (*DataCallback)(void *opaque, void *pData, int nDataLen, int nFlag, 
 //#define TEST_AAC_NO_ADTS 1
 #define USE_LINK_ACC 1
 
-//#define INPUT_FROM_FFMPEG
+#define INPUT_FROM_FFMPEG
 
 #ifdef INPUT_FROM_FFMPEG
 #ifndef TEST_AAC
@@ -386,6 +388,7 @@ int start_file_test(char * _pAudioFile, char * _pVideoFile, DataCallback callbac
         return 0;
 }
 
+#ifndef USE_OWN_TSMUX
 int start_ffmpeg_test(char * _pUrl, DataCallback callback, void *opaque)
 {
         AVFormatContext *pFmtCtx = NULL;
@@ -475,6 +478,7 @@ end:
         
         return 0;
 }
+#endif
 
 static int64_t firstTimeStamp = -1;
 static int segStartCount = 0;
@@ -530,8 +534,10 @@ int main(int argc, char* argv[])
 {
 
         int ret = 0;
-#ifdef INPUT_FROM_FFMPEG
+#ifndef USE_OWN_TSMUX
+    #ifdef INPUT_FROM_FFMPEG
         avformat_network_init();
+    #endif
 #endif
         SetLogLevelToDebug();
         signal(SIGINT, signalHander);
@@ -574,7 +580,7 @@ int main(int argc, char* argv[])
         avArg.nChannels = 1;
         avArg.nSamplerate = 8000;
 #endif
-        avArg.nVideoFormat = TK_VIDEO_H265;
+        avArg.nVideoFormat = TK_VIDEO_H264;
 
         /*
         //token过期测试
@@ -588,34 +594,35 @@ int main(int argc, char* argv[])
                 return ret;
         }
 #ifdef __APPLE__
-        char * pVFile = "/Users/liuye/Documents/material/h265_aac_1_16000_h264.h264";
+        char * pVFile = "/Users/mnt/c/d/learnffmpeg/material/h265_aac_1_16000_h264.h264";
   #ifdef TEST_AAC
-        char * pAFile = "/Users/liuye/Documents/material/h265_aac_1_16000_a.aac";
+        char * pAFile = "/Users/mnt/c/d/learnffmpeg/material/h265_aac_1_16000_a.aac";
   #else
-        char * pAFile = "/Users/liuye/Documents/material/h265_aac_1_16000_pcmu_8000.mulaw";
+        char * pAFile = "/Users/mnt/c/d/learnffmpeg/material/h265_aac_1_16000_pcmu_8000.mulaw";
   #endif
         if (avArg.nVideoFormat == TK_VIDEO_H265) {
-                pVFile = "/Users/liuye/Documents/material/h265_aac_1_16000_v.h265";
+                pVFile = "/Users/mnt/c/d/learnffmpeg/material/h265_aac_1_16000_v.h265";
         }
 #else
 
-        char * pVFile = "/liuye/Documents/material/h265_aac_1_16000_h264.h264";
+        char * pVFile = "/mnt/c/d/learnffmpeg/material/h265_aac_1_16000_h264.h264";
   #ifdef TEST_AAC
-        char * pAFile = "/liuye/Documents/material/h265_aac_1_16000_a.aac";
+        char * pAFile = "/mnt/c/d/learnffmpeg/material/h265_aac_1_16000_a.aac";
   #else
-        char * pAFile = "/liuye/Documents/material/h265_aac_1_16000_pcmu_8000.mulaw";
+        char * pAFile = "/mnt/c/d/learnffmpeg/material/h265_aac_1_16000_pcmu_8000.mulaw";
   #endif
         if (avArg.nVideoFormat == TK_VIDEO_H265) {
-                pVFile = "/liuye/Documents/material/h265_aac_1_16000_v.h265";
+                pVFile = "/mnt/c/d/learnffmpeg/material/h265_aac_1_16000_v.h265";
         }
 #endif
 
-#ifdef INPUT_FROM_FFMPEG
-        start_ffmpeg_test("rtmp://localhost:1935/live/movie", dataCallback, NULL);
-        
-        //start_ffmpeg_test("rtmp://live.hkstv.hk.lxdns.com/live/hks", dataCallback, NULL);
-#else
+#ifdef USE_OWN_TSMUX
         start_file_test(pAFile, pVFile, dataCallback, NULL);
+#else
+    #ifdef INPUT_FROM_FFMPEG
+        start_ffmpeg_test("rtmp://localhost:1935/live/movie", dataCallback, NULL);
+        //start_ffmpeg_test("rtmp://live.hkstv.hk.lxdns.com/live/hks", dataCallback, NULL);
+    #endif
 #endif
         
         

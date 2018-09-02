@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
+#include "base.h"
 
 /* pids */
 #define PAT_PID                 0x0000
@@ -18,16 +19,6 @@
 #define PMT_TID   0x02
 #define M4OD_TID  0x05
 #define SDT_TID   0x42
-
-typedef enum {
-        TK_VIDEO_H264 = 1,
-        TK_VIDEO_H265 = 2
-}TkVideoFormat;
-typedef enum {
-        TK_AUDIO_PCMU = 1,
-        TK_AUDIO_PCMA = 2,
-        TK_AUDIO_AAC = 3
-}TkAudioFormat;
 
 
 #define STREAM_TYPE_PRIVATE_SECTION 0x05
