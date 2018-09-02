@@ -1,5 +1,5 @@
 #include <stdio.h>
-#ifndef USE_OWN_TSMUX
+#ifdef TEST_WITH_FFMPEG
 #include <libavformat/avformat.h>
 #endif
 #include <assert.h>
@@ -388,7 +388,7 @@ int start_file_test(char * _pAudioFile, char * _pVideoFile, DataCallback callbac
         return 0;
 }
 
-#ifndef USE_OWN_TSMUX
+#ifdef TEST_WITH_FFMPEG
 int start_ffmpeg_test(char * _pUrl, DataCallback callback, void *opaque)
 {
         AVFormatContext *pFmtCtx = NULL;
@@ -396,7 +396,7 @@ int start_ffmpeg_test(char * _pUrl, DataCallback callback, void *opaque)
         if (ret != 0) {
                 char msg[128] = {0};
                 av_strerror(ret, msg, sizeof(msg)) ;
-                printf("ffmpeg err:%s\n", msg);
+                printf("ffmpeg err:%s (%s)\n", msg, _pUrl);
                 return ret;
         }
         
@@ -534,9 +534,14 @@ int main(int argc, char* argv[])
 {
 
         int ret = 0;
-#ifndef USE_OWN_TSMUX
+#ifdef TEST_WITH_FFMPEG
+    #ifdef USE_OWN_TSMUX
+        av_register_all();
+	printf("av_register_all\n");
+    #endif
     #ifdef INPUT_FROM_FFMPEG
         avformat_network_init();
+	printf("avformat_network_init\n");
     #endif
 #endif
         SetLogLevelToDebug();
@@ -616,13 +621,13 @@ int main(int argc, char* argv[])
         }
 #endif
 
-#ifdef USE_OWN_TSMUX
-        start_file_test(pAFile, pVFile, dataCallback, NULL);
-#else
+#ifdef TEST_WITH_FFMPEG
     #ifdef INPUT_FROM_FFMPEG
         start_ffmpeg_test("rtmp://localhost:1935/live/movie", dataCallback, NULL);
         //start_ffmpeg_test("rtmp://live.hkstv.hk.lxdns.com/live/hks", dataCallback, NULL);
     #endif
+#else
+        start_file_test(pAFile, pVFile, dataCallback, NULL);
 #endif
         
         
