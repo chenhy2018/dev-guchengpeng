@@ -24,9 +24,11 @@ if(NOT WITH_OPENSSL)
 endif()
 
 set(LIBFFMPEG avformat avcodec swresample avutil)
-if(NOT WITH_FFMPEG)
+if ($ENV{WITH_FFMPEG} STREQUAL "OFF")
         message("WITHOUT_FFMPEG")
         add_definitions(-DUSE_OWN_TSMUX)
+else()
+        message("WITH_FFMPEG")
 endif()
 
 if (NOT TEST_WITHOUT_FFMPEG) 
