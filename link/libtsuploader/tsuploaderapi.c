@@ -5,7 +5,9 @@
 #include <pthread.h>
 #include <curl/curl.h>
 #include "servertime.h"
+#ifndef USE_OWN_TSMUX
 #include <libavformat/avformat.h>
+#endif
 
 static char gAk[65] = {0};
 static char gSk[65] = {0};
