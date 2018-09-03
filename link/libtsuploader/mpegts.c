@@ -126,7 +126,7 @@ static int writePcrBits(uint8_t *buf, int64_t pcr)
 
 static int writeAdaptationFieldJustWithPCR(uint8_t *_pBuf, int64_t _nPcr)
 {
-        _pBuf[1] = 0x10; //discontinuity_indicator 1bit(0); random_access_indicator 1bit(0); elementary_stream_priority_indicator 1bit(0)
+        _pBuf[1] = 0x50; //discontinuity_indicator 1bit(0); random_access_indicator 1bit(1); elementary_stream_priority_indicator 1bit(0)
         //PCR_flag 1bit(1); OPCR_flag 1bit(0); splicing_point_flag 1bit(0); transport_private_data_flag 1bit(0); adaptation_field_extension_flag 1bit(0)
         
         int nPcrLen = writePcrBits(&_pBuf[2], _nPcr);
