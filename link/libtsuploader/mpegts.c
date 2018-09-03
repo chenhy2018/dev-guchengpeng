@@ -156,7 +156,13 @@ static void printPts(uint8_t *buf){
 
 static int getPESHeaderJustWithPtsLen(PES *_pPes)
 {
-        return 14;
+        int nLen = 14;
+        if (_pPes->videoFormat == TK_VIDEO_H264) {
+                nLen += sizeof(h264Aud);
+        } else if (_pPes->videoFormat == TK_VIDEO_H265) {
+                nLen += sizeof(h265Aud);
+        }
+        return nLen;
 }
 
 static int writePESHeaderJustWithPts(PES *_pPes, uint8_t *pData)
@@ -170,6 +176,11 @@ static int writePESHeaderJustWithPts(PES *_pPes, uint8_t *pData)
         pData[3] = _pPes->nStreamId; //stream_id 8bit
         
         int nLen = _pPes->nESDataLen + 8; //PES_packet_length 16bit header[6-13]长度为8
+        if (_pPes->videoFormat == TK_VIDEO_H264) {
+                nLen += sizeof(h264Aud);
+        } else if (_pPes->videoFormat == TK_VIDEO_H265) {
+                nLen += sizeof(h265Aud);
+        }
         if (nLen > 65535) {
                 //A value of zero for the PES packet length can be used only when the PES packet payload is a video elementary stream
                 assert(_pPes->nStreamId >= 0xE0 && _pPes->nStreamId <= 0xEF);
@@ -194,6 +205,14 @@ static int writePESHeaderJustWithPts(PES *_pPes, uint8_t *pData)
         pData[12] =  (nPts >> 7 & 0xFF);
         pData[13] = 0x01 | ((nPts << 1 ) & 0xFE);
         nRetLen += 14;
+        
+        if (_pPes->videoFormat == TK_VIDEO_H264) {
+                memcpy(&pData[nRetLen], h264Aud, sizeof(h264Aud));
+                nRetLen += sizeof(h264Aud);
+        } else if (_pPes->videoFormat == TK_VIDEO_H265) {
+                memcpy(&pData[nRetLen], h265Aud, sizeof(h265Aud));
+                nRetLen += sizeof(h265Aud);
+        }
 
         pPts=pData+9; //for debug
         
