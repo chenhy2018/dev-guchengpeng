@@ -5,7 +5,9 @@
 #include <pthread.h>
 #include <curl/curl.h>
 #include "servertime.h"
+#ifndef USE_OWN_TSMUX
 #include <libavformat/avformat.h>
+#endif
 
 static char gAk[65] = {0};
 static char gSk[65] = {0};
@@ -77,8 +79,10 @@ int InitUploader(char *_pDeviceId, char * _pToken, AvArg *_pAvArg)
         if (nProcStatus) {
                 return 0;
         }
-#if LIBAVFORMAT_VERSION_MAJOR < 58
+#ifndef USE_OWN_TSMUX
+    #if LIBAVFORMAT_VERSION_MAJOR < 58
         av_register_all();
+    #endif
 #endif
         setenv("TZ", "GMT-8", 1);
 

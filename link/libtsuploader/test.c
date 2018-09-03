@@ -1,5 +1,7 @@
 #include <stdio.h>
+#ifdef TEST_WITH_FFMPEG
 #include <libavformat/avformat.h>
+#endif
 #include <assert.h>
 #include <sys/time.h>
 #include <unistd.h>
@@ -11,7 +13,7 @@ AvArg avArg;
 typedef int (*DataCallback)(void *opaque, void *pData, int nDataLen, int nFlag, int64_t timestamp, int nIsKeyFrame);
 #define THIS_IS_AUDIO 1
 #define THIS_IS_VIDEO 2
-//#define TEST_AAC 1
+#define TEST_AAC 1
 //#define TEST_AAC_NO_ADTS 1
 #define USE_LINK_ACC 1
 
@@ -122,7 +124,7 @@ static const uint8_t *ff_avc_find_startcode_internal(const uint8_t *p, const uin
         return end + 3;
 }
 
-const uint8_t *ff_avc_find_startcode(const uint8_t *p, const uint8_t *end){
+static const uint8_t *ff_avc_find_startcode(const uint8_t *p, const uint8_t *end){
         const uint8_t *out= ff_avc_find_startcode_internal(p, end);
         if(p<out && out<end && !out[-1]) out--;
         return out;
@@ -244,49 +246,6 @@ int start_file_test(char * _pAudioFile, char * _pVideoFile, DataCallback callbac
         if (memcmp(_pAudioFile + strlen(_pAudioFile) - 3, "aac", 3) == 0)
                 isAAC = 1;
         while (bAudioOk || bVideoOk) {
-                if (bAudioOk && nNow+1 > nNextAudioTime) {
-                        if (isAAC) {
-                                ADTS adts;
-                                if(audioOffset+7 <= nAudioDataLen) {
-                                        ParseAdtsfixedHeader((unsigned char *)(pAudioData + audioOffset), &adts.fix);
-                                        int hlen = adts.fix.protection_absent == 1 ? 7 : 9;
-                                        ParseAdtsVariableHeader((unsigned char *)(pAudioData + audioOffset), &adts.var);
-                                        if (audioOffset+hlen+adts.var.aac_frame_length <= nAudioDataLen) {
-#ifdef TEST_AAC_NO_ADTS
-                                                cbRet = callback(opaque, pAudioData + audioOffset + hlen, adts.var.aac_frame_length - hlen,
-                                                                 THIS_IS_AUDIO, nNextAudioTime-nSysTimeBase, 0);
-#else
-                                                cbRet = callback(opaque, pAudioData + audioOffset, adts.var.aac_frame_length,
-                                                                 THIS_IS_AUDIO, nNextAudioTime-nSysTimeBase, 0);
-#endif
-                                                if (cbRet != 0) {
-                                                        bAudioOk = 0;
-                                                        continue;
-                                                }
-                                                audioOffset += adts.var.aac_frame_length;
-                                                aacFrameCount++;
-                                                int64_t d = ((1024*1000.0)/aacfreq[adts.fix.sampling_frequency_index]) * aacFrameCount;
-                                                nNextAudioTime = nSysTimeBase + d;
-                                        } else {
-                                                bAudioOk = 0;
-                                        }
-                                } else {
-                                        bAudioOk = 0;
-                                }
-                        } else {
-                                if(audioOffset+160 <= nAudioDataLen) {
-                                        cbRet = callback(opaque, pAudioData + audioOffset, 160, THIS_IS_AUDIO, nNextAudioTime-nSysTimeBase, 0);
-                                        if (cbRet != 0) {
-                                                bAudioOk = 0;
-                                                continue;
-                                        }
-                                        audioOffset += 160;
-                                        nNextAudioTime += 20;
-                                } else {
-                                        bAudioOk = 0;
-                                }
-                        }
-                }
                 if (bVideoOk && nNow+1 > nNextVideoTime) {
                         
                         uint8_t * start = NULL;
@@ -360,6 +319,50 @@ int start_file_test(char * _pAudioFile, char * _pVideoFile, DataCallback callbac
                                 }
                         }while(1);
                 }
+                if (bAudioOk && nNow+1 > nNextAudioTime) {
+                        if (isAAC) {
+                                ADTS adts;
+                                if(audioOffset+7 <= nAudioDataLen) {
+                                        ParseAdtsfixedHeader((unsigned char *)(pAudioData + audioOffset), &adts.fix);
+                                        int hlen = adts.fix.protection_absent == 1 ? 7 : 9;
+                                        ParseAdtsVariableHeader((unsigned char *)(pAudioData + audioOffset), &adts.var);
+                                        if (audioOffset+hlen+adts.var.aac_frame_length <= nAudioDataLen) {
+#ifdef TEST_AAC_NO_ADTS
+                                                cbRet = callback(opaque, pAudioData + audioOffset + hlen, adts.var.aac_frame_length - hlen,
+                                                                 THIS_IS_AUDIO, nNextAudioTime-nSysTimeBase, 0);
+#else
+                                                cbRet = callback(opaque, pAudioData + audioOffset, adts.var.aac_frame_length,
+                                                                 THIS_IS_AUDIO, nNextAudioTime-nSysTimeBase, 0);
+#endif
+                                                if (cbRet != 0) {
+                                                        bAudioOk = 0;
+                                                        continue;
+                                                }
+                                                audioOffset += adts.var.aac_frame_length;
+                                                aacFrameCount++;
+                                                int64_t d = ((1024*1000.0)/aacfreq[adts.fix.sampling_frequency_index]) * aacFrameCount;
+                                                nNextAudioTime = nSysTimeBase + d;
+                                        } else {
+                                                bAudioOk = 0;
+                                        }
+                                } else {
+                                        bAudioOk = 0;
+                                }
+                        } else {
+                                if(audioOffset+160 <= nAudioDataLen) {
+                                        cbRet = callback(opaque, pAudioData + audioOffset, 160, THIS_IS_AUDIO, nNextAudioTime-nSysTimeBase, 0);
+                                        if (cbRet != 0) {
+                                                bAudioOk = 0;
+                                                continue;
+                                        }
+                                        audioOffset += 160;
+                                        nNextAudioTime += 20;
+                                } else {
+                                        bAudioOk = 0;
+                                }
+                        }
+                }
+                
                 
                 int64_t nSleepTime = 0;
                 if (nNextAudioTime > nNextVideoTime) {
@@ -386,6 +389,7 @@ int start_file_test(char * _pAudioFile, char * _pVideoFile, DataCallback callbac
         return 0;
 }
 
+#ifdef TEST_WITH_FFMPEG
 int start_ffmpeg_test(char * _pUrl, DataCallback callback, void *opaque)
 {
         AVFormatContext *pFmtCtx = NULL;
@@ -393,7 +397,7 @@ int start_ffmpeg_test(char * _pUrl, DataCallback callback, void *opaque)
         if (ret != 0) {
                 char msg[128] = {0};
                 av_strerror(ret, msg, sizeof(msg)) ;
-                printf("ffmpeg err:%s\n", msg);
+                printf("ffmpeg err:%s (%s)\n", msg, _pUrl);
                 return ret;
         }
         
@@ -461,6 +465,11 @@ int start_ffmpeg_test(char * _pUrl, DataCallback callback, void *opaque)
 
                 av_packet_unref(&pkt);
         }
+        if (ret != 0) {
+                char msg[128] = {0};
+                av_strerror(ret, msg, sizeof(msg)) ;
+                printf("ffmpeg end:%s\n", msg);
+        }
 
 end:
         if (pBsfCtx)
@@ -475,6 +484,7 @@ end:
         
         return 0;
 }
+#endif
 
 static int64_t firstTimeStamp = -1;
 static int segStartCount = 0;
@@ -530,8 +540,17 @@ int main(int argc, char* argv[])
 {
 
         int ret = 0;
-#ifdef INPUT_FROM_FFMPEG
+#ifdef TEST_WITH_FFMPEG
+    #ifdef USE_OWN_TSMUX
+      #if LIBAVFORMAT_VERSION_MAJOR < 58
+        av_register_all();
+	printf("av_register_all\n");
+      #endif
+    #endif
+    #ifdef INPUT_FROM_FFMPEG
         avformat_network_init();
+	printf("avformat_network_init\n");
+    #endif
 #endif
         SetLogLevelToDebug();
         signal(SIGINT, signalHander);
@@ -574,7 +593,7 @@ int main(int argc, char* argv[])
         avArg.nChannels = 1;
         avArg.nSamplerate = 8000;
 #endif
-        avArg.nVideoFormat = TK_VIDEO_H265;
+        avArg.nVideoFormat = TK_VIDEO_H264;
 
         /*
         //token过期测试
@@ -610,11 +629,11 @@ int main(int argc, char* argv[])
         }
 #endif
 
-#ifdef INPUT_FROM_FFMPEG
+#if defined(TEST_WITH_FFMPEG) && defined(INPUT_FROM_FFMPEG)
         start_ffmpeg_test("rtmp://localhost:1935/live/movie", dataCallback, NULL);
-        
         //start_ffmpeg_test("rtmp://live.hkstv.hk.lxdns.com/live/hks", dataCallback, NULL);
 #else
+        printf("%s\n%s\n", pAFile, pVFile);
         start_file_test(pAFile, pVFile, dataCallback, NULL);
 #endif
         
