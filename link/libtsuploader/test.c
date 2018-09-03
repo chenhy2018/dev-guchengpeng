@@ -601,25 +601,25 @@ int main(int argc, char* argv[])
                 return ret;
         }
 #ifdef __APPLE__
-        char * pVFile = "/Users/mnt/c/d/learnffmpeg/material/h265_aac_1_16000_h264.h264";
+        char * pVFile = "/Users/liuye/Documents/material/h265_aac_1_16000_h264.h264";
   #ifdef TEST_AAC
-        char * pAFile = "/Users/mnt/c/d/learnffmpeg/material/h265_aac_1_16000_a.aac";
+        char * pAFile = "/Users/liuye/Documents/material/h265_aac_1_16000_a.aac";
   #else
-        char * pAFile = "/Users/mnt/c/d/learnffmpeg/material/h265_aac_1_16000_pcmu_8000.mulaw";
+        char * pAFile = "/Users/liuye/Documents/material/h265_aac_1_16000_pcmu_8000.mulaw";
   #endif
         if (avArg.nVideoFormat == TK_VIDEO_H265) {
-                pVFile = "/Users/mnt/c/d/learnffmpeg/material/h265_aac_1_16000_v.h265";
+                pVFile = "/Users/liuye/Documents/material/h265_aac_1_16000_v.h265";
         }
 #else
 
-        char * pVFile = "/mnt/c/d/learnffmpeg/material/h265_aac_1_16000_h264.h264";
+        char * pVFile = "/liuye/Documents/material/h265_aac_1_16000_h264.h264";
   #ifdef TEST_AAC
-        char * pAFile = "/mnt/c/d/learnffmpeg/material/h265_aac_1_16000_a.aac";
+        char * pAFile = "/liuye/Documents/material/h265_aac_1_16000_a.aac";
   #else
-        char * pAFile = "/mnt/c/d/learnffmpeg/material/h265_aac_1_16000_pcmu_8000.mulaw";
+        char * pAFile = "/liuye/Documents/material/h265_aac_1_16000_pcmu_8000.mulaw";
   #endif
         if (avArg.nVideoFormat == TK_VIDEO_H265) {
-                pVFile = "/mnt/c/d/learnffmpeg/material/h265_aac_1_16000_v.h265";
+                pVFile = "/liuye/Documents/material/h265_aac_1_16000_v.h265";
         }
 #endif
 
