@@ -87,6 +87,7 @@ TsMuxerContext * NewTsMuxerContext(TsMuxerArg *pArg)
                 pTsMuxerCtx->pidCounterMap[i].nPID = Pids[i];
                 pTsMuxerCtx->pidCounterMap[i].nCounter = 0;
         }
+        writeTable(pTsMuxerCtx, 0);
         return pTsMuxerCtx;
 }
 
@@ -107,8 +108,6 @@ static void makeTsPacket(TsMuxerContext* _pMuxCtx, int _nPid)
 
 int MuxerAudio(TsMuxerContext* _pMuxCtx, uint8_t *_pData, int _nDataLen, int64_t _nPts)
 {
-        writeTable(_pMuxCtx, _nPts);
-       
         if (_pMuxCtx->arg.nAudioFormat == TK_AUDIO_AAC) {
                 InitAudioPES(&_pMuxCtx->pes, _pData, _nDataLen, _nPts);
         } else {
@@ -121,8 +120,6 @@ int MuxerAudio(TsMuxerContext* _pMuxCtx, uint8_t *_pData, int _nDataLen, int64_t
 
 int MuxerVideo(TsMuxerContext* _pMuxCtx, uint8_t *_pData, int _nDataLen, int64_t _nPts)
 {
-        writeTable(_pMuxCtx, _nPts);
-        
         if (_pMuxCtx->nPcrFlag == 0) {
                 _pMuxCtx->nPcrFlag = 1;
                 InitVideoPESWithPcr(&_pMuxCtx->pes, _pMuxCtx->arg.nVideoFormat, _pData, _nDataLen, _nPts);
