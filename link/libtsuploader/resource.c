@@ -21,7 +21,11 @@ static void * recycle(void *_pOpaque)
                 if (ret == sizeof(TsUploader *)) {
                         fprintf(stderr, "pop from mgr:%p\n", pAsync);
                         AsynFunction func = pAsync->function;
-                        func(pAsync);
+                        if (pAsync == NULL && manager.nQuit_ != 1){
+                                logwarn("NULL function");
+                        } else {
+                                func(pAsync);
+                        }
                 }
                 manager.pQueue_->GetStatInfo(manager.pQueue_, &info);
         }
@@ -60,6 +64,7 @@ void StopMgr()
 {
         manager.nQuit_ = 1;
         if (manager.nIsStarted_) {
+                PushFunction(NULL);
                 pthread_join(manager.mgrThreadId_, NULL);
                 manager.nIsStarted_ = 0;
                 if (manager.pQueue_) {
