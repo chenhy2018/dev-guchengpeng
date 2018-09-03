@@ -124,7 +124,7 @@ static const uint8_t *ff_avc_find_startcode_internal(const uint8_t *p, const uin
         return end + 3;
 }
 
-const uint8_t *ff_avc_find_startcode(const uint8_t *p, const uint8_t *end){
+static const uint8_t *ff_avc_find_startcode(const uint8_t *p, const uint8_t *end){
         const uint8_t *out= ff_avc_find_startcode_internal(p, end);
         if(p<out && out<end && !out[-1]) out--;
         return out;
@@ -536,8 +536,10 @@ int main(int argc, char* argv[])
         int ret = 0;
 #ifdef TEST_WITH_FFMPEG
     #ifdef USE_OWN_TSMUX
+      #if LIBAVFORMAT_VERSION_MAJOR < 58
         av_register_all();
 	printf("av_register_all\n");
+      #endif
     #endif
     #ifdef INPUT_FROM_FFMPEG
         avformat_network_init();
