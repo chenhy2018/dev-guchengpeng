@@ -42,7 +42,7 @@ void Log(int nLevel, char * pFmt, ...)
                 if (logFunc == NULL) {
                         vprintf(pFmt, ap);
 		} else {
-                        char logStr[192] = {0};
+                        char logStr[257] = {0};
                         vsnprintf(logStr, sizeof(logStr), pFmt, ap);
                         logFunc(logStr);
 		}
