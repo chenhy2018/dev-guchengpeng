@@ -20,10 +20,10 @@ static void * recycle(void *_pOpaque)
                 int ret = manager.pQueue_->Pop(manager.pQueue_, (char *)(&pAsync), sizeof(AsyncInterface *));
                 if (ret == sizeof(TsUploader *)) {
                         fprintf(stderr, "pop from mgr:%p\n", pAsync);
-                        AsynFunction func = pAsync->function;
                         if (pAsync == NULL && manager.nQuit_ != 1){
                                 logwarn("NULL function");
                         } else {
+                                AsynFunction func = pAsync->function;
                                 func(pAsync);
                         }
                 }
