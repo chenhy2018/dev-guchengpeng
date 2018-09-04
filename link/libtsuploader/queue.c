@@ -20,7 +20,7 @@ static int PushQueue(CircleQueue *_pQueue, char *pData_, int nDataLen)
 {
         CircleQueueImp *pQueueImp = (CircleQueueImp *)_pQueue;
         assert(pQueueImp->nItemLen_ - sizeof(int) >= nDataLen);
-        
+
         pthread_mutex_lock(&pQueueImp->mutex_);
         
         if (pQueueImp->nIsStopPush_) {
@@ -47,7 +47,6 @@ static int PushQueue(CircleQueue *_pQueue, char *pData_, int nDataLen)
         
         if (pQueueImp->nLen_ == pQueueImp->nCap_) {
                 if (pQueueImp->policy == TSQ_FIX_LENGTH) {
-                        logwarn("queue is full. drop earliest data");
                         if(pQueueImp->nEnd_ + 1 == pQueueImp->nCap_){
                                 pQueueImp->nEnd_ = 0;
                                 pQueueImp->nStart_ = 0;
@@ -61,7 +60,8 @@ static int PushQueue(CircleQueue *_pQueue, char *pData_, int nDataLen)
                         pthread_cond_signal(&pQueueImp->condition_);
 
                         pQueueImp->statInfo.nPushDataBytes_ += nDataLen;
-                        return nDataLen;
+                        pQueueImp->statInfo.nOverwriteCnt++;
+                        return TK_Q_OVERWRIT;
                 } else{
                         char *pTmp = (char *)malloc(pQueueImp->nItemLen_ * pQueueImp->nCap_ * 2);
                         int nOriginCap = pQueueImp->nCap_;
@@ -162,6 +162,16 @@ static int PopQueue(CircleQueue *_pQueue, char *pBuf_, int nBufLen)
         return PopQueueWithTimeout(_pQueue, pBuf_, nBufLen, usec * 60 * 60 * 24 * 365);
 }
 
+static int PopQueueWithNoOverwrite(CircleQueue *_pQueue, char *pBuf_, int nBufLen)
+{
+        CircleQueueImp *pQueueImp = (CircleQueueImp *)_pQueue;
+        if (pQueueImp->statInfo.nOverwriteCnt > 0) {
+                return TK_Q_OVERWRIT;
+        }
+        int64_t usec = 1000000;
+        return PopQueueWithTimeout(_pQueue, pBuf_, nBufLen, usec * 60 * 60 * 24 * 365);
+}
+
 static void StopPush(CircleQueue *_pQueue)
 {
         CircleQueueImp *pQueueImp = (CircleQueueImp *)_pQueue;
@@ -208,7 +218,7 @@ int NewCircleQueue(CircleQueue **_pQueue, enum CircleQueuePolicy _policy, int _n
         pQueueImp->pData_ = (char *)pQueueImp + sizeof(CircleQueueImp);
         pQueueImp->nCap_ = _nInitItemCount;
         pQueueImp->nItemLen_ = _nMaxItemLen + sizeof(int); //前缀int类型的一个长度
-        pQueueImp->circleQueue.Pop = PopQueue;
+        pQueueImp->circleQueue.Pop = PopQueueWithNoOverwrite;
         pQueueImp->circleQueue.Push = PushQueue;
         pQueueImp->circleQueue.PopWithTimeout = PopQueueWithTimeout;
         pQueueImp->circleQueue.StopPush = StopPush;
