@@ -10,7 +10,7 @@ import (
 )
 
 func TestNamespace(t *testing.T) {
-	url := "mongodb://root:public@180.97.147.164:27017,180.97.147.179:27017/admin"
+	url := "mongodb://127.0.0.1:27017"
 	dbName := "vod"
 	config := db.MgoConfig{
 		Host:     url,
