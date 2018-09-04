@@ -5,7 +5,9 @@ go:
 script:
   - source env.sh
   - echo $GOPATH
-  - make
+  - go test -v ./link/vod/src/qiniu.com/models/
+  - go test -v ./link/vod/src/qiniu.com/controllers/
+  - go test -v ./link/vod/src/qiniu.com/m3u8/
   - echo "TRAVIS_BRANCH=" $TRAVIS_BRANCH
   - if [[ $TRAVIS_BRANCH == "dev-merge" ]]; then cd link/vod/src; curl https://aone.qiniu.io/api/coverage/collect?token=A59B8029-E9A1-4FF3-B72B-3657CEAC64D4 | bash; else make test; fi
   - make style
