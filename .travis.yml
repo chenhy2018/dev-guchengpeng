@@ -17,5 +17,8 @@ script:
   - source env.sh
   - echo $GOPATH
   - echo "TRAVIS_BRANCH=" $TRAVIS_BRANCH
-  - cd ./link/vod/src; curl https://aone.qiniu.io/api/coverage/collect?token=A59B8029-E9A1-4FF3-B72B-3657CEAC64D4 | bash
+  - cd ./link/vod/src;
+  - echo $PWD
+  - go list ./...
+  - curl https://aone.qiniu.io/api/coverage/collect?token=A59B8029-E9A1-4FF3-B72B-3657CEAC64D4 | bash
   - cd ..; make style
