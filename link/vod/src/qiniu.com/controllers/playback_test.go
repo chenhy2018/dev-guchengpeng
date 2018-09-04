@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"errors"
 	"net/http"
 	"reflect"
 	"testing"
@@ -71,6 +72,20 @@ func (suite *PlayBackTestSuite) TestPlayBack() {
 
 	w := PerformRequest(suite.r, req)
 	suite.Equal(200, w.Code, "200 for expect requset url")
+}
+
+func (suite *PlayBackTestSuite) TestPlayBackWithGetSegmentsInfoError() {
+	req, _ := http.NewRequest("GET", "/v1/namespaces/ipcamera/uas/testdeviceid8/playback?from=1532499325&to=1532499345&e=1532499345&token=13764829407:4ZNcW_AanSVccUmwq6MnA_8SWk8=", nil)
+	defer monkey.UnpatchAll()
+	monkey.Patch(VerifyToken, func(xl *xlog.Logger, expire int64, realToken, url, uid string) bool { return true })
+	monkey.PatchInstanceMethod(
+		reflect.TypeOf((*models.SegmentKodoModel)(nil)), "GetSegmentTsInfo", func(ss *models.SegmentKodoModel,
+			xl *xlog.Logger, starttime, endtime int64, bucketurl, uaid string, limit int, marker string) ([]map[string]interface{}, string, error) {
+			return nil, "", errors.New("get kodo data error")
+		})
+
+	w := PerformRequest(suite.r, req)
+	suite.Equal(500, w.Code, "500 for query kodo data error")
 }
 func TestPlayBackSuite(t *testing.T) {
 	suite.Run(t, new(PlayBackTestSuite))
