@@ -148,6 +148,7 @@ static int push(FFTsMuxUploader *pFFTsMuxUploader, char * _pData, int _nDataLen,
                 return 0;
         }
         if (pTsMuxCtx->pTsUploader_->GetUploaderState(pTsMuxCtx->pTsUploader_) == TK_UPLOAD_FAIL) {
+                logdebug("upload fail. drop the data");
                 pFFTsMuxUploader->ffMuxSatte = TK_UPLOAD_FAIL;
                 pthread_mutex_unlock(&pFFTsMuxUploader->muxUploaderMutex_);
                 return 0;
