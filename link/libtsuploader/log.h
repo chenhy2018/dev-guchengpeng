@@ -16,7 +16,7 @@
 #define LOG_LEVEL_ERROR 5
 
 extern int nLogLevel;
-typedef void (*LogFunc)(char * pFmt,   va_list ap);
+typedef void (*LogFunc)(char * pLog);
 
 void SetLogLevelToTrace();
 void SetLogLevelToDebug();

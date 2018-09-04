@@ -33,15 +33,18 @@ void SetLogCallback(LogFunc f)
 	logFunc = f;
 }
 
+
 void Log(int nLevel, char * pFmt, ...)
 {
 	if (nLevel >= nLogLevel){
 	        va_list ap;
                 va_start(ap, pFmt);
                 if (logFunc == NULL) {
-                        vprintf(pFmt, ap); 
+                        vprintf(pFmt, ap);
 		} else {
-                        logFunc(pFmt, ap);
+                        char logStr[192] = {0};
+                        vsnprintf(logStr, sizeof(logStr), pFmt, ap);
+                        logFunc(logStr);
 		}
                 va_end(ap);
 	}
