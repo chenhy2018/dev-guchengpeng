@@ -5,5 +5,5 @@ script:
   - source env.sh
   - echo $GOPATH
   - make
-  - if [[ "$TRAVIS_BRANCH" == "dev-merge" ]]; then curl https://aone.qiniu.io/api/coverage/collect?token=A59B8029-E9A1-4FF3-B72B-3657CEAC64D4 | bash; else make test; fi
+  - if [[ "$TRAVIS_BRANCH" == "dev-merge" ]]; then cd link/vod/src;curl https://aone.qiniu.io/api/coverage/collect?token=A59B8029-E9A1-4FF3-B72B-3657CEAC64D4 | bash; else make test; fi
   - make style
