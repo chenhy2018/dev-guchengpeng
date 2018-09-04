@@ -10,6 +10,7 @@ export ARCH=$1
 
 export WITH_P2P="OFF"
 export WITH_OPENSSL="OFF"
+export WITH_FFMPEG="OFF"
 
 prefix=
 if [ "$1" = "mstar" ];then

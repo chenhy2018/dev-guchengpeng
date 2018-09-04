@@ -3,21 +3,12 @@ package m3u8
 
 import (
 	"fmt"
+	"testing"
+
 	xlog "github.com/qiniu/xlog.v1"
 )
 
-func TestMakem3u8_old() {
-	fmt.Printf("enter main...\n")
-	pPlaylist := new(MediaPlaylist)
-	pPlaylist.Init(32, 32)
-	pPlaylist.AppendSegment("https://www.baidu.com/test1.ts", 10.00, "program")
-	pPlaylist.AppendSegment("https://www.baidu.com/test2.ts", 9.88, "program")
-	pPlaylist.AppendSegment("https://www.baidu.com/test3.ts", 9.88, "")
-	fmt.Printf("%s\n", pPlaylist.String())
-
-}
-
-func TestMakem3u8() {
+func TestMakem3u8(t *testing.T) {
 	var playlist []map[string]interface{}
 
 	m1 := map[string]interface{}{
@@ -39,6 +30,6 @@ func TestMakem3u8() {
 	playlist = append(playlist, m2)
 	playlist = append(playlist, m3)
 
-	res := Mkm3u8(playlist)
+	res := Mkm3u8(playlist, xlog.NewDummy())
 	fmt.Println(res)
 }

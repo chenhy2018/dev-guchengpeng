@@ -13,16 +13,22 @@ static ResourceMgr manager;
 
 static void * recycle(void *_pOpaque)
 {
-        while(!manager.nQuit_) {
+        UploaderStatInfo info = {0};
+        manager.pQueue_->GetStatInfo(manager.pQueue_, &info);
+        while(!manager.nQuit_ && info.nLen_ == 0) {
                 AsyncInterface *pAsync = NULL;
                 int ret = manager.pQueue_->Pop(manager.pQueue_, (char *)(&pAsync), sizeof(AsyncInterface *));
                 if (ret == sizeof(TsUploader *)) {
                         fprintf(stderr, "pop from mgr:%p\n", pAsync);
-                        AsynFunction func = pAsync->function;
-                        func(pAsync);
+                        if (pAsync == NULL && manager.nQuit_ != 1){
+                                logwarn("NULL function");
+                        } else {
+                                AsynFunction func = pAsync->function;
+                                func(pAsync);
+                        }
                 }
+                manager.pQueue_->GetStatInfo(manager.pQueue_, &info);
         }
-        return NULL;
 }
 
 int PushFunction(void *_pAsyncInterface)
@@ -58,6 +64,7 @@ void StopMgr()
 {
         manager.nQuit_ = 1;
         if (manager.nIsStarted_) {
+                PushFunction(NULL);
                 pthread_join(manager.mgrThreadId_, NULL);
                 manager.nIsStarted_ = 0;
                 if (manager.pQueue_) {
