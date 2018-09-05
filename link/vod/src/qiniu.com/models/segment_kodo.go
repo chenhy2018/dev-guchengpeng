@@ -178,7 +178,7 @@ func (m *SegmentKodoModel) GetSegmentTsInfo(xl *xlog.Logger, starttime, endtime 
 		if len(info) == 0 {
 			continue
 		}
-		if info[SEGMENT_ITEM_END_TIME].(int64) > endtime {
+		if info[SEGMENT_ITEM_END_TIME].(int64) / 1000 > endtime / 1000 {
 			cancelFunc()
 			break
 		}
@@ -242,7 +242,7 @@ func (m *SegmentKodoModel) GetFragmentTsInfo(xl *xlog.Logger, count int, startti
 			total++
 		}
 
-		if info[SEGMENT_ITEM_END_TIME].(int64) > endtime {
+		if info[SEGMENT_ITEM_END_TIME].(int64) / 1000 > endtime / 1000 {
 			cancelFunc()
 			break
 		}
@@ -289,11 +289,11 @@ func (m *SegmentKodoModel) GetFrameInfo(xl *xlog.Logger, starttime, endtime int6
 			xl.Infof("GetFrameInfo err  %s \n", err)
 			continue
 		}
-		if info[SEGMENT_ITEM_START_TIME].(int64) > endtime {
+		if info[SEGMENT_ITEM_START_TIME].(int64) / 1000 > endtime / 1000 {
 			cancelFunc()
 			break
 		}
-		if info[SEGMENT_ITEM_START_TIME].(int64) > starttime {
+		if info[SEGMENT_ITEM_START_TIME].(int64) >= starttime {
 			r = append(r, info)
 			total++
 		}
