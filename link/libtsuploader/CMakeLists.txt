@@ -6,9 +6,8 @@ include_directories("${CMAKE_CURRENT_SOURCE_DIR}/../../third_party/curl-7.61.0/i
 include_directories("${CMAKE_CURRENT_SOURCE_DIR}/c-sdk")
 
 if(CMAKE_TOOLCHAIN_FILE)
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${CMAKE_ENABLE_C99}")
-include_directories("${CMAKE_CURRENT_SOURCE_DIR}/include")
-include_directories("${CMAKE_CURRENT_SOURCE_DIR}/include/ffmpeg")
+include_directories("${CMAKE_CURRENT_SOURCE_DIR}/demo/include")
+include_directories("${CMAKE_CURRENT_SOURCE_DIR}/")
 endif()
 
 
@@ -77,8 +76,10 @@ add_library(tsuploader STATIC
 
 if(CMAKE_TOOLCHAIN_FILE)
 add_executable(testupload
-    ipc_test.c
-    socket_logging.c
+    ./demo/ipc_test.c
+    ./demo/socket_logging.c
+    ./demo/dbg.c
+    ./demo/log2file.c
 )
 add_definitions(-D__ARM)
 else()
