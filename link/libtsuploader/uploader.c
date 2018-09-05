@@ -282,6 +282,9 @@ size_t getDataCallback(void* buffer, size_t size, size_t n, void* rptr)
         KodoUploader * pUploader = (KodoUploader *) rptr;
         int nPopLen = 0;
         nPopLen = pUploader->pQueue_->Pop(pUploader->pQueue_, buffer, size * n);
+        if (nPopLen < 0) {
+                return CURL_READFUNC_ABORT;
+        }
         if (nPopLen == 0)
                 return 0;
 
@@ -291,6 +294,9 @@ size_t getDataCallback(void* buffer, size_t size, size_t n, void* rptr)
                 nTmp = pUploader->pQueue_->Pop(pUploader->pQueue_, pBuf + nPopLen, size * n - nPopLen);
                 if (nTmp == 0)
                         break;
+                if (nTmp < 0) {
+                        return CURL_READFUNC_ABORT;
+                }
                 nPopLen += nTmp;
         }
         return nPopLen;

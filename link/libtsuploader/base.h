@@ -48,5 +48,6 @@ typedef struct _AvArg{
 #define TK_HTTP_TIME       -2300
 #define TK_OPEN_TS_ERR     -2400
 #define TK_WRITE_TS_ERR    -2401
+#define TK_Q_OVERWRIT      -5001
 
 #endif

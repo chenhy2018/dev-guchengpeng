@@ -536,6 +536,11 @@ void signalHander(int s){
         exit(0);
 }
 
+void logCb(char * pLog)
+{
+        printf("-%s", pLog);
+}
+
 int main(int argc, char* argv[])
 {
 
@@ -553,6 +558,7 @@ int main(int argc, char* argv[])
     #endif
 #endif
         SetLogLevelToDebug();
+        SetLogCallback(logCb);
         signal(SIGINT, signalHander);
         
         pthread_t updateTokenThread;

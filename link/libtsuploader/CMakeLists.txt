@@ -6,8 +6,8 @@ include_directories("${CMAKE_CURRENT_SOURCE_DIR}/../../third_party/curl-7.61.0/i
 include_directories("${CMAKE_CURRENT_SOURCE_DIR}/c-sdk")
 
 if(CMAKE_TOOLCHAIN_FILE)
-include_directories("${CMAKE_CURRENT_SOURCE_DIR}/include")
-include_directories("${CMAKE_CURRENT_SOURCE_DIR}/include/ffmpeg")
+include_directories("${CMAKE_CURRENT_SOURCE_DIR}/demo/include")
+include_directories("${CMAKE_CURRENT_SOURCE_DIR}/")
 endif()
 
 
@@ -23,7 +23,12 @@ if(NOT WITH_OPENSSL)
         add_definitions(-DDISABLE_OPENSSL)
 endif()
 
+if(CMAKE_TOOLCHAIN_FILE)
+set(LIBFFMPEG "")
+else()
 set(LIBFFMPEG avformat avcodec swresample avutil)
+endif()
+
 if ($ENV{WITH_FFMPEG} STREQUAL "OFF")
         message("WITHOUT_FFMPEG")
         add_definitions(-DUSE_OWN_TSMUX)
@@ -71,8 +76,10 @@ add_library(tsuploader STATIC
 
 if(CMAKE_TOOLCHAIN_FILE)
 add_executable(testupload
-    ipc_test.c
-    socket_logging.c
+    ./demo/ipc_test.c
+    ./demo/socket_logging.c
+    ./demo/dbg.c
+    ./demo/log2file.c
 )
 add_definitions(-D__ARM)
 else()

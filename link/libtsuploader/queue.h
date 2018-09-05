@@ -23,6 +23,7 @@ typedef struct _UploaderStatInfo {
         int nPushDataBytes_;
         int nPopDataBytes_;
         int nLen_;
+        int nOverwriteCnt;
 }UploaderStatInfo;
 
 typedef struct _CircleQueue{
