@@ -9,7 +9,6 @@ import (
 	"github.com/gin-gonic/gin"
 	xlog "github.com/qiniu/xlog.v1"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/grpclog"
 	"qiniu.com/m3u8"
 	"qiniu.com/models"
 	pb "qiniu.com/proto"
@@ -31,7 +30,7 @@ func gRPCinit() {
 	conn, err := grpc.Dial("127.0.0.1:50051", grpc.WithInsecure())
 
 	if err != nil {
-		grpclog.Fatalln(err)
+		fmt.Println("Init gprc failedgrpcgrpc")
 
 	}
 
