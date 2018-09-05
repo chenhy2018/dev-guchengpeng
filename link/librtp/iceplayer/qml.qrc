@@ -1,0 +1,6 @@
+<RCC>
+    <qresource prefix="/">
+        <file>main.qml</file>
+        <file>ui/LineEdit.qml</file>
+    </qresource>
+</RCC>

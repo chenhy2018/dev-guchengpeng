@@ -1,0 +1,10 @@
+include(ExternalProject)
+
+add_subdirectory(max_account)
+add_subdirectory(max_call)
+add_subdirectory(max_ongoning_call_for_account)
+add_subdirectory(thread_test)
+add_subdirectory(uac_hangup_call)
+add_subdirectory(uas_hangup_call)
+add_subdirectory(perf_test)
+add_subdirectory(day_night_test)

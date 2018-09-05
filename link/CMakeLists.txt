@@ -1,6 +1,30 @@
-cmake_minimum_required (VERSION 2.8)
+if ($ENV{WITH_P2P} STREQUAL "ON")
+        if ($ENV{ARCH} STREQUAL "x86") 
+        include(ExternalProject)
+        ExternalProject_Add(stun
+                SOURCE_DIR stun
+                BUILD_COMMAND make
+                CONFIGURE_COMMAND ""
+                INSTALL_COMMAND ""
+                BUILD_IN_SOURCE 1
+        )
+        endif()
+add_subdirectory(libice)
+add_subdirectory(librtp)
+endif()
 
-project (linking)
+if ($ENV{ARCH} STREQUAL "x86")
+        include(ExternalProject)
+        ExternalProject_Add(vod
+                SOURCE_DIR vod
+                BUILD_COMMAND  make
+                CONFIGURE_COMMAND ""
+                INSTALL_COMMAND ""
+                BUILD_IN_SOURCE 1
+        )
+endif()
 
-add_subdirectory(stun)
-
+add_subdirectory(libsip)
+add_subdirectory(libmqtt)
+add_subdirectory(libsdk)
+add_subdirectory(libtsuploader)
