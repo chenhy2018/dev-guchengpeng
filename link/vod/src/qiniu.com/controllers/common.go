@@ -4,10 +4,10 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"qiniu.com/models"
 	"strconv"
 	"strings"
 	"time"
+
 	"github.com/gin-gonic/gin"
 	"github.com/qiniu/api.v7/auth/qbox"
 	"github.com/qiniu/api.v7/storage"
@@ -20,6 +20,7 @@ const (
 )
 
 type requestParams struct {
+	url       string
 	uid       string
 	uaid      string
 	from      int64
@@ -31,6 +32,7 @@ type requestParams struct {
 	namespace string
 	regex     string
 	exact     bool
+	speed     int32
 }
 
 func VerifyAuth(xl *xlog.Logger, req *http.Request) (bool, error) {
@@ -44,18 +46,6 @@ func GetUrlWithDownLoadToken(xl *xlog.Logger, domain, fname string, tsExpire int
 	realUrl := storage.MakePrivateURL(mac, domain, fname, expireT)
 	fmt.Println(realUrl)
 	return realUrl
-}
-
-func IsAutoCreateUa(xl *xlog.Logger, uid, namespace string) (bool, error) {
-	namespaceMod = &models.NamespaceModel{}
-	info, err := namespaceMod.GetNamespaceInfo(xl, uid, namespace)
-	if err != nil {
-		return false, err
-	}
-	if len(info) == 0 {
-		return false, errors.New("can't find namespace")
-	}
-	return info[0].AutoCreateUa, nil
 }
 
 func VerifyToken(xl *xlog.Logger, expire int64, realToken, url, uid string) bool {
@@ -91,6 +81,7 @@ func ParseRequest(c *gin.Context, xl *xlog.Logger) (*requestParams, error) {
 	marker := c.DefaultQuery("marker", "")
 	regex := c.DefaultQuery("regex", "")
 	exact := c.DefaultQuery("exact", "false")
+	speed := c.DefaultQuery("speed", "1")
 
 	if strings.Contains(uaid, ".m3u8") {
 		uaid = strings.Split(uaid, ".")[0]
@@ -119,7 +110,13 @@ func ParseRequest(c *gin.Context, xl *xlog.Logger) (*requestParams, error) {
 		return nil, errors.New("Parse exact failed")
 	}
 
+	speedT, err := strconv.ParseInt(speed, 10, 32)
+	if err != nil {
+		return nil, errors.New("Parse speed failed")
+	}
+
 	params := &requestParams{
+		url:       c.Request.URL.Path,
 		uid:       uid,
 		uaid:      uaid,
 		from:      fromT * 1000,
@@ -131,6 +128,7 @@ func ParseRequest(c *gin.Context, xl *xlog.Logger) (*requestParams, error) {
 		namespace: namespace,
 		regex:     regex,
 		exact:     exactT,
+		speed:     int32(speedT),
 	}
 
 	return params, nil

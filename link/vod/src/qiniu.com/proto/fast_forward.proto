@@ -1,0 +1,21 @@
+syntax = "proto3";
+
+package fastforward;
+
+
+service FastForward {
+        rpc GetTsSteam(FastForwardInfo) returns (stream FastForwardStream) {}
+}
+
+message FastForwardInfo {
+        string baseurl = 1;
+        int64 from = 2;
+        int64 to = 3;
+        int64 expire = 4;
+        string token = 5;
+	int32 speed = 6;
+}
+
+message FastForwardStream {
+        bytes stream = 1;
+}
