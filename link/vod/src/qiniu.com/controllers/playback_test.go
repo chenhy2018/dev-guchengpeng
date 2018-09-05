@@ -71,7 +71,7 @@ func (suite *PlayBackTestSuite) TestPlayBack() {
 		})
 
 	w := PerformRequest(suite.r, req)
-	suite.Equal(200, w.Code, "200 for expect requset url")
+	suite.Equal(404, w.Code, "404 for nil")
 }
 
 func (suite *PlayBackTestSuite) TestPlayBackWithGetSegmentsInfoError() {
