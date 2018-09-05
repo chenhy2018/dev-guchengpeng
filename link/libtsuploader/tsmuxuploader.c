@@ -112,7 +112,12 @@ static int writeTsPacketToMem(void *opaque, uint8_t *buf, int buf_size)
         
         int ret = pTsMuxCtx->pTsUploader_->Push(pTsMuxCtx->pTsUploader_, (char *)buf, buf_size);
         if (ret < 0){
-                logdebug("write ts to queue fail:%d", ret);
+                if (ret == TK_Q_OVERWRIT) {
+                        logdebug("write ts to queue overwrite:%d", ret);
+                } else {
+                        logdebug("write ts to queue fail:%d", ret);
+                }
+                return ret;
         } else {
                 logtrace("write_packet: should write:len:%d  actual:%d\n", buf_size, ret);
         }
@@ -148,6 +153,7 @@ static int push(FFTsMuxUploader *pFFTsMuxUploader, char * _pData, int _nDataLen,
                 return 0;
         }
         if (pTsMuxCtx->pTsUploader_->GetUploaderState(pTsMuxCtx->pTsUploader_) == TK_UPLOAD_FAIL) {
+                logdebug("upload fail. drop the data");
                 pFFTsMuxUploader->ffMuxSatte = TK_UPLOAD_FAIL;
                 pthread_mutex_unlock(&pFFTsMuxUploader->muxUploaderMutex_);
                 return 0;
@@ -212,7 +218,7 @@ static int push(FFTsMuxUploader *pFFTsMuxUploader, char * _pData, int _nDataLen,
                 } 
 #ifdef USE_OWN_TSMUX
                 else {
-                        MuxerAudio(pTsMuxCtx->pFmtCtx_, _pData, _nDataLen, _nTimestamp);
+                        ret = MuxerAudio(pTsMuxCtx->pFmtCtx_, (uint8_t*)_pData, _nDataLen, _nTimestamp);
                 }
 #endif
         }else{
@@ -223,7 +229,7 @@ static int push(FFTsMuxUploader *pFFTsMuxUploader, char * _pData, int _nDataLen,
                         return 0;
                 }
 #ifdef USE_OWN_TSMUX
-                MuxerVideo(pTsMuxCtx->pFmtCtx_, _pData, _nDataLen, _nTimestamp);
+                ret = MuxerVideo(pTsMuxCtx->pFmtCtx_, (uint8_t*)_pData, _nDataLen, _nTimestamp);
 #else
                 pkt.pts = _nTimestamp * 90;
                 pkt.stream_index = pTsMuxCtx->nOutVideoindex_;
@@ -234,12 +240,14 @@ static int push(FFTsMuxUploader *pFFTsMuxUploader, char * _pData, int _nDataLen,
         
 
 #ifndef USE_OWN_TSMUX
-        if ((ret = av_interleaved_write_frame(pTsMuxCtx->pFmtCtx_, &pkt)) < 0) {
-                logerror("Error muxing packet");
-        }
+        ret = av_interleaved_write_frame(pTsMuxCtx->pFmtCtx_, &pkt);
 #endif
         if (ret == 0) {
                 pTsMuxCtx->pTsUploader_->RecordTimestamp(pTsMuxCtx->pTsUploader_, _nTimestamp);
+        } else {
+                if (pFFTsMuxUploader->ffMuxSatte != TK_UPLOAD_FAIL)
+                        logerror("Error muxing packet:%d", ret);
+                pFFTsMuxUploader->ffMuxSatte = TK_UPLOAD_FAIL;
         }
 
         pthread_mutex_unlock(&pFFTsMuxUploader->muxUploaderMutex_);

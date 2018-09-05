@@ -6,6 +6,7 @@
 #include <pthread.h>
 #include "servertime.h"
 #include <time.h>
+#include <curl/curl.h>
 #ifdef __ARM
 #include "socket_logging.h"
 #endif
@@ -178,7 +179,7 @@ static void * streamUpload(void *_pOpaque)
         //putExtra.upHost="http://nbxs-gate-up.qiniu.com";
         
         char key[128] = {0};
-        client.lowSpeedLimit = 30;
+        client.lowSpeedLimit = 3000;
         client.lowSpeedTime = 3;
         
         //todo wait for first packet
@@ -254,7 +255,12 @@ static void * streamUpload(void *_pOpaque)
                                          pFullErrMsg);
                         }
                 } else {
-                        logerror("upload file :%s errorcode=%d errmsg={\"error\":\"server not response\"}", key, error.code);
+			const char *pCurlErrMsg = curl_easy_strerror(error.code);
+			if (pCurlErrMsg != NULL) {
+                                logerror("upload file :%s errorcode=%d errmsg={\"error\":\"%s\"}", key, error.code, pCurlErrMsg);
+			} else {
+                                logerror("upload file :%s errorcode=%d errmsg={\"error\":\"unknown error\"}", key, error.code);
+			}
                 }
                 //debug_log(&client, error);
         } else {
@@ -276,6 +282,9 @@ size_t getDataCallback(void* buffer, size_t size, size_t n, void* rptr)
         KodoUploader * pUploader = (KodoUploader *) rptr;
         int nPopLen = 0;
         nPopLen = pUploader->pQueue_->Pop(pUploader->pQueue_, buffer, size * n);
+        if (nPopLen < 0) {
+                return CURL_READFUNC_ABORT;
+        }
         if (nPopLen == 0)
                 return 0;
 
@@ -285,6 +294,9 @@ size_t getDataCallback(void* buffer, size_t size, size_t n, void* rptr)
                 nTmp = pUploader->pQueue_->Pop(pUploader->pQueue_, pBuf + nPopLen, size * n - nPopLen);
                 if (nTmp == 0)
                         break;
+                if (nTmp < 0) {
+                        return CURL_READFUNC_ABORT;
+                }
                 nPopLen += nTmp;
         }
         return nPopLen;

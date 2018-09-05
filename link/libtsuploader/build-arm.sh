@@ -1,4 +1,6 @@
 
+export WITH_OPENSSL="OFF"
+export WITH_FFMPEG="OFF"
 if [ $# == 1 ];then
 	if [ $1 == 'distclean' ];then
 		rm -rvf CMakeFiles CMakeCache.txt Makefile cmake_install.cmake

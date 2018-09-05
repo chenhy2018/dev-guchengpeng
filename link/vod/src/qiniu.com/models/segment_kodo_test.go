@@ -25,8 +25,8 @@ func TestKodoSegment(t *testing.T) {
 
 	// Test get 2018/8/16 - 2018/8/17 segment count. It should be 2767.
 	xl.Infof("SegmentTsInfo 1")
-	infos, _, err4 := model.GetSegmentTsInfo(xl, int64(1534385684000), int64(1534472084000), bucket, "testdeviceid5", 0, "")
-	assert.Equal(t, len(infos), 2767, "they should be equal")
+	infos, _, err4 := model.GetSegmentTsInfo(xl, int64(1535874867854), int64(1535878468023), bucket, "testdeviceid99", 0, "")
+	assert.Equal(t, len(infos), 11, "they should be equal")
 	/*
 	   for i := 0; i < len(infos); i++ {
 	           assert.Equal(t, infos[i][SEGMENT_ITEM_START_TIME].(int64), 0, "they should be equal")
@@ -35,52 +35,27 @@ func TestKodoSegment(t *testing.T) {
 	*/
 	assert.Equal(t, err4, nil, "they should be equal")
 
-	infos, _, err4 = model.GetSegmentTsInfo(xl, int64(1534848606000), int64(1534859606000), bucket, "testdeviceid10", 0, "")
-
-	//infos, err4 = model.GetSegmentTsInfo(xl, int64(1534414484000), int64(1534500884000), bucket,"testdeviceid10")
-	//assert.Equal(t, err4, nil, "they should be equal")
-	//assert.Equal(t, 12026, len(infos), "they should be equal")
 
 	// filename should be seg/ua_id/yyyy/mm/dd/hh/mm/ss/mmm/endts
-	infoF, markF, errF := model.GetFragmentTsInfo(xl, 0, int64(1534385684000), int64(1534472084000), bucket, "testdeviceid5", "")
-	assert.Equal(t, errF, nil, "they should be equal")
-	assert.Equal(t, len(infoF), 11, "they should be equal")
-	infoF, markF, errF = model.GetFragmentTsInfo(xl, 1, int64(1534385684000), int64(1534472084000), bucket, "testdeviceid5", "")
-	assert.Equal(t, errF, nil, "they should be equal")
-	assert.Equal(t, len(infoF), 1, "they should be equal")
-	infoF, markF, errF = model.GetFragmentTsInfo(xl, 2, int64(1534385684000), int64(1534472084000), bucket, "testdeviceid5", markF)
+	infoF, markF, errF := model.GetFragmentTsInfo(xl, 0, int64(1535874867854), int64(1535878468023), bucket, "testdeviceid99", "")
 	assert.Equal(t, errF, nil, "they should be equal")
 	assert.Equal(t, len(infoF), 2, "they should be equal")
-
-	infoF, markF, errF = model.GetFragmentTsInfo(xl, 10, int64(1534385684000), int64(1534472084000), bucket, "testdeviceid5", markF)
-	assert.Equal(t, errF, nil, "they should be equal")
-	assert.Equal(t, len(infoF), 8, "they should be equal")
-
-	infoF, markF, errF = model.GetFragmentTsInfo(xl, 0, int64(1534443284000), int64(1534500884000), bucket, "testdeviceid10", "")
-	assert.Equal(t, errF, nil, "they should be equal")
-	assert.Equal(t, len(infoF), 9, "they should be equal")
-
-	infoF, markF, errF = model.GetFragmentTsInfo(xl, 1, int64(1534412096000), int64(1534729559000), bucket, "testdeviceid10", "")
+	infoF, markF, errF = model.GetFragmentTsInfo(xl, 1, int64(1535874867854), int64(1535878468023), bucket, "testdeviceid99", "")
 	assert.Equal(t, errF, nil, "they should be equal")
 	assert.Equal(t, len(infoF), 1, "they should be equal")
-	xl.Infof("1 0 mark %s", markF)
-	infoF, markF, errF = model.GetFragmentTsInfo(xl, 1, int64(1534412096000), int64(1534729559000), bucket, "testdeviceid10", markF)
+	infoF, markF, errF = model.GetFragmentTsInfo(xl, 2, int64(1535874867854), int64(1535878468023), bucket, "testdeviceid99", markF)
 	assert.Equal(t, errF, nil, "they should be equal")
 	assert.Equal(t, len(infoF), 1, "they should be equal")
-	//assert.Equal(t, infos[0][SEGMENT_ITEM_END_TIME].(int64), int64(1534414490692), "they should be equal")
-	xl.Infof("1 1 mark %s", markF)
 
-	infoF, markF, errF = model.GetFragmentTsInfo(xl, 5, int64(1534412096000), int64(1534729559000), bucket, "testdeviceid10", markF)
+
+	infoF, markF, errF = model.GetFragmentTsInfo(xl, 5, int64(1535874867854), int64(1535878468023), bucket, "testdeviceid99", markF)
 	assert.Equal(t, errF, nil, "they should be equal")
-	assert.Equal(t, len(infoF), 5, "they should be equal")
-	//assert.Equal(t, infos[0][SEGMENT_ITEM_END_TIME].(int64), int64(1534414490692), "they should be equal")
+	assert.Equal(t, len(infoF), 2, "they should be equal")
+	assert.Equal(t, infos[0][SEGMENT_ITEM_END_TIME].(int64), int64(1535874874060), "they should be equal")
 	xl.Infof("1 2 mark %s", markF)
 
-	infoF, markF, errF = model.GetFragmentTsInfo(xl, 7, int64(1534412096000), int64(1534729559000), bucket, "testdeviceid10", markF)
-	assert.Equal(t, errF, nil, "they should be equal")
-	assert.Equal(t, len(infoF), 3, "they should be equal")
 
-	infoF, errF = model.GetFrameInfo(xl, int64(1535358330000), int64(1535359621000), bucket, "testdeviceid6")
+	infoF, errF = model.GetFrameInfo(xl, int64(1535874867854), int64(1535878468023), bucket, "testdeviceid99")
 	assert.Equal(t, errF, nil, "they should be equal")
-	assert.Equal(t, len(infoF), 3, "they should be equal")
+	assert.Equal(t, len(infoF), 10, "they should be equal")
 }
