@@ -1,5 +1,4 @@
 #include <stdio.h>
-#include <libavformat/avformat.h>
 #include <assert.h>
 #include <sys/time.h>
 #include <unistd.h>
@@ -192,11 +191,6 @@ int InitKodo()
     avArg.nVideoFormat = TK_VIDEO_H264;
 
     SetLogLevelToDebug();
-    SetAk("JAwTPb8dmrbiwt89Eaxa4VsL4_xSIYJoJh4rQfOQ");
-    SetSk("G5mtjT3QzG4Lf7jpCAN5PZHrGeoSH9jRdC96ecYS");
-
-    //计算token需要，所以需要先设置
-    SetBucketName("ipcamera");
 
     ret = GetUploadToken(gtestToken, sizeof(gtestToken));
     if (ret != 0) {

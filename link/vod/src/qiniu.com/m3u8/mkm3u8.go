@@ -5,6 +5,7 @@ import (
 	"errors"
 	"math"
 	"strconv"
+	"strings"
 	"time"
 
 	xlog "github.com/qiniu/xlog.v1"
@@ -36,6 +37,7 @@ type MediaSegment struct {
 	URI             string
 	Duration        float64   // first parameter for EXTINF tag; duration must be integers if protocol version is less than 3 but we are always keep them float
 	ProgramDateTime time.Time // EXT-X-PROGRAM-DATE-TIME tag associates the first sample of a media segment with an absolute date and/or time
+	IsDiscontinuity bool
 }
 
 type MediaPlaylist struct {
@@ -54,6 +56,7 @@ type MediaPlaylist struct {
 	Iframe         bool // EXT-X-I-FRAMES-ONLY
 	Closed         bool // is this VOD (closed) or Live (sliding) playlist?
 	durationAsInt  bool // output durations as integers of floats?
+	lastEndTime    int64
 }
 
 func (p *MediaPlaylist) Init(winsize uint, capacity uint) error {
@@ -86,6 +89,25 @@ func (p *MediaPlaylist) AppendSegment(uri string, duration float64, title string
 	seg.URI = uri
 	seg.Duration = duration
 	seg.Title = title
+
+	eles := strings.Split(uri, "/")
+
+	startTime, err := strconv.ParseInt(eles[5], 10, 64)
+	if err != nil {
+		return err
+	}
+	endTime, err := strconv.ParseInt(eles[6], 10, 64)
+	if err != nil {
+		return err
+	}
+
+	if p.lastEndTime != -1 {
+		if startTime-p.lastEndTime > 500 {
+			seg.IsDiscontinuity = true
+		}
+	}
+	p.lastEndTime = endTime
+
 	return p.Append(seg)
 }
 
@@ -173,6 +195,9 @@ func (p *MediaPlaylist) addSegments() {
 			p.buf.WriteString(seg.ProgramDateTime.Format(DATETIME))
 			p.buf.WriteRune('\n')
 		}
+		if seg.IsDiscontinuity {
+			p.buf.WriteString("#EXT-X-DISCONTINUITY\n")
+		}
 		p.buf.WriteString("#EXTINF:")
 		if str, ok := durationCache[seg.Duration]; ok {
 			p.buf.WriteString(str)
@@ -231,6 +256,7 @@ func (p *MediaPlaylist) String() string {
 func Mkm3u8(_segList []map[string]interface{}, _xl *xlog.Logger) string {
 	length := len(_segList)
 	pPlaylist := new(MediaPlaylist)
+	pPlaylist.lastEndTime = -1
 	pPlaylist.Init(uint(length), uint(length))
 	_xl.Infof("length = %v", length)
 	for _, v := range _segList {
