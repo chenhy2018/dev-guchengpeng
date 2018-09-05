@@ -6,6 +6,7 @@ include_directories("${CMAKE_CURRENT_SOURCE_DIR}/../../third_party/curl-7.61.0/i
 include_directories("${CMAKE_CURRENT_SOURCE_DIR}/c-sdk")
 
 if(CMAKE_TOOLCHAIN_FILE)
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${CMAKE_ENABLE_C99}")
 include_directories("${CMAKE_CURRENT_SOURCE_DIR}/include")
 include_directories("${CMAKE_CURRENT_SOURCE_DIR}/include/ffmpeg")
 endif()
@@ -23,7 +24,12 @@ if(NOT WITH_OPENSSL)
         add_definitions(-DDISABLE_OPENSSL)
 endif()
 
+if(CMAKE_TOOLCHAIN_FILE)
+set(LIBFFMPEG "")
+else()
 set(LIBFFMPEG avformat avcodec swresample avutil)
+endif()
+
 if ($ENV{WITH_FFMPEG} STREQUAL "OFF")
         message("WITHOUT_FFMPEG")
         add_definitions(-DUSE_OWN_TSMUX)
