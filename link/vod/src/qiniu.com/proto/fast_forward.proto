@@ -4,7 +4,7 @@ package fastforward;
 
 
 service FastForward {
-        rpc GetTsSteam(FastForwardInfo) returns (stream FastForwardStream) {}
+        rpc GetTsStream(FastForwardInfo) returns (stream FastForwardStream) {}
 }
 
 message FastForwardInfo {

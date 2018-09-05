@@ -100,7 +100,7 @@ func ParseRequest(c *gin.Context, xl *xlog.Logger) (*requestParams, error) {
 	}
 	limitT, err := strconv.ParseInt(limit, 10, 32)
 	if err != nil {
-		return nil, errors.New("Parse expire time failed")
+		return nil, errors.New("Parse limit failed")
 	}
 	if limitT > 1000 {
 		limitT = 1000
@@ -111,7 +111,7 @@ func ParseRequest(c *gin.Context, xl *xlog.Logger) (*requestParams, error) {
 	}
 
 	speedT, err := strconv.ParseInt(speed, 10, 32)
-	if err != nil {
+	if err != nil || !validspeed(speedT) {
 		return nil, errors.New("Parse speed failed")
 	}
 
@@ -132,4 +132,13 @@ func ParseRequest(c *gin.Context, xl *xlog.Logger) (*requestParams, error) {
 	}
 
 	return params, nil
+}
+func validspeed(speed int64) bool {
+	s := []int64{1, 2, 4, 8, 16, 32}
+	for _, v := range s {
+		if speed == v {
+			return true
+		}
+	}
+	return false
 }

@@ -155,7 +155,7 @@ func getFastForwardStream(params *requestParams, c *gin.Context) bool {
 	req.Token = params.token
 	req.Speed = params.speed
 
-	r, err := fastForwardClint.GetTsSteam(context.Background(), req)
+	r, err := fastForwardClint.GetTsStream(context.Background(), req)
 	if err != nil {
 		fmt.Println(err)
 	}
