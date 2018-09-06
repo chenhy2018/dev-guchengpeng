@@ -10,12 +10,14 @@
 #include "ipc_test.h"
 #include "log2file.h"
 #include "dbg.h"
+#include "media_cfg.h"
 
 /* global variable */
 static DevSdkAudioType gAudioType =  AUDIO_TYPE_AAC;
 static int gKodoInitOk = 0;
 static char gTestToken[1024] = { 0 };
 static Config gIpcConfig;
+static unsigned char gMovingDetect = 0;
 MediaStreamConfig gAjMediaStreamConfig = { 0 };
 
 /*
@@ -83,7 +85,7 @@ int VideoGetFrameCb( int streamno, char *_pFrame,
                    unsigned long _nFrameIndex, unsigned long _nKeyFrameIndex,
                    void *_pContext)
 {
-    if ( !gKodoInitOk ) {
+    if ( !gKodoInitOk || !gMovingDetect ) {
         ReportKodoInitError();
         return 0;
     }
@@ -102,7 +104,7 @@ int AudioGetFrameCb( char *_pFrame, int _nLen, double _dTimeStamp,
     static double min=0, max=0;
     int ret = 0;
 
-    if ( !gKodoInitOk ) {
+    if ( !gKodoInitOk || !gMovingDetect ) {
         return 0;
     }
 
@@ -290,6 +292,19 @@ void SdkLogCallback( char *log )
     DBG_LOG( log );
 }
 
+int AlarmCallback(ALARM_ENTRY alarm, void *pcontext)
+{
+    DBG_LOG("alarm.code = %d\n", alarm.code );
+
+    if ( alarm.code == ALARM_CODE_MOTION_DETECT ) {
+        gMovingDetect = 1;
+    } else {
+        gMovingDetect = 0;
+    }
+
+    return 0;
+}
+
 int main()
 {
     int ret = 0;
@@ -307,6 +322,7 @@ int main()
         DBG_ERROR("InitIPC() fail\n");
     }
 
+    dev_sdk_register_callback( AlarmCallback, NULL, NULL, NULL );	
     ret = InitKodo();
     if ( ret < 0 ) {
         DBG_ERROR("ret = %d\n",ret );
