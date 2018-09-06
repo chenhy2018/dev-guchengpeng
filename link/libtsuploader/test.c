@@ -25,6 +25,8 @@ typedef int (*DataCallback)(void *opaque, void *pData, int nDataLen, int nFlag, 
 #endif
 #endif
 
+#define TS_ROLLOVER 0 //95437000
+
 
 FILE *outTs;
 int gTotalLen = 0;
@@ -280,7 +282,7 @@ int start_file_test(char * _pAudioFile, char * _pVideoFile, DataCallback callbac
                                                         nIDR++;
                                                 }
                                                 //printf("send one video(%d) frame packet:%ld", type, end - sendp);
-                                                cbRet = callback(opaque, sendp, end - sendp, THIS_IS_VIDEO, nNextVideoTime-nSysTimeBase, type == 5);
+                                                cbRet = callback(opaque, sendp, end - sendp, THIS_IS_VIDEO, TS_ROLLOVER_BASE+nNextVideoTime-nSysTimeBase, type == 5);
                                                 if (cbRet != 0) {
                                                         bVideoOk = 0;
                                                 }
@@ -309,7 +311,7 @@ int start_file_test(char * _pAudioFile, char * _pVideoFile, DataCallback callbac
                                                         nNonIDR++;
                                                 }
                                                 //printf("send one video(%d) frame packet:%ld", type, end - sendp);
-                                                cbRet = callback(opaque, sendp, end - sendp, THIS_IS_VIDEO, nNextVideoTime-nSysTimeBase, hevctype == HEVC_I);
+                                                cbRet = callback(opaque, sendp, end - sendp, THIS_IS_VIDEO,TS_ROLLOVER_BASE+ nNextVideoTime-nSysTimeBase, hevctype == HEVC_I);
                                                 if (cbRet != 0) {
                                                         bVideoOk = 0;
                                                 }
@@ -329,10 +331,10 @@ int start_file_test(char * _pAudioFile, char * _pVideoFile, DataCallback callbac
                                         if (audioOffset+hlen+adts.var.aac_frame_length <= nAudioDataLen) {
 #ifdef TEST_AAC_NO_ADTS
                                                 cbRet = callback(opaque, pAudioData + audioOffset + hlen, adts.var.aac_frame_length - hlen,
-                                                                 THIS_IS_AUDIO, nNextAudioTime-nSysTimeBase, 0);
+                                                                 THIS_IS_AUDIO, nNextAudioTime-nSysTimeBase+TS_ROLLOVER_BASE, 0);
 #else
                                                 cbRet = callback(opaque, pAudioData + audioOffset, adts.var.aac_frame_length,
-                                                                 THIS_IS_AUDIO, nNextAudioTime-nSysTimeBase, 0);
+                                                                 THIS_IS_AUDIO, nNextAudioTime-nSysTimeBase+TS_ROLLOVER_BASE, 0);
 #endif
                                                 if (cbRet != 0) {
                                                         bAudioOk = 0;
@@ -350,7 +352,7 @@ int start_file_test(char * _pAudioFile, char * _pVideoFile, DataCallback callbac
                                 }
                         } else {
                                 if(audioOffset+160 <= nAudioDataLen) {
-                                        cbRet = callback(opaque, pAudioData + audioOffset, 160, THIS_IS_AUDIO, nNextAudioTime-nSysTimeBase, 0);
+                                        cbRet = callback(opaque, pAudioData + audioOffset, 160, THIS_IS_AUDIO, nNextAudioTime-nSysTimeBase+TS_ROLLOVER_BASE, 0);
                                         if (cbRet != 0) {
                                                 bAudioOk = 0;
                                                 continue;
