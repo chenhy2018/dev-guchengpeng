@@ -18,6 +18,9 @@ static void * recycle(void *_pOpaque)
         while(!manager.nQuit_ && info.nLen_ == 0) {
                 AsyncInterface *pAsync = NULL;
                 int ret = manager.pQueue_->Pop(manager.pQueue_, (char *)(&pAsync), sizeof(AsyncInterface *));
+                if (ret == TK_TIMEOUT) {
+                        continue;
+                }
                 if (ret == sizeof(TsUploader *)) {
                         loginfo("pop from mgr:%p\n", pAsync);
                         if (pAsync == NULL) {
