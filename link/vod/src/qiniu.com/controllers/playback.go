@@ -4,9 +4,12 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/qiniu/api.v7/auth/qbox"
 	xlog "github.com/qiniu/xlog.v1"
 	"google.golang.org/grpc"
 	"qiniu.com/m3u8"
@@ -148,14 +151,18 @@ type testStream struct {
 }
 
 func getFastForwardStream(params *requestParams, c *gin.Context) bool {
+	url := c.Request.URL.String()
+	fullUrl := "http://" + c.Request.Host + url
+
 	req := new(pb.FastForwardInfo)
 	req.Baseurl = params.url
 	req.From = params.from
 	req.To = params.to
-	req.Expire = params.expire
-	req.Token = params.token
+	req.Expire = time.Now().Add(time.Hour).Unix()
+	req.Token = getNewToken(fullUrl, req.Expire)
 	req.Speed = params.speed
-
+	req.ApiVerion = url[1:3]
+	fmt.Println(fullUrl, req.Expire, req.Token)
 	r, err := fastForwardClint.GetTsStream(context.Background(), req)
 	if err != nil {
 		fmt.Println(err)
@@ -174,38 +181,14 @@ func getFastForwardStream(params *requestParams, c *gin.Context) bool {
 		}
 		return false
 	})
-	/*
-		if ret, err := r.Recv(); err == nil || err != io.EOF {
-			//retN := &testStream{}
-			//copy(retN.Stream, ret.Stream)
-			r := bytes.NewReader(ret.Stream)
-			fmt.Println(len(ret.Stream))
-			http.ServeContent(c.Writer, c.Request, "test2.ts", time.Now(), r)
-		}
-	*/
-	/*
-		c.Stream(func(w io.Writer) bool {
-			if ret, err := r.Recv(); err == nil || err != io.EOF {
-				fmt.Println(len(ret.Stream))
-				//http.ServeContent(w, c.Request, "test2.ts", time.Now(), retN)
-				w.Write(ret.Stream)
-				return true
-			}
-			return false
-		})
-	*/
 	return false
-	/*
-		c.Header("Content-Type", "video/MP2T")
-			c.Header("Access-Control-Allow-Origin", "*")
-				c.Status(206)
-				c.Stream(func(w io.Writer) bool {
-					if ret, err := r.Recv(); err == nil || err != io.EOF {
-						w.Write(ret.Stream)
-						return true
-					}
-					return false
-				})
-				return false
-	*/
+}
+
+func getNewToken(origin string, expire int64) string {
+	prefix := strings.Split(origin, "&speed")[0]
+	playbackBaseUrl := prefix + "&e=" + strconv.FormatInt(expire, 10)
+	// using uid password as ak/sk
+	mac := qbox.NewMac(accessKey, secretKey)
+	token := mac.Sign([]byte(playbackBaseUrl))
+	return token
 }
