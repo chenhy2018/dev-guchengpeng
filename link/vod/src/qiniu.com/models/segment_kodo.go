@@ -31,6 +31,7 @@ const (
 	SEGMENT_FILENAME_SUB_LEN  = 6
 	FRAGMENT_FILENAME_SUB_LEN = 4
 	FRAME_FILENAME_SUB_LEN    = 4
+	MAX_SEGMENT_TS_TIME_STAMP = 20
 )
 
 type SegmentKodoModel struct {
@@ -124,7 +125,7 @@ func GetInfoFromFilename(s, sep string) (error, map[string]interface{}) {
 // Calculate mark.
 // Return []yyyy/mm/dd, if same day and same hour, return [1]yyyy/mm/dd/hh
 func calculateMark(xl *xlog.Logger, starttime int64, uaid, head string) string {
-	k2 := fmt.Sprintf("%s/%s/%d", head, uaid, starttime/1000-1)
+	k2 := fmt.Sprintf("%s/%s/%d", head, uaid, starttime/1000 - MAX_SEGMENT_TS_TIME_STAMP)
 	xl.Infof("CalculateMark k %s", k2)
 
 	m := map[string]interface{}{
@@ -135,7 +136,6 @@ func calculateMark(xl *xlog.Logger, starttime int64, uaid, head string) string {
 		return ""
 	}
 	encodeString := base64.StdEncoding.EncodeToString(b)
-	xl.Infof("CalculateMark %s", encodeString)
 	return encodeString
 }
 
@@ -164,8 +164,12 @@ func (m *SegmentKodoModel) GetSegmentTsInfo(xl *xlog.Logger, starttime, endtime 
 	xl.Infof("GetSegmentTsInfo prefix ********* %s \n", prefix)
 	entries, err := bucketManager.ListBucketContext(ctx, bucket, prefix, delimiter, marker)
 	if err != nil {
-		xl.Errorf("GetSegmentTsInfo ListBucketContext %#v", err)
-		return r, "", err
+                info := err.(*storage.ErrorInfo)
+                if info.Code == 200 {
+                        return r, "", nil
+                } else {
+                        return r, "", err
+                }
 	}
 
 	for listItem1 := range entries {
@@ -178,11 +182,11 @@ func (m *SegmentKodoModel) GetSegmentTsInfo(xl *xlog.Logger, starttime, endtime 
 		if len(info) == 0 {
 			continue
 		}
-		if info[SEGMENT_ITEM_END_TIME].(int64) / 1000 > endtime / 1000 {
+		if info[SEGMENT_ITEM_START_TIME].(int64) / 1000 > endtime / 1000 {
 			cancelFunc()
 			break
 		}
-		if info[SEGMENT_ITEM_START_TIME].(int64) >= starttime {
+		if info[SEGMENT_ITEM_END_TIME].(int64) > starttime {
 			xl.Infof("GetTsInfo info[SEGMENT_ITEM_START_TIME] %d \n", info[SEGMENT_ITEM_START_TIME].(int64))
 			r = append(r, info)
 			total++
@@ -235,17 +239,17 @@ func (m *SegmentKodoModel) GetFragmentTsInfo(xl *xlog.Logger, count int, startti
 			// if one file is not correct, continue to next
 			continue
 		}
-		if info[SEGMENT_ITEM_START_TIME].(int64) >= starttime {
-			xl.Infof("GetFragmentTsInfo info[SEGMENT_ITEM_START_TIME] %d \n", info[SEGMENT_ITEM_START_TIME].(int64))
-			xl.Infof("GetFragmentTsInfo info[SEGMENT_ITEM_END_TIME] %d \n", info[SEGMENT_ITEM_END_TIME].(int64))
-			r = append(r, info)
-			total++
-		}
 
-		if info[SEGMENT_ITEM_END_TIME].(int64) / 1000 > endtime / 1000 {
+		if info[SEGMENT_ITEM_START_TIME].(int64) / 1000 > endtime / 1000 {
 			cancelFunc()
 			break
 		}
+                if info[SEGMENT_ITEM_END_TIME].(int64) > starttime {
+                        xl.Infof("GetFragmentTsInfo info[SEGMENT_ITEM_START_TIME] %d \n", info[SEGMENT_ITEM_START_TIME].(int64))
+                        xl.Infof("GetFragmentTsInfo info[SEGMENT_ITEM_END_TIME] %d \n", info[SEGMENT_ITEM_END_TIME].(int64))
+                        r = append(r, info)
+                        total++
+                } 
 		if total >= count && count != 0 {
 			nextMarker = listItem1.Marker
 			break
