@@ -110,6 +110,7 @@ static int makeTsPacket(TsMuxerContext* _pMuxCtx, int _nPid)
                         }
                 }
         }while(nReadLen != 0);
+        return 0;
 }
 
 int MuxerAudio(TsMuxerContext* _pMuxCtx, uint8_t *_pData, int _nDataLen, int64_t _nPts)
