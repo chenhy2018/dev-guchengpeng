@@ -25,12 +25,15 @@ var (
 func init() {
 	SegMod = &models.SegmentKodoModel{}
 	SegMod.Init()
-	gRPCinit()
+	getFFGrpcClient()
 
 }
-func gRPCinit() {
-	//	conn, err := grpc.Dial("47.105.118.51:50051", grpc.WithInsecure())
-	conn, err := grpc.Dial("127.0.0.1:50051", grpc.WithInsecure())
+func getFFGrpcClient() pb.FastForwardClient {
+	if fastForwardClint != nil {
+		return fastForwardClint
+	}
+	conn, err := grpc.Dial("47.105.118.51:50051", grpc.WithInsecure())
+	//conn, err := grpc.Dial("127.0.0.1:50051", grpc.WithInsecure())
 
 	if err != nil {
 		fmt.Println("Init gprc failedgrpcgrpc")
@@ -38,6 +41,7 @@ func gRPCinit() {
 	}
 
 	fastForwardClint = pb.NewFastForwardClient(conn)
+	return fastForwardClint
 }
 
 // sample requset url = /playback/12345.m3u8?from=1532499345&to=1532499345&e=1532499345&token=xxxxxx
@@ -163,7 +167,8 @@ func getFastForwardStream(params *requestParams, c *gin.Context) bool {
 	req.Speed = params.speed
 	req.ApiVerion = url[1:3]
 	fmt.Println(fullUrl, req.Expire, req.Token)
-	r, err := fastForwardClint.GetTsStream(context.Background(), req)
+	ffGrpcClient := getFFGrpcClient()
+	r, err := ffGrpcClient.GetTsStream(context.Background(), req)
 	if err != nil {
 		fmt.Println(err)
 	}
