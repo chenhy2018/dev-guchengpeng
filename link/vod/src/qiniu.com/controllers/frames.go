@@ -28,7 +28,7 @@ func GetFrames(c *gin.Context) {
 	if params.to <= params.from {
 		xl.Errorf("bad from/to time, from = %v, to = %v", params.from, params.to)
 		c.JSON(400, gin.H{
-			"error": "bad from/to time, from great or equal to",
+			"error": "bad from/to time, from great or equal than to",
 		})
 		return
 	}
@@ -45,7 +45,7 @@ func GetFrames(c *gin.Context) {
 	if ok, err := VerifyAuth(xl, c.Request); err != nil || ok != true {
 		xl.Errorf("verify auth failed %#v", err)
 		c.JSON(401, gin.H{
-			"error": "verify auth failed",
+			"error": "bad token",
 		})
 		return
 	}

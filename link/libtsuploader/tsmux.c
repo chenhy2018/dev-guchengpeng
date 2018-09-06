@@ -21,7 +21,9 @@ typedef struct TsMuxerContext{
 static uint16_t getPidCounter(TsMuxerContext* _pMuxCtx, uint64_t _nPID)
 {
         int nCount = 0;
-        for (int i = 0; i  < _pMuxCtx->nPidCounterMapLen; i++) {
+        int i;
+
+        for ( i = 0; i  < _pMuxCtx->nPidCounterMapLen; i++) {
                 if (_pMuxCtx->pidCounterMap[i].nPID == _nPID) {
                         if (_pMuxCtx->pidCounterMap[i].nCounter == 0x0F){
                                 _pMuxCtx->pidCounterMap[i].nCounter = 0;
@@ -77,13 +79,14 @@ static void writeTable(TsMuxerContext* _pMuxCtx, int64_t _nPts)
 uint16_t Pids[5] = {AUDIO_PID, VIDEO_PID, PAT_PID, PMT_PID, SDT_PID};
 TsMuxerContext * NewTsMuxerContext(TsMuxerArg *pArg)
 {
+        int i;
         TsMuxerContext *pTsMuxerCtx = (TsMuxerContext *)malloc(sizeof(TsMuxerContext));
         if (pTsMuxerCtx == NULL)
                 return NULL;
         memset(pTsMuxerCtx, 0, sizeof(TsMuxerContext));
         pTsMuxerCtx->arg = *pArg;
         pTsMuxerCtx->nPidCounterMapLen = 5;
-        for (int i = 0; i < pTsMuxerCtx->nPidCounterMapLen; i++){
+        for ( i = 0; i < pTsMuxerCtx->nPidCounterMapLen; i++){
                 pTsMuxerCtx->pidCounterMap[i].nPID = Pids[i];
                 pTsMuxerCtx->pidCounterMap[i].nCounter = 0;
         }
@@ -107,6 +110,7 @@ static int makeTsPacket(TsMuxerContext* _pMuxCtx, int _nPid)
                         }
                 }
         }while(nReadLen != 0);
+	return 0;
 }
 
 int MuxerAudio(TsMuxerContext* _pMuxCtx, uint8_t *_pData, int _nDataLen, int64_t _nPts)

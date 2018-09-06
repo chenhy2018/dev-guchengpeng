@@ -12,6 +12,7 @@ import (
 	"github.com/qiniu/api.v7/auth/qbox"
 	"github.com/qiniu/api.v7/storage"
 	xlog "github.com/qiniu/xlog.v1"
+	"qiniu.com/models"
 )
 
 const (
@@ -102,7 +103,7 @@ func ParseRequest(c *gin.Context, xl *xlog.Logger) (*requestParams, error) {
 	if err != nil {
 		return nil, errors.New("Parse limit failed")
 	}
-	if limitT > 1000 {
+	if limitT > 1000 || limitT <= 0 {
 		limitT = 1000
 	}
 	exactT, err := strconv.ParseBool(exact)

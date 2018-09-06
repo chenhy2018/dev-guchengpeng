@@ -52,7 +52,7 @@ func GetPlayBackm3u8(c *gin.Context) {
 	if params.to <= params.from {
 		xl.Errorf("bad from/to time, from = %v, to = %v", params.from, params.to)
 		c.JSON(400, gin.H{
-			"error": "bad from/to time, from great or equal to",
+			"error": "bad from/to time, from great or equal than to",
 		})
 		return
 	}
@@ -87,7 +87,8 @@ func GetPlayBackm3u8(c *gin.Context) {
 	}
 
 	if len(segs) == 0 {
-		c.JSON(200, nil)
+		xl.Errorf("getTsInfo error, error =  %#v", err)
+		c.JSON(404, gin.H{"error": "can't find stream in this period"})
 		return
 	}
 	var playlist []map[string]interface{}
