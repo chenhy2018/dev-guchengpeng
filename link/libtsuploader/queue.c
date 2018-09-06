@@ -191,6 +191,7 @@ static void getStatInfo(CircleQueue *_pQueue, UploaderStatInfo *_pStatInfo)
         _pStatInfo->nPushDataBytes_ = pQueueImp->statInfo.nPushDataBytes_;
         _pStatInfo->nPopDataBytes_ = pQueueImp->statInfo.nPopDataBytes_;
         _pStatInfo->nLen_ = pQueueImp->statInfo.nLen_;
+        _pStatInfo->nIsReadOnly = pQueueImp->nIsStopPush_;
         return;
 }
 
