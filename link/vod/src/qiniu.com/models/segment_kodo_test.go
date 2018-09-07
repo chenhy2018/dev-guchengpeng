@@ -36,8 +36,15 @@ func TestKodoSegment(t *testing.T) {
 	assert.Equal(t, err4, nil, "they should be equal")
 
         // Reduce accuracy to seconds. also can find ts.
-        infos, _, err4 = model.GetSegmentTsInfo(xl, int64(1535874867000), int64(1535874874000), bucket, "testdeviceid99", 0, "")
+        // Include in 1535874867000-1535874874000
+        infos, _, err4 = model.GetSegmentTsInfo(xl, int64(1535874867000), int64(1535874871000), bucket, "testdeviceid99", 0, "")
         assert.Equal(t, len(infos), 1, "they should be equal")
+
+        infos, _, err4 = model.GetSegmentTsInfo(xl, int64(1535874869000), int64(1535874871000), bucket, "testdeviceid99", 0, "")
+        assert.Equal(t, len(infos), 1, "they should be equal")
+
+	infos, _, err4 = model.GetSegmentTsInfo(xl, int64(1535874869000), int64(1535874874000), bucket, "testdeviceid99", 0, "")
+        assert.Equal(t, len(infos), 2, "they should be equal")
 
 	// filename should be seg/ua_id/yyyy/mm/dd/hh/mm/ss/mmm/endts
 	infoF, markF, errF := model.GetFragmentTsInfo(xl, 0, int64(1535874867854), int64(1535878468023), bucket, "testdeviceid99", "")

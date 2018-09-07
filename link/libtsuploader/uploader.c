@@ -285,8 +285,12 @@ size_t getDataCallback(void* buffer, size_t size, size_t n, void* rptr)
         if (nPopLen < 0) {
                 return CURL_READFUNC_ABORT;
         }
-        if (nPopLen == 0)
+        if (nPopLen == 0) {
+                if (IsProcStatusQuit()) {
+                        return CURL_READFUNC_ABORT;
+                }
                 return 0;
+        }
 
         int nTmp = 0;
         char *pBuf = (char *)buffer;

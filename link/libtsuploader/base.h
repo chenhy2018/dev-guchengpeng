@@ -50,4 +50,6 @@ typedef struct _AvArg{
 #define TK_WRITE_TS_ERR    -2401
 #define TK_Q_OVERWRIT      -5001
 
+int IsProcStatusQuit();
+
 #endif

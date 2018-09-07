@@ -2,6 +2,12 @@
 #include "base.h"
 #include <unistd.h>
 #include "adts.h"
+#ifdef __APPLE__
+#include <sys/types.h>
+#include <sys/sysctl.h>
+#else
+#include <sys/sysinfo.h>
+#endif
 
 #ifdef USE_OWN_TSMUX
 #include "tsmux.h"
@@ -52,6 +58,7 @@ typedef struct _FFTsMuxUploader{
 }FFTsMuxUploader;
 
 static int aAacfreqs[13] = {96000, 88200, 64000, 48000, 44100, 32000, 24000, 22050 ,16000 ,12000, 11025, 8000, 7350};
+static int gnQBufsize = 0;
 
 static int getAacFreqIndex(int _nFreq)
 {
@@ -354,6 +361,53 @@ static int waitToCompleUploadAndDestroyTsMuxContext(void *_pOpaque)
 #define getFFmpegErrorMsg(errcode) char msg[128];\
                 av_strerror(errcode, msg, sizeof(msg))
 
+static void inline setQBufferSize(char *desc, int s)
+{
+        gnQBufsize = s;
+        loginfo("desc:(%s) buffer Q size is:%d", desc, gnQBufsize);
+        return;
+}
+
+static int getBufferSize() {
+        if (gnQBufsize != 0) {
+                return gnQBufsize;
+        }
+        int nSize = 512*1024;
+        int64_t nTotalMemSize = 0;
+        int nRet = 0;
+#ifdef __APPLE__
+        int mib[2];
+        size_t length;
+        mib[0] = CTL_HW;
+        mib[1] = HW_MEMSIZE;
+        length = sizeof(int64_t);
+        nRet = sysctl(mib, 2, &nTotalMemSize, &length, NULL, 0);
+#else
+        struct sysinfo info = {0};
+        nRet = sysinfo(&info);
+        nTotalMemSize = info.totalram;
+#endif
+        if (nRet != 0) {
+                setQBufferSize("default", nSize);
+                return gnQBufsize;
+        }
+        int64_t nCell = nTotalMemSize/200;
+        if (nCell < nSize) {
+                if (2 * nCell < nSize) {
+                        setQBufferSize("minimum default", nSize);
+                        return gnQBufsize;
+                }
+                setQBufferSize("1/100 of total", nCell * 2);
+                return gnQBufsize;
+        }
+        if (nCell * 2 > 1024 * 1024 * 5) {
+                setQBufferSize("max 5M", 1024 * 1024 * 5);
+                return gnQBufsize;
+        }
+        setQBufferSize("1/100 of total1", nCell * 2);
+        return gnQBufsize;
+}
+
 static int newTsMuxContext(FFTsMuxContext ** _pTsMuxCtx, AvArg *_pAvArg)
 #ifdef USE_OWN_TSMUX
 {
@@ -363,7 +417,8 @@ static int newTsMuxContext(FFTsMuxContext ** _pTsMuxCtx, AvArg *_pAvArg)
         }
         memset(pTsMuxCtx, 0, sizeof(FFTsMuxContext));
         
-        int ret = NewUploader(&pTsMuxCtx->pTsUploader_, TSQ_FIX_LENGTH, 188, 3300);
+        int nBufsize = getBufferSize();
+        int ret = NewUploader(&pTsMuxCtx->pTsUploader_, TSQ_FIX_LENGTH, 188, nBufsize / 188);
         if (ret != 0) {
                 free(pTsMuxCtx);
                 return ret;
@@ -398,7 +453,8 @@ static int newTsMuxContext(FFTsMuxContext ** _pTsMuxCtx, AvArg *_pAvArg)
         }
         memset(pTsMuxCtx, 0, sizeof(FFTsMuxContext));
         
-        int ret = NewUploader(&pTsMuxCtx->pTsUploader_, TSQ_FIX_LENGTH, FF_OUT_LEN, QUEUE_INIT_LEN);
+        int nBufsize = getBufferSize();
+        int ret = NewUploader(&pTsMuxCtx->pTsUploader_, TSQ_FIX_LENGTH, FF_OUT_LEN, nBufsize / FF_OUT_LEN);
         if (ret != 0) {
                 free(pTsMuxCtx);
                 return ret;
