@@ -337,6 +337,9 @@ size_t getDataCallback(void* buffer, size_t size, size_t n, void* rptr)
         nPopLen = pUploader->pQueue_->Pop(pUploader->pQueue_, buffer, size * n);
         if (nPopLen < 0) {
 		if (nPopLen == TK_TIMEOUT) {
+                        if (pUploader->nLastFrameTimestamp - pUploader->nFirstFrameTimestamp > 0) {
+                                return 0;
+                        }
                         logerror("pop from queue timeout");
 		}
                 return CURL_READFUNC_ABORT;
