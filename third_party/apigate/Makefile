@@ -9,6 +9,8 @@ QCHECKSTYLE=go run $(QBOXROOT)/base/qiniu/src/github.com/qiniu/checkstyle/gochec
 
 all:
 	CGO_ENABLED=0 go install -ldflags ${LDFLAGS} -v ./...
+	mv ./bin/qiniugate ./bin/linking_apigate
+	mv ./bin/qiniumockgate ./bin/linking_mockgate
 
 rebuild:
 	CGO_ENABLED=0 go install -ldflags ${LDFLAGS} -a -v ./...
