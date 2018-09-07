@@ -28,10 +28,11 @@ func Init(conf *system.Configuration) {
 		xl.Error("init qconf client failed")
 		os.Exit(3)
 	}
+	ret, err := getSKByAK("754zGDRRNFrtTQxjk3HXSpcttYqU-Unu5zKPp8fh")
+	fmt.Println(ret, err)
 	RedisClint = redis.NewClient(&redis.Options{
-		Addr:     conf.RedisConf.Addr,
-		DB:       conf.RedisConf.DB,
-		Password: conf.RedisConf.Password})
+		Addr: conf.RedisConf.Addr,
+		DB:   conf.RedisConf.DB})
 	if RedisClint == nil {
 		xl.Error("init reis falied")
 		os.Exit(3)
