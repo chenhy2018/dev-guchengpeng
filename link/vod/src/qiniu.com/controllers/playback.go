@@ -32,8 +32,8 @@ func getFFGrpcClient() pb.FastForwardClient {
 	if fastForwardClint != nil {
 		return fastForwardClint
 	}
-	conn, err := grpc.Dial("47.105.118.51:50051", grpc.WithInsecure())
-	//conn, err := grpc.Dial("127.0.0.1:50051", grpc.WithInsecure())
+	//conn, err := grpc.Dial("47.105.118.51:50051", grpc.WithInsecure())
+	conn, err := grpc.Dial("127.0.0.1:50051", grpc.WithInsecure())
 
 	if err != nil {
 		fmt.Println("Init gprc failedgrpcgrpc")
@@ -74,16 +74,16 @@ func GetPlayBackm3u8(c *gin.Context) {
 	}
 	xl.Infof("uid= %v, uaid = %v, from = %v, to = %v, namespace = %v", params.uid, params.uaid, params.from, params.to, params.namespace)
 
-	if params.speed != 1 {
-		getFastForwardStream(params, c)
-		return
-	}
 	dayInMilliSec := int64((24 * time.Hour).Seconds() * 1000)
 	if (params.to - params.from) > dayInMilliSec {
 		xl.Errorf("bad from/to time, from = %v, to = %v", params.from, params.to)
 		c.JSON(400, gin.H{
 			"error": "bad from/to time, currently we only support playback in 24 hours",
 		})
+		return
+	}
+	if params.speed != 1 {
+		getFastForwardStream(params, c)
 		return
 	}
 	segs, _, err := SegMod.GetSegmentTsInfo(xl, params.from, params.to, params.namespace, params.uaid, 0, "")
@@ -178,9 +178,9 @@ func getFastForwardStream(params *requestParams, c *gin.Context) bool {
 
 	c.Header("Content-Type", "video/mp2t")
 	c.Header("Access-Control-Allow-Origin", "*")
+	c.Header("Content-Disposition", "attachment;filename="+params.uaid+".ts")
 	c.Stream(func(w io.Writer) bool {
 		if ret, err := r.Recv(); err == nil {
-			c.Header("Accept-Ranges", "bytes")
 			w.Write(ret.Stream)
 			return true
 		}
