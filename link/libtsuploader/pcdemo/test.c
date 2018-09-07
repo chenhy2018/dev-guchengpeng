@@ -580,7 +580,7 @@ static void checkCmdArg(const char * name)
         if (cmdArg.IsTestTimestampRollover) {
                 cmdArg.nRolloverTestBase = 95437000;
 	}
-        if (cmdArg.nSleeptime < 1000) {
+        if (cmdArg.nSleeptime != 0 && cmdArg.nSleeptime < 1000) {
                 logerror("sleep time is milliseond. should great than 1000");
                 exit(4);
 	}
@@ -705,9 +705,9 @@ int main(int argc, const char** argv)
                 pAFile = "/liuye/Documents/material/h265_aac_1_16000_pcmu_8000.mulaw";
         }
         if(cmdArg.IsTestH265) {
-                pVFile = "/liuye/Documents/material/h265_aac_1_16000_h264.h264";
-	} else {
                 pVFile = "/liuye/Documents/material/h265_aac_1_16000_v.h265";
+	} else {
+                pVFile = "/liuye/Documents/material/h265_aac_1_16000_h264.h264";
         }
 #endif
 
