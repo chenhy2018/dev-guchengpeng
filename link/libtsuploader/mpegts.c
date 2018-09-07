@@ -96,7 +96,7 @@ void InitAudioPES(PES *_pPes, uint8_t *_pData, int _nDataLen, int64_t _nPts)
 void InitPrivateTypePES(PES *_pPes, uint8_t *_pData, int _nDataLen, int64_t _nPts)
 {
         initPes(_pPes, _pData, _nDataLen, _nPts);
-        _pPes->nStreamId = 0xC0;
+        _pPes->nStreamId = 0xBD;
         _pPes->nPrivate = 1;
         return;
 }
