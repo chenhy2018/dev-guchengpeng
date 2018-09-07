@@ -235,6 +235,43 @@ static Qiniu_Error Qiniu_Io_call_with_callback(
     curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
     curl_easy_setopt(curl, CURLOPT_READFUNCTION, rdr);
 
+    if (self->xferinfoData != NULL && self->xferinfoCb != NULL) {
+        retCode = curl_easy_setopt(curl, CURLOPT_NOPROGRESS, 0L);
+        if (retCode == CURLE_INTERFACE_FAILED) {
+            err.code = 9994;
+            err.message = "Can not specify CURLOPT_NOPROGRESS";
+            return err;
+        }
+        retCode = curl_easy_setopt(curl, CURLOPT_XFERINFOFUNCTION, self->xferinfoCb);
+        if (retCode == CURLE_INTERFACE_FAILED) {
+            err.code = 9994;
+            err.message = "Can not specify CURLOPT_XFERINFOFUNCTION";
+            return err;
+        }
+        retCode = curl_easy_setopt(curl, CURLOPT_XFERINFODATA, self->xferinfoData);
+        if (retCode == CURLE_INTERFACE_FAILED) {
+            err.code = 9994;
+            err.message = "Can not specify CURLOPT_XFERINFODATA";
+            return err;
+        }
+    }
+
+    // Specify the low speed limit and time
+    if (self->lowSpeedLimit > 0 && self->lowSpeedTime > 0) {
+        retCode = curl_easy_setopt(curl, CURLOPT_LOW_SPEED_LIMIT, self->lowSpeedLimit);
+        if (retCode == CURLE_INTERFACE_FAILED) {
+            err.code = 9994;
+            err.message = "Can not specify the low speed limit";
+            return err;
+        }
+        retCode = curl_easy_setopt(curl, CURLOPT_LOW_SPEED_TIME, self->lowSpeedTime);
+        if (retCode == CURLE_INTERFACE_FAILED) {
+            err.code = 9994;
+            err.message = "Can not specify the low speed time";
+            return err;
+        }
+    }
+
     err = Qiniu_callex(curl, &self->b, &self->root, Qiniu_False, &self->respHeader);
     if (err.code == 200 && ret != NULL) {
         if (extra->callbackRetParser != NULL) {

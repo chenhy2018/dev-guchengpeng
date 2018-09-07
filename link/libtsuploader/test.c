@@ -25,6 +25,8 @@ typedef int (*DataCallback)(void *opaque, void *pData, int nDataLen, int nFlag, 
 #endif
 #endif
 
+#define TS_ROLLOVER_BASE 0 // 95437000 will rollover about 7 second
+#define TEST_TIME_OUT 9100
 
 FILE *outTs;
 int gTotalLen = 0;
@@ -242,6 +244,7 @@ int start_file_test(char * _pAudioFile, char * _pVideoFile, DataCallback callbac
         int nIDR = 0;
         int nNonIDR = 0;
         int isAAC = 0;
+        int hasWaitTimeout = 0;
         int64_t aacFrameCount = 0;
         if (memcmp(_pAudioFile + strlen(_pAudioFile) - 3, "aac", 3) == 0)
                 isAAC = 1;
@@ -280,7 +283,7 @@ int start_file_test(char * _pAudioFile, char * _pVideoFile, DataCallback callbac
                                                         nIDR++;
                                                 }
                                                 //printf("send one video(%d) frame packet:%ld", type, end - sendp);
-                                                cbRet = callback(opaque, sendp, end - sendp, THIS_IS_VIDEO, nNextVideoTime-nSysTimeBase, type == 5);
+                                                cbRet = callback(opaque, sendp, end - sendp, THIS_IS_VIDEO, TS_ROLLOVER_BASE+nNextVideoTime-nSysTimeBase, type == 5);
                                                 if (cbRet != 0) {
                                                         bVideoOk = 0;
                                                 }
@@ -309,7 +312,7 @@ int start_file_test(char * _pAudioFile, char * _pVideoFile, DataCallback callbac
                                                         nNonIDR++;
                                                 }
                                                 //printf("send one video(%d) frame packet:%ld", type, end - sendp);
-                                                cbRet = callback(opaque, sendp, end - sendp, THIS_IS_VIDEO, nNextVideoTime-nSysTimeBase, hevctype == HEVC_I);
+                                                cbRet = callback(opaque, sendp, end - sendp, THIS_IS_VIDEO,TS_ROLLOVER_BASE+ nNextVideoTime-nSysTimeBase, hevctype == HEVC_I);
                                                 if (cbRet != 0) {
                                                         bVideoOk = 0;
                                                 }
@@ -318,6 +321,14 @@ int start_file_test(char * _pAudioFile, char * _pVideoFile, DataCallback callbac
                                         }
                                 }
                         }while(1);
+                        if (hasWaitTimeout == 0 && TEST_TIME_OUT >= 0 && nNextVideoTime > 9500+nSysTimeBase) {
+                                printf("sleep to wait timeout start:%lld\n", nNextVideoTime);
+                                hasWaitTimeout = 1;
+                                usleep(TEST_TIME_OUT * 1000);
+                                printf("sleep to wait timeout end\n");
+				nNextVideoTime += TEST_TIME_OUT;
+				nNextAudioTime += TEST_TIME_OUT;
+                        }
                 }
                 if (bAudioOk && nNow+1 > nNextAudioTime) {
                         if (isAAC) {
@@ -329,10 +340,10 @@ int start_file_test(char * _pAudioFile, char * _pVideoFile, DataCallback callbac
                                         if (audioOffset+hlen+adts.var.aac_frame_length <= nAudioDataLen) {
 #ifdef TEST_AAC_NO_ADTS
                                                 cbRet = callback(opaque, pAudioData + audioOffset + hlen, adts.var.aac_frame_length - hlen,
-                                                                 THIS_IS_AUDIO, nNextAudioTime-nSysTimeBase, 0);
+                                                                 THIS_IS_AUDIO, nNextAudioTime-nSysTimeBase+TS_ROLLOVER_BASE, 0);
 #else
                                                 cbRet = callback(opaque, pAudioData + audioOffset, adts.var.aac_frame_length,
-                                                                 THIS_IS_AUDIO, nNextAudioTime-nSysTimeBase, 0);
+                                                                 THIS_IS_AUDIO, nNextAudioTime-nSysTimeBase+TS_ROLLOVER_BASE, 0);
 #endif
                                                 if (cbRet != 0) {
                                                         bAudioOk = 0;
@@ -350,7 +361,7 @@ int start_file_test(char * _pAudioFile, char * _pVideoFile, DataCallback callbac
                                 }
                         } else {
                                 if(audioOffset+160 <= nAudioDataLen) {
-                                        cbRet = callback(opaque, pAudioData + audioOffset, 160, THIS_IS_AUDIO, nNextAudioTime-nSysTimeBase, 0);
+                                        cbRet = callback(opaque, pAudioData + audioOffset, 160, THIS_IS_AUDIO, nNextAudioTime-nSysTimeBase+TS_ROLLOVER_BASE, 0);
                                         if (cbRet != 0) {
                                                 bAudioOk = 0;
                                                 continue;
