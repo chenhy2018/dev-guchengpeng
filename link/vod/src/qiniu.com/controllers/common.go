@@ -47,16 +47,16 @@ func GetUrlWithDownLoadToken(xl *xlog.Logger, domain, fname string, tsExpire int
 	return realUrl
 }
 
-func IsAutoCreateUa(xl *xlog.Logger, uid, namespace string) (bool, error) {
+func IsAutoCreateUa(xl *xlog.Logger, bucket string) (bool, []models.NamespaceInfo, error) {
 	namespaceMod = &models.NamespaceModel{}
-	info, err := namespaceMod.GetNamespaceInfo(xl, uid, namespace)
+	info, err := namespaceMod.GetNamespaceByBucket(xl, bucket)
 	if err != nil {
-		return false, err
+		return false, []models.NamespaceInfo{}, err
 	}
 	if len(info) == 0 {
-		return false, errors.New("can't find namespace")
+		return false, []models.NamespaceInfo{}, errors.New("can't find namespace")
 	}
-	return info[0].AutoCreateUa, nil
+	return info[0].AutoCreateUa, info, nil
 }
 
 func VerifyToken(xl *xlog.Logger, expire int64, realToken, url, uid string) bool {
@@ -135,4 +135,35 @@ func ParseRequest(c *gin.Context, xl *xlog.Logger) (*requestParams, error) {
 	}
 
 	return params, nil
+}
+
+func HandleUaControl(xl *xlog.Logger, bucket, uaid string) error {
+        isAuto, info, err  := IsAutoCreateUa(xl, bucket)
+        if err != nil {
+                return err
+        }
+
+        model := models.UaModel{}
+        r, err := model.GetUaInfo(xl, info[0].Space, uaid)
+        if err != nil {
+                return err
+        }
+        if isAuto == false {
+                if len(r) == 0 {
+                        return fmt.Errorf("Can't find ua info")
+                }
+	} else {
+		if len(r) == 0 {
+                        ua := models.UaInfo{
+                                Uid:       info[0].Uid,
+                                UaId:      uaid,
+                                Namespace: info[0].Space,
+                        }
+                        err = UaMod.Register(xl, ua)
+                        if err != nil {
+                                return err
+                        }
+                }
+        }
+	return nil
 }
