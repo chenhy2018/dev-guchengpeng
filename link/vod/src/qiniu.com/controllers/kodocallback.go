@@ -48,10 +48,12 @@ func UploadTs(c *gin.Context) {
 		})
 		return
 	}
+
 	xl.Infof("%s", body)
 	var kodoData kodoCallBack
 	err = json.Unmarshal(body, &kodoData)
 	xl.Infof("%#v", kodoData)
+
 	key := kodoData.Key
 	ids := strings.Split(key, "/")
 	// key  =  ts/ua_id/start_ts/fragment_start_ts/expiry.ts
@@ -63,6 +65,18 @@ func UploadTs(c *gin.Context) {
 		return
 
 	}
+
+/* Will be enable after namespace register.
+        // Add namespace&ua check
+        err = HandleUaControl(xl, kodoData.Bucket, ids[1])
+        if err != nil {
+	xl.Errorf("error = %#v", err.Error())
+                c.JSON(400, gin.H{
+			"error": err.Error(),
+                })
+		return
+	}
+*/
 	startTime, err := strconv.ParseInt(ids[2], 10, 64)
 	if err != nil {
 		xl.Errorf("parse ts file name failed, filename = %#v", ids[2])
