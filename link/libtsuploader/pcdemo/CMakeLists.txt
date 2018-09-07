@@ -1,9 +1,10 @@
 cmake_minimum_required (VERSION 2.8)
 
-project(testupload1)
+project(testupload)
 
 include_directories("${CMAKE_CURRENT_SOURCE_DIR}/../")
 
+add_definitions("-Wall -g")
 
 link_directories("${CMAKE_CURRENT_SOURCE_DIR}/../../../third_party/curl-7.61.0/lib/.libs")
 
@@ -33,7 +34,7 @@ else()
         set(LIBFFMPEG "")
 endif()
 
-add_executable(testupload1
+add_executable(testupload
     test.c
     flag.h
     flag.c
@@ -43,22 +44,22 @@ if(APPLE)
 	set(CMAKE_EXE_LINKER_FLAGS
     		"-framework AudioToolbox -framework VideoToolbox -framework CoreGraphics -framework QuartzCore -framework CoreFoundation -framework CoreMedia -framework Security")
 	if(DISABLE_OPENSSL)
-        	target_link_libraries(testupload1 tsuploader ${LIBFFMPEG} qiniu curl bz2 lzma iconv z)
+        	target_link_libraries(testupload tsuploader ${LIBFFMPEG} qiniu curl bz2 lzma iconv z)
         else()
-        	target_link_libraries(testupload1 tsuploader ${LIBFFMPEG} qiniu curl crypto bz2 lzma iconv z)
+        	target_link_libraries(testupload tsuploader ${LIBFFMPEG} qiniu curl crypto bz2 lzma iconv z)
         endif()
 else()
     if(CMAKE_TOOLCHAIN_FILE)
         if(DISABLE_OPENSSL)
-        	target_link_libraries(testupload1 tsuploader ${LIBFFMPEG} qiniu curl m pthread devsdk tools)
+        	target_link_libraries(testupload tsuploader ${LIBFFMPEG} qiniu curl m pthread devsdk tools)
         else()
-        	target_link_libraries(testupload1 tsuploader ${LIBFFMPEG} qiniu curl crypto m pthread devsdk tools)
+        	target_link_libraries(testupload tsuploader ${LIBFFMPEG} qiniu curl crypto m pthread devsdk tools)
         endif()
     else()
         if(DISABLE_OPENSSL)
-        	target_link_libraries(testupload1 tsuploader ${LIBFFMPEG} qiniu curl m pthread z)
+        	target_link_libraries(testupload tsuploader ${LIBFFMPEG} qiniu curl m pthread z)
         else()
-        	target_link_libraries(testupload1 tsuploader ${LIBFFMPEG} avutil qiniu curl crypto m pthread z)
+        	target_link_libraries(testupload tsuploader ${LIBFFMPEG} avutil qiniu curl crypto m pthread z)
         endif()
     endif()
 endif()

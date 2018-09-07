@@ -109,6 +109,9 @@ flag_string(const char **value, const char *name, const char *help);
 void
 flag_parse(int argc, const char **args, const char *version);
 
+void
+flag_write_usage(const char *name);
+
 #define flag_str flag_string
 
 #endif /* _FLAG_H_ */

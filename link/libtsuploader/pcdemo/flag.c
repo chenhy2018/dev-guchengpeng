@@ -217,6 +217,10 @@ flagset_write_usage(flagset_t *self, FILE *fp, const char *name) {
 
   fprintf(fp, "\n");
 }
+void
+flag_write_usage(const char *name) {
+    flagset_write_usage(set, stdout, name);
+}
 
 /*
  * Parse and output on error.
