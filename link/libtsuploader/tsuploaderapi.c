@@ -13,7 +13,7 @@ static char gAk[65] = {0};
 static char gSk[65] = {0};
 static char gBucket[128] = {0};
 static char gCallbackUrl[256] = {0};
-static int nProcStatus = 0;
+static int volatile nProcStatus = 0;
 static TsMuxUploader *gpTsMuxUploader = NULL;
 static int nDeleteAfterDays = -1;
 static AvArg gAvArg;
@@ -169,6 +169,14 @@ int PushAudio(char * _pData, int _nDataLen, int64_t _nTimestamp)
         int ret = 0;
         ret = gpTsMuxUploader->PushAudio(gpTsMuxUploader, _pData, _nDataLen, _nTimestamp);
         return ret;
+}
+
+int IsProcStatusQuit()
+{
+        if (nProcStatus == 2) {
+                return 1;
+        }
+        return 0;
 }
 
 void UninitUploader()

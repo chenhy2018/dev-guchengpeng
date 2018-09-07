@@ -10,6 +10,7 @@
 #ifndef QINIU_HTTP_H
 #define QINIU_HTTP_H
 
+#include <curl/system.h>
 #include "base.h"
 #include "conf.h"
 
@@ -94,7 +95,7 @@ QINIU_DLLAPI extern Qiniu_Auth Qiniu_NoAuth;
 
 /*============================================================================*/
 /* type Qiniu_Client */
-
+typedef int (*ProgressCallback)(void *clientp,   curl_off_t dltotal,   curl_off_t dlnow,   curl_off_t ultotal,   curl_off_t ulnow);
 typedef struct _Qiniu_Client {
 	void* curl;
 	Qiniu_Auth auth;
@@ -114,6 +115,8 @@ typedef struct _Qiniu_Client {
 	// the transfer speed should be below the logSpeedLimit for this SDK to consider it
 	// too slow and abort.
 	long lowSpeedTime;
+	void *xferinfoData;
+	ProgressCallback xferinfoCb;
 } Qiniu_Client;
 
 QINIU_DLLAPI extern void Qiniu_Client_InitEx(Qiniu_Client* self, Qiniu_Auth auth, size_t bufSize);
