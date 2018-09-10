@@ -86,15 +86,18 @@ int timeoutCallback(void *clientp, curl_off_t dltotal, curl_off_t dlnow, curl_of
                 //printf("(%d)%d,==========dltotal:%lld dlnow:%lld ultotal:%lld ulnow-reculnow=%lld, now - lastrectime=%lld\n",
                 //       pUploader->nCount, pUploader->nLowSpeedCnt, dltotal, dlnow, ultotal, ulnow - pUploader->nLastUlnow, (nNow - pUploader->nUlnowRecTime)/1000000);
                 if ((ulnow - pUploader->nLastUlnow) / nDiff < 1024) { //} && !pUploader->nIsFinished) {
-                        pUploader->nLowSpeedCnt += (nDiff/1000);
+                        pUploader->nLowSpeedCnt += nDiff;
                         if (pUploader->nLowSpeedCnt >= 3) {
+                                logerror("accumulate upload timeout:%d", pUploader->nLowSpeedCnt); 
                                 return -1;
                         }
                 }
                 if (nDiff >= 10) {
+                        logerror("upload timeout directly:%d", nDiff); 
                         return -1;
                 } else if (nDiff >= 5) {
                         if (pUploader->nLowSpeedCnt >= 1) {
+                                logerror("half accumulate upload timeout:%d", pUploader->nLowSpeedCnt); 
                                 return -1;
                         }
                         pUploader->nLowSpeedCnt == 2;
