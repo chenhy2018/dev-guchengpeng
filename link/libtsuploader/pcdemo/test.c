@@ -653,6 +653,7 @@ int main(int argc, const char** argv)
         }
 #endif
         
+        SetUploadBufferSize(480);
         ret = GetUploadToken(gtestToken, sizeof(gtestToken));
         if (ret != 0)
                 return ret;

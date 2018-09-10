@@ -372,7 +372,7 @@ static int getBufferSize() {
         if (gnQBufsize != 0) {
                 return gnQBufsize;
         }
-        int nSize = 512*1024;
+        int nSize = 256*1024;
         int64_t nTotalMemSize = 0;
         int nRet = 0;
 #ifdef __APPLE__
@@ -391,20 +391,37 @@ static int getBufferSize() {
                 setQBufferSize("default", nSize);
                 return gnQBufsize;
         }
-        int64_t nCell = nTotalMemSize/200;
-        if (nCell < nSize) {
-                if (2 * nCell < nSize) {
-                        setQBufferSize("minimum default", nSize);
-                        return gnQBufsize;
-                }
-                setQBufferSize("1/100 of total", nCell * 2);
+        loginfo("toto memory size:%lld\n", nTotalMemSize);
+        
+        int64_t M = 1024 * 1024;
+        if (nTotalMemSize <= 32 * M) {
+                setQBufferSize("le 32M", nSize);
+                return gnQBufsize;
+        } else if (nTotalMemSize <= 64 * M) {
+                setQBufferSize("le 64M", nSize * 2);
+                return gnQBufsize;
+        } else if (nTotalMemSize <= 128 * M) {
+                setQBufferSize("le 128M", nSize * 3);
+                return gnQBufsize;
+        } else if (nTotalMemSize <= 256 * M) {
+                setQBufferSize("le 256M", nSize * 4);
+                return gnQBufsize;
+        } else if (nTotalMemSize <= 512 * M) {
+                setQBufferSize("le 512M", nSize * 6);
+                return gnQBufsize;
+        } else if (nTotalMemSize <= 1024 * M) {
+                setQBufferSize("le 1G", nSize * 8);
+                return gnQBufsize;
+        } else if (nTotalMemSize <= 2 * 1024 * M) {
+                setQBufferSize("le 2G", nSize * 10);
+                return gnQBufsize;
+        } else if (nTotalMemSize <= 4 * 1024 * M) {
+                setQBufferSize("le 4G", nSize * 12);
+                return gnQBufsize;
+        } else {
+                setQBufferSize("gt 4G", nSize * 16);
                 return gnQBufsize;
         }
-        if (nCell * 2 > 1024 * 1024 * 5) {
-                setQBufferSize("max 5M", 1024 * 1024 * 5);
-                return gnQBufsize;
-        }
-        setQBufferSize("1/100 of total1", nCell * 2);
         return gnQBufsize;
 }
 
@@ -789,4 +806,14 @@ void DestroyTsMuxUploader(TsMuxUploader **_pTsMuxUploader)
                 free(pFFTsMuxUploader);
         }
         return;
+}
+
+void SetUploadBufferSize(int nSize)
+{
+        if (nSize < 256) {
+                logwarn("set queue buffer is too small(%d). need great equal than 256k", nSize);
+                return;
+        }
+        loginfo("set queue buffer to:%dk", nSize);
+        gnQBufsize = nSize * 1024;
 }
