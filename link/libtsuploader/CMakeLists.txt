@@ -79,6 +79,8 @@ add_library(tsuploader STATIC
         mpegts.h
 )
 
+add_subdirectory(pcdemo)
+
 #if(CMAKE_TOOLCHAIN_FILE)
 if ( $ENV{ARCH} STREQUAL mstar )
 add_executable(testupload
@@ -88,10 +90,6 @@ add_executable(testupload
     ./demo/log2file.c
 )
 add_definitions(-D__ARM)
-else()
-add_executable(testupload
-    test.c
-)
 endif()
 
 if(APPLE)
@@ -112,9 +110,9 @@ else()
         endif()
     else()
         if(DISABLE_OPENSSL)
-        	target_link_libraries(testupload tsuploader qiniu curl m pthread z)
+            target_link_libraries(testupload tsuploader ${LIBFFMPEG} qiniu curl m pthread z)
         else()
-        	target_link_libraries(testupload tsuploader ${LIBFFMPEG} avutil qiniu curl crypto m pthread z)
+            target_link_libraries(testupload tsuploader ${LIBFFMPEG} avutil qiniu curl crypto m pthread z)
         endif()
     endif()
 endif()

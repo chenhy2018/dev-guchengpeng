@@ -157,6 +157,26 @@ func DeleteNamespace(c *gin.Context) {
 		})
 		return
 	} else {
+                model := models.UaModel{}
+                mark := ""
+                for {
+                        uas, nextmark, err := model.GetUaInfos(xl, 0, mark, params.namespace, models.UA_ITEM_UAID, "")
+                        if err != nil {
+                                xl.Errorf("Register falied error = %#v", err.Error())
+				c.JSON(400, gin.H{
+					"error": err.Error(),
+				})
+				return
+                        }
+                        for i := 0; i < len(uas); i++ {
+                                model.Delete(xl, uas[i].Namespace, uas[i].UaId)
+                        }
+                        if nextmark != "" {
+                                mark = nextmark
+                        } else {
+                                break
+                        }
+                }
 		c.JSON(200, gin.H{"success": true})
 	}
 }

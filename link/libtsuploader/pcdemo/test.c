@@ -8,22 +8,27 @@
 #include <signal.h>
 #include "tsuploaderapi.h"
 #include "adts.h"
+#include "flag.h"
+
+typedef struct {
+	bool IsInputFromFFmpeg;
+	bool IsTestAAC;
+	bool IsTestAACWithoutAdts;
+	bool IsTestTimestampRollover;
+	bool IsTestH265;
+	bool IsLocalToken;;
+	int nSleeptime;
+	int nBeforSleepDuration;;
+	int64_t nRolloverTestBase;;
+}CmdArg;
+
+#define VERSION "v1.0.0"
 AvArg avArg;
+CmdArg cmdArg;
 
 typedef int (*DataCallback)(void *opaque, void *pData, int nDataLen, int nFlag, int64_t timestamp, int nIsKeyFrame);
 #define THIS_IS_AUDIO 1
 #define THIS_IS_VIDEO 2
-#define TEST_AAC 1
-//#define TEST_AAC_NO_ADTS 1
-#define USE_LINK_ACC 1
-
-//#define INPUT_FROM_FFMPEG
-
-#ifdef INPUT_FROM_FFMPEG
-#ifndef TEST_AAC
-#define TEST_AAC 1
-#endif
-#endif
 
 
 FILE *outTs;
@@ -242,6 +247,7 @@ int start_file_test(char * _pAudioFile, char * _pVideoFile, DataCallback callbac
         int nIDR = 0;
         int nNonIDR = 0;
         int isAAC = 0;
+        int hasWaitTimeout = 0;
         int64_t aacFrameCount = 0;
         if (memcmp(_pAudioFile + strlen(_pAudioFile) - 3, "aac", 3) == 0)
                 isAAC = 1;
@@ -251,7 +257,6 @@ int start_file_test(char * _pAudioFile, char * _pVideoFile, DataCallback callbac
                         uint8_t * start = NULL;
                         uint8_t * end = NULL;
                         uint8_t * sendp = NULL;
-                        int eof = 0;
                         int type = -1;
                         do{
                                 start = (uint8_t *)ff_avc_find_startcode((const uint8_t *)nextstart, (const uint8_t *)endptr);
@@ -262,7 +267,6 @@ int start_file_test(char * _pAudioFile, char * _pVideoFile, DataCallback callbac
                                         sendp = start;
                                 
                                 if(start == end || end > endptr){
-                                        eof = 1;
                                         bVideoOk = 0;
                                         break;
                                 }
@@ -280,7 +284,7 @@ int start_file_test(char * _pAudioFile, char * _pVideoFile, DataCallback callbac
                                                         nIDR++;
                                                 }
                                                 //printf("send one video(%d) frame packet:%ld", type, end - sendp);
-                                                cbRet = callback(opaque, sendp, end - sendp, THIS_IS_VIDEO, nNextVideoTime-nSysTimeBase, type == 5);
+                                                cbRet = callback(opaque, sendp, end - sendp, THIS_IS_VIDEO, cmdArg.nRolloverTestBase+nNextVideoTime-nSysTimeBase, type == 5);
                                                 if (cbRet != 0) {
                                                         bVideoOk = 0;
                                                 }
@@ -288,11 +292,9 @@ int start_file_test(char * _pAudioFile, char * _pVideoFile, DataCallback callbac
                                                 break;
                                         }
                                 }else{
-                                        int dlen = 3;
                                         if(start[2] == 0x01){//0x 00 00 01
                                                 type = start[3] & 0x7E;
                                         }else{ // 0x 00 00 00 01
-                                                dlen = 4;
                                                 type = start[4] & 0x7E;
                                         }
                                         type = (type >> 1);
@@ -301,7 +303,6 @@ int start_file_test(char * _pAudioFile, char * _pVideoFile, DataCallback callbac
                                                 printf("unknown type:%d\n", type);
                                                 continue;
                                         }
-                                        //printf("%d------------->%d\n",dlen, type);
                                         if(hevctype == HEVC_I || hevctype == HEVC_B ){
                                                 if (hevctype == HEVC_I) {
                                                         nIDR++;
@@ -309,7 +310,7 @@ int start_file_test(char * _pAudioFile, char * _pVideoFile, DataCallback callbac
                                                         nNonIDR++;
                                                 }
                                                 //printf("send one video(%d) frame packet:%ld", type, end - sendp);
-                                                cbRet = callback(opaque, sendp, end - sendp, THIS_IS_VIDEO, nNextVideoTime-nSysTimeBase, hevctype == HEVC_I);
+                                                cbRet = callback(opaque, sendp, end - sendp, THIS_IS_VIDEO,cmdArg.nRolloverTestBase+nNextVideoTime-nSysTimeBase, hevctype == HEVC_I);
                                                 if (cbRet != 0) {
                                                         bVideoOk = 0;
                                                 }
@@ -318,6 +319,14 @@ int start_file_test(char * _pAudioFile, char * _pVideoFile, DataCallback callbac
                                         }
                                 }
                         }while(1);
+                        if (hasWaitTimeout == 0 && cmdArg.nSleeptime > 0 && nNextVideoTime > cmdArg.nBeforSleepDuration+nSysTimeBase) {
+                                printf("sleep %dms to wait timeout start:%lld\n", cmdArg.nSleeptime, nNextVideoTime);
+                                hasWaitTimeout = 1;
+                                usleep(cmdArg.nSleeptime * 1000);
+                                printf("sleep to wait timeout end\n");
+				nNextVideoTime += cmdArg.nSleeptime;
+				nNextAudioTime += cmdArg.nSleeptime;
+                        }
                 }
                 if (bAudioOk && nNow+1 > nNextAudioTime) {
                         if (isAAC) {
@@ -327,13 +336,13 @@ int start_file_test(char * _pAudioFile, char * _pVideoFile, DataCallback callbac
                                         int hlen = adts.fix.protection_absent == 1 ? 7 : 9;
                                         ParseAdtsVariableHeader((unsigned char *)(pAudioData + audioOffset), &adts.var);
                                         if (audioOffset+hlen+adts.var.aac_frame_length <= nAudioDataLen) {
-#ifdef TEST_AAC_NO_ADTS
-                                                cbRet = callback(opaque, pAudioData + audioOffset + hlen, adts.var.aac_frame_length - hlen,
-                                                                 THIS_IS_AUDIO, nNextAudioTime-nSysTimeBase, 0);
-#else
-                                                cbRet = callback(opaque, pAudioData + audioOffset, adts.var.aac_frame_length,
-                                                                 THIS_IS_AUDIO, nNextAudioTime-nSysTimeBase, 0);
-#endif
+
+                                                if (cmdArg.IsTestAACWithoutAdts)
+                                                        cbRet = callback(opaque, pAudioData + audioOffset + hlen, adts.var.aac_frame_length - hlen,
+                                                                 THIS_IS_AUDIO, nNextAudioTime-nSysTimeBase+cmdArg.nRolloverTestBase, 0);
+                                                else
+                                                        cbRet = callback(opaque, pAudioData + audioOffset, adts.var.aac_frame_length,
+                                                                 THIS_IS_AUDIO, nNextAudioTime-nSysTimeBase+cmdArg.nRolloverTestBase, 0);
                                                 if (cbRet != 0) {
                                                         bAudioOk = 0;
                                                         continue;
@@ -350,7 +359,7 @@ int start_file_test(char * _pAudioFile, char * _pVideoFile, DataCallback callbac
                                 }
                         } else {
                                 if(audioOffset+160 <= nAudioDataLen) {
-                                        cbRet = callback(opaque, pAudioData + audioOffset, 160, THIS_IS_AUDIO, nNextAudioTime-nSysTimeBase, 0);
+                                        cbRet = callback(opaque, pAudioData + audioOffset, 160, THIS_IS_AUDIO, nNextAudioTime-nSysTimeBase+cmdArg.nRolloverTestBase, 0);
                                         if (cbRet != 0) {
                                                 bAudioOk = 0;
                                                 continue;
@@ -459,7 +468,7 @@ int start_ffmpeg_test(char * _pUrl, DataCallback callback, void *opaque)
                                 goto end;
                         }
                         ret = callback(opaque, pkt.data, pkt.size, THIS_IS_VIDEO, pkt.pts, pkt.flags == 1);
-                } else {
+                } else if (nAudioIndex == pkt.stream_index) {
                         ret = callback(opaque, pkt.data, pkt.size, THIS_IS_AUDIO, pkt.pts, 0);
                 }
 
@@ -541,8 +550,68 @@ void logCb(char * pLog)
         printf("-%s", pLog);
 }
 
-int main(int argc, char* argv[])
+static void checkCmdArg(const char * name)
 {
+        if (cmdArg.IsTestAACWithoutAdts)
+                cmdArg.IsTestAAC = true;
+
+        if (cmdArg.nSleeptime && cmdArg.nBeforSleepDuration == false) {
+                logwarn("will set sleeptime to zero. cus'z for bsd is zero");
+                flag_write_usage(name);
+                cmdArg.nSleeptime = false;
+        }
+#ifndef TEST_WITH_FFMPEG
+        if (cmdArg.IsInputFromFFmpeg) {
+                logerror("not enable TEST_WITH_FFMPEG");
+                exit(2);
+        }
+#endif
+#ifndef DISABLE_OPENSSL
+        if (cmdArg.IsLocalToken) {
+                logerror("cannot from calc token from local. not enable OPENSSL");
+                exit(3);
+        }
+#endif
+        if (cmdArg.IsInputFromFFmpeg) {
+                cmdArg.IsTestAAC = true;
+                cmdArg.IsTestAACWithoutAdts = false;
+                logerror("input from ffmpeg");
+        }
+        if (cmdArg.IsTestTimestampRollover) {
+                cmdArg.nRolloverTestBase = 95437000;
+	}
+        if (cmdArg.nSleeptime != 0 && cmdArg.nSleeptime < 1000) {
+                logerror("sleep time is milliseond. should great than 1000");
+                exit(4);
+	}
+        return;
+}
+
+int main(int argc, const char** argv)
+{
+	flag_bool(&cmdArg.IsInputFromFFmpeg, "ffmpeg", "is input from ffmpeg. will set --testaac and not set noadts");
+	flag_bool(&cmdArg.IsTestAAC, "testaac", "input aac audio");
+	flag_bool(&cmdArg.IsTestAACWithoutAdts, "noadts", "input aac audio without adts. will set --testaac");
+	flag_bool(&cmdArg.IsTestTimestampRollover, "rollover", "will set start pts to 95437000. ts will roll over about 6.x second laetr.only effect for not input from ffmpeg");
+	flag_bool(&cmdArg.IsTestH265, "testh265", "input h264 video");
+	flag_bool(&cmdArg.IsLocalToken, "localtoken", "use kodo server mode");
+        flag_int(&cmdArg.nBeforSleepDuration, "bsd", "input go to sleep(milli) after bsd second");
+        flag_int(&cmdArg.nSleeptime, "sleeptime", "sleep time(milli) after bsd time");
+        flag_parse(argc, argv, VERSION);
+        if (argc == 2 && (strcmp(argv[1], "-h") == 0 || strcmp(argv[1], "-help") == 0)) {
+                flag_write_usage(argv[0]);
+                return 0;
+        }
+
+	printf("cmdArg.IsInputFromFFmpeg=%d\n", cmdArg.IsInputFromFFmpeg);
+	printf("cmdArg.IsTestAAC=%d\n", cmdArg.IsTestAAC);
+	printf("cmdArg.IsTestAACWithoutAdts=%d\n", cmdArg.IsTestAACWithoutAdts);
+	printf("cmdArg.IsTestTimestampRollover=%d\n", cmdArg.IsTestTimestampRollover);
+	printf("cmdArg.IsTestH265=%d\n", cmdArg.IsTestH265);
+	printf("cmdArg.IsLocalToken=%d\n", cmdArg.IsLocalToken);
+	printf("cmdArg.nBeforSleepDuration=%d\n", cmdArg.nBeforSleepDuration);
+	printf("cmdArg.nSleeptime=%d\n", cmdArg.nSleeptime);
+        checkCmdArg(argv[0]);
 
         int ret = 0;
 #ifdef TEST_WITH_FFMPEG
@@ -552,19 +621,21 @@ int main(int argc, char* argv[])
 	printf("av_register_all\n");
       #endif
     #endif
-    #ifdef INPUT_FROM_FFMPEG
-        avformat_network_init();
-	printf("avformat_network_init\n");
-    #endif
+        if (cmdArg.IsInputFromFFmpeg) {
+                avformat_network_init();
+ 	        printf("avformat_network_init\n");
+	}
 #endif
         SetLogLevelToDebug();
         SetLogCallback(logCb);
         signal(SIGINT, signalHander);
         
+
         pthread_t updateTokenThread;
         pthread_attr_t attr;
         pthread_attr_init (&attr);
         pthread_attr_setdetachstate (&attr, PTHREAD_CREATE_DETACHED);
+
         ret = pthread_create(&updateTokenThread, &attr, upadateToken, NULL);
         if (ret != 0) {
                 printf("create update token thread fail\n");
@@ -572,34 +643,34 @@ int main(int argc, char* argv[])
         }
         pthread_attr_destroy (&attr);
         
-#ifdef USE_LINK_ACC
-        SetAk("JAwTPb8dmrbiwt89Eaxa4VsL4_xSIYJoJh4rQfOQ");
-        SetSk("G5mtjT3QzG4Lf7jpCAN5PZHrGeoSH9jRdC96ecYS");
-        
-        //计算token需要，所以需要先设置
-        SetBucketName("ipcamera");
-#else
-        SetAk("p4y2X-zKqiDoWeIvmhhXkR3mHbHx_Yw36YHFz9e1");
-        SetSk("hVZOIZfLw_0xzJhtVv1ddmlSkbiUrHLdNJewZRkp");
-        SetBucketName("bucket");
-#endif
 
+#ifndef DISABLE_OPENSSL
+        if (cmdArg.IsLocalToken) {
+                SetAk("JAwTPb8dmrbiwt89Eaxa4VsL4_xSIYJoJh4rQfOQ");
+                SetSk("G5mtjT3QzG4Lf7jpCAN5PZHrGeoSH9jRdC96ecYS");
+                //计算token需要，所以需要先设置
+                SetBucketName("ipcamera");
+        }
+#endif
         
         ret = GetUploadToken(gtestToken, sizeof(gtestToken));
         if (ret != 0)
                 return ret;
         printf("token:%s\n", gtestToken);
         
-#ifdef TEST_AAC
-        avArg.nAudioFormat = TK_AUDIO_AAC;
         avArg.nChannels = 1;
-        avArg.nSamplerate = 16000;
-#else
-        avArg.nAudioFormat = TK_AUDIO_PCMU;
-        avArg.nChannels = 1;
-        avArg.nSamplerate = 8000;
-#endif
-        avArg.nVideoFormat = TK_VIDEO_H264;
+        if(cmdArg.IsTestAAC) {
+                avArg.nAudioFormat = TK_AUDIO_AAC;
+                avArg.nSamplerate = 16000;
+        } else {
+                avArg.nAudioFormat = TK_AUDIO_PCMU;
+                avArg.nSamplerate = 8000;
+        }
+        if(cmdArg.IsTestH265) {
+                avArg.nVideoFormat = TK_VIDEO_H265;
+	} else {
+                avArg.nVideoFormat = TK_VIDEO_H264;
+        }
 
         /*
         //token过期测试
@@ -612,36 +683,41 @@ int main(int argc, char* argv[])
         if (ret != 0) {
                 return ret;
         }
+
+        char *pVFile = NULL;
+        char *pAFile = NULL;
 #ifdef __APPLE__
-        char * pVFile = "/Users/liuye/Documents/material/h265_aac_1_16000_h264.h264";
-  #ifdef TEST_AAC
-        char * pAFile = "/Users/liuye/Documents/material/h265_aac_1_16000_a.aac";
-  #else
-        char * pAFile = "/Users/liuye/Documents/material/h265_aac_1_16000_pcmu_8000.mulaw";
-  #endif
-        if (avArg.nVideoFormat == TK_VIDEO_H265) {
+        if(cmdArg.IsTestAAC) {
+                pAFile = "/Users/liuye/Documents/material/h265_aac_1_16000_a.aac";
+	} else {
+                pAFile = "/Users/liuye/Documents/material/h265_aac_1_16000_pcmu_8000.mulaw";
+        }
+        if(cmdArg.IsTestH265) {
                 pVFile = "/Users/liuye/Documents/material/h265_aac_1_16000_v.h265";
+	} else {
+                pVFile = "/Users/liuye/Documents/material/h265_aac_1_16000_h264.h264";
         }
 #else
 
-        char * pVFile = "/liuye/Documents/material/h265_aac_1_16000_h264.h264";
-  #ifdef TEST_AAC
-        char * pAFile = "/liuye/Documents/material/h265_aac_1_16000_a.aac";
-  #else
-        char * pAFile = "/liuye/Documents/material/h265_aac_1_16000_pcmu_8000.mulaw";
-  #endif
-        if (avArg.nVideoFormat == TK_VIDEO_H265) {
+        if(cmdArg.IsTestAAC) {
+                pAFile = "/liuye/Documents/material/h265_aac_1_16000_a.aac";
+	} else {
+                pAFile = "/liuye/Documents/material/h265_aac_1_16000_pcmu_8000.mulaw";
+        }
+        if(cmdArg.IsTestH265) {
                 pVFile = "/liuye/Documents/material/h265_aac_1_16000_v.h265";
+	} else {
+                pVFile = "/liuye/Documents/material/h265_aac_1_16000_h264.h264";
         }
 #endif
 
-#if defined(TEST_WITH_FFMPEG) && defined(INPUT_FROM_FFMPEG)
-        start_ffmpeg_test("rtmp://localhost:1935/live/movie", dataCallback, NULL);
-        //start_ffmpeg_test("rtmp://live.hkstv.hk.lxdns.com/live/hks", dataCallback, NULL);
-#else
-        printf("%s\n%s\n", pAFile, pVFile);
-        start_file_test(pAFile, pVFile, dataCallback, NULL);
-#endif
+        if (cmdArg.IsInputFromFFmpeg) {
+                start_ffmpeg_test("rtmp://localhost:1935/live/movie", dataCallback, NULL);
+                //start_ffmpeg_test("rtmp://live.hkstv.hk.lxdns.com/live/hks", dataCallback, NULL);
+	} else {
+                printf("%s\n%s\n", pAFile, pVFile);
+                start_file_test(pAFile, pVFile, dataCallback, NULL);
+	}
         
         
         UninitUploader();

@@ -2,6 +2,8 @@ package controllers
 
 import (
 	"errors"
+	"fmt"
+	"net/http/httputil"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -15,6 +17,13 @@ type segInfo struct {
 }
 
 func GetSegments(c *gin.Context) {
+
+	requestDump, err := httputil.DumpRequest(c.Request, true)
+	if err != nil {
+		fmt.Println(err)
+
+	}
+	fmt.Println(string(requestDump))
 
 	xl := xlog.New(c.Writer, c.Request)
 	params, err := ParseRequest(c, xl)

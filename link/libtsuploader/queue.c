@@ -169,7 +169,7 @@ static int PopQueueWithNoOverwrite(CircleQueue *_pQueue, char *pBuf_, int nBufLe
                 return TK_Q_OVERWRIT;
         }
         int64_t usec = 1000000;
-        return PopQueueWithTimeout(_pQueue, pBuf_, nBufLen, usec * 60 * 60 * 24 * 365);
+        return PopQueueWithTimeout(_pQueue, pBuf_, nBufLen, usec * 3);
 }
 
 static void StopPush(CircleQueue *_pQueue)
@@ -191,6 +191,7 @@ static void getStatInfo(CircleQueue *_pQueue, UploaderStatInfo *_pStatInfo)
         _pStatInfo->nPushDataBytes_ = pQueueImp->statInfo.nPushDataBytes_;
         _pStatInfo->nPopDataBytes_ = pQueueImp->statInfo.nPopDataBytes_;
         _pStatInfo->nLen_ = pQueueImp->statInfo.nLen_;
+        _pStatInfo->nIsReadOnly = pQueueImp->nIsStopPush_;
         return;
 }
 
