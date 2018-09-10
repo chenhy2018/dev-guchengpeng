@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"strconv"
@@ -32,8 +33,8 @@ func getFFGrpcClient() pb.FastForwardClient {
 	if fastForwardClint != nil {
 		return fastForwardClint
 	}
-	//conn, err := grpc.Dial("47.105.118.51:50051", grpc.WithInsecure())
-	conn, err := grpc.Dial("127.0.0.1:50051", grpc.WithInsecure())
+	conn, err := grpc.Dial("47.105.118.51:50051", grpc.WithInsecure())
+	//conn, err := grpc.Dial("127.0.0.1:50051", grpc.WithInsecure())
 
 	if err != nil {
 		fmt.Println("Init gprc failedgrpcgrpc")
@@ -72,6 +73,7 @@ func GetPlayBackm3u8(c *gin.Context) {
 		})
 		return
 	}
+	fmt.Println("speed = ", params.speed)
 	xl.Infof("uid= %v, uaid = %v, from = %v, to = %v, namespace = %v", params.uid, params.uaid, params.from, params.to, params.namespace)
 
 	dayInMilliSec := int64((24 * time.Hour).Seconds() * 1000)
@@ -83,8 +85,11 @@ func GetPlayBackm3u8(c *gin.Context) {
 		return
 	}
 	if params.speed != 1 {
-		getFastForwardStream(params, c)
-		return
+		if err := getFastForwardStream(params, c); err != nil {
+			xl.Errorf("get fastforward stream error , error = %v", err.Error())
+			c.JSON(500, nil)
+			return
+		}
 	}
 	segs, _, err := SegMod.GetSegmentTsInfo(xl, params.from, params.to, params.namespace, params.uaid, 0, "")
 	if err != nil {
@@ -154,20 +159,19 @@ type testStream struct {
 	Stream []byte
 }
 
-func getFastForwardStream(params *requestParams, c *gin.Context) bool {
+func getFastForwardStream(params *requestParams, c *gin.Context) error {
 	url := c.Request.URL.String()
 	fullUrl := "http://" + c.Request.Host + url
 
 	req := new(pb.FastForwardInfo)
-	req.Baseurl = params.url
-	req.From = params.from
-	req.To = params.to
-	req.Expire = time.Now().Add(time.Hour).Unix()
-	req.Token = getNewToken(fullUrl, req.Expire)
+	expire := time.Now().Add(time.Hour).Unix()
+	req.Url = getNewToken(fullUrl, expire)
 	req.Speed = params.speed
-	req.ApiVerion = url[1:3]
-	fmt.Println(fullUrl, req.Expire, req.Token)
+	fmt.Println(req.Url)
 	ffGrpcClient := getFFGrpcClient()
+	if ffGrpcClient == nil {
+		return errors.New("grpc client error")
+	}
 	r, err := ffGrpcClient.GetTsStream(context.Background(), req)
 	if err != nil {
 		fmt.Println(err)
@@ -186,7 +190,7 @@ func getFastForwardStream(params *requestParams, c *gin.Context) bool {
 		}
 		return false
 	})
-	return false
+	return nil
 }
 
 func getNewToken(origin string, expire int64) string {
@@ -195,5 +199,5 @@ func getNewToken(origin string, expire int64) string {
 	// using uid password as ak/sk
 	mac := qbox.NewMac(accessKey, secretKey)
 	token := mac.Sign([]byte(playbackBaseUrl))
-	return token
+	return playbackBaseUrl + "&token=" + token
 }

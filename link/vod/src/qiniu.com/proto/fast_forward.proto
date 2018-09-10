@@ -8,13 +8,8 @@ service FastForward {
 }
 
 message FastForwardInfo {
-        string baseurl = 1;
-        int64 from = 2;
-        int64 to = 3;
-        int64 expire = 4;
-        string token = 5;
-	int32 speed = 6;
-        string apiVerion = 7;
+        string url = 1;
+        int32  speed= 2;
 }
 
 message FastForwardStream {
