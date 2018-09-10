@@ -7,6 +7,7 @@
 
 int InitUploader(char *pDeviceId, char * pToken, AvArg *pAvArg);
 int UpdateToken(char * pToken);
+void SetUploadBufferSize(int nSize);
 int PushVideo(char * pData, int nDataLen, int64_t nTimestamp, int nIsKeyFrame, int nIsSegStart);
 int PushAudio(char * pData, int nDataLen, int64_t nTimestamp);
 void UninitUploader();

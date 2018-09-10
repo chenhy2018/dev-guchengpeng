@@ -169,7 +169,7 @@ static int PopQueueWithNoOverwrite(CircleQueue *_pQueue, char *pBuf_, int nBufLe
                 return TK_Q_OVERWRIT;
         }
         int64_t usec = 1000000;
-        return PopQueueWithTimeout(_pQueue, pBuf_, nBufLen, usec * 3);
+        return PopQueueWithTimeout(_pQueue, pBuf_, nBufLen, usec * 1);
 }
 
 static void StopPush(CircleQueue *_pQueue)
