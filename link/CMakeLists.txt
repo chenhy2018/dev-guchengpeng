@@ -26,5 +26,5 @@ endif()
 
 add_subdirectory(libsip)
 add_subdirectory(libmqtt)
-add_subdirectory(libsdk)
+#add_subdirectory(libsdk)
 add_subdirectory(libtsuploader)
