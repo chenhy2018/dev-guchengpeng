@@ -42,7 +42,6 @@ func getDomain(xl *xlog.Logger, bucket string, info *userInfo) (string, error) {
 	if err != nil {
 		xl.Errorf("%#v", err)
 	}
-
 	mac := qbox.NewMac(info.ak, info.sk)
 
 	token, _ := mac.SignRequest(request)
@@ -52,6 +51,8 @@ func getDomain(xl *xlog.Logger, bucket string, info *userInfo) (string, error) {
 	if err != nil {
 		return "", err
 	}
+        xl.Infof("getdomain %s %s bucket %s", info.ak, info.sk, bucket)
+
 	body, err := ioutil.ReadAll(resp.Body)
 	var domain []string
 	err = json.Unmarshal(body, &domain)
@@ -288,7 +289,7 @@ func UpdateNamespace(c *gin.Context) {
 
 	domain, err := getDomain(xl, namespaceData.Bucket, info)
 	if err != nil || domain == "" {
-		xl.Errorf("bucket is not correct, err = %#v", err)
+		xl.Errorf("bucket is not correct")
 		c.JSON(403, gin.H{
 			"error": "bucket is not correct",
 		})
