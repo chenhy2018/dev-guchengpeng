@@ -31,11 +31,13 @@ type segInfos struct {
 func (suite *SegmentsTestSuite) TestFromEndInTwoSeg1() {
 	req, _ := http.NewRequest("GET", "/v1/namespaces/ipcamera/uas/testdeviceid8/segments?from=1532499325&to=1532499345", nil)
 	defer monkey.UnpatchAll()
-	monkey.Patch(VerifyAuth, func(xl *xlog.Logger, req *http.Request) (bool, error) { return true, nil })
 	monkey.PatchInstanceMethod(
 		reflect.TypeOf((*models.SegmentKodoModel)(nil)), "GetFragmentTsInfo", func(ss *models.SegmentKodoModel, xl *xlog.Logger, count int, starttime, endtime int64, bucketurl, uaid, mark string) ([]map[string]interface{}, string, error) {
 			return nil, "", nil
 		})
+	monkey.Patch(getUserInfo, func(xl *xlog.Logger, req *http.Request) (*userInfo, error) {
+		return &userInfo{}, nil
+	})
 	w := PerformRequest(suite.r, req)
 	body, _ := ioutil.ReadAll(w.Body)
 	var segInfos segInfos
@@ -51,7 +53,6 @@ func (suite *SegmentsTestSuite) TestFromEndInTwoSeg1() {
 func (suite *SegmentsTestSuite) TestFromEndInTwoSeg2() {
 	req, _ := http.NewRequest("GET", "/v1/namespaces/ipcamera/uas/testdeviceid8/segments?from=1532499325&to=1532499345", nil)
 	defer monkey.UnpatchAll()
-	monkey.Patch(VerifyAuth, func(xl *xlog.Logger, req *http.Request) (bool, error) { return true, nil })
 	monkey.PatchInstanceMethod(
 		reflect.TypeOf((*models.SegmentKodoModel)(nil)), "GetFragmentTsInfo", func(ss *models.SegmentKodoModel, xl *xlog.Logger, count int, starttime, endtime int64, bucketurl, uaid, mark string) ([]map[string]interface{}, string, error) {
 			rets := make([](map[string]interface{}), 0, 3)
@@ -65,6 +66,9 @@ func (suite *SegmentsTestSuite) TestFromEndInTwoSeg2() {
 			rets = append(rets, item)
 			return rets, "", nil
 		})
+	monkey.Patch(getUserInfo, func(xl *xlog.Logger, req *http.Request) (*userInfo, error) {
+		return &userInfo{}, nil
+	})
 	w := PerformRequest(suite.r, req)
 
 	body, _ := ioutil.ReadAll(w.Body)
@@ -82,9 +86,9 @@ func (suite *SegmentsTestSuite) TestFromEndInTwoSeg2() {
 func (suite *SegmentsTestSuite) TestFromEndInTwoSeg3() {
 	req, _ := http.NewRequest("GET", "/v1/namespaces/ipcamera/uas/testdeviceid8/segments?from=1532499325&to=1532499341", nil)
 	defer monkey.UnpatchAll()
-	// hack verifyAuth
-	monkey.Patch(VerifyAuth, func(xl *xlog.Logger, req *http.Request) (bool, error) { return true, nil })
-
+	monkey.Patch(getUserInfo, func(xl *xlog.Logger, req *http.Request) (*userInfo, error) {
+		return &userInfo{}, nil
+	})
 	// hack models.SegMentKodomodel.GetFragmentTsInfo
 	monkey.PatchInstanceMethod(
 		reflect.TypeOf((*models.SegmentKodoModel)(nil)), "GetFragmentTsInfo", func(ss *models.SegmentKodoModel, xl *xlog.Logger, count int, starttime, endtime int64, bucketurl, uaid, mark string) ([]map[string]interface{}, string, error) {
@@ -125,10 +129,9 @@ func (suite *SegmentsTestSuite) TestFromEndInTwoSeg3() {
 func (suite *SegmentsTestSuite) TestFromEndInTwoSeg4() {
 	req, _ := http.NewRequest("GET", "/v1/namespaces/ipcamera/uas/testdeviceid8/segments?from=1532499329&to=1532499335", nil)
 	defer monkey.UnpatchAll()
-
-	// hack verifyAuth
-	monkey.Patch(VerifyAuth, func(xl *xlog.Logger, req *http.Request) (bool, error) { return true, nil })
-
+	monkey.Patch(getUserInfo, func(xl *xlog.Logger, req *http.Request) (*userInfo, error) {
+		return &userInfo{}, nil
+	})
 	// hack models.SegMentKodomodel.GetFragmentTsInfo
 	monkey.PatchInstanceMethod(
 		reflect.TypeOf((*models.SegmentKodoModel)(nil)), "GetFragmentTsInfo", func(ss *models.SegmentKodoModel, xl *xlog.Logger, count int, starttime, endtime int64, bucketurl, uaid, mark string) ([]map[string]interface{}, string, error) {
@@ -164,9 +167,6 @@ func (suite *SegmentsTestSuite) TestFromEndInTwoSeg5() {
 	req, _ := http.NewRequest("GET", "/v1/namespaces/ipcamera/uas/testdeviceid8/segments?from=1532499335&to=1532499345", nil)
 	defer monkey.UnpatchAll()
 
-	// hack verifyAuth
-	monkey.Patch(VerifyAuth, func(xl *xlog.Logger, req *http.Request) (bool, error) { return true, nil })
-
 	// hack models.SegMentKodomodel.GetFragmentTsInfo
 	monkey.PatchInstanceMethod(
 		reflect.TypeOf((*models.SegmentKodoModel)(nil)), "GetFragmentTsInfo", func(ss *models.SegmentKodoModel, xl *xlog.Logger, count int, starttime, endtime int64, bucketurl, uaid, mark string) ([]map[string]interface{}, string, error) {
@@ -179,7 +179,9 @@ func (suite *SegmentsTestSuite) TestFromEndInTwoSeg5() {
 			rets = append(rets, item)
 			return rets, "", nil
 		})
-
+	monkey.Patch(getUserInfo, func(xl *xlog.Logger, req *http.Request) (*userInfo, error) {
+		return &userInfo{}, nil
+	})
 	w := PerformRequest(suite.r, req)
 
 	body, _ := ioutil.ReadAll(w.Body)
@@ -201,9 +203,6 @@ func (suite *SegmentsTestSuite) TestFromEndInTwoSeg6() {
 	req, _ := http.NewRequest("GET", "/v1/namespaces/ipcamera/uas/testdeviceid8/segments?from=1532499325&to=1532499335", nil)
 	defer monkey.UnpatchAll()
 
-	// hack verifyAuth
-	monkey.Patch(VerifyAuth, func(xl *xlog.Logger, req *http.Request) (bool, error) { return true, nil })
-
 	// hack models.SegMentKodomodel.GetFragmentTsInfo
 	monkey.PatchInstanceMethod(
 		reflect.TypeOf((*models.SegmentKodoModel)(nil)), "GetFragmentTsInfo", func(ss *models.SegmentKodoModel, xl *xlog.Logger, count int, starttime, endtime int64, bucketurl, uaid, mark string) ([]map[string]interface{}, string, error) {
@@ -215,7 +214,9 @@ func (suite *SegmentsTestSuite) TestFromEndInTwoSeg6() {
 			rets = append(rets, item)
 			return rets, "", nil
 		})
-
+	monkey.Patch(getUserInfo, func(xl *xlog.Logger, req *http.Request) (*userInfo, error) {
+		return &userInfo{}, nil
+	})
 	w := PerformRequest(suite.r, req)
 
 	body, _ := ioutil.ReadAll(w.Body)
@@ -238,9 +239,6 @@ func (suite *SegmentsTestSuite) TestFromEndInTwoSeg7() {
 	req, _ := http.NewRequest("GET", "/v1/namespaces/ipcamera/uas/testdeviceid8/segments?from=1532499326&to=1532499330", nil)
 	defer monkey.UnpatchAll()
 
-	// hack verifyAuth
-	monkey.Patch(VerifyAuth, func(xl *xlog.Logger, req *http.Request) (bool, error) { return true, nil })
-
 	// hack models.SegMentKodomodel.GetFragmentTsInfo
 	monkey.PatchInstanceMethod(
 		reflect.TypeOf((*models.SegmentKodoModel)(nil)), "GetFragmentTsInfo", func(ss *models.SegmentKodoModel, xl *xlog.Logger, count int, starttime, endtime int64, bucketurl, uaid, mark string) ([]map[string]interface{}, string, error) {
@@ -249,7 +247,9 @@ func (suite *SegmentsTestSuite) TestFromEndInTwoSeg7() {
 			rets = append(rets, item)
 			return rets, "", nil
 		})
-
+	monkey.Patch(getUserInfo, func(xl *xlog.Logger, req *http.Request) (*userInfo, error) {
+		return &userInfo{}, nil
+	})
 	w := PerformRequest(suite.r, req)
 
 	body, _ := ioutil.ReadAll(w.Body)
@@ -269,9 +269,6 @@ func (suite *SegmentsTestSuite) TestFromEndInTwoSeg8() {
 	req, _ := http.NewRequest("GET", "/v1/namespaces/ipcamera/uas/testdeviceid8/segments?from=1532499325&to=1532499340", nil)
 	defer monkey.UnpatchAll()
 
-	// hack verifyAuth
-	monkey.Patch(VerifyAuth, func(xl *xlog.Logger, req *http.Request) (bool, error) { return true, nil })
-
 	// hack models.SegMentKodomodel.GetFragmentTsInfo
 	monkey.PatchInstanceMethod(
 		reflect.TypeOf((*models.SegmentKodoModel)(nil)), "GetFragmentTsInfo", func(ss *models.SegmentKodoModel, xl *xlog.Logger, count int, starttime, endtime int64, bucketurl, uaid, mark string) ([]map[string]interface{}, string, error) {
@@ -286,8 +283,10 @@ func (suite *SegmentsTestSuite) TestFromEndInTwoSeg8() {
 			rets = append(rets, item)
 			return rets, "", nil
 		})
+	monkey.Patch(getUserInfo, func(xl *xlog.Logger, req *http.Request) (*userInfo, error) {
+		return &userInfo{}, nil
+	})
 	w := PerformRequest(suite.r, req)
-
 	body, _ := ioutil.ReadAll(w.Body)
 	var segInfos segInfos
 	json.Unmarshal(body, &segInfos)
