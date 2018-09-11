@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/bouk/monkey"
+	"github.com/qiniu/api.v7/auth/qbox"
 	xlog "github.com/qiniu/xlog.v1"
 	"github.com/stretchr/testify/suite"
 	"qiniu.com/models"
@@ -16,6 +17,14 @@ type PlayBackTestSuite struct {
 	suite.Suite
 	r http.Handler
 }
+
+var (
+	userinfo = userInfo{
+		uid: 1,
+		ak:  "JAwTPb8dmrbiwt89Eaxa4VsL4_xSIYJoJh4rQfOQ",
+		sk:  "G5mtjT3QzG4Lf7jpCAN5PZHrGeoSH9jRdC96ecYS",
+	}
+)
 
 func (suite *PlayBackTestSuite) SetupTest() {
 	suite.r = GetRouter()
@@ -73,10 +82,25 @@ func (suite *PlayBackTestSuite) TestPlayBack() {
 	req, _ := http.NewRequest("GET", "/v1/namespaces/ipcamera/uas/testdeviceid8/playback?from=1532499325&to=1532499345&e=1532499345&token=13764829407:4ZNcW_AanSVccUmwq6MnA_8SWk8=", nil)
 	defer monkey.UnpatchAll()
 	monkey.Patch(VerifyToken, func(xl *xlog.Logger, expire int64, realToken string, req *http.Request) bool { return true })
-	monkey.Patch(getUserInfo, func(xl *xlog.Logger, req *http.Request) (*userInfo, error) { return &userInfo{}, nil })
+	monkey.Patch(getUserInfo, func(xl *xlog.Logger, req *http.Request) (*userInfo, error) { return &userinfo, nil })
+	monkey.PatchInstanceMethod(
+		reflect.TypeOf((*models.NamespaceModel)(nil)), "GetNamespaceInfo", func(ss *models.NamespaceModel, xl *xlog.Logger, uid, namespace string) ([]models.NamespaceInfo, error) {
+			info := []models.NamespaceInfo{}
+			item := models.NamespaceInfo{
+				Space:        "ipcamera",
+				Regtime:      111111,
+				UpdateTime:   3333333,
+				Bucket:       "ipcamera",
+				Uid:          "link",
+				Domain:       "www.baidu.com",
+				AutoCreateUa: true,
+			}
+			info = append(info, item)
+			return info, nil
+		})
 	monkey.PatchInstanceMethod(
 		reflect.TypeOf((*models.SegmentKodoModel)(nil)), "GetSegmentTsInfo", func(ss *models.SegmentKodoModel,
-			xl *xlog.Logger, starttime, endtime int64, bucketurl, uaid string, limit int, marker string) ([]map[string]interface{}, string, error) {
+			xl *xlog.Logger, starttime, endtime int64, bucketurl, uaid string, limit int, marker string, mac *qbox.Mac) ([]map[string]interface{}, string, error) {
 			return nil, "", nil
 		})
 
@@ -90,7 +114,7 @@ func (suite *PlayBackTestSuite) TestPlayBackWithGetSegmentsInfoError() {
 	monkey.Patch(VerifyToken, func(xl *xlog.Logger, expire int64, realToken string, req *http.Request) bool { return true })
 	monkey.PatchInstanceMethod(
 		reflect.TypeOf((*models.SegmentKodoModel)(nil)), "GetSegmentTsInfo", func(ss *models.SegmentKodoModel,
-			xl *xlog.Logger, starttime, endtime int64, bucketurl, uaid string, limit int, marker string) ([]map[string]interface{}, string, error) {
+			xl *xlog.Logger, starttime, endtime int64, bucketurl, uaid string, limit int, marker string, mac *qbox.Mac) ([]map[string]interface{}, string, error) {
 			return nil, "", errors.New("get kodo data error")
 		})
 

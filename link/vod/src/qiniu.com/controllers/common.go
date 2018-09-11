@@ -18,7 +18,6 @@ import (
 )
 
 type requestParams struct {
-	uid       string
 	uaid      string
 	from      int64
 	to        int64
@@ -65,11 +64,27 @@ func getUserInfo(xl *xlog.Logger, req *http.Request) (*userInfo, error) {
 	return &userInfo, nil
 }
 
+func getUid(uid uint32) string {
+	return strconv.Itoa(int(uid))
+}
+
 func GetUrlWithDownLoadToken(xl *xlog.Logger, domain, fname string, tsExpire int64, userInfo *userInfo) string {
 	mac := qbox.NewMac(userInfo.ak, userInfo.sk)
 	expireT := time.Now().Add(time.Hour).Unix() + tsExpire
 	realUrl := storage.MakePrivateURL(mac, domain, fname, expireT)
 	return realUrl
+}
+
+func GetBucket(xl *xlog.Logger, uid, namespace string) (string, error) {
+	namespaceMod = &models.NamespaceModel{}
+	info, err := namespaceMod.GetNamespaceInfo(xl, uid, namespace)
+	if err != nil {
+		return "", err
+	}
+	if len(info) == 0 {
+		return "", errors.New("can't find namespace")
+	}
+	return info[0].Bucket, nil
 }
 
 func IsAutoCreateUa(xl *xlog.Logger, bucket string) (bool, []models.NamespaceInfo, error) {
@@ -112,8 +127,6 @@ func ParseRequest(c *gin.Context, xl *xlog.Logger) (*requestParams, error) {
 	*/
 	uaid := c.Param("uaid")
 	namespace := c.Param("namespace")
-	// TODO use ak or body uid.
-	uid := c.DefaultQuery("uid", "link")
 	from := c.DefaultQuery("from", "0")
 	to := c.DefaultQuery("to", "0")
 	expire := c.DefaultQuery("e", "0")
@@ -151,7 +164,6 @@ func ParseRequest(c *gin.Context, xl *xlog.Logger) (*requestParams, error) {
 	}
 
 	params := &requestParams{
-		uid:       uid,
 		uaid:      uaid,
 		from:      fromT * 1000,
 		to:        toT * 1000,
