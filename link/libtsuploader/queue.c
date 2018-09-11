@@ -171,9 +171,9 @@ static int PopQueueWithNoOverwrite(CircleQueue *_pQueue, char *pBuf_, int nBufLe
         int64_t usec = 1000000;
         if (pQueueImp->statInfo.nPushDataBytes_> 0) {
                 return PopQueueWithTimeout(_pQueue, pBuf_, nBufLen, usec * 1);
-	} else {
-	        retrurn PopQueueWithTimeout(_pQueue, pBuf_, nBufLen, usec * 60 * 60 * 24 * 365);
-	}
+        } else {
+                return PopQueueWithTimeout(_pQueue, pBuf_, nBufLen, usec * 60 * 60 * 24 * 365);
+        }
 }
 
 static void StopPush(CircleQueue *_pQueue)
