@@ -2,8 +2,6 @@ package controllers
 
 import (
 	"errors"
-	"fmt"
-	"net/http/httputil"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -17,13 +15,6 @@ type segInfo struct {
 }
 
 func GetSegments(c *gin.Context) {
-
-	requestDump, err := httputil.DumpRequest(c.Request, true)
-	if err != nil {
-		fmt.Println(err)
-
-	}
-	fmt.Println(string(requestDump))
 
 	xl := xlog.New(c.Writer, c.Request)
 	params, err := ParseRequest(c, xl)
@@ -51,17 +42,16 @@ func GetSegments(c *gin.Context) {
 		})
 		return
 	}
-	if ok, err := VerifyAuth(xl, c.Request); err != nil || ok != true {
-		xl.Errorf("verify auth failed %#v", err)
-		c.JSON(401, gin.H{
-			"error": "bad token",
-		})
-		return
-	}
 
 	xl.Infof("uid= %v, deviceid = %v, from = %v, to = %v, limit = %v, marker = %v, namespace = %v", params.uid, params.uaid, params.from, params.to, params.limit, params.marker, params.namespace)
 
-	newFrom := getFristTsAfterFrom(xl, params.from, params.to, params.namespace, params.uaid)
+	user, err := getUserInfo(xl, c.Request)
+	if err != nil {
+		xl.Errorf("get user info error, error = %v", err)
+		c.JSON(500, nil)
+		return
+	}
+	newFrom := getFristTsAfterFrom(xl, params.from, params.to, params.namespace, params.uaid, user)
 	ret, marker, err := SegMod.GetFragmentTsInfo(xl, params.limit, newFrom, params.to, params.namespace, params.uaid, params.marker)
 	if err != nil {
 		xl.Errorf("get segments list error, error =%#v", err)
@@ -91,7 +81,7 @@ func GetSegments(c *gin.Context) {
 	})
 
 }
-func getFristTsAfterFrom(xl *xlog.Logger, from, to int64, namespace, uaid string) int64 {
+func getFristTsAfterFrom(xl *xlog.Logger, from, to int64, namespace, uaid string, user *userInfo) int64 {
 
 	segs, _, err := SegMod.GetSegmentTsInfo(xl, from, to, namespace, uaid, 1, "")
 	if err != nil || segs == nil {

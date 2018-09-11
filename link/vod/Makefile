@@ -10,5 +10,6 @@ test:
 	cd src/qiniu.com/models; go test
 	cd src/qiniu.com/m3u8; go test
 	cd src/qiniu.com/db; go test
+	cd src/qiniu.com/auth; go test
 style:
 	@$(QCHECKSTYLE) src

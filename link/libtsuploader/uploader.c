@@ -343,7 +343,7 @@ size_t getDataCallback(void* buffer, size_t size, size_t n, void* rptr)
                         if (pUploader->nLastFrameTimestamp - pUploader->nFirstFrameTimestamp > 0) {
                                 return 0;
                         }
-                        logerror("pop from queue timeout");
+                        logerror("first pop from queue timeout:%d", nPopLen);
 		}
                 return CURL_READFUNC_ABORT;
         }
@@ -361,8 +361,12 @@ size_t getDataCallback(void* buffer, size_t size, size_t n, void* rptr)
                 if (nTmp == 0)
                         break;
                 if (nTmp < 0) {
-		        if (nTmp == TK_TIMEOUT)
-                                logerror("pop from queue timeout");
+		        if (nTmp == TK_TIMEOUT) {
+                                if (pUploader->nLastFrameTimestamp - pUploader->nFirstFrameTimestamp > 0) {
+                                        return 0;
+                                }
+                                logerror("next pop from queue timeout:%d", nTmp);
+                        }
                         return CURL_READFUNC_ABORT;
                 }
                 nPopLen += nTmp;

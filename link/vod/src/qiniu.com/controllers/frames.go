@@ -42,14 +42,6 @@ func GetFrames(c *gin.Context) {
 		return
 	}
 
-	if ok, err := VerifyAuth(xl, c.Request); err != nil || ok != true {
-		xl.Errorf("verify auth failed %#v", err)
-		c.JSON(401, gin.H{
-			"error": "bad token",
-		})
-		return
-	}
-
 	xl.Infof("uid= %v, uaid = %v, from = %v, to = %v, namespace = %v", params.uid, params.uaid, params.from, params.to, params.namespace)
 
 	frames, err := SegMod.GetFrameInfo(xl, params.from, params.to, params.namespace, params.uaid)
@@ -66,6 +58,12 @@ func GetFrames(c *gin.Context) {
 	}
 
 	framesWithToken := make([]FrameInfo, 0, len(frames))
+	userInfo, err := getUserInfo(xl, c.Request)
+	if err != nil {
+		xl.Errorf("get userInfo error error %#v", err)
+		c.JSON(500, nil)
+		return
+	}
 	for _, v := range frames {
 		filename, ok := v[models.SEGMENT_ITEM_FILE_NAME].(string)
 		if !ok {
@@ -73,7 +71,7 @@ func GetFrames(c *gin.Context) {
 			c.JSON(500, nil)
 			return
 		}
-		realUrl := GetUrlWithDownLoadToken(xl, "http://pdwjeyj6v.bkt.clouddn.com/", filename, 0)
+		realUrl := GetUrlWithDownLoadToken(xl, "http://pdwjeyj6v.bkt.clouddn.com/", filename, 0, userInfo)
 		starttime, ok := v[models.SEGMENT_ITEM_START_TIME].(int64)
 		if !ok {
 			xl.Errorf("segment start format error %#v", v)

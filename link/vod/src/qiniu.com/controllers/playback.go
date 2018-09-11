@@ -38,8 +38,7 @@ func GetPlayBackm3u8(c *gin.Context) {
 		return
 	}
 
-	fullUrl := "http://" + c.Request.Host + c.Request.URL.String()
-	if !VerifyToken(xl, params.expire, params.token, fullUrl, params.uid) {
+	if !VerifyToken(xl, params.expire, params.token, c.Request) {
 		xl.Errorf("verify token falied")
 		c.JSON(401, gin.H{
 			"error": "bad token",
@@ -55,6 +54,13 @@ func GetPlayBackm3u8(c *gin.Context) {
 		})
 		return
 	}
+	userInfo, err := getUserInfo(xl, c.Request)
+	if err != nil {
+		xl.Errorf("get user Info failed%v", err)
+		c.JSON(500, nil)
+		return
+	}
+
 	segs, _, err := SegMod.GetSegmentTsInfo(xl, params.from, params.to, params.namespace, params.uaid, 0, "")
 	if err != nil {
 		xl.Errorf("getTsInfo error, error =  %#v", err)
@@ -92,7 +98,7 @@ func GetPlayBackm3u8(c *gin.Context) {
 			c.JSON(500, nil)
 			return
 		}
-		realUrl := GetUrlWithDownLoadToken(xl, "http://pdwjeyj6v.bkt.clouddn.com/", filename, total)
+		realUrl := GetUrlWithDownLoadToken(xl, "http://pdwjeyj6v.bkt.clouddn.com/", filename, total, userInfo)
 
 		m := map[string]interface{}{
 			"duration": duration,
