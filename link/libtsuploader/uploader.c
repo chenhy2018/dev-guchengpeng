@@ -100,7 +100,7 @@ int timeoutCallback(void *clientp, curl_off_t dltotal, curl_off_t dlnow, curl_of
                                 logerror("half accumulate upload timeout:%d", pUploader->nLowSpeedCnt); 
                                 return -1;
                         }
-                        pUploader->nLowSpeedCnt == 2;
+                        pUploader->nLowSpeedCnt = 2;
 
                 }
                 pUploader->nLastUlnow = ulnow;
