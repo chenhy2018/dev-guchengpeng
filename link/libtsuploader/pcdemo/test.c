@@ -17,6 +17,8 @@ typedef struct {
 	bool IsTestTimestampRollover;
 	bool IsTestH265;
 	bool IsLocalToken;;
+        bool IsNoAudio;
+        bool IsNoVideo;
 	int nSleeptime;
 	int nBeforSleepDuration;;
 	int64_t nRolloverTestBase;;
@@ -249,8 +251,10 @@ int start_file_test(char * _pAudioFile, char * _pVideoFile, DataCallback callbac
         int isAAC = 0;
         int hasWaitTimeout = 0;
         int64_t aacFrameCount = 0;
-        if (memcmp(_pAudioFile + strlen(_pAudioFile) - 3, "aac", 3) == 0)
-                isAAC = 1;
+        if (bAudioOk) {
+                if (cmdArg.IsTestAAC)
+                        isAAC = 1;
+        }
         while (bAudioOk || bVideoOk) {
                 if (bVideoOk && nNow+1 > nNextVideoTime) {
                         
@@ -584,6 +588,10 @@ static void checkCmdArg(const char * name)
                 logerror("sleep time is milliseond. should great than 1000");
                 exit(4);
 	}
+        if (cmdArg.IsNoAudio && cmdArg.IsNoVideo) {
+                logerror("no audio and video");
+                exit(5);
+        }
         return;
 }
 
@@ -595,6 +603,8 @@ int main(int argc, const char** argv)
 	flag_bool(&cmdArg.IsTestTimestampRollover, "rollover", "will set start pts to 95437000. ts will roll over about 6.x second laetr.only effect for not input from ffmpeg");
 	flag_bool(&cmdArg.IsTestH265, "testh265", "input h264 video");
 	flag_bool(&cmdArg.IsLocalToken, "localtoken", "use kodo server mode");
+	flag_bool(&cmdArg.IsNoAudio, "na", "no audio");
+	flag_bool(&cmdArg.IsNoVideo, "nv", "no video(not support now)");
         flag_int(&cmdArg.nBeforSleepDuration, "bsd", "input go to sleep(milli) after bsd second");
         flag_int(&cmdArg.nSleeptime, "sleeptime", "sleep time(milli) after bsd time");
         flag_parse(argc, argv, VERSION);
@@ -660,20 +670,24 @@ int main(int argc, const char** argv)
         printf("token:%s\n", gtestToken);
         
         avArg.nChannels = 1;
-        if(cmdArg.IsTestAAC) {
-                avArg.nAudioFormat = TK_AUDIO_AAC;
-                avArg.nSamplerate = 16000;
-        } else {
-                avArg.nAudioFormat = TK_AUDIO_PCMU;
-                avArg.nSamplerate = 8000;
+        if (!cmdArg.IsNoAudio) {
+                if(cmdArg.IsTestAAC) {
+                        avArg.nAudioFormat = TK_AUDIO_AAC;
+                        avArg.nSamplerate = 16000;
+                } else {
+                        avArg.nAudioFormat = TK_AUDIO_PCMU;
+                        avArg.nSamplerate = 8000;
+                }
         }
-        if(cmdArg.IsTestH265) {
-                avArg.nVideoFormat = TK_VIDEO_H265;
-	} else {
-                avArg.nVideoFormat = TK_VIDEO_H264;
+        if (!cmdArg.IsNoVideo) {
+                if(cmdArg.IsTestH265) {
+                        avArg.nVideoFormat = TK_VIDEO_H265;
+                } else {
+                        avArg.nVideoFormat = TK_VIDEO_H264;
+                }
         }
-
-        /*
+         
+                /*
         //token过期测试
         memset(gtestToken, 0, sizeof(gtestToken));
         strcpy(gtestToken, "JAwTPb8dmrbiwt89Eaxa4VsL4_xSIYJoJh4rQfOQ:5Zq-f4f4ItNZsb7Isbl9CkwmN50=:eyJzY29wZSI6ImlwY2FtZXJhIiwiZGVhZGxpbmUiOjE1MzQ3NzExMzksImNhbGxiYWNrVXJsIjoiaHR0cDovLzM5LjEwNy4yNDcuMTQ6ODA4OC9xaW5pdS91cGxvYWQvY2FsbGJhY2siLCJjYWxsYmFja0JvZHkiOiJ7XCJrZXlcIjpcIiQoa2V5KVwiLFwiaGFzaFwiOlwiJChldGFnKVwiLFwiZnNpemVcIjokKGZzaXplKSxcImJ1Y2tldFwiOlwiJChidWNrZXQpXCIsXCJuYW1lXCI6XCIkKHg6bmFtZSlcIiwgXCJkdXJhdGlvblwiOlwiJChhdmluZm8uZm9ybWF0LmR1cmF0aW9uKVwifSIsImNhbGxiYWNrQm9keVR5cGUiOiJhcHBsaWNhdGlvbi9qc29uIiwiZGVsZXRlQWZ0ZXJEYXlzIjo3fQ==");
@@ -711,6 +725,10 @@ int main(int argc, const char** argv)
                 pVFile = "/liuye/Documents/material/h265_aac_1_16000_h264.h264";
         }
 #endif
+        if (cmdArg.IsNoAudio)
+                pAFile = NULL;
+        if (cmdArg.IsNoVideo)
+                pVFile = NULL;
 
         if (cmdArg.IsInputFromFFmpeg) {
                 start_ffmpeg_test("rtmp://localhost:1935/live/movie", dataCallback, NULL);
