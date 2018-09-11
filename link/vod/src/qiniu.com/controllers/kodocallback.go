@@ -32,14 +32,6 @@ func UploadTs(c *gin.Context) {
 	xl := xlog.New(c.Writer, c.Request)
 
 	c.Header("Content-Type", "application/json")
-	if ok, err := VerifyAuth(xl, c.Request); err != nil || ok != true {
-		xl.Errorf("verify auth failed %#v", err)
-		c.JSON(401, gin.H{
-			"error": "verify auth failed",
-		})
-		return
-	}
-
 	body, err := ioutil.ReadAll(c.Request.Body)
 	if err != nil {
 		xl.Errorf("parse request body failed, body = %#v", body)
@@ -101,7 +93,13 @@ func UploadTs(c *gin.Context) {
 	newFilName := append(ids[:3], append([]string{strconv.FormatInt(endTime, 10)}, ids[3:]...)...)
 	xl.Infof("oldFileName = %v, newFileName = %v", kodoData.Key, strings.Join(newFilName[:], "/"))
 
-	mac := qbox.NewMac(accessKey, secretKey)
+	userInfo, err := getUserInfo(xl, c.Request)
+	if err != nil {
+		xl.Errorf("get userinfo failed err = %#v", err)
+		c.JSON(500, nil)
+		return
+	}
+	mac := qbox.NewMac(userInfo.ak, userInfo.sk)
 	segPrefix := strings.Join([]string{"seg", ids[1], ids[3]}, "/")
 	if err := updateTsName(xl, key, strings.Join(newFilName[:], "/"), kodoData.Bucket, segPrefix, endTime, int(tsExpire), mac); err != nil {
 		xl.Errorf("ts filename update failed err = %#v", err)
