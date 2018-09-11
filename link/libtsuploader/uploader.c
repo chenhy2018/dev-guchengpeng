@@ -27,6 +27,7 @@ enum WaitFirstFlag {
         WF_QUIT,
 };
 
+static int gnCount = 1;
 typedef struct _KodoUploader{
         TsUploader uploader;
 #ifdef TK_STREAM_UPLOAD
@@ -49,9 +50,64 @@ typedef struct _KodoUploader{
         int64_t nLastFrameTimestamp;
         UploadState state;
         
+        curl_off_t nLastUlnow;
+        int64_t nUlnowRecTime;
+        int nLowSpeedCnt;
+        int nIsFinished;
+	int64_t nCount;
+        
         pthread_mutex_t waitFirstMutex_;
         enum WaitFirstFlag nWaitFirstMutexLocked_;
 }KodoUploader;
+
+static struct timespec tmResolution;
+int timeoutCallback(void *clientp, curl_off_t dltotal, curl_off_t dlnow, curl_off_t ultotal, curl_off_t ulnow)
+{
+        if (ulnow == 0) {
+                return 0;
+        }
+        
+        if (tmResolution.tv_nsec == 0) {
+                clock_getres(CLOCK_MONOTONIC, &tmResolution);
+        }
+        struct timespec tp;
+        clock_gettime(CLOCK_MONOTONIC, &tp);
+        int64_t nNow = (int64_t)(tp.tv_sec * 1000000000ll + tp.tv_nsec / tmResolution.tv_nsec);
+        
+        KodoUploader * pUploader = (KodoUploader *)clientp;
+        if (pUploader->nUlnowRecTime == 0) {
+                pUploader->nLastUlnow = ulnow;
+                pUploader->nUlnowRecTime = nNow;
+                return 0;
+        }
+        
+        int nDiff = (int)((nNow - pUploader->nUlnowRecTime) / 1000000000);
+        if (nDiff > 0) {
+                //printf("(%d)%d,==========dltotal:%lld dlnow:%lld ultotal:%lld ulnow-reculnow=%lld, now - lastrectime=%lld\n",
+                //       pUploader->nCount, pUploader->nLowSpeedCnt, dltotal, dlnow, ultotal, ulnow - pUploader->nLastUlnow, (nNow - pUploader->nUlnowRecTime)/1000000);
+                if ((ulnow - pUploader->nLastUlnow) / nDiff < 1024) { //} && !pUploader->nIsFinished) {
+                        pUploader->nLowSpeedCnt += nDiff;
+                        if (pUploader->nLowSpeedCnt >= 3) {
+                                logerror("accumulate upload timeout:%d", pUploader->nLowSpeedCnt); 
+                                return -1;
+                        }
+                }
+                if (nDiff >= 10) {
+                        logerror("upload timeout directly:%d", nDiff); 
+                        return -1;
+                } else if (nDiff >= 5) {
+                        if (pUploader->nLowSpeedCnt >= 1) {
+                                logerror("half accumulate upload timeout:%d", pUploader->nLowSpeedCnt); 
+                                return -1;
+                        }
+                        pUploader->nLowSpeedCnt == 2;
+
+                }
+                pUploader->nLastUlnow = ulnow;
+                pUploader->nUlnowRecTime = nNow;
+        }
+        return 0;
+}
 
 static void setSegmentId(TsUploader* _pUploader, int64_t _nId)
 {
@@ -179,8 +235,6 @@ static void * streamUpload(void *_pOpaque)
         //putExtra.upHost="http://nbxs-gate-up.qiniu.com";
         
         char key[128] = {0};
-        client.lowSpeedLimit = 3000;
-        client.lowSpeedTime = 3;
         
         //todo wait for first packet
         if (pUploader->nWaitFirstMutexLocked_ == WF_LOCKED) {
@@ -232,6 +286,8 @@ static void * streamUpload(void *_pOpaque)
         sprintf(key, "ts/%s/%lld/%lld/%d.ts", gDeviceId,
                 curTime / 1000000, nSegmentId / 1000000, pUploader->deleteAfterDays_);
 #ifdef TK_STREAM_UPLOAD
+        client.xferinfoData = _pOpaque;
+        client.xferinfoCb = timeoutCallback;
         Qiniu_Error error = Qiniu_Io_PutStream(&client, &putRet, uptoken, key, pUploader, -1, getDataCallback, &putExtra);
 #else
         Qiniu_Error error = Qiniu_Io_PutBuffer(&client, &putRet, uptoken, key, (const char*)pUploader->pTsData,
@@ -283,6 +339,12 @@ size_t getDataCallback(void* buffer, size_t size, size_t n, void* rptr)
         int nPopLen = 0;
         nPopLen = pUploader->pQueue_->Pop(pUploader->pQueue_, buffer, size * n);
         if (nPopLen < 0) {
+		if (nPopLen == TK_TIMEOUT) {
+                        if (pUploader->nLastFrameTimestamp - pUploader->nFirstFrameTimestamp > 0) {
+                                return 0;
+                        }
+                        logerror("first pop from queue timeout:%d", nPopLen);
+		}
                 return CURL_READFUNC_ABORT;
         }
         if (nPopLen == 0) {
@@ -299,10 +361,21 @@ size_t getDataCallback(void* buffer, size_t size, size_t n, void* rptr)
                 if (nTmp == 0)
                         break;
                 if (nTmp < 0) {
+		        if (nTmp == TK_TIMEOUT) {
+                                if (pUploader->nLastFrameTimestamp - pUploader->nFirstFrameTimestamp > 0) {
+                                        return 0;
+                                }
+                                logerror("next pop from queue timeout:%d", nTmp);
+                        }
                         return CURL_READFUNC_ABORT;
                 }
                 nPopLen += nTmp;
         }
+        UploaderStatInfo info;
+        pUploader->pQueue_->GetStatInfo(rptr, &info);
+        //if (!info.nIsReadOnly) {
+        //        pUploader->nIsFinished = 1;
+        //}
         return nPopLen;
 }
 
@@ -460,6 +533,7 @@ int NewUploader(TsUploader ** _pUploader, enum CircleQueuePolicy _policy, int _n
         pKodoUploader->uploader.SetSegmentId = setSegmentId;
         pKodoUploader->uploader.RecordTimestamp = recordTimestamp;
         pKodoUploader->uploader.GetUploaderState = getUploaderState;
+	pKodoUploader->nCount = gnCount++;
         
         *_pUploader = (TsUploader*)pKodoUploader;
         

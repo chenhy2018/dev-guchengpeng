@@ -284,6 +284,8 @@ void Qiniu_Client_InitEx(Qiniu_Client *self, Qiniu_Auth auth, size_t bufSize) {
 
     self->lowSpeedLimit = 0;
     self->lowSpeedTime = 0;
+    self->xferinfoCb = NULL;
+    self->xferinfoData = NULL;
 }
 
 void Qiniu_Client_InitNoAuth(Qiniu_Client *self, size_t bufSize) {

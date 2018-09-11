@@ -11,6 +11,7 @@ export ARCH=$1
 export WITH_P2P="OFF"
 export WITH_OPENSSL="OFF"
 export WITH_FFMPEG="OFF"
+export WITH_PJSIP="OFF"
 
 prefix=
 if [ "$1" = "mstar" ];then
@@ -37,7 +38,10 @@ fi
 cmake .
 if ! make VERBOSE=1; then echo "build failed"; exit 1; fi
 
-if ! ./merge-lib.sh $1; then echo "merge lib failed"; exit 1; fi
+if [ "$WITH_PJSIP" = "ON" ];then
+    if ! ./merge-lib.sh $1; then echo "merge lib failed"; exit 1; fi
 
-cd link/libsdk/
-./test.sh $1
+    cd link/libsdk/
+    ./test.sh $1
+fi
+

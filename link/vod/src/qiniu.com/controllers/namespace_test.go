@@ -298,7 +298,7 @@ func TestAutoCreateUa(t *testing.T) {
 	c.Params = append(c.Params, param)
 	c.Request = req
 	RegisterNamespace(c)
-	check, _ := IsAutoCreateUa(xl, "link", "test1")
+	check, _, _ := IsAutoCreateUa(xl, "ipcamera")
 	assert.Equal(t, check, false, "they should be equal")
 	// bucket maybe already exit. so not check this response.
 	body = namespacebody{
@@ -317,6 +317,76 @@ func TestAutoCreateUa(t *testing.T) {
 	c.Params = append(c.Params, param)
 	c.Request = req
 	UpdateNamespace(c)
-	check, _ = IsAutoCreateUa(xl, "link", "test1")
+	check, _,  _ = IsAutoCreateUa(xl, "ipcamera")
 	assert.Equal(t, check, true, "they should be equal")
+        req, _ = http.NewRequest("Put", "/v1/namespaces/test1", nil)
+        recoder = httptest.NewRecorder()
+        c, _ = gin.CreateTestContext(recoder)
+        param = gin.Param{
+                Key:   "namespace",
+                Value: "test1",
+        }
+        c.Params = append(c.Params, param)
+        c.Request = req
+        DeleteNamespace(c)
+        assert.Equal(t, c.Writer.Status(), 200, "they should be equal")
+}
+
+func TestHandleUaControl(t *testing.T) {
+	initDb()
+        xl := xlog.NewDummy()
+	err := HandleUaControl(xl, "ipcamera", "test1")
+        assert.Equal(t, err.Error(), "can't find namespace", "they should be equal")
+
+        // bucket maybe already exist. so not check this response.
+        body := namespacebody{
+                Uid:       "link",
+                Bucket:    "ipcamera",
+                Namespace: "test1",
+        }
+
+        bodyBuffer, _ := json.Marshal(body)
+        bodyT := bytes.NewBuffer(bodyBuffer)
+        req, _ := http.NewRequest("POST", "/v1/namespaces/test1", bodyT)
+        c, _ := gin.CreateTestContext(httptest.NewRecorder())
+        param := gin.Param{
+                Key:   "namespace",
+                Value: "test1",
+        }
+        c.Params = append(c.Params, param)
+        c.Request = req
+        RegisterNamespace(c)
+        err = HandleUaControl(xl, "ipcamera", "test1a")
+
+        assert.Equal(t, err.Error(), "Can't find ua info", "they should be equal")
+        // bucket maybe already exit. so not check this response.
+        body = namespacebody{
+                Uid:          "link",
+                Bucket:       "ipcamera",
+                Namespace:    "test1",
+                AutoCreateUa: true,
+        }
+
+        bodyBuffer, _ = json.Marshal(body)
+        bodyT = bytes.NewBuffer(bodyBuffer)
+
+        req, _ = http.NewRequest("Put", "/v1/namespaces/test1", bodyT)
+        recoder := httptest.NewRecorder()
+        c, _ = gin.CreateTestContext(recoder)
+        c.Params = append(c.Params, param)
+        c.Request = req
+        UpdateNamespace(c)
+	err = HandleUaControl(xl, "ipcamera", "test1a")
+        assert.Equal(t, err, nil, "they should be equal")
+
+        req, _ = http.NewRequest("Delete", "/v1/namespaces/test1", nil)
+        recoder = httptest.NewRecorder()
+        c, _ = gin.CreateTestContext(recoder)
+        param = gin.Param{
+                Key:   "namespace",
+                Value: "test1",
+        }
+        c.Params = append(c.Params, param)
+        c.Request = req
+        DeleteNamespace(c)
 }

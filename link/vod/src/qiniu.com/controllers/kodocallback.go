@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"net/http"
 	"strconv"
 	"strings"
 
@@ -40,10 +41,12 @@ func UploadTs(c *gin.Context) {
 		})
 		return
 	}
+
 	xl.Infof("%s", body)
 	var kodoData kodoCallBack
 	err = json.Unmarshal(body, &kodoData)
 	xl.Infof("%#v", kodoData)
+
 	key := kodoData.Key
 	ids := strings.Split(key, "/")
 	// key  =  ts/ua_id/start_ts/fragment_start_ts/expiry.ts
@@ -55,65 +58,24 @@ func UploadTs(c *gin.Context) {
 		return
 
 	}
-	startTime, err := strconv.ParseInt(ids[2], 10, 64)
-	if err != nil {
-		xl.Errorf("parse ts file name failed, filename = %#v", ids[2])
-		c.JSON(500, gin.H{
-			"error": "parse ts file name failed",
-		})
-		return
-	}
-	duration, err := strconv.ParseFloat(kodoData.Duration, 64)
-	if err != nil {
-		xl.Errorf("parse duration failed, duration = %#v", kodoData.Duration)
-		c.JSON(500, gin.H{
-			"error": "parse duration failed",
-		})
-		return
-	}
-	endTime := startTime + int64(duration*1000)
-	expire := strings.Split(ids[4], ".")
-	if len(expire) != 2 {
-		xl.Errorf("bad file name, expire = %#v", key)
-		c.JSON(500, gin.H{
-			"error": "parse expire failed",
-		})
-		return
-	}
-	tsExpire, err := strconv.ParseInt(expire[0], 10, 32)
 
-	if err != nil {
-		xl.Errorf("parse ts expire failed tsExpire = %#v", ids[4])
-		c.JSON(500, gin.H{
-			"error": "parse expire failed",
-		})
-		return
-	}
-	// key -->ts/ua_id/start_ts/endts/segment_start_ts/expiry.ts
-	newFilName := append(ids[:3], append([]string{strconv.FormatInt(endTime, 10)}, ids[3:]...)...)
-	xl.Infof("oldFileName = %v, newFileName = %v", kodoData.Key, strings.Join(newFilName[:], "/"))
+	/* Will be enable after namespace register.
+	           // Add namespace&ua check
+	           err = HandleUaControl(xl, kodoData.Bucket, ids[1])
+	           if err != nil {
+	   		xl.Errorf("error = %#v", err.Error())
+	                   c.JSON(400, gin.H{
+	   			"error": err.Error(),
+	                   })
+	   		return
+	   	}
+	*/
 
-	userInfo, err := getUserInfo(xl, c.Request)
+	err = HandleTs(xl, kodoData.Bucket, ids, kodoData, c.Request)
 	if err != nil {
-		xl.Errorf("get userinfo failed err = %#v", err)
-		c.JSON(500, nil)
-		return
-	}
-	mac := qbox.NewMac(userInfo.ak, userInfo.sk)
-	segPrefix := strings.Join([]string{"seg", ids[1], ids[3]}, "/")
-	if err := updateTsName(xl, key, strings.Join(newFilName[:], "/"), kodoData.Bucket, segPrefix, endTime, int(tsExpire), mac); err != nil {
-		xl.Errorf("ts filename update failed err = %#v", err)
+		xl.Errorf("error = %#v", err.Error())
 		c.JSON(500, gin.H{
-			"error": "update ts file name failed",
-		})
-		return
-	}
-
-	jpegName := strings.Join([]string{"frame", ids[1], ids[2], ids[3]}, "/")
-	if err = fop(strings.Join(newFilName[:], "/"), kodoData.Bucket, jpegName+".jpeg", mac); err != nil {
-		xl.Errorf("fop operation failed err = %#v", err)
-		c.JSON(500, gin.H{
-			"error": "fop failed failed",
+			"error": err.Error(),
 		})
 		return
 	}
@@ -121,6 +83,45 @@ func UploadTs(c *gin.Context) {
 		"success": true,
 		"name":    key,
 	})
+}
+
+func HandleTs(xl *xlog.Logger, bucket string, ids []string, kodoData kodoCallBack, req *http.Request) error {
+	startTime, err := strconv.ParseInt(ids[2], 10, 64)
+	if err != nil {
+		return fmt.Errorf("parse ts file name failed, filename = %#v", ids[2])
+	}
+	duration, err := strconv.ParseFloat(kodoData.Duration, 64)
+	if err != nil {
+		return fmt.Errorf("parse duration failed, duration = %#v", kodoData.Duration)
+	}
+	endTime := startTime + int64(duration*1000)
+	expire := strings.Split(ids[4], ".")
+	if len(expire) != 2 {
+		return fmt.Errorf("bad file name, expire = %#v", ids[4])
+	}
+	tsExpire, err := strconv.ParseInt(expire[0], 10, 32)
+
+	if err != nil {
+		return fmt.Errorf("parse ts expire failed tsExpire = %#v", ids[4])
+	}
+	// key -->ts/ua_id/start_ts/endts/segment_start_ts/expiry.ts
+	newFilName := append(ids[:3], append([]string{strconv.FormatInt(endTime, 10)}, ids[3:]...)...)
+	xl.Infof("oldFileName = %v, newFileName = %v", kodoData.Key, strings.Join(newFilName[:], "/"))
+
+	user, err := getUserInfo(xl, req)
+	if err != nil {
+		return fmt.Errorf("get user info falied, erro = %#v", err)
+	}
+	mac := qbox.NewMac(user.ak, user.sk)
+	segPrefix := strings.Join([]string{"seg", ids[1], ids[3]}, "/")
+	if err := updateTsName(xl, kodoData.Key, strings.Join(newFilName[:], "/"), bucket, segPrefix, endTime, int(tsExpire), mac); err != nil {
+		return fmt.Errorf("ts filename update failed err = %#v", err)
+	}
+	jpegName := strings.Join([]string{"frame", ids[1], ids[2], ids[3]}, "/")
+	if err = fop(strings.Join(newFilName[:], "/"), kodoData.Bucket, jpegName+".jpeg", mac); err != nil {
+		return fmt.Errorf("fop operation failed err = %#v", err)
+	}
+	return nil
 }
 
 func updateTsName(xl *xlog.Logger, srcTsKey, destTsKey, bucket, segPrefix string, endTime int64, expire int, mac *qbox.Mac) (err error) {

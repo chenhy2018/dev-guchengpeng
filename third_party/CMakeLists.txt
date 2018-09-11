@@ -14,31 +14,33 @@ endif()
 SET(PJ_PREFIX_PATH "${CMAKE_CURRENT_SOURCE_DIR}/pjproject-2.7.2/prefix/$ENV{ARCH}")
 include(ExternalProject)
 
+if ($ENV{WITH_PJSIP} STREQUAL "ON")
 if ($ENV{WITH_OPENSSL} STREQUAL "ON")
 ExternalProject_Add(pjsip
-        DEPENDS openssl-1.1.0h
-        SOURCE_DIR pjproject-2.7.2
-        CONFIGURE_COMMAND ./configure  --host=$ENV{HOST}  --with-ssl=${OPENSSL_PREFIX_PATH} --prefix=${PJ_PREFIX_PATH} --disable-sdl --disable-ffmpeg --disable-v4l2 --disable-openh264 --disable-libwebrtc --disable-sound --disable-oss --disable-video --disable-speex-aec --disable-g711-code --disable-l16-codec --disable-gsm-codec --disable-g722-codec --disable-g7221-codec --disable-speex-codec --disable-ilbc-codec --disable-bcg729 --disable-libyuv
-        BUILD_COMMAND make dep COMMAND make
-        INSTALL_COMMAND make install
-        BUILD_IN_SOURCE 1
-)
-else()
+		DEPENDS openssl-1.1.0h
+		SOURCE_DIR pjproject-2.7.2
+		CONFIGURE_COMMAND ./configure  --host=$ENV{HOST}  --with-ssl=${OPENSSL_PREFIX_PATH} --prefix=${PJ_PREFIX_PATH} --disable-sdl --disable-ffmpeg --disable-v4l2 --disable-openh264 --disable-libwebrtc --disable-sound --disable-oss --disable-video --disable-speex-aec --disable-g711-code --disable-l16-codec --disable-gsm-codec --disable-g722-codec --disable-g7221-codec --disable-speex-codec --disable-ilbc-codec --disable-bcg729 --disable-libyuv
+		BUILD_COMMAND make dep COMMAND make
+		INSTALL_COMMAND make install
+		BUILD_IN_SOURCE 1
+		)
+	else()
 add_definitions(-DPJMEDIA_HAS_SRTP=0)
-ExternalProject_Add(pjsip
-        SOURCE_DIR pjproject-2.7.2
-        CONFIGURE_COMMAND ./configure  --host=$ENV{HOST}  --prefix=${PJ_PREFIX_PATH} --disable-ssl --disable-sdl --disable-ffmpeg --disable-v4l2 --disable-openh264 --disable-libwebrtc --disable-sound --disable-oss --disable-video --disable-speex-aec --disable-g711-code --disable-l16-codec --disable-gsm-codec --disable-g722-codec --disable-g7221-codec --disable-speex-codec --disable-ilbc-codec --disable-bcg729 --disable-libyuv
-        BUILD_COMMAND make dep COMMAND make
-        INSTALL_COMMAND make install
-        BUILD_IN_SOURCE 1
-)
+	ExternalProject_Add(pjsip
+			SOURCE_DIR pjproject-2.7.2
+			CONFIGURE_COMMAND ./configure  --host=$ENV{HOST}  --prefix=${PJ_PREFIX_PATH} --disable-ssl --disable-sdl --disable-ffmpeg --disable-v4l2 --disable-openh264 --disable-libwebrtc --disable-sound --disable-oss --disable-video --disable-speex-aec --disable-g711-code --disable-l16-codec --disable-gsm-codec --disable-g722-codec --disable-g7221-codec --disable-speex-codec --disable-ilbc-codec --disable-bcg729 --disable-libyuv
+			BUILD_COMMAND make dep COMMAND make
+			INSTALL_COMMAND make install
+			BUILD_IN_SOURCE 1
+			)
+	endif()
 endif()
 
 SET(PJ_PREFIX_PATH "${CMAKE_CURRENT_SOURCE_DIR}/curl-7.61.0/prefix/$ENV{ARCH}")
 include(ExternalProject)
 ExternalProject_Add(curl-7.61.0
         SOURCE_DIR curl-7.61.0
-        CONFIGURE_COMMAND ./configure --enable-shared=no --without-zlib --without-libidn2 --disable-libtool-lock --enable-http --disable-ftp --disable-file --disable-ldap --disable-ldaps --disable-rtsp --disable-proxy --disable-dict --disable-telnet --disable-tftp --disable-pop3 --disable-imap --disable-smb --disable-smtp --disable-gopher --disable-manual --disable-libcurl-option --enable-ipv6 --disable-largefile --disable-sspi --disable-ntlm-wb --disable-unix-sockets --disable-cookies --disable-crypto-auth --disable-tls-srp --without-ssl 
+        CONFIGURE_COMMAND ./configure --enable-shared=no --without-zlib --without-libidn2 --disable-libtool-lock --enable-http --disable-ftp --disable-file --disable-ldap --disable-ldaps --disable-rtsp --disable-proxy --disable-dict --disable-telnet --disable-tftp --disable-pop3 --disable-imap --disable-smb --disable-smtp --disable-gopher --disable-manual --disable-libcurl-option --enable-ipv6 --disable-largefile --disable-sspi --disable-ntlm-wb --disable-unix-sockets --disable-cookies --disable-crypto-auth --disable-tls-srp --without-ssl  --host=$ENV{HOST}
         BUILD_COMMAND make
         BUILD_IN_SOURCE 1
 )
@@ -63,6 +65,7 @@ ExternalProject_Add(curl-7.61.0
 #        BUILD_IN_SOURCE 1
 #)
 
+if ($ENV{WITH_FFMPEG} STREQUAL "ON")
 include(ExternalProject)
 ExternalProject_Add(ffmpeg
         SOURCE_DIR ffmpeg-4.0
@@ -71,6 +74,7 @@ ExternalProject_Add(ffmpeg
         INSTALL_COMMAND ""
         BUILD_IN_SOURCE 1
 )
+endif()
 
 #include(ExternalProject)
 #ExternalProject_Add(librtmp

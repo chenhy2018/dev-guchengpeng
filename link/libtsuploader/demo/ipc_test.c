@@ -298,7 +298,7 @@ int AlarmCallback(ALARM_ENTRY alarm, void *pcontext)
 
     if ( alarm.code == ALARM_CODE_MOTION_DETECT ) {
         gMovingDetect = 1;
-    } else {
+    } else if ( alarm.code == ALARM_CODE_MOTION_DETECT_DISAPPEAR ) {
         gMovingDetect = 0;
     }
 
