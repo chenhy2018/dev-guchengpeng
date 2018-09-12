@@ -58,14 +58,14 @@ func GetPlayBackm3u8(c *gin.Context) {
 	userInfo, err := getUserInfo(xl, c.Request)
 	if err != nil {
 		xl.Errorf("get user Info failed%v", err)
-		c.JSON(500, nil)
+		c.JSON(500, gin.H{"error": "Service Internal Error"})
 		return
 	}
 
 	bucket, err := GetBucket(xl, userInfo.ak, params.namespace)
 	if err != nil {
 		xl.Errorf("get bucket error, error =  %#v", err)
-		c.JSON(500, nil)
+		c.JSON(500, gin.H{"error": "Service Internal Error"})
 		return
 	}
 
@@ -74,7 +74,7 @@ func GetPlayBackm3u8(c *gin.Context) {
 	segs, _, err := SegMod.GetSegmentTsInfo(xl, params.from, params.to, bucket, params.uaid, 0, "", mac)
 	if err != nil {
 		xl.Errorf("getTsInfo error, error =  %#v", err)
-		c.JSON(500, nil)
+		c.JSON(500, gin.H{"error": "Service Internal Error"})
 		return
 	}
 
@@ -90,13 +90,13 @@ func GetPlayBackm3u8(c *gin.Context) {
 		start, ok := v[models.SEGMENT_ITEM_START_TIME].(int64)
 		if !ok {
 			xl.Errorf("start time format error %#v", v)
-			c.JSON(500, nil)
+			c.JSON(500, gin.H{"error": "Service Internal Error"})
 			return
 		}
 		end, ok := v[models.SEGMENT_ITEM_END_TIME].(int64)
 		if !ok {
 			xl.Errorf("end time format error %#v", v)
-			c.JSON(500, nil)
+			c.JSON(500, gin.H{"error": "Service Internal Error"})
 			return
 		}
 		duration := float64(end-start) / 1000
@@ -105,7 +105,7 @@ func GetPlayBackm3u8(c *gin.Context) {
 
 		if !ok {
 			xl.Errorf("filename format error %#v", v)
-			c.JSON(500, nil)
+			c.JSON(500, gin.H{"error": "Service Internal Error"})
 			return
 		}
 		realUrl := GetUrlWithDownLoadToken(xl, "http://pdwjeyj6v.bkt.clouddn.com/", filename, total, userInfo)

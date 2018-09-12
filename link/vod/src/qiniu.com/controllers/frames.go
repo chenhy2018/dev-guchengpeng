@@ -48,14 +48,14 @@ func GetFrames(c *gin.Context) {
 	user, err := getUserInfo(xl, c.Request)
 	if err != nil {
 		xl.Errorf("get user info error, error = %v", err)
-		c.JSON(500, nil)
+		c.JSON(500, gin.H{"error": "Service Internal Error"})
 		return
 	}
 
 	bucket, err := GetBucket(xl, getUid(user.uid), params.namespace)
 	if err != nil {
 		xl.Errorf("get bucket error, error =  %#v", err)
-		c.JSON(500, nil)
+		c.JSON(500, gin.H{"error": "Service Internal Error"})
 		return
 	}
 	mac := qbox.NewMac(user.ak, user.sk)
@@ -63,7 +63,7 @@ func GetFrames(c *gin.Context) {
 	frames, err := SegMod.GetFrameInfo(xl, params.from, params.to, bucket, params.uaid, mac)
 	if err != nil {
 		xl.Errorf("get FrameInfo falied, error = %#v", err)
-		c.JSON(500, nil)
+		c.JSON(500, gin.H{"error": "Service Internal Error"})
 		return
 	}
 	if frames == nil {
@@ -77,21 +77,21 @@ func GetFrames(c *gin.Context) {
 	userInfo, err := getUserInfo(xl, c.Request)
 	if err != nil {
 		xl.Errorf("get userInfo error error %#v", err)
-		c.JSON(500, nil)
+		c.JSON(500, gin.H{"error": "Service Internal Error"})
 		return
 	}
 	for _, v := range frames {
 		filename, ok := v[models.SEGMENT_ITEM_FILE_NAME].(string)
 		if !ok {
 			xl.Errorf("filename format error %#v", v)
-			c.JSON(500, nil)
+			c.JSON(500, gin.H{"error": "Service Internal Error"})
 			return
 		}
 		realUrl := GetUrlWithDownLoadToken(xl, "http://pdwjeyj6v.bkt.clouddn.com/", filename, 0, userInfo)
 		starttime, ok := v[models.SEGMENT_ITEM_START_TIME].(int64)
 		if !ok {
 			xl.Errorf("segment start format error %#v", v)
-			c.JSON(500, nil)
+			c.JSON(500, gin.H{"error": "Service Internal Error"})
 			return
 		}
 		frame := FrameInfo{DownloadUr: realUrl,
