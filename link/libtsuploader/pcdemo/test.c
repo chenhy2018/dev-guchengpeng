@@ -530,11 +530,11 @@ static int dataCallback(void *opaque, void *pData, int nDataLen, int nFlag, int6
                         segStartCount++;
                 }
                 if (nIsKeyFrame && nVideoKeyframeAccLen != 0) {
-                        printf("nVideoKeyframeAccLen:%d\n", nVideoKeyframeAccLen);
+                        //printf("nVideoKeyframeAccLen:%d\n", nVideoKeyframeAccLen);
                         nVideoKeyframeAccLen = 0;
                 }
                 nVideoKeyframeAccLen += nDataLen;
-                printf("------->push video key:%d ts:%lld size:%d\n",nIsKeyFrame, timestamp, nDataLen);
+                //printf("------->push video key:%d ts:%lld size:%d\n",nIsKeyFrame, timestamp, nDataLen);
                 ret = PushVideo(pData, nDataLen, timestamp, nIsKeyFrame, nNewSegMent);
         }
         return ret;

@@ -19,6 +19,7 @@ size_t getDataCallback(void* buffer, size_t size, size_t n, void* rptr);
 static char gDeviceId[64];
 static int64_t nSegmentId;
 static int64_t nLastUploadTsTime;
+static int64_t nNewSegmentInterval = 10;
 
 enum WaitFirstFlag {
         WF_INIT,
@@ -251,7 +252,7 @@ static void * streamUpload(void *_pOpaque)
         // ts/uid/ua_id/yyyy/mm/dd/hh/mm/ss/mmm/fragment_start_ts/expiry.ts
         time_t secs = curTime / 1000000000;
 #ifndef MULTI_SEG_TEST
-        if ((curTime - nLastUploadTsTime) > 30 * 1000000000ll) {
+        if ((curTime - nLastUploadTsTime) > nNewSegmentInterval * 1000000000ll) {
 #else
         if (newSegCount % 10 == 0) {
                 if (newSegCount == 0)
@@ -574,4 +575,11 @@ int SetDeviceId(char *_pDeviceId)
         }
         
         return 0;
+}
+
+void SetNewSegmentInterval(int nInterval)
+{
+        if (nInterval > 0) {
+                nNewSegmentInterval = nInterval;
+        }
 }
