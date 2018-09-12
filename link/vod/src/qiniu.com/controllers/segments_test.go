@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"encoding/json"
+	"github.com/qiniu/api.v7/auth/qbox"
 	"io/ioutil"
 	"net/http"
 	"reflect"
@@ -32,12 +33,35 @@ func (suite *SegmentsTestSuite) TestFromEndInTwoSeg1() {
 	req, _ := http.NewRequest("GET", "/v1/namespaces/ipcamera/uas/testdeviceid8/segments?from=1532499325&to=1532499345", nil)
 	defer monkey.UnpatchAll()
 	monkey.PatchInstanceMethod(
-		reflect.TypeOf((*models.SegmentKodoModel)(nil)), "GetFragmentTsInfo", func(ss *models.SegmentKodoModel, xl *xlog.Logger, count int, starttime, endtime int64, bucketurl, uaid, mark string) ([]map[string]interface{}, string, error) {
+		reflect.TypeOf((*models.SegmentKodoModel)(nil)), "GetFragmentTsInfo", func(ss *models.SegmentKodoModel, xl *xlog.Logger, count int, starttime, endtime int64, bucketurl, uaid, mark string, mac *qbox.Mac) ([]map[string]interface{}, string, error) {
 			return nil, "", nil
 		})
 	monkey.Patch(getUserInfo, func(xl *xlog.Logger, req *http.Request) (*userInfo, error) {
 		return &userInfo{}, nil
 	})
+	monkey.PatchInstanceMethod(
+		reflect.TypeOf((*models.NamespaceModel)(nil)), "GetNamespaceInfo", func(ss *models.NamespaceModel, xl *xlog.Logger, uid, namespace string) ([]models.NamespaceInfo, error) {
+			info := []models.NamespaceInfo{}
+			item := models.NamespaceInfo{
+				Space:        "ipcamera",
+				Regtime:      111111,
+				UpdateTime:   3333333,
+				Bucket:       "ipcamera",
+				Uid:          "link",
+				Domain:       "www.baidu.com",
+				AutoCreateUa: true,
+			}
+			info = append(info, item)
+			return info, nil
+		})
+	monkey.PatchInstanceMethod(
+		reflect.TypeOf((*models.SegmentKodoModel)(nil)), "GetSegmentTsInfo", func(ss *models.SegmentKodoModel,
+			xl *xlog.Logger, starttime, endtime int64, bucketurl, uaid string, limit int, marker string, mac *qbox.Mac) ([]map[string]interface{}, string, error) {
+			rets := make([](map[string]interface{}), 0, 1)
+			item := map[string]interface{}{models.SEGMENT_ITEM_START_TIME: int64(1532499327000), models.SEGMENT_ITEM_END_TIME: int64(1532499331000), models.SEGMENT_ITEM_FRAGMENT_START_TIME: int64(1532499327000)}
+			rets = append(rets, item)
+			return rets, "", nil
+		})
 	w := PerformRequest(suite.r, req)
 	body, _ := ioutil.ReadAll(w.Body)
 	var segInfos segInfos
@@ -54,7 +78,7 @@ func (suite *SegmentsTestSuite) TestFromEndInTwoSeg2() {
 	req, _ := http.NewRequest("GET", "/v1/namespaces/ipcamera/uas/testdeviceid8/segments?from=1532499325&to=1532499345", nil)
 	defer monkey.UnpatchAll()
 	monkey.PatchInstanceMethod(
-		reflect.TypeOf((*models.SegmentKodoModel)(nil)), "GetFragmentTsInfo", func(ss *models.SegmentKodoModel, xl *xlog.Logger, count int, starttime, endtime int64, bucketurl, uaid, mark string) ([]map[string]interface{}, string, error) {
+		reflect.TypeOf((*models.SegmentKodoModel)(nil)), "GetFragmentTsInfo", func(ss *models.SegmentKodoModel, xl *xlog.Logger, count int, starttime, endtime int64, bucketurl, uaid, mark string, mac *qbox.Mac) ([]map[string]interface{}, string, error) {
 			rets := make([](map[string]interface{}), 0, 3)
 			item := map[string]interface{}{models.SEGMENT_ITEM_START_TIME: int64(1532499327000), models.SEGMENT_ITEM_END_TIME: int64(1532499331000)}
 			rets = append(rets, item)
@@ -69,6 +93,31 @@ func (suite *SegmentsTestSuite) TestFromEndInTwoSeg2() {
 	monkey.Patch(getUserInfo, func(xl *xlog.Logger, req *http.Request) (*userInfo, error) {
 		return &userInfo{}, nil
 	})
+
+	monkey.PatchInstanceMethod(
+		reflect.TypeOf((*models.NamespaceModel)(nil)), "GetNamespaceInfo", func(ss *models.NamespaceModel, xl *xlog.Logger, uid, namespace string) ([]models.NamespaceInfo, error) {
+			info := []models.NamespaceInfo{}
+			item := models.NamespaceInfo{
+				Space:        "ipcamera",
+				Regtime:      111111,
+				UpdateTime:   3333333,
+				Bucket:       "ipcamera",
+				Uid:          "link",
+				Domain:       "www.baidu.com",
+				AutoCreateUa: true,
+			}
+			info = append(info, item)
+			return info, nil
+		})
+	monkey.PatchInstanceMethod(
+		reflect.TypeOf((*models.SegmentKodoModel)(nil)), "GetSegmentTsInfo", func(ss *models.SegmentKodoModel,
+			xl *xlog.Logger, starttime, endtime int64, bucketurl, uaid string, limit int, marker string, mac *qbox.Mac) ([]map[string]interface{}, string, error) {
+			rets := make([](map[string]interface{}), 0, 1)
+			item := map[string]interface{}{models.SEGMENT_ITEM_START_TIME: int64(1532499327000), models.SEGMENT_ITEM_END_TIME: int64(1532499331000), models.SEGMENT_ITEM_FRAGMENT_START_TIME: int64(1532499327000)}
+			rets = append(rets, item)
+			return rets, "", nil
+		})
+
 	w := PerformRequest(suite.r, req)
 
 	body, _ := ioutil.ReadAll(w.Body)
@@ -91,7 +140,7 @@ func (suite *SegmentsTestSuite) TestFromEndInTwoSeg3() {
 	})
 	// hack models.SegMentKodomodel.GetFragmentTsInfo
 	monkey.PatchInstanceMethod(
-		reflect.TypeOf((*models.SegmentKodoModel)(nil)), "GetFragmentTsInfo", func(ss *models.SegmentKodoModel, xl *xlog.Logger, count int, starttime, endtime int64, bucketurl, uaid, mark string) ([]map[string]interface{}, string, error) {
+		reflect.TypeOf((*models.SegmentKodoModel)(nil)), "GetFragmentTsInfo", func(ss *models.SegmentKodoModel, xl *xlog.Logger, count int, starttime, endtime int64, bucketurl, uaid, mark string, mac *qbox.Mac) ([]map[string]interface{}, string, error) {
 			rets := make([](map[string]interface{}), 0, 3)
 			item := map[string]interface{}{models.SEGMENT_ITEM_START_TIME: int64(1532499322000), models.SEGMENT_ITEM_END_TIME: int64(1532499331000)}
 			rets = append(rets, item)
@@ -100,6 +149,29 @@ func (suite *SegmentsTestSuite) TestFromEndInTwoSeg3() {
 			rets = append(rets, item)
 
 			item = map[string]interface{}{models.SEGMENT_ITEM_START_TIME: int64(1532499339000), models.SEGMENT_ITEM_END_TIME: int64(1532499342000)}
+			rets = append(rets, item)
+			return rets, "", nil
+		})
+	monkey.PatchInstanceMethod(
+		reflect.TypeOf((*models.NamespaceModel)(nil)), "GetNamespaceInfo", func(ss *models.NamespaceModel, xl *xlog.Logger, uid, namespace string) ([]models.NamespaceInfo, error) {
+			info := []models.NamespaceInfo{}
+			item := models.NamespaceInfo{
+				Space:        "ipcamera",
+				Regtime:      111111,
+				UpdateTime:   3333333,
+				Bucket:       "ipcamera",
+				Uid:          "link",
+				Domain:       "www.baidu.com",
+				AutoCreateUa: true,
+			}
+			info = append(info, item)
+			return info, nil
+		})
+	monkey.PatchInstanceMethod(
+		reflect.TypeOf((*models.SegmentKodoModel)(nil)), "GetSegmentTsInfo", func(ss *models.SegmentKodoModel,
+			xl *xlog.Logger, starttime, endtime int64, bucketurl, uaid string, limit int, marker string, mac *qbox.Mac) ([]map[string]interface{}, string, error) {
+			rets := make([](map[string]interface{}), 0, 1)
+			item := map[string]interface{}{models.SEGMENT_ITEM_START_TIME: int64(1532499327000), models.SEGMENT_ITEM_END_TIME: int64(1532499331000), models.SEGMENT_ITEM_FRAGMENT_START_TIME: int64(1532499327000)}
 			rets = append(rets, item)
 			return rets, "", nil
 		})
@@ -134,7 +206,7 @@ func (suite *SegmentsTestSuite) TestFromEndInTwoSeg4() {
 	})
 	// hack models.SegMentKodomodel.GetFragmentTsInfo
 	monkey.PatchInstanceMethod(
-		reflect.TypeOf((*models.SegmentKodoModel)(nil)), "GetFragmentTsInfo", func(ss *models.SegmentKodoModel, xl *xlog.Logger, count int, starttime, endtime int64, bucketurl, uaid, mark string) ([]map[string]interface{}, string, error) {
+		reflect.TypeOf((*models.SegmentKodoModel)(nil)), "GetFragmentTsInfo", func(ss *models.SegmentKodoModel, xl *xlog.Logger, count int, starttime, endtime int64, bucketurl, uaid, mark string, mac *qbox.Mac) ([]map[string]interface{}, string, error) {
 			rets := make([](map[string]interface{}), 0, 3)
 			item := map[string]interface{}{models.SEGMENT_ITEM_START_TIME: int64(1532499327000), models.SEGMENT_ITEM_END_TIME: int64(1532499331000)}
 			rets = append(rets, item)
@@ -145,6 +217,29 @@ func (suite *SegmentsTestSuite) TestFromEndInTwoSeg4() {
 			return rets, "", nil
 		})
 
+	monkey.PatchInstanceMethod(
+		reflect.TypeOf((*models.SegmentKodoModel)(nil)), "GetSegmentTsInfo", func(ss *models.SegmentKodoModel,
+			xl *xlog.Logger, starttime, endtime int64, bucketurl, uaid string, limit int, marker string, mac *qbox.Mac) ([]map[string]interface{}, string, error) {
+			rets := make([](map[string]interface{}), 0, 1)
+			item := map[string]interface{}{models.SEGMENT_ITEM_START_TIME: int64(1532499327000), models.SEGMENT_ITEM_END_TIME: int64(1532499331000), models.SEGMENT_ITEM_FRAGMENT_START_TIME: int64(1532499327000)}
+			rets = append(rets, item)
+			return rets, "", nil
+		})
+	monkey.PatchInstanceMethod(
+		reflect.TypeOf((*models.NamespaceModel)(nil)), "GetNamespaceInfo", func(ss *models.NamespaceModel, xl *xlog.Logger, uid, namespace string) ([]models.NamespaceInfo, error) {
+			info := []models.NamespaceInfo{}
+			item := models.NamespaceInfo{
+				Space:        "ipcamera",
+				Regtime:      111111,
+				UpdateTime:   3333333,
+				Bucket:       "ipcamera",
+				Uid:          "link",
+				Domain:       "www.baidu.com",
+				AutoCreateUa: true,
+			}
+			info = append(info, item)
+			return info, nil
+		})
 	w := PerformRequest(suite.r, req)
 
 	body, _ := ioutil.ReadAll(w.Body)
@@ -169,7 +264,7 @@ func (suite *SegmentsTestSuite) TestFromEndInTwoSeg5() {
 
 	// hack models.SegMentKodomodel.GetFragmentTsInfo
 	monkey.PatchInstanceMethod(
-		reflect.TypeOf((*models.SegmentKodoModel)(nil)), "GetFragmentTsInfo", func(ss *models.SegmentKodoModel, xl *xlog.Logger, count int, starttime, endtime int64, bucketurl, uaid, mark string) ([]map[string]interface{}, string, error) {
+		reflect.TypeOf((*models.SegmentKodoModel)(nil)), "GetFragmentTsInfo", func(ss *models.SegmentKodoModel, xl *xlog.Logger, count int, starttime, endtime int64, bucketurl, uaid, mark string, mac *qbox.Mac) ([]map[string]interface{}, string, error) {
 			rets := make([](map[string]interface{}), 0, 3)
 
 			item := map[string]interface{}{models.SEGMENT_ITEM_START_TIME: int64(1532499332000), models.SEGMENT_ITEM_END_TIME: int64(1532499337000)}
@@ -178,6 +273,30 @@ func (suite *SegmentsTestSuite) TestFromEndInTwoSeg5() {
 			item = map[string]interface{}{models.SEGMENT_ITEM_START_TIME: int64(1532499339000), models.SEGMENT_ITEM_END_TIME: int64(1532499342000)}
 			rets = append(rets, item)
 			return rets, "", nil
+		})
+
+	monkey.PatchInstanceMethod(
+		reflect.TypeOf((*models.SegmentKodoModel)(nil)), "GetSegmentTsInfo", func(ss *models.SegmentKodoModel,
+			xl *xlog.Logger, starttime, endtime int64, bucketurl, uaid string, limit int, marker string, mac *qbox.Mac) ([]map[string]interface{}, string, error) {
+			rets := make([](map[string]interface{}), 0, 1)
+			item := map[string]interface{}{models.SEGMENT_ITEM_START_TIME: int64(1532499327000), models.SEGMENT_ITEM_END_TIME: int64(1532499331000), models.SEGMENT_ITEM_FRAGMENT_START_TIME: int64(1532499327000)}
+			rets = append(rets, item)
+			return rets, "", nil
+		})
+	monkey.PatchInstanceMethod(
+		reflect.TypeOf((*models.NamespaceModel)(nil)), "GetNamespaceInfo", func(ss *models.NamespaceModel, xl *xlog.Logger, uid, namespace string) ([]models.NamespaceInfo, error) {
+			info := []models.NamespaceInfo{}
+			item := models.NamespaceInfo{
+				Space:        "ipcamera",
+				Regtime:      111111,
+				UpdateTime:   3333333,
+				Bucket:       "ipcamera",
+				Uid:          "link",
+				Domain:       "www.baidu.com",
+				AutoCreateUa: true,
+			}
+			info = append(info, item)
+			return info, nil
 		})
 	monkey.Patch(getUserInfo, func(xl *xlog.Logger, req *http.Request) (*userInfo, error) {
 		return &userInfo{}, nil
@@ -205,7 +324,7 @@ func (suite *SegmentsTestSuite) TestFromEndInTwoSeg6() {
 
 	// hack models.SegMentKodomodel.GetFragmentTsInfo
 	monkey.PatchInstanceMethod(
-		reflect.TypeOf((*models.SegmentKodoModel)(nil)), "GetFragmentTsInfo", func(ss *models.SegmentKodoModel, xl *xlog.Logger, count int, starttime, endtime int64, bucketurl, uaid, mark string) ([]map[string]interface{}, string, error) {
+		reflect.TypeOf((*models.SegmentKodoModel)(nil)), "GetFragmentTsInfo", func(ss *models.SegmentKodoModel, xl *xlog.Logger, count int, starttime, endtime int64, bucketurl, uaid, mark string, mac *qbox.Mac) ([]map[string]interface{}, string, error) {
 			rets := make([](map[string]interface{}), 0, 3)
 			item := map[string]interface{}{models.SEGMENT_ITEM_START_TIME: int64(1532499327000), models.SEGMENT_ITEM_END_TIME: int64(1532499331000)}
 			rets = append(rets, item)
@@ -217,6 +336,30 @@ func (suite *SegmentsTestSuite) TestFromEndInTwoSeg6() {
 	monkey.Patch(getUserInfo, func(xl *xlog.Logger, req *http.Request) (*userInfo, error) {
 		return &userInfo{}, nil
 	})
+
+	monkey.PatchInstanceMethod(
+		reflect.TypeOf((*models.SegmentKodoModel)(nil)), "GetSegmentTsInfo", func(ss *models.SegmentKodoModel,
+			xl *xlog.Logger, starttime, endtime int64, bucketurl, uaid string, limit int, marker string, mac *qbox.Mac) ([]map[string]interface{}, string, error) {
+			rets := make([](map[string]interface{}), 0, 1)
+			item := map[string]interface{}{models.SEGMENT_ITEM_START_TIME: int64(1532499327000), models.SEGMENT_ITEM_END_TIME: int64(1532499331000), models.SEGMENT_ITEM_FRAGMENT_START_TIME: int64(1532499327000)}
+			rets = append(rets, item)
+			return rets, "", nil
+		})
+	monkey.PatchInstanceMethod(
+		reflect.TypeOf((*models.NamespaceModel)(nil)), "GetNamespaceInfo", func(ss *models.NamespaceModel, xl *xlog.Logger, uid, namespace string) ([]models.NamespaceInfo, error) {
+			info := []models.NamespaceInfo{}
+			item := models.NamespaceInfo{
+				Space:        "ipcamera",
+				Regtime:      111111,
+				UpdateTime:   3333333,
+				Bucket:       "ipcamera",
+				Uid:          "link",
+				Domain:       "www.baidu.com",
+				AutoCreateUa: true,
+			}
+			info = append(info, item)
+			return info, nil
+		})
 	w := PerformRequest(suite.r, req)
 
 	body, _ := ioutil.ReadAll(w.Body)
@@ -241,7 +384,7 @@ func (suite *SegmentsTestSuite) TestFromEndInTwoSeg7() {
 
 	// hack models.SegMentKodomodel.GetFragmentTsInfo
 	monkey.PatchInstanceMethod(
-		reflect.TypeOf((*models.SegmentKodoModel)(nil)), "GetFragmentTsInfo", func(ss *models.SegmentKodoModel, xl *xlog.Logger, count int, starttime, endtime int64, bucketurl, uaid, mark string) ([]map[string]interface{}, string, error) {
+		reflect.TypeOf((*models.SegmentKodoModel)(nil)), "GetFragmentTsInfo", func(ss *models.SegmentKodoModel, xl *xlog.Logger, count int, starttime, endtime int64, bucketurl, uaid, mark string, mac *qbox.Mac) ([]map[string]interface{}, string, error) {
 			rets := make([](map[string]interface{}), 0, 3)
 			item := map[string]interface{}{models.SEGMENT_ITEM_START_TIME: int64(1532499325000), models.SEGMENT_ITEM_END_TIME: int64(1532499331000)}
 			rets = append(rets, item)
@@ -250,6 +393,30 @@ func (suite *SegmentsTestSuite) TestFromEndInTwoSeg7() {
 	monkey.Patch(getUserInfo, func(xl *xlog.Logger, req *http.Request) (*userInfo, error) {
 		return &userInfo{}, nil
 	})
+
+	monkey.PatchInstanceMethod(
+		reflect.TypeOf((*models.SegmentKodoModel)(nil)), "GetSegmentTsInfo", func(ss *models.SegmentKodoModel,
+			xl *xlog.Logger, starttime, endtime int64, bucketurl, uaid string, limit int, marker string, mac *qbox.Mac) ([]map[string]interface{}, string, error) {
+			rets := make([](map[string]interface{}), 0, 1)
+			item := map[string]interface{}{models.SEGMENT_ITEM_START_TIME: int64(1532499327000), models.SEGMENT_ITEM_END_TIME: int64(1532499331000), models.SEGMENT_ITEM_FRAGMENT_START_TIME: int64(1532499327000)}
+			rets = append(rets, item)
+			return rets, "", nil
+		})
+	monkey.PatchInstanceMethod(
+		reflect.TypeOf((*models.NamespaceModel)(nil)), "GetNamespaceInfo", func(ss *models.NamespaceModel, xl *xlog.Logger, uid, namespace string) ([]models.NamespaceInfo, error) {
+			info := []models.NamespaceInfo{}
+			item := models.NamespaceInfo{
+				Space:        "ipcamera",
+				Regtime:      111111,
+				UpdateTime:   3333333,
+				Bucket:       "ipcamera",
+				Uid:          "link",
+				Domain:       "www.baidu.com",
+				AutoCreateUa: true,
+			}
+			info = append(info, item)
+			return info, nil
+		})
 	w := PerformRequest(suite.r, req)
 
 	body, _ := ioutil.ReadAll(w.Body)
@@ -271,7 +438,7 @@ func (suite *SegmentsTestSuite) TestFromEndInTwoSeg8() {
 
 	// hack models.SegMentKodomodel.GetFragmentTsInfo
 	monkey.PatchInstanceMethod(
-		reflect.TypeOf((*models.SegmentKodoModel)(nil)), "GetFragmentTsInfo", func(ss *models.SegmentKodoModel, xl *xlog.Logger, count int, starttime, endtime int64, bucketurl, uaid, mark string) ([]map[string]interface{}, string, error) {
+		reflect.TypeOf((*models.SegmentKodoModel)(nil)), "GetFragmentTsInfo", func(ss *models.SegmentKodoModel, xl *xlog.Logger, count int, starttime, endtime int64, bucketurl, uaid, mark string, mac *qbox.Mac) ([]map[string]interface{}, string, error) {
 			rets := make([](map[string]interface{}), 0, 3)
 			item := map[string]interface{}{models.SEGMENT_ITEM_START_TIME: int64(1532499327000), models.SEGMENT_ITEM_END_TIME: int64(1532499331000)}
 			rets = append(rets, item)
@@ -282,6 +449,29 @@ func (suite *SegmentsTestSuite) TestFromEndInTwoSeg8() {
 			item = map[string]interface{}{models.SEGMENT_ITEM_START_TIME: int64(1532499339000), models.SEGMENT_ITEM_END_TIME: int64(1532499342000)}
 			rets = append(rets, item)
 			return rets, "", nil
+		})
+	monkey.PatchInstanceMethod(
+		reflect.TypeOf((*models.SegmentKodoModel)(nil)), "GetSegmentTsInfo", func(ss *models.SegmentKodoModel,
+			xl *xlog.Logger, starttime, endtime int64, bucketurl, uaid string, limit int, marker string, mac *qbox.Mac) ([]map[string]interface{}, string, error) {
+			rets := make([](map[string]interface{}), 0, 1)
+			item := map[string]interface{}{models.SEGMENT_ITEM_START_TIME: int64(1532499327000), models.SEGMENT_ITEM_END_TIME: int64(1532499331000), models.SEGMENT_ITEM_FRAGMENT_START_TIME: int64(1532499327000)}
+			rets = append(rets, item)
+			return rets, "", nil
+		})
+	monkey.PatchInstanceMethod(
+		reflect.TypeOf((*models.NamespaceModel)(nil)), "GetNamespaceInfo", func(ss *models.NamespaceModel, xl *xlog.Logger, uid, namespace string) ([]models.NamespaceInfo, error) {
+			info := []models.NamespaceInfo{}
+			item := models.NamespaceInfo{
+				Space:        "ipcamera",
+				Regtime:      111111,
+				UpdateTime:   3333333,
+				Bucket:       "ipcamera",
+				Uid:          "link",
+				Domain:       "www.baidu.com",
+				AutoCreateUa: true,
+			}
+			info = append(info, item)
+			return info, nil
 		})
 	monkey.Patch(getUserInfo, func(xl *xlog.Logger, req *http.Request) (*userInfo, error) {
 		return &userInfo{}, nil

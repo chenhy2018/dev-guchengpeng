@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/qiniu/api.v7/auth/qbox"
 	xlog "github.com/qiniu/xlog.v1"
 	"qiniu.com/models"
 )
@@ -42,9 +43,24 @@ func GetFrames(c *gin.Context) {
 		return
 	}
 
-	xl.Infof("uid= %v, uaid = %v, from = %v, to = %v, namespace = %v", params.uid, params.uaid, params.from, params.to, params.namespace)
+	xl.Infof("uaid = %v, from = %v, to = %v, namespace = %v", params.uaid, params.from, params.to, params.namespace)
 
-	frames, err := SegMod.GetFrameInfo(xl, params.from, params.to, params.namespace, params.uaid)
+	user, err := getUserInfo(xl, c.Request)
+	if err != nil {
+		xl.Errorf("get user info error, error = %v", err)
+		c.JSON(500, nil)
+		return
+	}
+
+	bucket, err := GetBucket(xl, getUid(user.uid), params.namespace)
+	if err != nil {
+		xl.Errorf("get bucket error, error =  %#v", err)
+		c.JSON(500, nil)
+		return
+	}
+	mac := qbox.NewMac(user.ak, user.sk)
+
+	frames, err := SegMod.GetFrameInfo(xl, params.from, params.to, bucket, params.uaid, mac)
 	if err != nil {
 		xl.Errorf("get FrameInfo falied, error = %#v", err)
 		c.JSON(500, nil)

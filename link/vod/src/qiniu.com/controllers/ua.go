@@ -85,15 +85,21 @@ func RegisterUa(c *gin.Context) {
 		})
 		return
 	}
+	user, err := getUserInfo(xl, c.Request)
+	if err != nil {
+		c.JSON(403, gin.H{
+			"error": "get user info falied",
+		})
+	}
 
 	ua := models.UaInfo{
-		Uid:       params.uid,
+		Uid:       getUid(user.uid),
 		UaId:      uaData.Uaid,
 		Namespace: params.namespace,
 		Password:  uaData.Password,
 	}
 	model := models.NamespaceModel{}
-	r, err := model.GetNamespaceInfo(xl, params.uid, params.namespace)
+	r, err := model.GetNamespaceInfo(xl, getUid(user.uid), params.namespace)
 	if err != nil || len(r) == 0 {
 		xl.Errorf("namespace is not correct")
 		c.JSON(400, gin.H{
@@ -161,7 +167,7 @@ func UpdateUa(c *gin.Context) {
 	body, err := ioutil.ReadAll(c.Request.Body)
 	var uaData uabody
 	err = json.Unmarshal(body, &uaData)
-	if err != nil || uaData.Uid == "" || uaData.Uaid == "" || uaData.Namespace == "" {
+	if err != nil || uaData.Uaid == "" || uaData.Namespace == "" {
 		xl.Errorf("parse request body failed, body = %#v", body)
 		c.JSON(400, gin.H{
 			"error": "read callback body failed",
@@ -169,15 +175,22 @@ func UpdateUa(c *gin.Context) {
 		return
 	}
 
+	user, err := getUserInfo(xl, c.Request)
+	if err != nil {
+		c.JSON(403, gin.H{
+			"error": "get user info falied",
+		})
+	}
+
 	ua := models.UaInfo{
-		Uid:       uaData.Uid,
+		Uid:       getUid(user.uid),
 		UaId:      uaData.Uaid,
 		Namespace: uaData.Namespace,
 		Password:  uaData.Password,
 	}
 
 	model := models.NamespaceModel{}
-	r, err := model.GetNamespaceInfo(xl, uaData.Uid, uaData.Namespace)
+	r, err := model.GetNamespaceInfo(xl, getUid(user.uid), uaData.Namespace)
 	if err != nil || len(r) == 0 {
 		xl.Errorf("namespace is not correct")
 		c.JSON(400, gin.H{

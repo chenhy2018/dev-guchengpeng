@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/qiniu/api.v7/auth/qbox"
 	xlog "github.com/qiniu/xlog.v1"
 	"qiniu.com/m3u8"
 	"qiniu.com/models"
@@ -45,7 +46,7 @@ func GetPlayBackm3u8(c *gin.Context) {
 		})
 		return
 	}
-	xl.Infof("uid= %v, uaid = %v, from = %v, to = %v, namespace = %v", params.uid, params.uaid, params.from, params.to, params.namespace)
+	xl.Infof("uaid = %v, from = %v, to = %v, namespace = %v", params.uaid, params.from, params.to, params.namespace)
 	dayInMilliSec := int64((24 * time.Hour).Seconds() * 1000)
 	if (params.to - params.from) > dayInMilliSec {
 		xl.Errorf("bad from/to time, from = %v, to = %v", params.from, params.to)
@@ -61,7 +62,16 @@ func GetPlayBackm3u8(c *gin.Context) {
 		return
 	}
 
-	segs, _, err := SegMod.GetSegmentTsInfo(xl, params.from, params.to, params.namespace, params.uaid, 0, "")
+	bucket, err := GetBucket(xl, userInfo.ak, params.namespace)
+	if err != nil {
+		xl.Errorf("get bucket error, error =  %#v", err)
+		c.JSON(500, nil)
+		return
+	}
+
+	mac := qbox.NewMac(userInfo.ak, userInfo.sk)
+
+	segs, _, err := SegMod.GetSegmentTsInfo(xl, params.from, params.to, bucket, params.uaid, 0, "", mac)
 	if err != nil {
 		xl.Errorf("getTsInfo error, error =  %#v", err)
 		c.JSON(500, nil)
