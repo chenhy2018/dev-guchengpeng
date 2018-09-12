@@ -19,7 +19,7 @@ size_t getDataCallback(void* buffer, size_t size, size_t n, void* rptr);
 static char gDeviceId[64];
 static int64_t nSegmentId;
 static int64_t nLastUploadTsTime;
-static int64_t nNewSegmentInterval = 10;
+static int64_t nNewSegmentInterval = 30;
 
 enum WaitFirstFlag {
         WF_INIT,
