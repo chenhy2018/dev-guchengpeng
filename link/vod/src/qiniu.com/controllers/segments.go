@@ -2,11 +2,10 @@ package controllers
 
 import (
 	"errors"
-	"fmt"
-	"net/http/httputil"
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/qiniu/api.v7/auth/qbox"
 	xlog "github.com/qiniu/xlog.v1"
 	"qiniu.com/models"
 )
@@ -17,13 +16,6 @@ type segInfo struct {
 }
 
 func GetSegments(c *gin.Context) {
-
-	requestDump, err := httputil.DumpRequest(c.Request, true)
-	if err != nil {
-		fmt.Println(err)
-
-	}
-	fmt.Println(string(requestDump))
 
 	xl := xlog.New(c.Writer, c.Request)
 	params, err := ParseRequest(c, xl)
@@ -51,18 +43,25 @@ func GetSegments(c *gin.Context) {
 		})
 		return
 	}
-	if ok, err := VerifyAuth(xl, c.Request); err != nil || ok != true {
-		xl.Errorf("verify auth failed %#v", err)
-		c.JSON(401, gin.H{
-			"error": "bad token",
-		})
+
+	xl.Infof("deviceid = %v, from = %v, to = %v, limit = %v, marker = %v, namespace = %v", params.uaid, params.from, params.to, params.limit, params.marker, params.namespace)
+
+	user, err := getUserInfo(xl, c.Request)
+	if err != nil {
+		xl.Errorf("get user info error, error = %v", err)
+		c.JSON(500, nil)
 		return
 	}
 
-	xl.Infof("uid= %v, deviceid = %v, from = %v, to = %v, limit = %v, marker = %v, namespace = %v", params.uid, params.uaid, params.from, params.to, params.limit, params.marker, params.namespace)
-
-	newFrom := getFristTsAfterFrom(xl, params.from, params.to, params.namespace, params.uaid)
-	ret, marker, err := SegMod.GetFragmentTsInfo(xl, params.limit, newFrom, params.to, params.namespace, params.uaid, params.marker)
+	bucket, err := GetBucket(xl, getUid(user.uid), params.namespace)
+	if err != nil {
+		xl.Errorf("get bucket error, error =  %#v", err)
+		c.JSON(500, nil)
+		return
+	}
+	mac := qbox.NewMac(user.ak, user.sk)
+	newFrom := getFristTsAfterFrom(xl, params.from, params.to, bucket, params.uaid, mac)
+	ret, marker, err := SegMod.GetFragmentTsInfo(xl, params.limit, newFrom, params.to, bucket, params.uaid, params.marker, mac)
 	if err != nil {
 		xl.Errorf("get segments list error, error =%#v", err)
 		c.JSON(500, nil)
@@ -91,9 +90,9 @@ func GetSegments(c *gin.Context) {
 	})
 
 }
-func getFristTsAfterFrom(xl *xlog.Logger, from, to int64, namespace, uaid string) int64 {
+func getFristTsAfterFrom(xl *xlog.Logger, from, to int64, bucket, uaid string, mac *qbox.Mac) int64 {
 
-	segs, _, err := SegMod.GetSegmentTsInfo(xl, from, to, namespace, uaid, 1, "")
+	segs, _, err := SegMod.GetSegmentTsInfo(xl, from, to, bucket, uaid, 1, "", mac)
 	if err != nil || segs == nil {
 		return from
 	}

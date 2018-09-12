@@ -17,8 +17,11 @@ typedef struct {
 	bool IsTestTimestampRollover;
 	bool IsTestH265;
 	bool IsLocalToken;;
+        bool IsNoAudio;
+        bool IsNoVideo;
+        bool IsTestMove;
 	int nSleeptime;
-	int nBeforSleepDuration;;
+	int nFirstFrameSleeptime;
 	int64_t nRolloverTestBase;;
 }CmdArg;
 
@@ -247,10 +250,12 @@ int start_file_test(char * _pAudioFile, char * _pVideoFile, DataCallback callbac
         int nIDR = 0;
         int nNonIDR = 0;
         int isAAC = 0;
-        int hasWaitTimeout = 0;
+        int IsFirst = 1;
         int64_t aacFrameCount = 0;
-        if (memcmp(_pAudioFile + strlen(_pAudioFile) - 3, "aac", 3) == 0)
-                isAAC = 1;
+        if (bAudioOk) {
+                if (cmdArg.IsTestAAC)
+                        isAAC = 1;
+        }
         while (bAudioOk || bVideoOk) {
                 if (bVideoOk && nNow+1 > nNextVideoTime) {
                         
@@ -282,6 +287,21 @@ int start_file_test(char * _pAudioFile, char * _pVideoFile, DataCallback callbac
                                                         nNonIDR++;
                                                 } else {
                                                         nIDR++;
+                                                        if(cmdArg.IsTestMove && !IsFirst) {;
+                                                                printf("sleep %dms to wait timeout start:%lld\n", cmdArg.nSleeptime, nNextVideoTime);
+                                                                usleep(cmdArg.nSleeptime * 1000);
+                                                                printf("sleep to wait timeout end\n");
+                                                                nNextVideoTime += cmdArg.nSleeptime;
+                                                                nNextAudioTime += cmdArg.nSleeptime;
+                                                                nNow += cmdArg.nSleeptime;
+							}
+                                                        if(IsFirst && cmdArg.nFirstFrameSleeptime > 0) {
+                                                                usleep(cmdArg.nFirstFrameSleeptime * 1000);
+                                                                nNextVideoTime += cmdArg.nFirstFrameSleeptime;
+                                                                nNextAudioTime += cmdArg.nFirstFrameSleeptime;
+                                                                nNow += cmdArg.nFirstFrameSleeptime;
+							}
+						 	IsFirst = 0;
                                                 }
                                                 //printf("send one video(%d) frame packet:%ld", type, end - sendp);
                                                 cbRet = callback(opaque, sendp, end - sendp, THIS_IS_VIDEO, cmdArg.nRolloverTestBase+nNextVideoTime-nSysTimeBase, type == 5);
@@ -319,14 +339,6 @@ int start_file_test(char * _pAudioFile, char * _pVideoFile, DataCallback callbac
                                         }
                                 }
                         }while(1);
-                        if (hasWaitTimeout == 0 && cmdArg.nSleeptime > 0 && nNextVideoTime > cmdArg.nBeforSleepDuration+nSysTimeBase) {
-                                printf("sleep %dms to wait timeout start:%lld\n", cmdArg.nSleeptime, nNextVideoTime);
-                                hasWaitTimeout = 1;
-                                usleep(cmdArg.nSleeptime * 1000);
-                                printf("sleep to wait timeout end\n");
-				nNextVideoTime += cmdArg.nSleeptime;
-				nNextAudioTime += cmdArg.nSleeptime;
-                        }
                 }
                 if (bAudioOk && nNow+1 > nNextAudioTime) {
                         if (isAAC) {
@@ -383,6 +395,7 @@ int start_file_test(char * _pAudioFile, char * _pVideoFile, DataCallback callbac
                 }
                 if (nSleepTime != 0) {
                         //printf("sleeptime:%lld\n", nSleepTime);
+			assert(nSleepTime < 200000);
                         usleep(nSleepTime);
                 }
                 nNow = getCurrentMilliSecond();
@@ -498,6 +511,7 @@ end:
 static int64_t firstTimeStamp = -1;
 static int segStartCount = 0;
 static int nByteCount = 0;
+static int nVideoKeyframeAccLen = 0;
 
 static int dataCallback(void *opaque, void *pData, int nDataLen, int nFlag, int64_t timestamp, int nIsKeyFrame)
 {
@@ -515,7 +529,12 @@ static int dataCallback(void *opaque, void *pData, int nDataLen, int nFlag, int6
                         nNewSegMent = 1;
                         segStartCount++;
                 }
-                //fprintf(stderr, "push video ts:%lld\n", timestamp);
+                if (nIsKeyFrame && nVideoKeyframeAccLen != 0) {
+                        //printf("nVideoKeyframeAccLen:%d\n", nVideoKeyframeAccLen);
+                        nVideoKeyframeAccLen = 0;
+                }
+                nVideoKeyframeAccLen += nDataLen;
+                //printf("------->push video key:%d ts:%lld size:%d\n",nIsKeyFrame, timestamp, nDataLen);
                 ret = PushVideo(pData, nDataLen, timestamp, nIsKeyFrame, nNewSegMent);
         }
         return ret;
@@ -555,10 +574,10 @@ static void checkCmdArg(const char * name)
         if (cmdArg.IsTestAACWithoutAdts)
                 cmdArg.IsTestAAC = true;
 
-        if (cmdArg.nSleeptime && cmdArg.nBeforSleepDuration == false) {
-                logwarn("will set sleeptime to zero. cus'z for bsd is zero");
-                flag_write_usage(name);
-                cmdArg.nSleeptime = false;
+        if (cmdArg.IsTestMove) {
+                if (cmdArg.nSleeptime == 0) {
+                        cmdArg.nSleeptime = 2000;
+                }
         }
 #ifndef TEST_WITH_FFMPEG
         if (cmdArg.IsInputFromFFmpeg) {
@@ -584,6 +603,10 @@ static void checkCmdArg(const char * name)
                 logerror("sleep time is milliseond. should great than 1000");
                 exit(4);
 	}
+        if (cmdArg.IsNoAudio && cmdArg.IsNoVideo) {
+                logerror("no audio and video");
+                exit(5);
+        }
         return;
 }
 
@@ -595,8 +618,11 @@ int main(int argc, const char** argv)
 	flag_bool(&cmdArg.IsTestTimestampRollover, "rollover", "will set start pts to 95437000. ts will roll over about 6.x second laetr.only effect for not input from ffmpeg");
 	flag_bool(&cmdArg.IsTestH265, "testh265", "input h264 video");
 	flag_bool(&cmdArg.IsLocalToken, "localtoken", "use kodo server mode");
-        flag_int(&cmdArg.nBeforSleepDuration, "bsd", "input go to sleep(milli) after bsd second");
-        flag_int(&cmdArg.nSleeptime, "sleeptime", "sleep time(milli) after bsd time");
+	flag_bool(&cmdArg.IsNoAudio, "na", "no audio");
+	flag_bool(&cmdArg.IsNoVideo, "nv", "no video(not support now)");
+	flag_bool(&cmdArg.IsTestMove, "testmove", "testmove seperated by key frame");
+        flag_int(&cmdArg.nSleeptime, "sleeptime", "sleep time(milli) used by testmove.default(2s) if testmove is enable");
+        flag_int(&cmdArg.nFirstFrameSleeptime, "fsleeptime", "first video key frame sleep time(milli)");
         flag_parse(argc, argv, VERSION);
         if (argc == 2 && (strcmp(argv[1], "-h") == 0 || strcmp(argv[1], "-help") == 0)) {
                 flag_write_usage(argv[0]);
@@ -609,7 +635,7 @@ int main(int argc, const char** argv)
 	printf("cmdArg.IsTestTimestampRollover=%d\n", cmdArg.IsTestTimestampRollover);
 	printf("cmdArg.IsTestH265=%d\n", cmdArg.IsTestH265);
 	printf("cmdArg.IsLocalToken=%d\n", cmdArg.IsLocalToken);
-	printf("cmdArg.nBeforSleepDuration=%d\n", cmdArg.nBeforSleepDuration);
+	printf("cmdArg.IsTestMove=%d\n", cmdArg.IsTestMove);
 	printf("cmdArg.nSleeptime=%d\n", cmdArg.nSleeptime);
         checkCmdArg(argv[0]);
 
@@ -660,20 +686,24 @@ int main(int argc, const char** argv)
         printf("token:%s\n", gtestToken);
         
         avArg.nChannels = 1;
-        if(cmdArg.IsTestAAC) {
-                avArg.nAudioFormat = TK_AUDIO_AAC;
-                avArg.nSamplerate = 16000;
-        } else {
-                avArg.nAudioFormat = TK_AUDIO_PCMU;
-                avArg.nSamplerate = 8000;
+        if (!cmdArg.IsNoAudio) {
+                if(cmdArg.IsTestAAC) {
+                        avArg.nAudioFormat = TK_AUDIO_AAC;
+                        avArg.nSamplerate = 16000;
+                } else {
+                        avArg.nAudioFormat = TK_AUDIO_PCMU;
+                        avArg.nSamplerate = 8000;
+                }
         }
-        if(cmdArg.IsTestH265) {
-                avArg.nVideoFormat = TK_VIDEO_H265;
-	} else {
-                avArg.nVideoFormat = TK_VIDEO_H264;
+        if (!cmdArg.IsNoVideo) {
+                if(cmdArg.IsTestH265) {
+                        avArg.nVideoFormat = TK_VIDEO_H265;
+                } else {
+                        avArg.nVideoFormat = TK_VIDEO_H264;
+                }
         }
-
-        /*
+         
+                /*
         //token过期测试
         memset(gtestToken, 0, sizeof(gtestToken));
         strcpy(gtestToken, "JAwTPb8dmrbiwt89Eaxa4VsL4_xSIYJoJh4rQfOQ:5Zq-f4f4ItNZsb7Isbl9CkwmN50=:eyJzY29wZSI6ImlwY2FtZXJhIiwiZGVhZGxpbmUiOjE1MzQ3NzExMzksImNhbGxiYWNrVXJsIjoiaHR0cDovLzM5LjEwNy4yNDcuMTQ6ODA4OC9xaW5pdS91cGxvYWQvY2FsbGJhY2siLCJjYWxsYmFja0JvZHkiOiJ7XCJrZXlcIjpcIiQoa2V5KVwiLFwiaGFzaFwiOlwiJChldGFnKVwiLFwiZnNpemVcIjokKGZzaXplKSxcImJ1Y2tldFwiOlwiJChidWNrZXQpXCIsXCJuYW1lXCI6XCIkKHg6bmFtZSlcIiwgXCJkdXJhdGlvblwiOlwiJChhdmluZm8uZm9ybWF0LmR1cmF0aW9uKVwifSIsImNhbGxiYWNrQm9keVR5cGUiOiJhcHBsaWNhdGlvbi9qc29uIiwiZGVsZXRlQWZ0ZXJEYXlzIjo3fQ==");
@@ -711,6 +741,10 @@ int main(int argc, const char** argv)
                 pVFile = "/liuye/Documents/material/h265_aac_1_16000_h264.h264";
         }
 #endif
+        if (cmdArg.IsNoAudio)
+                pAFile = NULL;
+        if (cmdArg.IsNoVideo)
+                pVFile = NULL;
 
         if (cmdArg.IsInputFromFFmpeg) {
                 start_ffmpeg_test("rtmp://localhost:1935/live/movie", dataCallback, NULL);
@@ -721,6 +755,7 @@ int main(int argc, const char** argv)
 	}
         
         
+        sleep(1);
         UninitUploader();
         loginfo("should total:%d\n", nByteCount);
 

@@ -34,7 +34,7 @@ type namespacebody struct {
 	AutoCreateUa bool   `json:"auto"`
 }
 
-func getDomain(xl *xlog.Logger, bucket string) (string, error) {
+func getDomain(xl *xlog.Logger, bucket string, info *userInfo) (string, error) {
 	client := http.Client{}
 	url := fmt.Sprintf("%s%s", DOMAIN_URL, bucket)
 	request, err := http.NewRequest("GET", url, nil)
@@ -42,7 +42,8 @@ func getDomain(xl *xlog.Logger, bucket string) (string, error) {
 	if err != nil {
 		xl.Errorf("%#v", err)
 	}
-	mac := qbox.NewMac("JAwTPb8dmrbiwt89Eaxa4VsL4_xSIYJoJh4rQfOQ", "G5mtjT3QzG4Lf7jpCAN5PZHrGeoSH9jRdC96ecYS")
+	mac := qbox.NewMac(info.ak, info.sk)
+
 	token, _ := mac.SignRequest(request)
 
 	request.Header.Set("Authorization", "QBox "+token)
@@ -50,6 +51,7 @@ func getDomain(xl *xlog.Logger, bucket string) (string, error) {
 	if err != nil {
 		return "", err
 	}
+
 	body, err := ioutil.ReadAll(resp.Body)
 	var domain []string
 	err = json.Unmarshal(body, &domain)
@@ -111,7 +113,14 @@ func RegisterNamespace(c *gin.Context) {
 		return
 	}
 
-	domain, err := getDomain(xl, namespaceData.Bucket)
+	info, err := getUserInfo(xl, c.Request)
+	if err != nil {
+		c.JSON(403, gin.H{
+			"error": "get user info falied",
+		})
+	}
+
+	domain, err := getDomain(xl, namespaceData.Bucket, info)
 	if err != nil || domain == "" {
 		xl.Errorf("bucket is not correct, err = %#v", err)
 		c.JSON(403, gin.H{
@@ -120,7 +129,7 @@ func RegisterNamespace(c *gin.Context) {
 		return
 	}
 	namespace := models.NamespaceInfo{
-		Uid:          params.uid,
+		Uid:          getUid(info.uid),
 		Space:        params.namespace,
 		Bucket:       namespaceData.Bucket,
 		Domain:       domain,
@@ -149,7 +158,16 @@ func DeleteNamespace(c *gin.Context) {
 		})
 		return
 	}
-	err = namespaceMod.Delete(xl, params.uid, params.namespace)
+	info, err := getUserInfo(xl, c.Request)
+	if err != nil {
+		xl.Errorf("get user info falied, erro = %#v", err)
+		c.JSON(403, gin.H{
+			"error": "get user info falied",
+		})
+		return
+	}
+
+	err = namespaceMod.Delete(xl, getUid(info.uid), params.namespace)
 	if err != nil {
 		xl.Errorf("Register falied error = %#v", err.Error())
 		c.JSON(400, gin.H{
@@ -157,26 +175,26 @@ func DeleteNamespace(c *gin.Context) {
 		})
 		return
 	} else {
-                model := models.UaModel{}
-                mark := ""
-                for {
-                        uas, nextmark, err := model.GetUaInfos(xl, 0, mark, params.namespace, models.UA_ITEM_UAID, "")
-                        if err != nil {
-                                xl.Errorf("Register falied error = %#v", err.Error())
+		model := models.UaModel{}
+		mark := ""
+		for {
+			uas, nextmark, err := model.GetUaInfos(xl, 0, mark, params.namespace, models.UA_ITEM_UAID, "")
+			if err != nil {
+				xl.Errorf("Register falied error = %#v", err.Error())
 				c.JSON(400, gin.H{
 					"error": err.Error(),
 				})
 				return
-                        }
-                        for i := 0; i < len(uas); i++ {
-                                model.Delete(xl, uas[i].Namespace, uas[i].UaId)
-                        }
-                        if nextmark != "" {
-                                mark = nextmark
-                        } else {
-                                break
-                        }
-                }
+			}
+			for i := 0; i < len(uas); i++ {
+				model.Delete(xl, uas[i].Namespace, uas[i].UaId)
+			}
+			if nextmark != "" {
+				mark = nextmark
+			} else {
+				break
+			}
+		}
 		c.JSON(200, gin.H{"success": true})
 	}
 }
@@ -259,9 +277,18 @@ func UpdateNamespace(c *gin.Context) {
 		return
 	}
 
-	domain, err := getDomain(xl, namespaceData.Bucket)
+	info, err := getUserInfo(xl, c.Request)
+	if err != nil {
+		xl.Errorf("get user info falied, erro = %#v", err)
+		c.JSON(403, gin.H{
+			"error": "get user info falied",
+		})
+		return
+	}
+
+	domain, err := getDomain(xl, namespaceData.Bucket, info)
 	if err != nil || domain == "" {
-		xl.Errorf("bucket is not correct, err = %#v", err)
+		xl.Errorf("bucket is not correct")
 		c.JSON(403, gin.H{
 			"error": "bucket is not correct",
 		})
@@ -275,7 +302,7 @@ func UpdateNamespace(c *gin.Context) {
 	           Domain : domain,
 	   }
 	*/
-	oldinfo, err := namespaceMod.GetNamespaceInfo(xl, params.uid, params.namespace)
+	oldinfo, err := namespaceMod.GetNamespaceInfo(xl, getUid(info.uid), params.namespace)
 	if err != nil || len(oldinfo) == 0 {
 		xl.Errorf("Can't find namespace")
 		c.JSON(400, gin.H{
@@ -283,7 +310,7 @@ func UpdateNamespace(c *gin.Context) {
 		})
 		return
 	}
-	err = updateNamespace(xl, params.uid, params.namespace, namespaceData.Namespace)
+	err = updateNamespace(xl, getUid(info.uid), params.namespace, namespaceData.Namespace)
 	if err != nil {
 		xl.Errorf("update namespace failed, err = %#v", err)
 		c.JSON(400, gin.H{
@@ -291,7 +318,7 @@ func UpdateNamespace(c *gin.Context) {
 		})
 		return
 	}
-	err = updateBucket(xl, params.uid, params.namespace, oldinfo[0].Bucket, namespaceData.Bucket, domain)
+	err = updateBucket(xl, getUid(info.uid), params.namespace, oldinfo[0].Bucket, namespaceData.Bucket, domain)
 	if err != nil {
 		xl.Errorf("update bucket failed, err = %#v", err)
 		c.JSON(400, gin.H{
@@ -299,7 +326,7 @@ func UpdateNamespace(c *gin.Context) {
 		})
 		return
 	}
-	err = updateAutoCreateUa(xl, params.uid, params.namespace, oldinfo[0].AutoCreateUa, namespaceData.AutoCreateUa)
+	err = updateAutoCreateUa(xl, getUid(info.uid), params.namespace, oldinfo[0].AutoCreateUa, namespaceData.AutoCreateUa)
 	if err != nil {
 		xl.Errorf("update auto create ua failed")
 		c.JSON(400, gin.H{
@@ -323,11 +350,21 @@ func GetNamespaceInfo(c *gin.Context) {
 	}
 	nextMark := ""
 	var r []models.NamespaceInfo
-	xl.Infof("limit %d, marker %s, regex %s uid %s", params.limit, params.marker, params.regex, params.uid)
+
+	info, err := getUserInfo(xl, c.Request)
+	if err != nil {
+		xl.Errorf("get user info falied, erro = %#v", err)
+		c.JSON(403, gin.H{
+			"error": "get user info falied",
+		})
+		return
+	}
+
+	xl.Infof("limit %d, marker %s, regex %s uid %s", params.limit, params.marker, params.regex, getUid(info.uid))
 	if params.exact {
-		r, err = namespaceMod.GetNamespaceInfo(xl, params.uid, params.regex)
+		r, err = namespaceMod.GetNamespaceInfo(xl, getUid(info.uid), params.regex)
 	} else {
-		r, nextMark, err = namespaceMod.GetNamespaceInfos(xl, params.limit, params.marker, params.uid, models.NAMESPACE_ITEM_ID, params.regex)
+		r, nextMark, err = namespaceMod.GetNamespaceInfos(xl, params.limit, params.marker, getUid(info.uid), models.NAMESPACE_ITEM_ID, params.regex)
 	}
 	if err != nil {
 		xl.Errorf("Update falied error = %#v", err.Error())

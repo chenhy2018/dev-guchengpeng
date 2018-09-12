@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/qiniu/api.v7/auth/qbox"
 	xlog "github.com/qiniu/xlog.v1"
 	"qiniu.com/m3u8"
 	"qiniu.com/models"
@@ -38,15 +39,14 @@ func GetPlayBackm3u8(c *gin.Context) {
 		return
 	}
 
-	fullUrl := "http://" + c.Request.Host + c.Request.URL.String()
-	if !VerifyToken(xl, params.expire, params.token, fullUrl, params.uid) {
+	if !VerifyToken(xl, params.expire, params.token, c.Request) {
 		xl.Errorf("verify token falied")
 		c.JSON(401, gin.H{
 			"error": "bad token",
 		})
 		return
 	}
-	xl.Infof("uid= %v, uaid = %v, from = %v, to = %v, namespace = %v", params.uid, params.uaid, params.from, params.to, params.namespace)
+	xl.Infof("uaid = %v, from = %v, to = %v, namespace = %v", params.uaid, params.from, params.to, params.namespace)
 	dayInMilliSec := int64((24 * time.Hour).Seconds() * 1000)
 	if (params.to - params.from) > dayInMilliSec {
 		xl.Errorf("bad from/to time, from = %v, to = %v", params.from, params.to)
@@ -55,7 +55,23 @@ func GetPlayBackm3u8(c *gin.Context) {
 		})
 		return
 	}
-	segs, _, err := SegMod.GetSegmentTsInfo(xl, params.from, params.to, params.namespace, params.uaid, 0, "")
+	userInfo, err := getUserInfo(xl, c.Request)
+	if err != nil {
+		xl.Errorf("get user Info failed%v", err)
+		c.JSON(500, nil)
+		return
+	}
+
+	bucket, err := GetBucket(xl, userInfo.ak, params.namespace)
+	if err != nil {
+		xl.Errorf("get bucket error, error =  %#v", err)
+		c.JSON(500, nil)
+		return
+	}
+
+	mac := qbox.NewMac(userInfo.ak, userInfo.sk)
+
+	segs, _, err := SegMod.GetSegmentTsInfo(xl, params.from, params.to, bucket, params.uaid, 0, "", mac)
 	if err != nil {
 		xl.Errorf("getTsInfo error, error =  %#v", err)
 		c.JSON(500, nil)
@@ -92,7 +108,7 @@ func GetPlayBackm3u8(c *gin.Context) {
 			c.JSON(500, nil)
 			return
 		}
-		realUrl := GetUrlWithDownLoadToken(xl, "http://pdwjeyj6v.bkt.clouddn.com/", filename, total)
+		realUrl := GetUrlWithDownLoadToken(xl, "http://pdwjeyj6v.bkt.clouddn.com/", filename, total, userInfo)
 
 		m := map[string]interface{}{
 			"duration": duration,

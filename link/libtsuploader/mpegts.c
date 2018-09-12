@@ -442,7 +442,9 @@ int WritePAT(uint8_t *_pBuf, int _nUinitStartIndicator, int _nCount, int _nAdapt
 
 int WritePMT(uint8_t *_pBuf, int _nUinitStartIndicator, int _nCount, int _nAdaptationField, int _nVStreamType, int _nAStreamType)
 {
+        assert(_nVStreamType ||  _nAStreamType);
         int nRetLen = 4;
+        int noAOrV = 0;
         WriteTsHeader(_pBuf, _nUinitStartIndicator, _nCount, PMT_PID, _nAdaptationField);
         _pBuf += 4;
         if (_nUinitStartIndicator) {
@@ -470,19 +472,27 @@ int WritePMT(uint8_t *_pBuf, int _nUinitStartIndicator, int _nCount, int _nAdapt
         _pBuf[10] = 0xF0; //reserved 4bit
         _pBuf[11] = 0x00; //program_info_length 12bit(00 mean no descriptor)
         
-        _pBuf[12] = _nVStreamType; //stream_type 8bit STREAM_TYPE_VIDEO_H264
-        _pBuf[13] = 0xE1; //reserved 3bit(7), include elementary_PID 5bit
-        _pBuf[14] = 0x00; //remain elementary_PID 8bit
+        if (_nVStreamType != 0) {
+                _pBuf[12] = _nVStreamType; //stream_type 8bit STREAM_TYPE_VIDEO_H264
+                _pBuf[13] = 0xE1; //reserved 3bit(7), include elementary_PID 5bit
+                _pBuf[14] = 0x00; //remain elementary_PID 8bit
+                _pBuf[15] = 0xF0; //reserved 4bit, include program_info_length 4bit
+                _pBuf[16] = 0x00; //remaint program_info_length 8bit
+        } else {
+                _pBuf[2] = 0x12; //section_length 12bit
+                noAOrV = -5;
+	}
         
-        _pBuf[15] = 0xF0; //reserved 4bit, include program_info_length 4bit
-        _pBuf[16] = 0x00; //remaint program_info_length 8bit
-        
-        _pBuf[17] = _nAStreamType; //stream_type 8bit STREAM_TYPE_VIDEO_H264
-        _pBuf[18] = 0xE1; //reserved 3bit(7), include elementary_PID 5bit
-        _pBuf[19] = 0x01; //remain elementary_PID 8bit
-        
-        _pBuf[20] = 0xF0; //reserved 4bit, include program_info_length 4bit
-        _pBuf[21] = 0x00; //remaint program_info_length 8bit
+        if (_nAStreamType != 0) {
+                _pBuf[17] = _nAStreamType; //stream_type 8bit STREAM_TYPE_VIDEO_H264
+                _pBuf[18] = 0xE1; //reserved 3bit(7), include elementary_PID 5bit
+                _pBuf[19] = 0x01; //remain elementary_PID 8bit
+                _pBuf[20] = 0xF0; //reserved 4bit, include program_info_length 4bit
+                _pBuf[21] = 0x00; //remaint program_info_length 8bit
+        } else {
+                noAOrV = -5;
+                _pBuf[2] = 0x12; //section_length 12bit
+	}
         
         uint32_t c32 = crc32(_pBuf, 22);
         uint8_t *pTmp =  (uint8_t*)&c32;
@@ -491,5 +501,5 @@ int WritePMT(uint8_t *_pBuf, int _nUinitStartIndicator, int _nCount, int _nAdapt
         _pBuf[24] = pTmp[1];
         _pBuf[25] = pTmp[0];
         
-        return 26+nRetLen;
+        return 26+nRetLen+noAOrV;
 }

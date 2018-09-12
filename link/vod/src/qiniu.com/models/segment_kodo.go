@@ -15,16 +15,12 @@ import (
 )
 
 var (
-	// test code, TODO change to token api
-	accessKey = "JAwTPb8dmrbiwt89Eaxa4VsL4_xSIYJoJh4rQfOQ"
-	secretKey = "G5mtjT3QzG4Lf7jpCAN5PZHrGeoSH9jRdC96ecYS"
-	bucket    = "ipcamera"
-	cfg       storage.Config
+	cfg storage.Config
 )
 
 type Segment interface {
-	GetSegmentTsInfo(xl *xlog.Logger, index, rows int, starttime, endtime int64, bucketurl, uaid, mark string) ([]map[string]interface{}, error)
-	GetFragmentTsInfo(xl *xlog.Logger, index, rows int, starttime, endtime int64, bucketurl, uaid, mark string) ([]map[string]interface{}, error)
+	GetSegmentTsInfo(xl *xlog.Logger, index, rows int, starttime, endtime int64, bucket, uaid, mark string, mac *qbox.Mac) ([]map[string]interface{}, error)
+	GetFragmentTsInfo(xl *xlog.Logger, index, rows int, starttime, endtime int64, bucket, uaid, mark string, mac *qbox.Mac) ([]map[string]interface{}, error)
 }
 
 const (
@@ -125,7 +121,7 @@ func GetInfoFromFilename(s, sep string) (error, map[string]interface{}) {
 // Calculate mark.
 // Return []yyyy/mm/dd, if same day and same hour, return [1]yyyy/mm/dd/hh
 func calculateMark(xl *xlog.Logger, starttime int64, uaid, head string) string {
-	k2 := fmt.Sprintf("%s/%s/%d", head, uaid, starttime/1000 - MAX_SEGMENT_TS_TIME_STAMP)
+	k2 := fmt.Sprintf("%s/%s/%d", head, uaid, starttime/1000-MAX_SEGMENT_TS_TIME_STAMP)
 	xl.Infof("CalculateMark k %s", k2)
 
 	m := map[string]interface{}{
@@ -140,9 +136,7 @@ func calculateMark(xl *xlog.Logger, starttime int64, uaid, head string) string {
 }
 
 // Get Segment TS info List.
-func (m *SegmentKodoModel) GetSegmentTsInfo(xl *xlog.Logger, starttime, endtime int64, bucketurl, uaid string, limit int, mark string) ([]map[string]interface{}, string, error) {
-	//todo change to get aksk
-	mac := qbox.NewMac(accessKey, secretKey)
+func (m *SegmentKodoModel) GetSegmentTsInfo(xl *xlog.Logger, starttime, endtime int64, bucket, uaid string, limit int, mark string, mac *qbox.Mac) ([]map[string]interface{}, string, error) {
 	// 指定空间所在的区域，如果不指定将自动探测
 	// 如果没有特殊需求，默认不需要指定
 	//cfg.Zone=&storage.ZoneHuabei
@@ -164,12 +158,12 @@ func (m *SegmentKodoModel) GetSegmentTsInfo(xl *xlog.Logger, starttime, endtime 
 	xl.Infof("GetSegmentTsInfo prefix ********* %s \n", prefix)
 	entries, err := bucketManager.ListBucketContext(ctx, bucket, prefix, delimiter, marker)
 	if err != nil {
-                info := err.(*storage.ErrorInfo)
-                if info.Code == 200 {
-                        return r, "", nil
-                } else {
-                        return r, "", err
-                }
+		info := err.(*storage.ErrorInfo)
+		if info.Code == 200 {
+			return r, "", nil
+		} else {
+			return r, "", err
+		}
 	}
 
 	for listItem1 := range entries {
@@ -182,7 +176,7 @@ func (m *SegmentKodoModel) GetSegmentTsInfo(xl *xlog.Logger, starttime, endtime 
 		if len(info) == 0 {
 			continue
 		}
-		if info[SEGMENT_ITEM_START_TIME].(int64) / 1000 > endtime / 1000 {
+		if info[SEGMENT_ITEM_START_TIME].(int64)/1000 > endtime/1000 {
 			cancelFunc()
 			break
 		}
@@ -201,10 +195,8 @@ func (m *SegmentKodoModel) GetSegmentTsInfo(xl *xlog.Logger, starttime, endtime 
 }
 
 // Get Fragment Ts info List.
-func (m *SegmentKodoModel) GetFragmentTsInfo(xl *xlog.Logger, count int, starttime, endtime int64, bucketurl, uaid, mark string) ([]map[string]interface{}, string, error) {
+func (m *SegmentKodoModel) GetFragmentTsInfo(xl *xlog.Logger, count int, starttime, endtime int64, bucket, uaid, mark string, mac *qbox.Mac) ([]map[string]interface{}, string, error) {
 	pre := time.Now().UnixNano()
-	//todo change to get aksk
-	mac := qbox.NewMac(accessKey, secretKey)
 	// 指定空间所在的区域，如果不指定将自动探测
 	// 如果没有特殊需求，默认不需要指定
 	//cfg.Zone=&storage.ZoneHuabei
@@ -240,16 +232,16 @@ func (m *SegmentKodoModel) GetFragmentTsInfo(xl *xlog.Logger, count int, startti
 			continue
 		}
 
-		if info[SEGMENT_ITEM_START_TIME].(int64) / 1000 > endtime / 1000 {
+		if info[SEGMENT_ITEM_START_TIME].(int64)/1000 > endtime/1000 {
 			cancelFunc()
 			break
 		}
-                if info[SEGMENT_ITEM_END_TIME].(int64) > starttime {
-                        xl.Infof("GetFragmentTsInfo info[SEGMENT_ITEM_START_TIME] %d \n", info[SEGMENT_ITEM_START_TIME].(int64))
-                        xl.Infof("GetFragmentTsInfo info[SEGMENT_ITEM_END_TIME] %d \n", info[SEGMENT_ITEM_END_TIME].(int64))
-                        r = append(r, info)
-                        total++
-                } 
+		if info[SEGMENT_ITEM_END_TIME].(int64) > starttime {
+			xl.Infof("GetFragmentTsInfo info[SEGMENT_ITEM_START_TIME] %d \n", info[SEGMENT_ITEM_START_TIME].(int64))
+			xl.Infof("GetFragmentTsInfo info[SEGMENT_ITEM_END_TIME] %d \n", info[SEGMENT_ITEM_END_TIME].(int64))
+			r = append(r, info)
+			total++
+		}
 		if total >= count && count != 0 {
 			nextMarker = listItem1.Marker
 			break
@@ -260,10 +252,8 @@ func (m *SegmentKodoModel) GetFragmentTsInfo(xl *xlog.Logger, count int, startti
 }
 
 // Get Frame info List.
-func (m *SegmentKodoModel) GetFrameInfo(xl *xlog.Logger, starttime, endtime int64, bucketurl, uaid string) ([]map[string]interface{}, error) {
+func (m *SegmentKodoModel) GetFrameInfo(xl *xlog.Logger, starttime, endtime int64, bucket, uaid string, mac *qbox.Mac) ([]map[string]interface{}, error) {
 	pre := time.Now().UnixNano()
-	//todo change to get aksk
-	mac := qbox.NewMac(accessKey, secretKey)
 	// 指定空间所在的区域，如果不指定将自动探测
 	// 如果没有特殊需求，默认不需要指定
 	//cfg.Zone=&storage.ZoneHuabei
@@ -293,7 +283,7 @@ func (m *SegmentKodoModel) GetFrameInfo(xl *xlog.Logger, starttime, endtime int6
 			xl.Infof("GetFrameInfo err  %s \n", err)
 			continue
 		}
-		if info[SEGMENT_ITEM_START_TIME].(int64) / 1000 > endtime / 1000 {
+		if info[SEGMENT_ITEM_START_TIME].(int64)/1000 > endtime/1000 {
 			cancelFunc()
 			break
 		}
