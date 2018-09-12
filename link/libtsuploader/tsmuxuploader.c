@@ -338,8 +338,8 @@ static int waitToCompleUploadAndDestroyTsMuxContext(void *_pOpaque)
 
                 UploaderStatInfo statInfo = {0};
                 pTsMuxCtx->pTsUploader_->GetStatInfo(pTsMuxCtx->pTsUploader_, &statInfo);
-                logdebug("uploader push:%d pop:%d remainItemCount:%d", statInfo.nPushDataBytes_,
-                         statInfo.nPopDataBytes_, statInfo.nLen_);
+                logdebug("uploader push:%d pop:%d remainItemCount:%d dropped:%d", statInfo.nPushDataBytes_,
+                         statInfo.nPopDataBytes_, statInfo.nLen_, statInfo.nDropped);
                 DestroyUploader(&pTsMuxCtx->pTsUploader_);
 #ifdef USE_OWN_TSMUX
                 DestroyTsMuxerContext(pTsMuxCtx->pFmtCtx_);
@@ -452,11 +452,11 @@ static int newTsMuxContext(FFTsMuxContext ** _pTsMuxCtx, AvArg *_pAvArg)
         avArg.nVideoFormat = _pAvArg->nVideoFormat;
         avArg.pOpaque = pTsMuxCtx;
 
-        pTsMuxCtx->pFmtCtx_ = NewTsMuxerContext(&avArg);
-        if (pTsMuxCtx->pFmtCtx_ == NULL) {
+        ret = NewTsMuxerContext(&avArg, &pTsMuxCtx->pFmtCtx_);
+        if (ret != 0) {
                 DestroyUploader(&pTsMuxCtx->pTsUploader_);
                 free(pTsMuxCtx);
-                return TK_NO_MEMORY;
+                return ret;
         }
 
 

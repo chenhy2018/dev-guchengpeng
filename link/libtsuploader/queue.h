@@ -25,6 +25,7 @@ typedef struct _UploaderStatInfo {
         int nLen_;
         int nOverwriteCnt;
         int nIsReadOnly;
+	int nDropped;
 }UploaderStatInfo;
 
 typedef struct _CircleQueue{
@@ -35,7 +36,7 @@ typedef struct _CircleQueue{
         void (*GetStatInfo)(CircleQueue *pQueue, UploaderStatInfo *pStatInfo);
 }CircleQueue;
 
-int NewCircleQueue(CircleQueue **pQueue, enum CircleQueuePolicy policy, int nMaxItemLen, int nInitItemCount);
+int NewCircleQueue(CircleQueue **pQueue, int nIsAvailableAfterTimeout,  enum CircleQueuePolicy policy, int nMaxItemLen, int nInitItemCount);
 void DestroyQueue(CircleQueue **_pQueue);
 
 #endif

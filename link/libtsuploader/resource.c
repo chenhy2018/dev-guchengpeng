@@ -48,7 +48,7 @@ int StartMgr()
                 return 0;
         }
 
-        int ret = NewCircleQueue(&manager.pQueue_, TSQ_FIX_LENGTH, sizeof(void *), 100);
+        int ret = NewCircleQueue(&manager.pQueue_, 1, TSQ_FIX_LENGTH, sizeof(void *), 100);
         if (ret != 0){
                 return ret;
         }

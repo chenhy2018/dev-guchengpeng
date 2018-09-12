@@ -19,6 +19,7 @@ size_t getDataCallback(void* buffer, size_t size, size_t n, void* rptr);
 static char gDeviceId[64];
 static int64_t nSegmentId;
 static int64_t nLastUploadTsTime;
+static int64_t nNewSegmentInterval = 30;
 
 enum WaitFirstFlag {
         WF_INIT,
@@ -50,6 +51,7 @@ typedef struct _KodoUploader{
         int64_t nLastFrameTimestamp;
         UploadState state;
         
+        int64_t getDataBytes;
         curl_off_t nLastUlnow;
         int64_t nUlnowRecTime;
         int nLowSpeedCnt;
@@ -100,7 +102,7 @@ int timeoutCallback(void *clientp, curl_off_t dltotal, curl_off_t dlnow, curl_of
                                 logerror("half accumulate upload timeout:%d", pUploader->nLowSpeedCnt); 
                                 return -1;
                         }
-                        pUploader->nLowSpeedCnt == 2;
+                        pUploader->nLowSpeedCnt = 2;
 
                 }
                 pUploader->nLastUlnow = ulnow;
@@ -208,7 +210,6 @@ static void * streamUpload(void *_pOpaque)
                 Qiniu_Client_InitMacAuth(&client, 1024, &mac);
         } else {
 #else
-                logdebug("client upload");
                 uptoken = pUploader->pToken_;
                 Qiniu_Client_InitNoAuth(&client, 1024);
 #endif
@@ -244,13 +245,14 @@ static void * streamUpload(void *_pOpaque)
         if (pUploader->nWaitFirstMutexLocked_ != WF_FIRST) {
                 goto END;
         }
+        logdebug("upload start");
         
         //segmentid(time)
         int64_t curTime = GetCurrentNanosecond();
         // ts/uid/ua_id/yyyy/mm/dd/hh/mm/ss/mmm/fragment_start_ts/expiry.ts
         time_t secs = curTime / 1000000000;
 #ifndef MULTI_SEG_TEST
-        if ((curTime - nLastUploadTsTime) > 30 * 1000000000ll) {
+        if ((curTime - nLastUploadTsTime) > nNewSegmentInterval * 1000000000ll) {
 #else
         if (newSegCount % 10 == 0) {
                 if (newSegCount == 0)
@@ -299,7 +301,7 @@ static void * streamUpload(void *_pOpaque)
         if (error.code != 200) {
                 pUploader->state = TK_UPLOAD_FAIL;
                 if (error.code == 401) {
-                        logerror("upload file :%s httpcode=%d errmsg=%s", key, error.code, Qiniu_Buffer_CStr(&client.b));
+                        logerror("upload file :%s expsize:%d httpcode=%d errmsg=%s", key, pUploader->getDataBytes, error.code, Qiniu_Buffer_CStr(&client.b));
                 } else if (error.code >= 500) {
                         const char * pFullErrMsg = Qiniu_Buffer_CStr(&client.b);
                         char errMsg[256];
@@ -313,15 +315,16 @@ static void * streamUpload(void *_pOpaque)
                 } else {
 			const char *pCurlErrMsg = curl_easy_strerror(error.code);
 			if (pCurlErrMsg != NULL) {
-                                logerror("upload file :%s errorcode=%d errmsg={\"error\":\"%s\"}", key, error.code, pCurlErrMsg);
+                                logerror("upload file :%s expsize:%d errorcode=%d errmsg={\"error\":\"%s\"}", key, pUploader->getDataBytes, error.code, pCurlErrMsg);
 			} else {
-                                logerror("upload file :%s errorcode=%d errmsg={\"error\":\"unknown error\"}", key, error.code);
+                                logerror("upload file :%s expsize:%d errorcode=%d errmsg={\"error\":\"unknown error\"}", key, pUploader->getDataBytes, error.code);
 			}
                 }
                 //debug_log(&client, error);
         } else {
                 pUploader->state = TK_UPLOAD_OK;
-                logdebug("upload file %s: key:%s success", pUploader->bucketName_, key);
+                logdebug("upload file %s: size:(exp:%lld real:%lld) key:%s success", pUploader->bucketName_,
+                          pUploader->getDataBytes, pUploader->nLastUlnow, key);
         }
 END:
         if (canFreeToken) {
@@ -340,10 +343,10 @@ size_t getDataCallback(void* buffer, size_t size, size_t n, void* rptr)
         nPopLen = pUploader->pQueue_->Pop(pUploader->pQueue_, buffer, size * n);
         if (nPopLen < 0) {
 		if (nPopLen == TK_TIMEOUT) {
-                        if (pUploader->nLastFrameTimestamp - pUploader->nFirstFrameTimestamp > 0) {
+                        if (pUploader->nLastFrameTimestamp >= 0 &&  pUploader->nFirstFrameTimestamp >= 0) {
                                 return 0;
                         }
-                        logerror("first pop from queue timeout:%d", nPopLen);
+                        logerror("first pop from queue timeout:%d %lld %lld", nPopLen, pUploader->nLastFrameTimestamp, pUploader->nFirstFrameTimestamp);
 		}
                 return CURL_READFUNC_ABORT;
         }
@@ -362,10 +365,10 @@ size_t getDataCallback(void* buffer, size_t size, size_t n, void* rptr)
                         break;
                 if (nTmp < 0) {
 		        if (nTmp == TK_TIMEOUT) {
-                                if (pUploader->nLastFrameTimestamp - pUploader->nFirstFrameTimestamp > 0) {
-                                        return 0;
+                                if (pUploader->nLastFrameTimestamp >= 0 &&  pUploader->nFirstFrameTimestamp >= 0) {
+                                        goto RET;
                                 }
-                                logerror("next pop from queue timeout:%d", nTmp);
+                                logerror("next pop from queue timeout:%d %lld %lld", nTmp, pUploader->nLastFrameTimestamp, pUploader->nFirstFrameTimestamp);
                         }
                         return CURL_READFUNC_ABORT;
                 }
@@ -376,6 +379,8 @@ size_t getDataCallback(void* buffer, size_t size, size_t n, void* rptr)
         //if (!info.nIsReadOnly) {
         //        pUploader->nIsFinished = 1;
         //}
+RET:
+        pUploader->getDataBytes += nPopLen;
         return nPopLen;
 }
 
@@ -504,7 +509,7 @@ int NewUploader(TsUploader ** _pUploader, enum CircleQueuePolicy _policy, int _n
         pthread_mutex_lock(&pKodoUploader->waitFirstMutex_);
         pKodoUploader->nWaitFirstMutexLocked_ = WF_LOCKED;
 #ifdef TK_STREAM_UPLOAD
-        ret = NewCircleQueue(&pKodoUploader->pQueue_, _policy, _nMaxItemLen, _nInitItemCount);
+        ret = NewCircleQueue(&pKodoUploader->pQueue_, 0, _policy, _nMaxItemLen, _nInitItemCount);
         if (ret != 0) {
                 free(pKodoUploader);
                 return ret;
@@ -570,4 +575,11 @@ int SetDeviceId(char *_pDeviceId)
         }
         
         return 0;
+}
+
+void SetNewSegmentInterval(int nInterval)
+{
+        if (nInterval > 0) {
+                nNewSegmentInterval = nInterval;
+        }
 }
