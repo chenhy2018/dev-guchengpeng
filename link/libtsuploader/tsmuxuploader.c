@@ -338,8 +338,8 @@ static int waitToCompleUploadAndDestroyTsMuxContext(void *_pOpaque)
 
                 UploaderStatInfo statInfo = {0};
                 pTsMuxCtx->pTsUploader_->GetStatInfo(pTsMuxCtx->pTsUploader_, &statInfo);
-                logdebug("uploader push:%d pop:%d remainItemCount:%d", statInfo.nPushDataBytes_,
-                         statInfo.nPopDataBytes_, statInfo.nLen_);
+                logdebug("uploader push:%d pop:%d remainItemCount:%d dropped:%d", statInfo.nPushDataBytes_,
+                         statInfo.nPopDataBytes_, statInfo.nLen_, statInfo.nDropped);
                 DestroyUploader(&pTsMuxCtx->pTsUploader_);
 #ifdef USE_OWN_TSMUX
                 DestroyTsMuxerContext(pTsMuxCtx->pFmtCtx_);
