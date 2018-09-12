@@ -227,16 +227,16 @@ func updateNamespace(xl *xlog.Logger, uid, space, newSpace string) error {
 }
 
 func updateBucket(xl *xlog.Logger, uid, space, bucket, newBucket string, info *userInfo) error {
-	if bucket != newBucket && newBucket != "" {
+if bucket != newBucket && newBucket != "" {
 		err := checkbucket(xl, newBucket)
 		if err != nil {
 			xl.Errorf("bucket is already register, err = %#v", err)
 			return err
 		}
 		domain, err := getDomain(xl, newBucket, info)
-		if err != nil {
-			xl.Errorf("bucket is not correct, err = %#v", err)
-			return err
+		if err != nil || domain == "" {
+			xl.Errorf("bucket is not correct")
+			return fmt.Errorf("bucket is not correct")
 		}
 		err = namespaceMod.UpdateBucket(xl, uid, space, newBucket, domain)
 		if err != nil {
