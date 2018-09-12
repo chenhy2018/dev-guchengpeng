@@ -452,11 +452,11 @@ static int newTsMuxContext(FFTsMuxContext ** _pTsMuxCtx, AvArg *_pAvArg)
         avArg.nVideoFormat = _pAvArg->nVideoFormat;
         avArg.pOpaque = pTsMuxCtx;
 
-        pTsMuxCtx->pFmtCtx_ = NewTsMuxerContext(&avArg);
-        if (pTsMuxCtx->pFmtCtx_ == NULL) {
+        ret = NewTsMuxerContext(&avArg, &pTsMuxCtx->pFmtCtx_);
+        if (ret != 0) {
                 DestroyUploader(&pTsMuxCtx->pTsUploader_);
                 free(pTsMuxCtx);
-                return TK_NO_MEMORY;
+                return ret;
         }
 
 

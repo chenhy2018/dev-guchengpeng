@@ -1,4 +1,6 @@
 #include "tsmux.h"
+#include "base.h"
+#include <pthread.h>
 
 typedef struct PIDCounter {
         uint16_t nPID;
@@ -14,6 +16,8 @@ typedef struct TsMuxerContext{
         int nPidCounterMapLen;
         PIDCounter pidCounterMap[5];
         uint64_t nLastPts;
+        pthread_mutex_t tsMutex_;
+        int isTableWrited;
         
         uint8_t nPcrFlag; //分析ffmpeg，pcr只在pes中出现一次在最开头
 }TsMuxerContext;
@@ -45,6 +49,14 @@ static int writeTsHeader(TsMuxerContext* _pMuxCtx, uint8_t *_pBuf, int _nUinitSt
 
 static void writeTable(TsMuxerContext* _pMuxCtx, int64_t _nPts)
 {
+        if (_pMuxCtx->isTableWrited) {
+                return;
+        }
+        pthread_mutex_lock(&_pMuxCtx->tsMutex_);
+        if (_pMuxCtx->isTableWrited) {
+                pthread_mutex_unlock(&_pMuxCtx->tsMutex_);
+                return;
+        }
         int nLen = 0;
         int nCount = 0;
         if (_pMuxCtx->nLastPts == 0 || _nPts - _pMuxCtx->nLastPts > 300 * 90) { //300毫米间隔
@@ -77,15 +89,18 @@ static void writeTable(TsMuxerContext* _pMuxCtx, int64_t _nPts)
                 memset(&_pMuxCtx->tsPacket[nLen], 0xff, 188 - nLen);
                 _pMuxCtx->arg.output(_pMuxCtx->arg.pOpaque,_pMuxCtx->tsPacket, 188);
         }
+        _pMuxCtx->isTableWrited = 1;
+        pthread_mutex_unlock(&_pMuxCtx->tsMutex_);
 }
 
 uint16_t Pids[5] = {AUDIO_PID, VIDEO_PID, PAT_PID, PMT_PID, SDT_PID};
-TsMuxerContext * NewTsMuxerContext(TsMuxerArg *pArg)
+int NewTsMuxerContext(TsMuxerArg *pArg, TsMuxerContext **_pTsMuxerCtx)
 {
         int i;
         TsMuxerContext *pTsMuxerCtx = (TsMuxerContext *)malloc(sizeof(TsMuxerContext));
-        if (pTsMuxerCtx == NULL)
-                return NULL;
+        if (pTsMuxerCtx == NULL) {
+                return TK_NO_MEMORY;
+        }
         memset(pTsMuxerCtx, 0, sizeof(TsMuxerContext));
         pTsMuxerCtx->arg = *pArg;
         pTsMuxerCtx->nPidCounterMapLen = 5;
@@ -93,8 +108,13 @@ TsMuxerContext * NewTsMuxerContext(TsMuxerArg *pArg)
                 pTsMuxerCtx->pidCounterMap[i].nPID = Pids[i];
                 pTsMuxerCtx->pidCounterMap[i].nCounter = 0;
         }
-        writeTable(pTsMuxerCtx, 0);
-        return pTsMuxerCtx;
+        int ret = pthread_mutex_init(&pTsMuxerCtx->tsMutex_, NULL);
+        if (ret != 0){
+                free(pTsMuxerCtx);
+                return TK_MUTEX_ERROR;
+        }
+	*_pTsMuxerCtx = pTsMuxerCtx;
+        return 0;
 }
 
 static int makeTsPacket(TsMuxerContext* _pMuxCtx, int _nPid)
@@ -118,6 +138,8 @@ static int makeTsPacket(TsMuxerContext* _pMuxCtx, int _nPid)
 
 int MuxerAudio(TsMuxerContext* _pMuxCtx, uint8_t *_pData, int _nDataLen, int64_t _nPts)
 {
+        writeTable(_pMuxCtx, 0);
+        pthread_mutex_lock(&_pMuxCtx->tsMutex_);
         if (_pMuxCtx->arg.nAudioFormat == TK_AUDIO_AAC) {
                 InitAudioPES(&_pMuxCtx->pes, _pData, _nDataLen, _nPts);
         } else {
@@ -125,6 +147,7 @@ int MuxerAudio(TsMuxerContext* _pMuxCtx, uint8_t *_pData, int _nDataLen, int64_t
         }
 
         int nRet = makeTsPacket(_pMuxCtx, AUDIO_PID);
+        pthread_mutex_unlock(&_pMuxCtx->tsMutex_);
         if (nRet < 0)
                 return nRet;
         return 0;
@@ -132,6 +155,8 @@ int MuxerAudio(TsMuxerContext* _pMuxCtx, uint8_t *_pData, int _nDataLen, int64_t
 
 int MuxerVideo(TsMuxerContext* _pMuxCtx, uint8_t *_pData, int _nDataLen, int64_t _nPts)
 {
+        writeTable(_pMuxCtx, 0);
+        pthread_mutex_lock(&_pMuxCtx->tsMutex_);
         if (_pMuxCtx->nPcrFlag == 0) {
                 _pMuxCtx->nPcrFlag = 1;
                 InitVideoPESWithPcr(&_pMuxCtx->pes, _pMuxCtx->arg.nVideoFormat, _pData, _nDataLen, _nPts);
@@ -140,6 +165,7 @@ int MuxerVideo(TsMuxerContext* _pMuxCtx, uint8_t *_pData, int _nDataLen, int64_t
         }
 
         int nRet = makeTsPacket(_pMuxCtx, VIDEO_PID);
+        pthread_mutex_unlock(&_pMuxCtx->tsMutex_);
         if (nRet < 0)
                 return nRet;
         return 0;
