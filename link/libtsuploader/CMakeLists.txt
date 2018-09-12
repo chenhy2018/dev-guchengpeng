@@ -73,6 +73,7 @@ add_executable(ipc-testupload
     ./demo/socket_logging.c
     ./demo/dbg.c
     ./demo/log2file.c
+    ./demo/queue.c
 )
 add_definitions(-D__ARM)
 endif()
