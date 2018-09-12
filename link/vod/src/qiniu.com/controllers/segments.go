@@ -49,14 +49,14 @@ func GetSegments(c *gin.Context) {
 	user, err := getUserInfo(xl, c.Request)
 	if err != nil {
 		xl.Errorf("get user info error, error = %v", err)
-		c.JSON(500, nil)
+		c.JSON(500, gin.H{"error": "Service Internal Error"})
 		return
 	}
 
 	bucket, err := GetBucket(xl, getUid(user.uid), params.namespace)
 	if err != nil {
 		xl.Errorf("get bucket error, error =  %#v", err)
-		c.JSON(500, nil)
+		c.JSON(500, gin.H{"error": "Service Internal Error"})
 		return
 	}
 	mac := qbox.NewMac(user.ak, user.sk)
@@ -64,7 +64,7 @@ func GetSegments(c *gin.Context) {
 	ret, marker, err := SegMod.GetFragmentTsInfo(xl, params.limit, newFrom, params.to, bucket, params.uaid, params.marker, mac)
 	if err != nil {
 		xl.Errorf("get segments list error, error =%#v", err)
-		c.JSON(500, nil)
+		c.JSON(500, gin.H{"error": "Service Internal Error"})
 		return
 	}
 	if ret == nil {
@@ -79,7 +79,7 @@ func GetSegments(c *gin.Context) {
 	if err != nil {
 		xl.Error("parse seg start/end failed")
 		c.JSON(500, gin.H{
-			"error": "parse seg start/end failed",
+			"error": "Service Internal Error",
 		})
 		return
 	}
