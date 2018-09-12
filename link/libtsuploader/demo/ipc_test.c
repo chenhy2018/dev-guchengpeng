@@ -36,6 +36,7 @@ void InitConfig()
     gIpcConfig.bucketName = "ipcamera";
     gIpcConfig.ak = "JAwTPb8dmrbiwt89Eaxa4VsL4_xSIYJoJh4rQfOQ";
     gIpcConfig.sk = "G5mtjT3QzG4Lf7jpCAN5PZHrGeoSH9jRdC96ecYS";
+    gIpcConfig.movingDetection = 1;
 }
 
 
@@ -66,7 +67,7 @@ void TraceTimeStamp( int type, double _dTimeStamp )
     lastTimeStamp = _dTimeStamp;
 }
 
-void ReportKodoInitError()
+void ReportKodoInitError( char *reason )
 {
     static struct timeval start = { 0, 0 }, end = { 0, 0 };
     double interval = 0;
@@ -74,8 +75,10 @@ void ReportKodoInitError()
     gettimeofday( &end, NULL );
     interval = GetTimeDiff( &start, &end );
     if ( interval >= gIpcConfig.timeStampPrintInterval ) {
-        DBG_LOG( "[ %s ] [ gKodoInitOk error ]\n", 
-                 gAjMediaStreamConfig.rtmpConfig.server);
+        DBG_LOG( "[ %s ] [ %s ]\n", 
+                 gAjMediaStreamConfig.rtmpConfig.server,
+                 reason
+                 );
         start = end;
     }
 }
@@ -85,10 +88,16 @@ int VideoGetFrameCb( int streamno, char *_pFrame,
                    unsigned long _nFrameIndex, unsigned long _nKeyFrameIndex,
                    void *_pContext)
 {
-    if ( !gKodoInitOk || !gMovingDetect ) {
-        ReportKodoInitError();
+    if ( !gKodoInitOk ) {
+        ReportKodoInitError( "kodo not init" );
         return 0;
     }
+
+    if ( gIpcConfig.movingDetection && !gMovingDetect ) {
+        ReportKodoInitError( "not detect moving" );
+        return 0;
+    }
+
 
     TraceTimeStamp( TYPE_VIDEO, _dTimeStamp );
     PushVideo( _pFrame, _nLen, (int64_t)_dTimeStamp, _nIskey, 0 );
@@ -104,7 +113,13 @@ int AudioGetFrameCb( char *_pFrame, int _nLen, double _dTimeStamp,
     static double min=0, max=0;
     int ret = 0;
 
-    if ( !gKodoInitOk || !gMovingDetect ) {
+    if ( !gKodoInitOk ) {
+        ReportKodoInitError("gKodoInitOk");
+        return 0;
+    }
+
+    if ( gIpcConfig.movingDetection && !gMovingDetect ) {
+        ReportKodoInitError("gMovingDetect");
         return 0;
     }
 
@@ -224,7 +239,7 @@ int InitKodo()
         return ret;
     }
 
-    DBG_LOG("kodo init ok\n");
+    DBG_LOG("[ %s ] kodo init ok\n", gAjMediaStreamConfig.rtmpConfig.server );
     gKodoInitOk = 1;
 
 }
@@ -294,7 +309,7 @@ void SdkLogCallback( char *log )
 
 int AlarmCallback(ALARM_ENTRY alarm, void *pcontext)
 {
-    DBG_LOG("alarm.code = %d\n", alarm.code );
+    DBG_LOG("[ %s ] alarm.code = %d\n", gAjMediaStreamConfig.rtmpConfig.server, alarm.code );
 
     if ( alarm.code == ALARM_CODE_MOTION_DETECT ) {
         gMovingDetect = 1;
@@ -322,7 +337,10 @@ int main()
         DBG_ERROR("InitIPC() fail\n");
     }
 
-    dev_sdk_register_callback( AlarmCallback, NULL, NULL, NULL );	
+    if ( gIpcConfig.movingDetection ) {
+        dev_sdk_register_callback( AlarmCallback, NULL, NULL, NULL );
+    }
+
     ret = InitKodo();
     if ( ret < 0 ) {
         DBG_ERROR("ret = %d\n",ret );
@@ -332,7 +350,7 @@ int main()
 
     for (;; ) {
         sleep( gIpcConfig.heartBeatInterval );
-        DBG_LOG("[ HEART BEAT] main thread is running\n");
+        DBG_LOG("[ %s ] [ HEART BEAT] main thread is running\n", gAjMediaStreamConfig.rtmpConfig.server );
     }
 
     DeInitIPC();

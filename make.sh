@@ -45,3 +45,8 @@ if [ "$WITH_PJSIP" = "ON" ];then
     ./test.sh $1
 fi
 
+if [ "$ARCH" = "mstar" ];then
+	arm-linux-gnueabihf-strip link/libtsuploader/ipc-testupload
+	cp -rvf link/libtsuploader/ipc-testupload /home/share/
+fi
+
