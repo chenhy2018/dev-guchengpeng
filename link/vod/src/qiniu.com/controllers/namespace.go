@@ -51,7 +51,6 @@ func getDomain(xl *xlog.Logger, bucket string, info *userInfo) (string, error) {
 	if err != nil {
 		return "", err
 	}
-        xl.Infof("getdomain %s %s bucket %s", info.ak, info.sk, bucket)
 
 	body, err := ioutil.ReadAll(resp.Body)
 	var domain []string
