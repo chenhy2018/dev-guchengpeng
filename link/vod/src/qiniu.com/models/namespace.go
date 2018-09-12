@@ -36,12 +36,13 @@ func (m *NamespaceModel) Register(xl *xlog.Logger, req NamespaceInfo) error {
 				},
 				bson.M{
 					"$set": bson.M{
-						NAMESPACE_ITEM_ID:     req.Space,
-						ITEM_CREATE_TIME:      time.Now().Unix(),
-						NAMESPACE_ITEM_BUCKET: req.Bucket,
-						ITEM_UPDATA_TIME:      time.Now().Unix(),
-						NAMESPACE_ITEM_UID:    req.Uid,
-						NAMESPACE_ITEM_DOMAIN: req.Domain,
+						NAMESPACE_ITEM_ID:             req.Space,
+						ITEM_CREATE_TIME:              time.Now().Unix(),
+						NAMESPACE_ITEM_BUCKET:         req.Bucket,
+						ITEM_UPDATA_TIME:              time.Now().Unix(),
+						NAMESPACE_ITEM_UID:            req.Uid,
+						NAMESPACE_ITEM_DOMAIN:         req.Domain,
+						NAMESPACE_ITEM_AUTO_CREATE_UA: req.AutoCreateUa,
 					},
 				},
 			)

@@ -226,14 +226,19 @@ func updateNamespace(xl *xlog.Logger, uid, space, newSpace string) error {
 	return nil
 }
 
-func updateBucket(xl *xlog.Logger, uid, space, bucket, newBucket, domain string) error {
+func updateBucket(xl *xlog.Logger, uid, space, bucket, newBucket string, info *userInfo) error {
 	if bucket != newBucket && newBucket != "" {
 		err := checkbucket(xl, newBucket)
 		if err != nil {
 			xl.Errorf("bucket is already register, err = %#v", err)
 			return err
 		}
-		err = namespaceMod.UpdateBucket(xl, uid, space, bucket, domain)
+		domain, err := getDomain(xl, newBucket, info)
+		if err != nil {
+			xl.Errorf("bucket is not correct, err = %#v", err)
+			return err
+		}
+		err = namespaceMod.UpdateBucket(xl, uid, space, newBucket, domain)
 		if err != nil {
 			xl.Errorf("Update falied error = %#v", err.Error())
 			return err
@@ -269,7 +274,7 @@ func UpdateNamespace(c *gin.Context) {
 	body, err := ioutil.ReadAll(c.Request.Body)
 	var namespaceData namespacebody
 	err = json.Unmarshal(body, &namespaceData)
-	if err != nil || namespaceData.Uid == "" {
+	if err != nil {
 		xl.Errorf("parse request body failed, body = %#v", body)
 		c.JSON(400, gin.H{
 			"error": "read callback body failed",
@@ -286,17 +291,9 @@ func UpdateNamespace(c *gin.Context) {
 		return
 	}
 
-	domain, err := getDomain(xl, namespaceData.Bucket, info)
-	if err != nil || domain == "" {
-		xl.Errorf("bucket is not correct")
-		c.JSON(403, gin.H{
-			"error": "bucket is not correct",
-		})
-		return
-	}
 	/*
 	   namespace := models.NamespaceInfo{
-	           Uid  : namespaceData.Uid,
+	           Uid  : info.Uid,
 	           Space : namespaceData.Namespace,
 	           Bucket  : namespaceData.Bucket,
 	           Domain : domain,
@@ -318,7 +315,7 @@ func UpdateNamespace(c *gin.Context) {
 		})
 		return
 	}
-	err = updateBucket(xl, getUid(info.uid), params.namespace, oldinfo[0].Bucket, namespaceData.Bucket, domain)
+	err = updateBucket(xl, getUid(info.uid), params.namespace, oldinfo[0].Bucket, namespaceData.Bucket, info)
 	if err != nil {
 		xl.Errorf("update bucket failed, err = %#v", err)
 		c.JSON(400, gin.H{

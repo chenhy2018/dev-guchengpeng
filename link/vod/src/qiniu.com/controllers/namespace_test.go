@@ -198,7 +198,6 @@ func TestUpdateNamespace(t *testing.T) {
 
 	// Change invaild bucket, return 403
 	body = namespacebody{
-		Uid:       "link",
 		Bucket:    "ipcamera1",
 		Namespace: "aab",
 	}
@@ -216,7 +215,7 @@ func TestUpdateNamespace(t *testing.T) {
 	c.Params = append(c.Params, param)
 	c.Request = req
 	UpdateNamespace(c)
-	assert.Equal(t, c.Writer.Status(), 403, "they should be equal")
+	assert.Equal(t, c.Writer.Status(), 400, "they should be equal")
 
 	// invaild body. return 400
 	body1 := "asddhjk"
