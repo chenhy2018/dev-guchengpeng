@@ -160,7 +160,7 @@ func (m *NamespaceModel) GetNamespaceInfos(xl *xlog.Logger, limit int, mark, uid
 	if err != nil {
 		return []NamespaceInfo{}, "", err
 	}
-	if count == limit {
+	if count < limit {
 		nextMark = fmt.Sprintf("%d", count)
 	}
 	return r, nextMark, nil
