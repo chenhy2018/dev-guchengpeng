@@ -8,7 +8,7 @@
 #include <time.h>
 #include <curl/curl.h>
 #ifdef __ARM
-#include "socket_logging.h"
+#include "./demo/socket_logging.h"
 #endif
 
 size_t getDataCallback(void* buffer, size_t size, size_t n, void* rptr);
@@ -296,7 +296,7 @@ static void * streamUpload(void *_pOpaque)
                                                pUploader->nTsDataLen, &putExtra);
 #endif
 #ifdef __ARM
-        report_status( error.code );// add by liyq to record ts upload status
+        report_status( error.code, key );// add by liyq to record ts upload status
 #endif
         if (error.code != 200) {
                 pUploader->state = TK_UPLOAD_FAIL;
