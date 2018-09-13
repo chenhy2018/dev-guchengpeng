@@ -160,7 +160,6 @@ func TestUpdateUa(t *testing.T) {
 	initDb()
 	// Change namespace to aab, return 400
 	body := uabody{
-		Uid:       "link",
 		Uaid:      "ipcamera2",
 		Namespace: "aab",
 	}
@@ -218,7 +217,6 @@ func TestUpdateUa(t *testing.T) {
 
 	// invaild namespace, return 400.
 	body = uabody{
-		Uid:       "link",
 		Uaid:      "ipcamera1",
 		Namespace: "test1",
 	}
@@ -271,7 +269,6 @@ func TestUpdateUa(t *testing.T) {
 
 	// Change ua to aaaaa
 	body = uabody{
-		Uid:       "link",
 		Uaid:      "aaaaa",
 		Namespace: "test1",
 	}
