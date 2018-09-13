@@ -20,6 +20,7 @@ typedef struct {
         bool IsNoAudio;
         bool IsNoVideo;
         bool IsTestMove;
+        bool IsTwoUpload;
 	int nSleeptime;
 	int nFirstFrameSleeptime;
 	int64_t nRolloverTestBase;
@@ -543,7 +544,7 @@ static int dataCallback(void *opaque, void *pData, int nDataLen, int nFlag, int6
         return ret;
 }
 
-static void * upadateToken(void * opaque) {
+static void * updateToken(void * opaque) {
         int ret = 0;
         while(1) {
                 sleep(cmdArg.nUptokenInterval);
@@ -617,6 +618,36 @@ static void checkCmdArg(const char * name)
         return;
 }
 
+static void * second_test(void * opaque) {
+        AvArg avarg;
+        
+        avarg.nAudioFormat = TK_AUDIO_AAC;
+        avarg.nSamplerate = 16000;
+        avarg.nChannels = 1;
+        avarg.nVideoFormat = TK_VIDEO_H264;
+
+        
+        UserUploadArg userUploadArg;
+        memset(&userUploadArg, 0, sizeof(userUploadArg));
+        userUploadArg.pToken_ = gtestToken;
+        userUploadArg.nTokenLen_ = strlen(gtestToken);
+        userUploadArg.pDeviceId_ = "testdeviceid0";
+        userUploadArg.nDeviceIdLen_ = strlen("testdeviceid0");
+        userUploadArg.nUploaderBufferSize = cmdArg.nQbufSize;
+        userUploadArg.nNewSegmentInterval = cmdArg.nNewSetIntval;
+        
+        TsMuxUploader *pTsMuxUploader;
+        int ret = CreateAndStartAVUploader(&pTsMuxUploader, &avarg, &userUploadArg);
+        if (ret != 0) {
+                fprintf(stderr, "CreateAndStartAVUploader err:%d\n", ret);
+                return;
+        }
+        
+        start_ffmpeg_test("rtmp://localhost:1935/live/movie", dataCallback, pTsMuxUploader);
+        sleep(1);
+        DestroyAVUploader(&pTsMuxUploader);
+}
+
 int main(int argc, const char** argv)
 {
 	flag_bool(&cmdArg.IsInputFromFFmpeg, "ffmpeg", "is input from ffmpeg. will set --testaac and not set noadts");
@@ -628,6 +659,9 @@ int main(int argc, const char** argv)
 	flag_bool(&cmdArg.IsNoAudio, "na", "no audio");
 	flag_bool(&cmdArg.IsNoVideo, "nv", "no video(not support now)");
 	flag_bool(&cmdArg.IsTestMove, "testmove", "testmove seperated by key frame");
+#ifdef TEST_WITH_FFMPEG
+        flag_bool(&cmdArg.IsTwoUpload, "two", "test two instance upload. ffmpeg and file");
+#endif
         flag_int(&cmdArg.nSleeptime, "sleeptime", "sleep time(milli) used by testmove.default(2s) if testmove is enable");
         flag_int(&cmdArg.nFirstFrameSleeptime, "fsleeptime", "first video key frame sleep time(milli)");
         flag_int(&cmdArg.nQbufSize, "qbufsize", "upload queue buffer size");
@@ -732,7 +766,7 @@ int main(int argc, const char** argv)
         pthread_attr_t attr;
         pthread_attr_init (&attr);
         pthread_attr_setdetachstate (&attr, PTHREAD_CREATE_DETACHED);
-        ret = pthread_create(&updateTokenThread, &attr, upadateToken, (void*)pTsMuxUploader);
+        ret = pthread_create(&updateTokenThread, &attr, updateToken, (void*)pTsMuxUploader);
         if (ret != 0) {
                 printf("create update token thread fail\n");
                 return ret;
@@ -769,18 +803,31 @@ int main(int argc, const char** argv)
                 pAFile = NULL;
         if (cmdArg.IsNoVideo)
                 pVFile = NULL;
-
-        if (cmdArg.IsInputFromFFmpeg) {
-                start_ffmpeg_test("rtmp://localhost:1935/live/movie", dataCallback, pTsMuxUploader);
-                //start_ffmpeg_test("rtmp://live.hkstv.hk.lxdns.com/live/hks", dataCallback, NULL);
-	} else {
-                printf("%s\n%s\n", pAFile, pVFile);
-                start_file_test(pAFile, pVFile, dataCallback, pTsMuxUploader);
-	}
         
+        pthread_t secondUploadThread = 0;
+        if (cmdArg.IsTwoUpload) {
+                ret = pthread_create(&secondUploadThread, NULL, second_test, NULL);
+                if (ret != 0) {
+                        printf("create update token thread fail\n");
+                        return ret;
+                }
+                
+                start_file_test(pAFile, pVFile, dataCallback, pTsMuxUploader);
+        } else {
+                if (cmdArg.IsInputFromFFmpeg) {
+                        start_ffmpeg_test("rtmp://localhost:1935/live/movie", dataCallback, pTsMuxUploader);
+                        //start_ffmpeg_test("rtmp://live.hkstv.hk.lxdns.com/live/hks", dataCallback, NULL);
+                } else {
+                        printf("%s\n%s\n", pAFile, pVFile);
+                        start_file_test(pAFile, pVFile, dataCallback, pTsMuxUploader);
+                }
+        }
         
         sleep(1);
         DestroyAVUploader(&pTsMuxUploader);
+        if (cmdArg.IsTwoUpload) {
+                pthread_join(secondUploadThread, NULL);
+        }
         UninitUploader();
         loginfo("should total:%d\n", nByteCount);
 
