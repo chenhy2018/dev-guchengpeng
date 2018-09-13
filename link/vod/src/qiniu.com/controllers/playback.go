@@ -88,8 +88,8 @@ func GetPlayBackm3u8(c *gin.Context) {
 		if err := getFastForwardStream(params, c); err != nil {
 			xl.Errorf("get fastforward stream error , error = %v", err.Error())
 			c.JSON(500, nil)
-			return
 		}
+		return
 	}
 	segs, _, err := SegMod.GetSegmentTsInfo(xl, params.from, params.to, params.namespace, params.uaid, 0, "")
 	if err != nil {
@@ -142,23 +142,6 @@ func GetPlayBackm3u8(c *gin.Context) {
 	c.String(200, m3u8.Mkm3u8(playlist, xl))
 }
 
-func (s *testStream) Read(b []byte) (n int, err error) {
-	n = len(s.Stream)
-	copy(b, s.Stream)
-	return n, nil
-}
-
-func (f *testStream) Seek(offset int64, whence int) (ret int64, err error) {
-	if whence == io.SeekEnd {
-		ret = int64(len(f.Stream))
-	}
-	return ret, nil
-}
-
-type testStream struct {
-	Stream []byte
-}
-
 func getFastForwardStream(params *requestParams, c *gin.Context) error {
 	url := c.Request.URL.String()
 	fullUrl := "http://" + c.Request.Host + url
@@ -172,7 +155,9 @@ func getFastForwardStream(params *requestParams, c *gin.Context) error {
 	if ffGrpcClient == nil {
 		return errors.New("grpc client error")
 	}
-	r, err := ffGrpcClient.GetTsStream(context.Background(), req)
+	ctx, cancel := context.WithCancel(context.Background())
+	r, err := ffGrpcClient.GetTsStream(ctx, req)
+	defer cancel()
 	if err != nil {
 		fmt.Println(err)
 	}
@@ -180,7 +165,7 @@ func getFastForwardStream(params *requestParams, c *gin.Context) error {
 		fmt.Println("get ts file error")
 	}
 
-	c.Header("Content-Type", "video/mp2t")
+	c.Header("Content-Type", "video/mp4")
 	c.Header("Access-Control-Allow-Origin", "*")
 	c.Header("Content-Disposition", "attachment;filename="+params.uaid+".ts")
 	c.Stream(func(w io.Writer) bool {
