@@ -26,23 +26,17 @@ var (
 func init() {
 	SegMod = &models.SegmentKodoModel{}
 	SegMod.Init()
-	getFFGrpcClient()
+	FFGrpcClientInit()
 
 }
-func getFFGrpcClient() pb.FastForwardClient {
-	if fastForwardClint != nil {
-		return fastForwardClint
-	}
-	conn, err := grpc.Dial("47.105.118.51:50051", grpc.WithInsecure())
-	//conn, err := grpc.Dial("127.0.0.1:50051", grpc.WithInsecure())
-
+func FFGrpcClientInit() {
+	//conn, err := grpc.Dial("47.105.118.51:50051", grpc.WithInsecure())
+	conn, err := grpc.Dial("127.0.0.1:50051", grpc.WithInsecure())
 	if err != nil {
 		fmt.Println("Init gprc failedgrpcgrpc")
 
 	}
-
 	fastForwardClint = pb.NewFastForwardClient(conn)
-	return fastForwardClint
 }
 
 // sample requset url = /playback/12345.m3u8?from=1532499345&to=1532499345&e=1532499345&token=xxxxxx
@@ -73,7 +67,6 @@ func GetPlayBackm3u8(c *gin.Context) {
 		})
 		return
 	}
-	fmt.Println("speed = ", params.speed)
 	xl.Infof("uid= %v, uaid = %v, from = %v, to = %v, namespace = %v", params.uid, params.uaid, params.from, params.to, params.namespace)
 
 	dayInMilliSec := int64((24 * time.Hour).Seconds() * 1000)
@@ -85,7 +78,7 @@ func GetPlayBackm3u8(c *gin.Context) {
 		return
 	}
 	if params.speed != 1 {
-		if err := getFastForwardStream(params, c); err != nil {
+		if err := getFastForwardStream(xl, params, c); err != nil {
 			xl.Errorf("get fastforward stream error , error = %v", err.Error())
 			c.JSON(500, nil)
 		}
@@ -142,7 +135,7 @@ func GetPlayBackm3u8(c *gin.Context) {
 	c.String(200, m3u8.Mkm3u8(playlist, xl))
 }
 
-func getFastForwardStream(params *requestParams, c *gin.Context) error {
+func getFastForwardStream(xl *xlog.Logger, params *requestParams, c *gin.Context) error {
 	url := c.Request.URL.String()
 	fullUrl := "http://" + c.Request.Host + url
 
@@ -150,21 +143,13 @@ func getFastForwardStream(params *requestParams, c *gin.Context) error {
 	expire := time.Now().Add(time.Hour).Unix()
 	req.Url = getNewToken(fullUrl, expire)
 	req.Speed = params.speed
-	fmt.Println(req.Url)
-	ffGrpcClient := getFFGrpcClient()
-	if ffGrpcClient == nil {
-		return errors.New("grpc client error")
-	}
 	ctx, cancel := context.WithCancel(context.Background())
-	r, err := ffGrpcClient.GetTsStream(ctx, req)
+	r, err := fastForwardClint.GetTsStream(ctx, req)
 	defer cancel()
 	if err != nil {
-		fmt.Println(err)
+		xl.Errorf("get TsStream error, errr =%#v", err)
+		return errors.New("get TsStream error")
 	}
-	if r == nil {
-		fmt.Println("get ts file error")
-	}
-
 	c.Header("Content-Type", "video/mp4")
 	c.Header("Access-Control-Allow-Origin", "*")
 	c.Header("Content-Disposition", "attachment;filename="+params.uaid+".ts")
