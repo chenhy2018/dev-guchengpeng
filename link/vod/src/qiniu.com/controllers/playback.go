@@ -62,7 +62,7 @@ func GetPlayBackm3u8(c *gin.Context) {
 		return
 	}
 
-	bucket, err := GetBucket(xl, userInfo.ak, params.namespace)
+	bucket, err := GetBucket(xl, getUid(userInfo.uid), params.namespace)
 	if err != nil {
 		xl.Errorf("get bucket error, error =  %#v", err)
 		c.JSON(500, gin.H{"error": "Service Internal Error"})

@@ -38,9 +38,7 @@ func TestRegisterUa(t *testing.T) {
 	RegisterNamespace(c)
 
 	// register ua
-	// bucket maybe already exist. so not check this response.
 	body := uabody{
-		Uaid:      "ipcamera1",
 		Namespace: "test1",
 	}
 
@@ -79,7 +77,6 @@ func TestRegisterUa(t *testing.T) {
 	assert.Equal(t, c.Writer.Status(), 400, "they should be equal")
 
 	body = uabody{
-		Uaid:      "ipcamera",
 		Namespace: "test1",
 	}
 
@@ -94,7 +91,7 @@ func TestRegisterUa(t *testing.T) {
 	c.Params = append(c.Params, param)
 	param = gin.Param{
 		Key:   "uaid",
-		Value: "ipcamera1",
+		Value: "ipcamera",
 	}
 	c.Params = append(c.Params, param)
 	c.Request = req

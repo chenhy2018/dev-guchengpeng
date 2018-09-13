@@ -94,7 +94,7 @@ func RegisterUa(c *gin.Context) {
 
 	ua := models.UaInfo{
 		Uid:       getUid(user.uid),
-		UaId:      uaData.Uaid,
+		UaId:      params.uaid,
 		Namespace: params.namespace,
 		Password:  uaData.Password,
 	}
@@ -112,7 +112,7 @@ func RegisterUa(c *gin.Context) {
 	if len(info) != 0 {
 		xl.Errorf("ua is exist")
 		c.JSON(400, gin.H{
-			"error": "us is exist",
+			"error": "ua is exist",
 		})
 		return
 	}
@@ -142,7 +142,7 @@ func DeleteUa(c *gin.Context) {
 	}
 	err = UaMod.Delete(xl, params.namespace, params.uaid)
 	if err != nil {
-		xl.Errorf("Register falied error = %#v", err.Error())
+		xl.Errorf("Delete falied error = %#v", err.Error())
 		c.JSON(400, gin.H{
 			"error": err.Error(),
 		})

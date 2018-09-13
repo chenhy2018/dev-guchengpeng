@@ -44,7 +44,6 @@ func TestRegisterNamespace(t *testing.T) {
 	initDb()
 	// bucket maybe already exist. so not check this response.
 	body := namespacebody{
-		Uid:       "link",
 		Bucket:    "ipcamera",
 		Namespace: "test1",
 	}
@@ -72,7 +71,6 @@ func TestRegisterNamespace(t *testing.T) {
 
 	// bucket is not correct. return 403
 	body = namespacebody{
-		Uid:       "link",
 		Bucket:    "ipcamera1",
 		Namespace: "aabb",
 	}
@@ -88,7 +86,6 @@ func TestRegisterNamespace(t *testing.T) {
 	// body is not correct. return 403
 	/*
 	   body = namespacebody{
-	            Uid : "aabb",
 	   }
 	*/
 	body1 := "asddhjk"
@@ -150,7 +147,6 @@ func TestUpdateNamespace(t *testing.T) {
 	initDb()
 	// bucket maybe already exit. so not check this response.
 	body := namespacebody{
-		Uid:       "link",
 		Bucket:    "ipcamera",
 		Namespace: "aab",
 	}
@@ -176,7 +172,6 @@ func TestUpdateNamespace(t *testing.T) {
 
 	// Change namespace to aab
 	body = namespacebody{
-		Uid:       "link",
 		Bucket:    "ipcamera",
 		Namespace: "aab",
 	}
@@ -198,7 +193,6 @@ func TestUpdateNamespace(t *testing.T) {
 
 	// Change invaild bucket, return 403
 	body = namespacebody{
-		Uid:       "link",
 		Bucket:    "ipcamera1",
 		Namespace: "aab",
 	}
@@ -216,7 +210,7 @@ func TestUpdateNamespace(t *testing.T) {
 	c.Params = append(c.Params, param)
 	c.Request = req
 	UpdateNamespace(c)
-	assert.Equal(t, c.Writer.Status(), 403, "they should be equal")
+	assert.Equal(t, c.Writer.Status(), 400, "they should be equal")
 
 	// invaild body. return 400
 	body1 := "asddhjk"
@@ -237,7 +231,6 @@ func TestUpdateNamespace(t *testing.T) {
 
 	// Change namespace to test1
 	body = namespacebody{
-		Uid:       "link",
 		Bucket:    "ipcamera",
 		Namespace: "test1",
 	}
@@ -297,7 +290,6 @@ func TestAutoCreateUa(t *testing.T) {
 	xl := xlog.NewDummy()
 	// bucket maybe already exist. so not check this response.
 	body := namespacebody{
-		Uid:       "link",
 		Bucket:    "ipcamera",
 		Namespace: "test1",
 	}
@@ -317,7 +309,6 @@ func TestAutoCreateUa(t *testing.T) {
 	assert.Equal(t, check, false, "they should be equal")
 	// bucket maybe already exit. so not check this response.
 	body = namespacebody{
-		Uid:          "link",
 		Bucket:       "ipcamera",
 		Namespace:    "test1",
 		AutoCreateUa: true,
@@ -357,7 +348,6 @@ func TestHandleUaControl(t *testing.T) {
 
 	// bucket maybe already exist. so not check this response.
 	body := namespacebody{
-		Uid:       "link",
 		Bucket:    "ipcamera",
 		Namespace: "test1",
 	}
@@ -378,7 +368,6 @@ func TestHandleUaControl(t *testing.T) {
 	assert.Equal(t, err.Error(), "Can't find ua info", "they should be equal")
 	// bucket maybe already exit. so not check this response.
 	body = namespacebody{
-		Uid:          "link",
 		Bucket:       "ipcamera",
 		Namespace:    "test1",
 		AutoCreateUa: true,

@@ -17,7 +17,7 @@ import (
 func main() {
 
 	r := gin.Default()
-	config.Init("f", "qbox", "fusiondomain_ability.conf")
+	config.Init("f", "qbox", "linking_vod.conf")
 	var conf system.Configuration
 	err := config.Load(&conf)
 	if err != nil {
