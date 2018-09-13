@@ -19,6 +19,7 @@ static char gTestToken[1024] = { 0 };
 static Config gIpcConfig;
 static unsigned char gMovingDetect = 0;
 MediaStreamConfig gAjMediaStreamConfig = { 0 };
+TsMuxUploader *pTsMuxUploader;
 
 /*
  * TODO: config read from config file, ex: ipc.conf
@@ -100,7 +101,7 @@ int VideoGetFrameCb( int streamno, char *_pFrame,
 
 
     TraceTimeStamp( TYPE_VIDEO, _dTimeStamp );
-    PushVideo( _pFrame, _nLen, (int64_t)_dTimeStamp, _nIskey, 0 );
+    PushVideo(pTsMuxUploader, _pFrame, _nLen, (int64_t)_dTimeStamp, _nIskey, 0 );
 
     return 0;
 }
@@ -143,7 +144,7 @@ int AudioGetFrameCb( char *_pFrame, int _nLen, double _dTimeStamp,
 
     TraceTimeStamp( TYPE_AUDIO, _dTimeStamp );
 
-    ret = PushAudio( _pFrame, _nLen, (int64_t)timeStamp );
+    ret = PushAudio(pTsMuxUploader, _pFrame, _nLen, (int64_t)timeStamp );
     if ( ret != 0 ) {
         DBG_ERROR("ret = %d\n", ret );
     }
@@ -233,9 +234,24 @@ int InitKodo()
 
     DBG_LOG("gAjMediaStreamConfig.rtmpConfig.streamid = %s\n", gAjMediaStreamConfig.rtmpConfig.streamid);
     DBG_LOG("gAjMediaStreamConfig.rtmpConfig.server = %s\n", gAjMediaStreamConfig.rtmpConfig.server );
-    ret = InitUploader( gAjMediaStreamConfig.rtmpConfig.server, gTestToken, &avArg);
+
+    ret = InitUploader();
     if (ret != 0) {
         DBG_LOG("InitUploader error, ret = %d\n", ret );
+        return ret;
+    }
+
+    UserUploadArg userUploadArg;
+    memset(&userUploadArg, 0, sizeof(userUploadArg));
+    userUploadArg.pToken_ = gTestToken;
+    userUploadArg.nTokenLen_ = strlen(gTestToken);
+    userUploadArg.pDeviceId_ = gAjMediaStreamConfig.rtmpConfig.server;
+    userUploadArg.nDeviceIdLen_ = strlen(gAjMediaStreamConfig.rtmpConfig.server);
+    userUploadArg.nUploaderBufferSize = 512;
+
+    ret = CreateAndStartAVUploader(&pTsMuxUploader, &avArg, &userUploadArg);
+    if (ret != 0) {
+        DBG_LOG("CreateAndStartAVUploader error, ret = %d\n", ret );
         return ret;
     }
 
@@ -249,13 +265,14 @@ static void * upadateToken() {
 
         while( 1 ) {
             sleep( gIpcConfig.tokenUploadInterval );// 59 minutes
+            memset(gtestToken, 0, sizeof(gtestToken));
             ret = GetUploadToken(gTestToken, sizeof(gTestToken));
             if ( ret != 0 ) {
                 DBG_ERROR("GetUploadToken error, ret = %d\n", ret );
                 return NULL;
             }
             DBG_LOG("token:%s\n", gTestToken);
-            ret = UpdateToken(gTestToken);
+            ret = UpdateToken(pTsMuxUploader, gTestToken, strlen(gTestToken));
             if (ret != 0) {
                 DBG_ERROR("UpdateToken error, ret = %d\n", ret );
                 return NULL;
@@ -354,6 +371,7 @@ int main()
     }
 
     DeInitIPC();
+    DestroyAVUploader(&pTsMuxUploader);
     UninitUploader();
 
     return 0;
