@@ -15,6 +15,7 @@ import (
 	xlog "github.com/qiniu/xlog.v1"
 	"qiniu.com/auth"
 	"qiniu.com/models"
+	"qiniu.com/system"
 )
 
 type requestParams struct {
@@ -76,6 +77,9 @@ func GetUrlWithDownLoadToken(xl *xlog.Logger, domain, fname string, tsExpire int
 }
 
 func GetBucket(xl *xlog.Logger, uid, namespace string) (string, error) {
+	if system.HaveDb() == false {
+		return namespace, nil
+	}
 	namespaceMod = &models.NamespaceModel{}
 	info, err := namespaceMod.GetNamespaceInfo(xl, uid, namespace)
 	if err != nil {
@@ -88,6 +92,10 @@ func GetBucket(xl *xlog.Logger, uid, namespace string) (string, error) {
 }
 
 func IsAutoCreateUa(xl *xlog.Logger, bucket string) (bool, []models.NamespaceInfo, error) {
+	if system.HaveDb() == false {
+		return true, []models.NamespaceInfo{}, nil
+	}
+
 	namespaceMod = &models.NamespaceModel{}
 	info, err := namespaceMod.GetNamespaceByBucket(xl, bucket)
 	if err != nil {
@@ -180,6 +188,10 @@ func ParseRequest(c *gin.Context, xl *xlog.Logger) (*requestParams, error) {
 }
 
 func HandleUaControl(xl *xlog.Logger, bucket, uaid string) error {
+	if system.HaveDb() == false {
+		return nil
+	}
+
 	isAuto, info, err := IsAutoCreateUa(xl, bucket)
 	if err != nil {
 		return err
@@ -193,18 +205,6 @@ func HandleUaControl(xl *xlog.Logger, bucket, uaid string) error {
 	if isAuto == false {
 		if len(r) == 0 {
 			return fmt.Errorf("Can't find ua info")
-		}
-	} else {
-		if len(r) == 0 {
-			ua := models.UaInfo{
-				Uid:       info[0].Uid,
-				UaId:      uaid,
-				Namespace: info[0].Space,
-			}
-			err = UaMod.Register(xl, ua)
-			if err != nil {
-				return err
-			}
 		}
 	}
 	return nil
