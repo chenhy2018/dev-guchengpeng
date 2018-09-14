@@ -59,17 +59,15 @@ func UploadTs(c *gin.Context) {
 
 	}
 
-	/* Will be enable after namespace register.
-	           // Add namespace&ua check
-	           err = HandleUaControl(xl, kodoData.Bucket, ids[1])
-	           if err != nil {
-	   		xl.Errorf("error = %#v", err.Error())
-	                   c.JSON(400, gin.H{
-	   			"error": err.Error(),
-	                   })
-	   		return
-	   	}
-	*/
+	// Add namespace&ua check
+	err = HandleUaControl(xl, kodoData.Bucket, ids[1])
+	if err != nil {
+		xl.Errorf("error = %#v", err.Error())
+		c.JSON(400, gin.H{
+			"error": err.Error(),
+		})
+		return
+	}
 
 	err = HandleTs(xl, kodoData.Bucket, ids, kodoData, c.Request)
 	if err != nil {

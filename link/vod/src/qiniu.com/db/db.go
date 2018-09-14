@@ -30,7 +30,6 @@ type ColConfig struct {
 }
 
 func InitDb(config *MgoConfig) error {
-
 	if GlobConn != nil {
 		fmt.Printf("db already connected \n")
 		return nil
@@ -84,7 +83,7 @@ func WithCollection(coll string, cb func(*mgo.Collection) error) error {
 
 	session := cloneSession()
 	if session == nil {
-		return nil
+		return fmt.Errorf("Data base is not init")
 	}
 	defer session.Close()
 	c := session.DB(GlobConn.db).C(coll)
