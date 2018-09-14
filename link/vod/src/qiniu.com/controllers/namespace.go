@@ -25,7 +25,6 @@ func init() {
 }
 
 type namespacebody struct {
-	Uid          string `json:"uid"`
 	Bucket       string `json:"bucket"`
 	Domain       string `json:"domain"`
 	Namespace    string `json:"namespace"`
@@ -227,7 +226,7 @@ func updateNamespace(xl *xlog.Logger, uid, space, newSpace string) error {
 }
 
 func updateBucket(xl *xlog.Logger, uid, space, bucket, newBucket string, info *userInfo) error {
-if bucket != newBucket && newBucket != "" {
+	if bucket != newBucket && newBucket != "" {
 		err := checkbucket(xl, newBucket)
 		if err != nil {
 			xl.Errorf("bucket is already register, err = %#v", err)
