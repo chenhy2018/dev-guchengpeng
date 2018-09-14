@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/bouk/monkey"
+	"github.com/gin-gonic/gin"
 	"github.com/qiniu/api.v7/auth/qbox"
 	xlog "github.com/qiniu/xlog.v1"
 	"github.com/stretchr/testify/suite"
@@ -121,6 +122,18 @@ func (suite *PlayBackTestSuite) TestPlayBackWithGetSegmentsInfoError() {
 	w := PerformRequest(suite.r, req)
 	suite.Equal(500, w.Code, "500 for query kodo data error")
 }
+
+func (suite *PlayBackTestSuite) TestGetFastForwardStreamError() {
+	req, _ := http.NewRequest("GET", "/v1/namespaces/ipcamera/uas/testdeviceid8/playback?from=1532499325&to=1532499345&speed=2&e=1532499345&token=13764829407:4ZNcW_AanSVccUmwq6MnA_8SWk8=", nil)
+	defer monkey.UnpatchAll()
+	monkey.Patch(VerifyToken, func(xl *xlog.Logger, expire int64, realToken string, req *http.Request) bool { return true })
+	monkey.Patch(getFastForwardStream, func(xl *xlog.Logger, params *requestParams, c *gin.Context, user *userInfo) error {
+		return errors.New("get Ts Stream Error")
+	})
+	w := PerformRequest(suite.r, req)
+	suite.Equal(500, w.Code, "500 for query kodo data error")
+}
+
 func TestPlayBackSuite(t *testing.T) {
 	suite.Run(t, new(PlayBackTestSuite))
 }

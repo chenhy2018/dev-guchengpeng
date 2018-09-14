@@ -18,7 +18,6 @@ import (
 )
 
 type requestParams struct {
-	uid       string
 	uaid      string
 	from      int64
 	to        int64
@@ -167,7 +166,7 @@ func ParseRequest(c *gin.Context, xl *xlog.Logger) (*requestParams, error) {
 	}
 
 	speedT, err := strconv.ParseInt(speed, 10, 32)
-	if err != nil || !validspeed(speedT) {
+	if err != nil || !isValidSpeed(speedT) {
 		return nil, errors.New("Parse speed failed")
 	}
 
@@ -187,7 +186,7 @@ func ParseRequest(c *gin.Context, xl *xlog.Logger) (*requestParams, error) {
 
 	return params, nil
 }
-func validspeed(speed int64) bool {
+func isValidSpeed(speed int64) bool {
 	s := []int64{1, 2, 4, 8, 16, 32}
 	for _, v := range s {
 		if speed == v {
