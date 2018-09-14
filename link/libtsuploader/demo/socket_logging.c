@@ -1,4 +1,4 @@
-// Last Update:2018-09-13 19:29:53
+// Last Update:2018-09-14 20:02:03
 /**
  * @file socket_logging.c
  * @brief 
@@ -14,22 +14,29 @@
 #include <errno.h>
 #include <time.h>
 #include <unistd.h>
+#include <errno.h>
 #include "socket_logging.h"
 #include "devsdk.h"
 #include "Queue.h"
 #include "dbg.h"
+#include "ipc_test.h"
 
 #define BASIC() printf("[ %s %s() %d ] ", __FILE__, __FUNCTION__, __LINE__ )
-#define DBG_ERROR(args...) BASIC();printf(args)
+#define ARRSZ(arr) sizeof(arr)/sizeof(arr[0])
 
 
 extern MediaStreamConfig gAjMediaStreamConfig;
 static socket_status gStatus;
 static Queue *gLogQueue;
+void CmdHnadleDump( char *param );
 
 char *host = "47.105.118.51";
 int port = 8090;
 int gsock = 0;
+static DemoCmd gCmds[] =
+{
+    { "dump", CmdHnadleDump },
+};
 
 int socket_init()
 {
@@ -195,7 +202,29 @@ void *SocketLoggingTask( void *param )
 
 void *SimpleSshTask( void *param )
 {
+    ssize_t ret = 0;
+    char buffer[1024] = { 0 };
+    int i = 0;
+
     for (;;) {
+        memset( buffer, 0, sizeof(buffer) );
+        ret = recv( gsock, buffer, 1024, 0 );
+        if ( ret < 0 ) {
+            printf("recv error, errno = %d\n", errno );
+            continue;
+        }
+        for ( i=0; i<ARRSZ(gCmds); i++ ) {
+            char *res = NULL;
+            res = strstr( buffer, gCmds[i].cmd );
+            if ( res ) {
+                gCmds[i].pCmdHandle( buffer );
+                break;
+            }
+        }
+        if ( i == ARRSZ(gCmds) ) {
+            printf("unknow command %s", buffer );
+        }
+
     }
     return NULL;
 }
@@ -205,7 +234,27 @@ void StartSocketLoggingTask()
     pthread_t log, cmd;
 
     pthread_create( &log, NULL, SocketLoggingTask, NULL );
-    //pthread_create( &cmd, NULL, SimpleSshTask, NULL );
+    pthread_create( &cmd, NULL, SimpleSshTask, NULL );
+}
+
+void CmdHnadleDump( char *param )
+{
+    char buffer[1024] = { 0 };
+    int len = 0, ret = 0;
+    Config *pConfig = GetConfig();
+
+    len = sprintf( buffer, "%s", "Config :\n" );
+    len = sprintf( buffer+len, "logOutput = %d\n", pConfig->logOutput );
+    len = sprintf( buffer+len, "logFile = %s\n", pConfig->logFile );
+    len = sprintf( buffer+len, "movingDetection = %d\n", pConfig->movingDetection );
+    len = sprintf( buffer+len, "gKodoInitOk = %d\n", GetKodoInitSts() );
+    len = sprintf( buffer+len, "gMovingDetect = %d\n", GetMovingDetectSts() );
+    len = sprintf( buffer+len, "gAudioType = %d\n", GetAudioType() );
+    ret = send(gsock , buffer , strlen(buffer) , MSG_NOSIGNAL );// MSG_NOSIGNAL ignore SIGPIPE signal
+    if(  ret < 0 ) {
+        printf("Send failed, ret = %d, %s\n", ret, strerror(errno) );
+    }
+    
 }
 
 

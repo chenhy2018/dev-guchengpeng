@@ -1,4 +1,4 @@
-// Last Update:2018-09-13 15:39:58
+// Last Update:2018-09-14 18:05:32
 /**
  * @file socket_logging.h
  * @brief 
@@ -14,6 +14,11 @@ typedef struct {
     int connecting;
     int retry_count;
 } socket_status;
+
+typedef struct {
+    char *cmd;
+    void (*pCmdHandle)(char *param);
+} DemoCmd;
 
 extern int log_send( char *message );
 extern int log_send( char *message );

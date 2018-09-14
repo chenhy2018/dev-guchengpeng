@@ -12,6 +12,7 @@
 #include "dbg.h"
 #include "media_cfg.h"
 #include "cfg_parse.h"
+#include "socket_logging.h"
 
 /* global variable */
 static DevSdkAudioType gAudioType =  AUDIO_TYPE_AAC;
@@ -19,10 +20,29 @@ static int gKodoInitOk = 0;
 static char gTestToken[1024] = { 0 };
 static Config gIpcConfig;
 static unsigned char gMovingDetect = 0;
-MediaStreamConfig gAjMediaStreamConfig = { 0 };
+MediaStreamConfig gAjMediaStreamConfig;
 TsMuxUploader *pTsMuxUploader;
 static struct cfg_struct *cfg;
 
+int GetKodoInitSts()
+{
+    return gKodoInitOk;
+}
+
+Config *GetConfig()
+{
+    return &gIpcConfig;
+}
+
+int GetAudioType()
+{
+    return gAudioType;
+}
+
+int GetMovingDetectSts()
+{
+    return gMovingDetect;
+}
 /*
  * TODO: config read from config file, ex: ipc.conf
  * */
@@ -47,15 +67,15 @@ void LoadConfig()
 {
     cfg = cfg_init();
 
-    if (cfg_load(cfg,"ipc.conf") < 0) {
+    if (cfg_load(cfg,"/tmp/oem/app/ipc.conf") < 0) {
         fprintf(stderr,"Unable to load ipc.conf\n");
-        return -1;
     }
 }
 
 void UpdateConfig()
 {
-    char *logOutput = NULL;
+    const char *logOutput = NULL;
+    const char *logFile = NULL;
 
     logOutput = cfg_get( cfg, "LOG_OUTPUT" );
     if ( strcmp( logOutput, "socket") == 0 ) {
@@ -69,7 +89,9 @@ void UpdateConfig()
     } else {
         gIpcConfig.logOutput = OUTPUT_SOCKET;
     }
-    gIpcConfig.logFile = cfg_get( cfg, "LOG_FILE" );
+
+    logFile = cfg_get( cfg, "LOG_FILE" );
+    gIpcConfig.logFile = logFile;
     printf("read from ipc.conf, logOutput = %s\n", logOutput );
     printf("read from ipc.conf, logfile = %s\n", gIpcConfig.logFile );
 }
@@ -145,7 +167,6 @@ int AudioGetFrameCb( char *_pFrame, int _nLen, double _dTimeStamp,
 {
     static int first = 1;
     static double localTimeStamp = 0, timeStamp = 0;
-    static double min=0, max=0;
     int ret = 0;
 
     if ( !gKodoInitOk ) {
@@ -170,7 +191,7 @@ int AudioGetFrameCb( char *_pFrame, int _nLen, double _dTimeStamp,
         localTimeStamp += G711_TIMESTAMP_INTERVAL;
     }
 
-    if ( gAudioType = AUDIO_TYPE_AAC ) {
+    if ( gAudioType == AUDIO_TYPE_AAC ) {
         timeStamp = _dTimeStamp;
     } else {
         timeStamp = localTimeStamp;
@@ -191,7 +212,6 @@ static int InitIPC( )
     static int context = 1;
     int s32Ret = 0;
     AudioConfig audioConfig;
-    int ret = 0;
 
     DBG_LOG("start to init IPC\n");
     s32Ret = dev_sdk_init( DEV_SDK_PROCESS_APP );
@@ -202,7 +222,7 @@ static int InitIPC( )
     GetMediaStreamConfig(&gAjMediaStreamConfig);
     sleep( 2 );
     SendFileName();
-    ret = dev_sdk_start_video( 0, 0, VideoGetFrameCb, &context );
+    dev_sdk_start_video( 0, 0, VideoGetFrameCb, &context );
     dev_sdk_get_AudioConfig( &audioConfig );
     DBG_LOG("audioConfig.audioEncode.enable = %d\n", audioConfig.audioEncode.enable );
     if ( audioConfig.audioEncode.enable ) {
@@ -227,6 +247,7 @@ static int DeInitIPC()
     dev_sdk_stop_audio( 0, 1 );
     dev_sdk_stop_audio_play();
     dev_sdk_release();
+    return 0;
 }
 
 int InitKodo()
@@ -292,7 +313,7 @@ int InitKodo()
 
     DBG_LOG("[ %s ] kodo init ok\n", gAjMediaStreamConfig.rtmpConfig.server );
     gKodoInitOk = 1;
-
+    return 0;
 }
 
 static void * upadateToken() {
@@ -300,7 +321,7 @@ static void * upadateToken() {
 
         while( 1 ) {
             sleep( gIpcConfig.tokenUploadInterval );// 59 minutes
-            memset(gtestToken, 0, sizeof(gtestToken));
+            memset(gTestToken, 0, sizeof(gTestToken));
             ret = GetUploadToken(gTestToken, sizeof(gTestToken));
             if ( ret != 0 ) {
                 DBG_ERROR("GetUploadToken error, ret = %d\n", ret );
@@ -330,6 +351,8 @@ int StartTokenUpdateTask()
         return ret;
     }
     pthread_attr_destroy (&attr);
+
+    return 0;
 }
 
 int WaitForNetworkOk()
@@ -384,7 +407,7 @@ void StartConfigUpdateTask()
 {
     pthread_t thread;
 
-    pthread_create( &thread, ConfigUpdateTask, NULL, NULL );
+    pthread_create( &thread, NULL, ConfigUpdateTask, NULL );
 }
 
 int main()
