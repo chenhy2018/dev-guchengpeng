@@ -168,7 +168,7 @@ func DeleteNamespace(c *gin.Context) {
 
 	err = namespaceMod.Delete(xl, getUid(info.uid), params.namespace)
 	if err != nil {
-		xl.Errorf("Register falied error = %#v", err.Error())
+		xl.Errorf("Delete falied error = %#v", err.Error())
 		c.JSON(400, gin.H{
 			"error": err.Error(),
 		})
