@@ -1,0 +1,17 @@
+syntax = "proto3";
+
+package fastforward;
+
+
+service FastForward {
+        rpc GetTsStream(FastForwardInfo) returns (stream FastForwardStream) {}
+}
+
+message FastForwardInfo {
+        string url = 1;
+        int32  speed= 2;
+}
+
+message FastForwardStream {
+        bytes stream = 1;
+}
