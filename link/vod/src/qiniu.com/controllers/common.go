@@ -36,6 +36,16 @@ type userInfo struct {
 	sk  string
 }
 
+var (
+	localInfo userInfo
+)
+
+func setUserInfo(xl *xlog.Logger, ak, sk string) {
+	localInfo.uid = 0
+	localInfo.ak = ak
+	localInfo.sk = sk
+}
+
 func getUserInfo(xl *xlog.Logger, req *http.Request) (*userInfo, error) {
 	reqUrl := req.URL.String()
 	if strings.Contains(reqUrl, "token=") {
@@ -52,17 +62,28 @@ func getUserInfo(xl *xlog.Logger, req *http.Request) (*userInfo, error) {
 		return nil, errors.New("Parse auth header Failed")
 	}
 	ak := u["ak"][0]
-	user, err := auth.GetUserInfoFromQconf(xl, ak)
-	if err != nil {
-		return nil, errors.New("get userinfo error")
+	var info userInfo
+	if system.HaveQconf() == true {
+		user, err := auth.GetUserInfoFromQconf(xl, ak)
+		if err != nil {
+			return nil, errors.New("get userinfo error")
+		}
+		uid := user.Uid
+		info = userInfo{
+			uid: uid,
+			ak:  ak,
+			sk:  string(user.Secret[:]),
+		}
+	} else {
+		if ak == localInfo.ak {
+			info = userInfo{
+				uid: localInfo.uid,
+				ak:  localInfo.ak,
+				sk:  localInfo.sk,
+			}
+		}
 	}
-	uid := user.Uid
-	userInfo := userInfo{
-		uid: uid,
-		ak:  ak,
-		sk:  string(user.Secret[:]),
-	}
-	return &userInfo, nil
+	return &info, nil
 }
 
 func getUid(uid uint32) string {

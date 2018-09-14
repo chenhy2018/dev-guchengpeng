@@ -19,10 +19,8 @@ type AuthTestSuite struct {
 
 func (suite *AuthTestSuite) TestIfQconfIsNil() {
 	QConfClient = nil
-	SetSkFromUser(xlog.NewDummy(), []byte("xxaass"))
-	info, err := GetUserInfoFromQconf(xlog.NewDummy(), "xssss")
-	// if qconf client has not been initialized, also return nil and use load sk
-	suite.Equal(info.Secret, []byte("xxaass"))
+	_, err := GetUserInfoFromQconf(xlog.NewDummy(), "xssss")
+	suite.Equal(err, errors.New("qconf client has not been initialized"), nil)
 
 	monkey.PatchInstanceMethod(
 		reflect.TypeOf((*qconfapi.Client)(nil)), "Get", func(ss *qconfapi.Client, logger rpc.Logger, ret interface{}, ak string, entry int) error {

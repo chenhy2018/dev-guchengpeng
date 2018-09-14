@@ -14,10 +14,6 @@ const (
 	AK_PREFIX = "ak:"
 )
 
-var (
-	localSk []byte
-)
-
 var QConfClient *qconfapi.Client
 
 func Init(conf *system.Configuration) {
@@ -31,19 +27,12 @@ func Init(conf *system.Configuration) {
 func GetUserInfoFromQconf(xl *xlog.Logger, accessKey string) (*proto.AccessInfo, error) {
 	resp := proto.AccessInfo{}
 	if QConfClient == nil {
-		resp.Uid = 0
-		resp.Appid = 0
-		resp.Secret = localSk
-	} else {
-		err := QConfClient.Get(nil, &resp, AK_PREFIX+accessKey, qconfapi.Cache_NoSuchEntry)
-		if err != nil {
-			return nil, errors.New("get account info failed")
+		return nil, errors.New("qconf client has not been initialized")
+	}
+	err := QConfClient.Get(nil, &resp, AK_PREFIX+accessKey, qconfapi.Cache_NoSuchEntry)
+	if err != nil {
+		return nil, errors.New("get account info failed")
 
-		}
 	}
 	return &resp, nil
-}
-
-func SetSkFromUser(xl *xlog.Logger, sk []byte) {
-	localSk = sk
 }
