@@ -79,7 +79,7 @@ func GetPlayBackm3u8(c *gin.Context) {
 	if params.speed != 1 {
 		if err := getFastForwardStream(xl, params, c, userInfo); err != nil {
 			xl.Errorf("get fastforward stream error , error = %v", err.Error())
-			c.JSON(500, nil)
+			c.JSON(500, gin.H{"error": "Service Internal Error"})
 		}
 		return
 	}
