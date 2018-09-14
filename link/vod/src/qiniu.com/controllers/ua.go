@@ -3,12 +3,12 @@ package controllers
 import (
 	//"time"
 	"encoding/json"
-	"errors"
+	//"errors"
 	"github.com/gin-gonic/gin"
 	xlog "github.com/qiniu/xlog.v1"
 	"io/ioutil"
 	"qiniu.com/models"
-	"strconv"
+	//"strconv"
 )
 
 var (
@@ -21,45 +21,11 @@ func init() {
 }
 
 type uabody struct {
-	Uid       string `json:"uid"`
 	Uaid      string `json:"uaid"`
 	Namespace string `json:"namespace"`
 	CreatedAt int64  `json:"createdAt"`
 	UpdatedAt int64  `json:"updatedAt"`
 	Password  string `json:"password"`
-}
-
-type params struct {
-	uid       string
-	namespace string
-	uaid      string
-	token     string
-	expire    int64
-	limit     int
-	marker    string
-}
-
-func parseRequest(c *gin.Context, xl *xlog.Logger) (*params, error) {
-	uaid := c.Param("uaid")
-	namespace := c.Param("namespace")
-	limit := c.DefaultQuery("limit", "1000")
-	marker := c.DefaultQuery("marker", "")
-
-	limitT, err := strconv.ParseInt(limit, 10, 32)
-	if err != nil {
-		return nil, errors.New("Parse limit time failed")
-	}
-	if limitT > 1000 {
-		limitT = 1000
-	}
-
-	param := &params{
-		uaid:      uaid,
-		namespace: namespace,
-		limit:     int(limitT),
-		marker:    marker,
-	}
-	return param, nil
 }
 
 // sample requset url = /v1/namespaces/<Namespace>/uas
@@ -85,15 +51,21 @@ func RegisterUa(c *gin.Context) {
 		})
 		return
 	}
+	user, err := getUserInfo(xl, c.Request)
+	if err != nil {
+		c.JSON(403, gin.H{
+			"error": "get user info falied",
+		})
+	}
 
 	ua := models.UaInfo{
-		Uid:       params.uid,
-		UaId:      uaData.Uaid,
+		Uid:       getUid(user.uid),
+		UaId:      params.uaid,
 		Namespace: params.namespace,
 		Password:  uaData.Password,
 	}
 	model := models.NamespaceModel{}
-	r, err := model.GetNamespaceInfo(xl, params.uid, params.namespace)
+	r, err := model.GetNamespaceInfo(xl, getUid(user.uid), params.namespace)
 	if err != nil || len(r) == 0 {
 		xl.Errorf("namespace is not correct")
 		c.JSON(400, gin.H{
@@ -102,11 +74,11 @@ func RegisterUa(c *gin.Context) {
 		return
 	}
 
-	info, err := UaMod.GetUaInfo(xl, uaData.Namespace, uaData.Uaid)
+	info, err := UaMod.GetUaInfo(xl, uaData.Namespace, params.uaid)
 	if len(info) != 0 {
 		xl.Errorf("ua is exist")
 		c.JSON(400, gin.H{
-			"error": "us is exist",
+			"error": "ua is exist",
 		})
 		return
 	}
@@ -136,7 +108,7 @@ func DeleteUa(c *gin.Context) {
 	}
 	err = UaMod.Delete(xl, params.namespace, params.uaid)
 	if err != nil {
-		xl.Errorf("Register falied error = %#v", err.Error())
+		xl.Errorf("Delete falied error = %#v", err.Error())
 		c.JSON(400, gin.H{
 			"error": err.Error(),
 		})
@@ -161,7 +133,7 @@ func UpdateUa(c *gin.Context) {
 	body, err := ioutil.ReadAll(c.Request.Body)
 	var uaData uabody
 	err = json.Unmarshal(body, &uaData)
-	if err != nil || uaData.Uid == "" || uaData.Uaid == "" || uaData.Namespace == "" {
+	if err != nil {
 		xl.Errorf("parse request body failed, body = %#v", body)
 		c.JSON(400, gin.H{
 			"error": "read callback body failed",
@@ -169,15 +141,22 @@ func UpdateUa(c *gin.Context) {
 		return
 	}
 
+	user, err := getUserInfo(xl, c.Request)
+	if err != nil {
+		c.JSON(403, gin.H{
+			"error": "get user info falied",
+		})
+	}
+
 	ua := models.UaInfo{
-		Uid:       uaData.Uid,
+		Uid:       getUid(user.uid),
 		UaId:      uaData.Uaid,
 		Namespace: uaData.Namespace,
 		Password:  uaData.Password,
 	}
 
 	model := models.NamespaceModel{}
-	r, err := model.GetNamespaceInfo(xl, uaData.Uid, uaData.Namespace)
+	r, err := model.GetNamespaceInfo(xl, getUid(user.uid), params.namespace)
 	if err != nil || len(r) == 0 {
 		xl.Errorf("namespace is not correct")
 		c.JSON(400, gin.H{
@@ -186,12 +165,33 @@ func UpdateUa(c *gin.Context) {
 		return
 	}
 
-	if uaData.Namespace != params.namespace {
-		info, _ := UaMod.GetUaInfo(xl, uaData.Namespace, uaData.Uaid)
+	if ua.UaId == "" {
+		ua.UaId = params.uaid
+	}
+
+	if ua.Namespace == "" {
+		ua.Namespace = params.namespace
+	}
+
+	info, err := UaMod.GetUaInfo(xl, params.namespace, params.uaid)
+	if len(info) == 0 || err != nil {
+		xl.Errorf("ua is not correct")
+		c.JSON(400, gin.H{
+			"error": "ua is not correct",
+		})
+		return
+	}
+
+	if ua.Password == "" {
+		ua.Password = info[0].Password
+	}
+
+	if ua.Namespace != params.namespace {
+		info, _ = UaMod.GetUaInfo(xl, ua.Namespace, ua.UaId)
 		if len(info) != 0 {
 			xl.Errorf("ua is exist")
 			c.JSON(400, gin.H{
-				"error": "us is exist",
+				"error": "ua is exist",
 			})
 			return
 		}

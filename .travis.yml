@@ -11,6 +11,7 @@ addons:
       - mongodb-org-shell
 services:
   - mongodb
+  - redis
 install:
   - sleep 10
 script:

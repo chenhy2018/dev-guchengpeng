@@ -2,17 +2,18 @@ cmake_minimum_required (VERSION 2.8)
 
 project(tsuploader)
 
+add_definitions("-Wall -g")
 include_directories("${CMAKE_CURRENT_SOURCE_DIR}/../../third_party/curl-7.61.0/include")
 include_directories("${CMAKE_CURRENT_SOURCE_DIR}/c-sdk")
 
-if(CMAKE_TOOLCHAIN_FILE)
+if ( $ENV{ARCH} STREQUAL mstar )
 include_directories("${CMAKE_CURRENT_SOURCE_DIR}/demo/include")
 include_directories("${CMAKE_CURRENT_SOURCE_DIR}/")
 endif()
 
 
 link_directories("${CMAKE_CURRENT_SOURCE_DIR}/../../third_party/curl-7.61.0/lib/.libs")
-if(CMAKE_TOOLCHAIN_FILE)
+if ( $ENV{ARCH} STREQUAL mstar )
 link_directories("${CMAKE_CURRENT_SOURCE_DIR}/libs")
 endif()
 
@@ -23,7 +24,7 @@ if(NOT WITH_OPENSSL)
         add_definitions(-DDISABLE_OPENSSL)
 endif()
 
-if(CMAKE_TOOLCHAIN_FILE)
+if ( $ENV{ARCH} STREQUAL mstar )
 set(LIBFFMPEG "")
 else()
 set(LIBFFMPEG avformat avcodec swresample avutil)
@@ -34,18 +35,6 @@ if ($ENV{WITH_FFMPEG} STREQUAL "OFF")
         add_definitions(-DUSE_OWN_TSMUX)
 else()
         message("WITH_FFMPEG")
-endif()
-
-if (NOT TEST_WITHOUT_FFMPEG) 
-        message("TEST_WITH_FFMPEG")
-        add_definitions(-DTEST_WITH_FFMPEG)
-	#include_directories("${CMAKE_CURRENT_SOURCE_DIR}/../../third_party/ffmpeg-4.0/")
-	#link_directories("${CMAKE_CURRENT_SOURCE_DIR}/../../third_party/ffmpeg-4.0/libavformat")
-	#link_directories("${CMAKE_CURRENT_SOURCE_DIR}/../../third_party/ffmpeg-4.0/libavcodec")
-	#link_directories("${CMAKE_CURRENT_SOURCE_DIR}/../../third_party/ffmpeg-4.0/libavutil")
-else()
-        message("TEST_WITHOUT_FFMPEG")
-        set(LIBFFMPEG "")
 endif()
 
 add_subdirectory(c-sdk)
@@ -74,41 +63,26 @@ add_library(tsuploader STATIC
         mpegts.h
 )
 
-if(CMAKE_TOOLCHAIN_FILE)
-add_executable(testupload
+if ( $ENV{ARCH} STREQUAL x86 )
+    add_subdirectory(pcdemo)
+endif()
+
+if ( $ENV{ARCH} STREQUAL mstar )
+add_executable(ipc-testupload
     ./demo/ipc_test.c
     ./demo/socket_logging.c
     ./demo/dbg.c
     ./demo/log2file.c
+    ./demo/queue.c
 )
 add_definitions(-D__ARM)
-else()
-add_executable(testupload
-    test.c
-)
 endif()
 
-if(APPLE)
-	set(CMAKE_EXE_LINKER_FLAGS
-    		"-framework AudioToolbox -framework VideoToolbox -framework CoreGraphics -framework QuartzCore -framework CoreFoundation -framework CoreMedia -framework Security")
-	if(DISABLE_OPENSSL)
-        	target_link_libraries(testupload tsuploader ${LIBFFMPEG} qiniu curl bz2 lzma iconv z)
-        else()
-        	target_link_libraries(testupload tsuploader ${LIBFFMPEG} qiniu curl crypto bz2 lzma iconv z)
-        endif()
-else()
-    if(CMAKE_TOOLCHAIN_FILE)
-        if(DISABLE_OPENSSL)
-        	target_link_libraries(testupload tsuploader ${LIBFFMPEG} qiniu curl m pthread devsdk tools)
-        else()
-        	target_link_libraries(testupload tsuploader ${LIBFFMPEG} qiniu curl crypto m pthread devsdk tools)
-        endif()
+if ( $ENV{ARCH} STREQUAL mstar )
+    if(DISABLE_OPENSSL)
+        target_link_libraries(ipc-testupload tsuploader ${LIBFFMPEG} qiniu curl m pthread devsdk tools)
     else()
-        if(DISABLE_OPENSSL)
-        	target_link_libraries(testupload tsuploader ${LIBFFMPEG} qiniu curl m pthread z)
-        else()
-        	target_link_libraries(testupload tsuploader ${LIBFFMPEG} avutil qiniu curl crypto m pthread z)
-        endif()
+        target_link_libraries(ipc-testupload tsuploader ${LIBFFMPEG} qiniu curl crypto m pthread devsdk tools)
     endif()
 endif()
 

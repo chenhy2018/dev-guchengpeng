@@ -11,7 +11,6 @@
 #define QINIU_IO_H
 
 #include "http.h"
-#include <curl/system.h>
 #include "reader.h"
 
 #pragma pack(1)

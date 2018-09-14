@@ -15,7 +15,7 @@ typedef struct {
         void *pOpaque;
 }TsMuxerArg;
 
-TsMuxerContext * NewTsMuxerContext(TsMuxerArg *pArg);
+int NewTsMuxerContext(TsMuxerArg *pArg, TsMuxerContext **pTsMuxerContext);
 int MuxerAudio(TsMuxerContext* pMuxerCtx, uint8_t *pData, int nDataLen, int64_t nPts);
 int MuxerVideo(TsMuxerContext* pMuxerCtx, uint8_t *pData, int nDataLen,  int64_t nPts);
 int MuxerFlush(TsMuxerContext* pMuxerCtx);

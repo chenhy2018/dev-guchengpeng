@@ -32,6 +32,7 @@ typedef struct {
     char *bucketName;
     char *ak;
     char *sk;
+    unsigned char movingDetection;
 } Config;
 
 #endif  /*IPC_TEST_H*/

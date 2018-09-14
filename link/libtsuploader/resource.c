@@ -18,9 +18,12 @@ static void * recycle(void *_pOpaque)
         while(!manager.nQuit_ && info.nLen_ == 0) {
                 AsyncInterface *pAsync = NULL;
                 int ret = manager.pQueue_->Pop(manager.pQueue_, (char *)(&pAsync), sizeof(AsyncInterface *));
+                if (ret == TK_TIMEOUT) {
+                        continue;
+                }
                 if (ret == sizeof(TsUploader *)) {
-                        fprintf(stderr, "pop from mgr:%p\n", pAsync);
-                        if (pAsync == NULL && manager.nQuit_ != 1){
+                        loginfo("pop from mgr:%p\n", pAsync);
+                        if (pAsync == NULL) {
                                 logwarn("NULL function");
                         } else {
                                 AsynFunction func = pAsync->function;
@@ -45,7 +48,7 @@ int StartMgr()
                 return 0;
         }
 
-        int ret = NewCircleQueue(&manager.pQueue_, TSQ_FIX_LENGTH, sizeof(void *), 100);
+        int ret = NewCircleQueue(&manager.pQueue_, 1, TSQ_FIX_LENGTH, sizeof(void *), 100);
         if (ret != 0){
                 return ret;
         }

@@ -4,13 +4,14 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"github.com/bouk/monkey"
+	"github.com/gin-gonic/gin"
+	"github.com/qiniu/xlog.v1"
+	"github.com/stretchr/testify/assert"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"testing"
-
-	"github.com/gin-gonic/gin"
-	"github.com/stretchr/testify/assert"
 )
 
 func TestRegisterUa(t *testing.T) {
@@ -19,7 +20,6 @@ func TestRegisterUa(t *testing.T) {
 
 	// register name space.  bucket maybe already exist. so not check this response.
 	bodyN := namespacebody{
-		Uid:       "link",
 		Bucket:    "ipcamera",
 		Namespace: "test1",
 	}
@@ -32,15 +32,13 @@ func TestRegisterUa(t *testing.T) {
 		Key:   "namespace",
 		Value: "test1",
 	}
+	monkey.Patch(getUserInfo, func(xl *xlog.Logger, req *http.Request) (*userInfo, error) { return &user, nil })
 	c.Params = append(c.Params, param)
 	c.Request = req
 	RegisterNamespace(c)
 
 	// register ua
-	// bucket maybe already exist. so not check this response.
 	body := uabody{
-		Uid:       "link",
-		Uaid:      "ipcamera1",
 		Namespace: "test1",
 	}
 
@@ -79,8 +77,6 @@ func TestRegisterUa(t *testing.T) {
 	assert.Equal(t, c.Writer.Status(), 400, "they should be equal")
 
 	body = uabody{
-		Uid:       "link",
-		Uaid:      "ipcamera",
 		Namespace: "test1",
 	}
 
@@ -95,7 +91,7 @@ func TestRegisterUa(t *testing.T) {
 	c.Params = append(c.Params, param)
 	param = gin.Param{
 		Key:   "uaid",
-		Value: "ipcamera1",
+		Value: "ipcamera",
 	}
 	c.Params = append(c.Params, param)
 	c.Request = req
@@ -108,6 +104,8 @@ func TestGetUa(t *testing.T) {
 	recoder := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(recoder)
 	c.Request = req
+	monkey.Patch(getUserInfo, func(xl *xlog.Logger, req *http.Request) (*userInfo, error) { return &user, nil })
+
 	param := gin.Param{
 		Key:   "namespace",
 		Value: "test1",
@@ -162,14 +160,13 @@ func TestUpdateUa(t *testing.T) {
 	initDb()
 	// Change namespace to aab, return 400
 	body := uabody{
-		Uid:       "link",
 		Uaid:      "ipcamera2",
 		Namespace: "aab",
 	}
 
 	bodyBuffer, _ := json.Marshal(body)
 	bodyT := bytes.NewBuffer(bodyBuffer)
-
+	monkey.Patch(getUserInfo, func(xl *xlog.Logger, req *http.Request) (*userInfo, error) { return &user, nil })
 	req, _ := http.NewRequest("Put", "/v1/namespaces/test1/uas/ipcamera2", bodyT)
 	recoder := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(recoder)
@@ -192,7 +189,6 @@ func TestUpdateUa(t *testing.T) {
 
 	// Change uaid invaild ipcamera2 to ipcamera3, return 400.
 	body = uabody{
-		Uid:       "link",
 		Uaid:      "ipcamera3",
 		Namespace: "test1",
 	}
@@ -221,7 +217,6 @@ func TestUpdateUa(t *testing.T) {
 
 	// invaild namespace, return 400.
 	body = uabody{
-		Uid:       "link",
 		Uaid:      "ipcamera1",
 		Namespace: "test1",
 	}
@@ -274,7 +269,6 @@ func TestUpdateUa(t *testing.T) {
 
 	// Change ua to aaaaa
 	body = uabody{
-		Uid:       "link",
 		Uaid:      "aaaaa",
 		Namespace: "test1",
 	}

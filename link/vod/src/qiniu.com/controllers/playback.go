@@ -59,16 +59,14 @@ func GetPlayBackm3u8(c *gin.Context) {
 		return
 	}
 
-	fullUrl := "http://" + c.Request.Host + c.Request.URL.String()
-	if !VerifyToken(xl, params.expire, params.token, fullUrl, params.uid) {
+	if !VerifyToken(xl, params.expire, params.token, c.Request) {
 		xl.Errorf("verify token falied")
 		c.JSON(401, gin.H{
 			"error": "bad token",
 		})
 		return
 	}
-	xl.Infof("uid= %v, uaid = %v, from = %v, to = %v, namespace = %v", params.uid, params.uaid, params.from, params.to, params.namespace)
-
+	xl.Infof("uaid = %v, from = %v, to = %v, namespace = %v", params.uaid, params.from, params.to, params.namespace)
 	dayInMilliSec := int64((24 * time.Hour).Seconds() * 1000)
 	if (params.to - params.from) > dayInMilliSec {
 		xl.Errorf("bad from/to time, from = %v, to = %v", params.from, params.to)
@@ -77,17 +75,33 @@ func GetPlayBackm3u8(c *gin.Context) {
 		})
 		return
 	}
+	userInfo, err := getUserInfo(xl, c.Request)
 	if params.speed != 1 {
-		if err := getFastForwardStream(xl, params, c); err != nil {
+		if err := getFastForwardStream(xl, params, c, userInfo); err != nil {
 			xl.Errorf("get fastforward stream error , error = %v", err.Error())
 			c.JSON(500, nil)
 		}
 		return
 	}
-	segs, _, err := SegMod.GetSegmentTsInfo(xl, params.from, params.to, params.namespace, params.uaid, 0, "")
+	if err != nil {
+		xl.Errorf("get user Info failed%v", err)
+		c.JSON(500, gin.H{"error": "Service Internal Error"})
+		return
+	}
+
+	bucket, err := GetBucket(xl, getUid(userInfo.uid), params.namespace)
+	if err != nil {
+		xl.Errorf("get bucket error, error =  %#v", err)
+		c.JSON(500, gin.H{"error": "Service Internal Error"})
+		return
+	}
+
+	mac := qbox.NewMac(userInfo.ak, userInfo.sk)
+
+	segs, _, err := SegMod.GetSegmentTsInfo(xl, params.from, params.to, bucket, params.uaid, 0, "", mac)
 	if err != nil {
 		xl.Errorf("getTsInfo error, error =  %#v", err)
-		c.JSON(500, nil)
+		c.JSON(500, gin.H{"error": "Service Internal Error"})
 		return
 	}
 
@@ -103,13 +117,13 @@ func GetPlayBackm3u8(c *gin.Context) {
 		start, ok := v[models.SEGMENT_ITEM_START_TIME].(int64)
 		if !ok {
 			xl.Errorf("start time format error %#v", v)
-			c.JSON(500, nil)
+			c.JSON(500, gin.H{"error": "Service Internal Error"})
 			return
 		}
 		end, ok := v[models.SEGMENT_ITEM_END_TIME].(int64)
 		if !ok {
 			xl.Errorf("end time format error %#v", v)
-			c.JSON(500, nil)
+			c.JSON(500, gin.H{"error": "Service Internal Error"})
 			return
 		}
 		duration := float64(end-start) / 1000
@@ -118,10 +132,10 @@ func GetPlayBackm3u8(c *gin.Context) {
 
 		if !ok {
 			xl.Errorf("filename format error %#v", v)
-			c.JSON(500, nil)
+			c.JSON(500, gin.H{"error": "Service Internal Error"})
 			return
 		}
-		realUrl := GetUrlWithDownLoadToken(xl, "http://pdwjeyj6v.bkt.clouddn.com/", filename, total)
+		realUrl := GetUrlWithDownLoadToken(xl, "http://pdwjeyj6v.bkt.clouddn.com/", filename, total, userInfo)
 
 		m := map[string]interface{}{
 			"duration": duration,
@@ -135,13 +149,13 @@ func GetPlayBackm3u8(c *gin.Context) {
 	c.String(200, m3u8.Mkm3u8(playlist, xl))
 }
 
-func getFastForwardStream(xl *xlog.Logger, params *requestParams, c *gin.Context) error {
+func getFastForwardStream(xl *xlog.Logger, params *requestParams, c *gin.Context, user *userInfo) error {
 	url := c.Request.URL.String()
 	fullUrl := "http://" + c.Request.Host + url
 
 	req := new(pb.FastForwardInfo)
 	expire := time.Now().Add(time.Hour).Unix()
-	req.Url = getNewToken(fullUrl, expire)
+	req.Url = getNewToken(fullUrl, expire, user)
 	req.Speed = params.speed
 	ctx, cancel := context.WithCancel(context.Background())
 	r, err := fastForwardClint.GetTsStream(ctx, req)
@@ -163,11 +177,11 @@ func getFastForwardStream(xl *xlog.Logger, params *requestParams, c *gin.Context
 	return nil
 }
 
-func getNewToken(origin string, expire int64) string {
+func getNewToken(origin string, expire int64, user *userInfo) string {
 	prefix := strings.Split(origin, "&speed")[0]
 	playbackBaseUrl := prefix + "&e=" + strconv.FormatInt(expire, 10)
 	// using uid password as ak/sk
-	mac := qbox.NewMac(accessKey, secretKey)
+	mac := qbox.NewMac(user.ak, user.sk)
 	token := mac.Sign([]byte(playbackBaseUrl))
 	return playbackBaseUrl + "&token=" + token
 }

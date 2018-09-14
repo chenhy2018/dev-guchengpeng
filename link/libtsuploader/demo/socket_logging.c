@@ -1,4 +1,4 @@
-// Last Update:2018-09-04 14:31:41
+// Last Update:2018-09-11 11:30:18
 /**
  * @file socket_logging.c
  * @brief 
@@ -59,6 +59,7 @@ int socket_init()
 
     gStatus.connecting = 1;
     DBG_LOG("connet to %s:%d sucdefully\n", host, port  );
+    SendFileName();
     return 0;
 }
 
@@ -132,7 +133,7 @@ int report_status( int code, char *_pFileName )
              gAjMediaStreamConfig.rtmpConfig.server,
              _pFileName,
              total, error, error*1.0/total*100 ); 
-    log_send( message );
+    DBG_LOG("%s", message );
 
     return 0;
 }

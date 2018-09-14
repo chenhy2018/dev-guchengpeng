@@ -6,6 +6,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"qbox.us/cc/config"
+	"qiniu.com/auth"
 	"qiniu.com/controllers"
 	"qiniu.com/db"
 	"qiniu.com/models"
@@ -29,7 +30,7 @@ func main() {
 		os.Exit(3)
 	}
 	initDb()
-
+	auth.Init(&conf)
 	r.POST("/v1/namespaces/:namespace/uas/:uaid", controllers.RegisterUa)
 	r.DELETE("/v1/namespaces/:namespace/uas/:uaid", controllers.DeleteUa)
 	r.PUT("/v1/namespaces/:namespace/uas/:uaid", controllers.UpdateUa)

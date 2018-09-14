@@ -1,0 +1,12 @@
+# glibc static library generate manifest file
+export GLIBC_RELEASE_TAG=2.27
+cd /var/local && \
+    curl -OL http://ftp.gnu.org/gnu/libc/glibc-${GLIBC_RELEASE_TAG}.tar.bz2 && \
+    tar jvxf glibc-${GLIBC_RELEASE_TAG}.tar.bz2 && cd glibc-${GLIBC_RELEASE_TAG} && \
+    mkdir -p build && cd build && \
+    ../configure \
+        --enable-static-nss \
+        --disable-sanity-checks  && \
+    make -j$(nproc) && make install && \
+    cp -f nss/*.a /usr/local/lib && \
+    cd /usr/local/lib && mv libm.a libm.a.bak && strip -g *.a && mv libm.a.bak libm.a

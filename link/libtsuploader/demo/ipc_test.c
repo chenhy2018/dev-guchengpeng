@@ -10,13 +10,16 @@
 #include "ipc_test.h"
 #include "log2file.h"
 #include "dbg.h"
+#include "media_cfg.h"
 
 /* global variable */
 static DevSdkAudioType gAudioType =  AUDIO_TYPE_AAC;
 static int gKodoInitOk = 0;
 static char gTestToken[1024] = { 0 };
 static Config gIpcConfig;
+static unsigned char gMovingDetect = 0;
 MediaStreamConfig gAjMediaStreamConfig = { 0 };
+TsMuxUploader *pTsMuxUploader;
 
 /*
  * TODO: config read from config file, ex: ipc.conf
@@ -34,6 +37,7 @@ void InitConfig()
     gIpcConfig.bucketName = "ipcamera";
     gIpcConfig.ak = "JAwTPb8dmrbiwt89Eaxa4VsL4_xSIYJoJh4rQfOQ";
     gIpcConfig.sk = "G5mtjT3QzG4Lf7jpCAN5PZHrGeoSH9jRdC96ecYS";
+    gIpcConfig.movingDetection = 1;
 }
 
 
@@ -64,7 +68,7 @@ void TraceTimeStamp( int type, double _dTimeStamp )
     lastTimeStamp = _dTimeStamp;
 }
 
-void ReportKodoInitError()
+void ReportKodoInitError( char *reason )
 {
     static struct timeval start = { 0, 0 }, end = { 0, 0 };
     double interval = 0;
@@ -72,8 +76,10 @@ void ReportKodoInitError()
     gettimeofday( &end, NULL );
     interval = GetTimeDiff( &start, &end );
     if ( interval >= gIpcConfig.timeStampPrintInterval ) {
-        DBG_LOG( "[ %s ] [ gKodoInitOk error ]\n", 
-                 gAjMediaStreamConfig.rtmpConfig.server);
+        DBG_LOG( "[ %s ] [ %s ]\n", 
+                 gAjMediaStreamConfig.rtmpConfig.server,
+                 reason
+                 );
         start = end;
     }
 }
@@ -84,12 +90,18 @@ int VideoGetFrameCb( int streamno, char *_pFrame,
                    void *_pContext)
 {
     if ( !gKodoInitOk ) {
-        ReportKodoInitError();
+        ReportKodoInitError( "kodo not init" );
         return 0;
     }
 
+    if ( gIpcConfig.movingDetection && !gMovingDetect ) {
+        ReportKodoInitError( "not detect moving" );
+        return 0;
+    }
+
+
     TraceTimeStamp( TYPE_VIDEO, _dTimeStamp );
-    PushVideo( _pFrame, _nLen, (int64_t)_dTimeStamp, _nIskey, 0 );
+    PushVideo(pTsMuxUploader, _pFrame, _nLen, (int64_t)_dTimeStamp, _nIskey, 0 );
 
     return 0;
 }
@@ -103,6 +115,12 @@ int AudioGetFrameCb( char *_pFrame, int _nLen, double _dTimeStamp,
     int ret = 0;
 
     if ( !gKodoInitOk ) {
+        ReportKodoInitError("gKodoInitOk");
+        return 0;
+    }
+
+    if ( gIpcConfig.movingDetection && !gMovingDetect ) {
+        ReportKodoInitError("gMovingDetect");
         return 0;
     }
 
@@ -126,7 +144,7 @@ int AudioGetFrameCb( char *_pFrame, int _nLen, double _dTimeStamp,
 
     TraceTimeStamp( TYPE_AUDIO, _dTimeStamp );
 
-    ret = PushAudio( _pFrame, _nLen, (int64_t)timeStamp );
+    ret = PushAudio(pTsMuxUploader, _pFrame, _nLen, (int64_t)timeStamp );
     if ( ret != 0 ) {
         DBG_ERROR("ret = %d\n", ret );
     }
@@ -216,13 +234,28 @@ int InitKodo()
 
     DBG_LOG("gAjMediaStreamConfig.rtmpConfig.streamid = %s\n", gAjMediaStreamConfig.rtmpConfig.streamid);
     DBG_LOG("gAjMediaStreamConfig.rtmpConfig.server = %s\n", gAjMediaStreamConfig.rtmpConfig.server );
-    ret = InitUploader( gAjMediaStreamConfig.rtmpConfig.server, gTestToken, &avArg);
+
+    ret = InitUploader();
     if (ret != 0) {
         DBG_LOG("InitUploader error, ret = %d\n", ret );
         return ret;
     }
 
-    DBG_LOG("kodo init ok\n");
+    UserUploadArg userUploadArg;
+    memset(&userUploadArg, 0, sizeof(userUploadArg));
+    userUploadArg.pToken_ = gTestToken;
+    userUploadArg.nTokenLen_ = strlen(gTestToken);
+    userUploadArg.pDeviceId_ = gAjMediaStreamConfig.rtmpConfig.server;
+    userUploadArg.nDeviceIdLen_ = strlen(gAjMediaStreamConfig.rtmpConfig.server);
+    userUploadArg.nUploaderBufferSize = 512;
+
+    ret = CreateAndStartAVUploader(&pTsMuxUploader, &avArg, &userUploadArg);
+    if (ret != 0) {
+        DBG_LOG("CreateAndStartAVUploader error, ret = %d\n", ret );
+        return ret;
+    }
+
+    DBG_LOG("[ %s ] kodo init ok\n", gAjMediaStreamConfig.rtmpConfig.server );
     gKodoInitOk = 1;
 
 }
@@ -232,13 +265,14 @@ static void * upadateToken() {
 
         while( 1 ) {
             sleep( gIpcConfig.tokenUploadInterval );// 59 minutes
+            memset(gtestToken, 0, sizeof(gtestToken));
             ret = GetUploadToken(gTestToken, sizeof(gTestToken));
             if ( ret != 0 ) {
                 DBG_ERROR("GetUploadToken error, ret = %d\n", ret );
                 return NULL;
             }
             DBG_LOG("token:%s\n", gTestToken);
-            ret = UpdateToken(gTestToken);
+            ret = UpdateToken(pTsMuxUploader, gTestToken, strlen(gTestToken));
             if (ret != 0) {
                 DBG_ERROR("UpdateToken error, ret = %d\n", ret );
                 return NULL;
@@ -290,6 +324,19 @@ void SdkLogCallback( char *log )
     DBG_LOG( log );
 }
 
+int AlarmCallback(ALARM_ENTRY alarm, void *pcontext)
+{
+    DBG_LOG("[ %s ] alarm.code = %d\n", gAjMediaStreamConfig.rtmpConfig.server, alarm.code );
+
+    if ( alarm.code == ALARM_CODE_MOTION_DETECT ) {
+        gMovingDetect = 1;
+    } else if ( alarm.code == ALARM_CODE_MOTION_DETECT_DISAPPEAR ) {
+        gMovingDetect = 0;
+    }
+
+    return 0;
+}
+
 int main()
 {
     int ret = 0;
@@ -307,6 +354,10 @@ int main()
         DBG_ERROR("InitIPC() fail\n");
     }
 
+    if ( gIpcConfig.movingDetection ) {
+        dev_sdk_register_callback( AlarmCallback, NULL, NULL, NULL );
+    }
+
     ret = InitKodo();
     if ( ret < 0 ) {
         DBG_ERROR("ret = %d\n",ret );
@@ -316,10 +367,11 @@ int main()
 
     for (;; ) {
         sleep( gIpcConfig.heartBeatInterval );
-        DBG_LOG("[ HEART BEAT] main thread is running\n");
+        DBG_LOG("[ %s ] [ HEART BEAT] main thread is running\n", gAjMediaStreamConfig.rtmpConfig.server );
     }
 
     DeInitIPC();
+    DestroyAVUploader(&pTsMuxUploader);
     UninitUploader();
 
     return 0;
