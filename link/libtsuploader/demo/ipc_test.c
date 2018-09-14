@@ -11,6 +11,7 @@
 #include "log2file.h"
 #include "dbg.h"
 #include "media_cfg.h"
+#include "cfg_parse.h"
 
 /* global variable */
 static DevSdkAudioType gAudioType =  AUDIO_TYPE_AAC;
@@ -20,6 +21,7 @@ static Config gIpcConfig;
 static unsigned char gMovingDetect = 0;
 MediaStreamConfig gAjMediaStreamConfig = { 0 };
 TsMuxUploader *pTsMuxUploader;
+static struct cfg_struct *cfg;
 
 /*
  * TODO: config read from config file, ex: ipc.conf
@@ -38,6 +40,38 @@ void InitConfig()
     gIpcConfig.ak = "JAwTPb8dmrbiwt89Eaxa4VsL4_xSIYJoJh4rQfOQ";
     gIpcConfig.sk = "G5mtjT3QzG4Lf7jpCAN5PZHrGeoSH9jRdC96ecYS";
     gIpcConfig.movingDetection = 1;
+    gIpcConfig.configUpdateInterval = 10;
+}
+
+void LoadConfig()
+{
+    cfg = cfg_init();
+
+    if (cfg_load(cfg,"ipc.conf") < 0) {
+        fprintf(stderr,"Unable to load ipc.conf\n");
+        return -1;
+    }
+}
+
+void UpdateConfig()
+{
+    char *logOutput = NULL;
+
+    logOutput = cfg_get( cfg, "LOG_OUTPUT" );
+    if ( strcmp( logOutput, "socket") == 0 ) {
+        gIpcConfig.logOutput = OUTPUT_SOCKET;
+    } else if ( strcmp(logOutput, "console" ) == 0 ) {
+        gIpcConfig.logOutput = OUTPUT_CONSOLE;
+    } else if ( strcmp( logOutput, "mqtt") == 0  ) {
+        gIpcConfig.logOutput = OUTPUT_MQTT;
+    } else if ( strcmp ( logOutput, "file") == 0 ) {
+        gIpcConfig.logOutput = OUTPUT_FILE;
+    } else {
+        gIpcConfig.logOutput = OUTPUT_SOCKET;
+    }
+    gIpcConfig.logFile = cfg_get( cfg, "LOG_FILE" );
+    printf("read from ipc.conf, logOutput = %s\n", logOutput );
+    printf("read from ipc.conf, logfile = %s\n", gIpcConfig.logFile );
 }
 
 
@@ -166,6 +200,7 @@ static int InitIPC( )
         return -1;
     }
     GetMediaStreamConfig(&gAjMediaStreamConfig);
+    sleep( 2 );
     SendFileName();
     ret = dev_sdk_start_video( 0, 0, VideoGetFrameCb, &context );
     dev_sdk_get_AudioConfig( &audioConfig );
@@ -337,11 +372,28 @@ int AlarmCallback(ALARM_ENTRY alarm, void *pcontext)
     return 0;
 }
 
+void *ConfigUpdateTask( void *param )
+{
+    for (;;) {
+        UpdateConfig();
+        sleep( gIpcConfig.configUpdateInterval );
+    }
+}
+
+void StartConfigUpdateTask()
+{
+    pthread_t thread;
+
+    pthread_create( &thread, ConfigUpdateTask, NULL, NULL );
+}
+
 int main()
 {
     int ret = 0;
 
     InitConfig();
+    LoadConfig();
+    UpdateConfig();
     WaitForNetworkOk();
     LoggerInit( gIpcConfig.logPrintTime, gIpcConfig.logOutput, gIpcConfig.logFile, gIpcConfig.logVerbose );
     SetLogCallback( SdkLogCallback );
@@ -349,6 +401,10 @@ int main()
     DBG_LOG("compile tile : %s %s \n", __DATE__, __TIME__ );
 
     StartTokenUpdateTask();
+    StartConfigUpdateTask();
+    if ( gIpcConfig.logOutput == OUTPUT_SOCKET)
+        StartSocketLoggingTask();
+
     ret = InitIPC();
     if ( 0 != ret ) {
         DBG_ERROR("InitIPC() fail\n");

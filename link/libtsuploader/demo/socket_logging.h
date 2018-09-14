@@ -1,4 +1,4 @@
-// Last Update:2018-09-04 14:32:20
+// Last Update:2018-09-13 15:39:58
 /**
  * @file socket_logging.h
  * @brief 
@@ -12,7 +12,6 @@
 
 typedef struct {
     int connecting;
-    int retrying;
     int retry_count;
 } socket_status;
 
@@ -22,5 +21,6 @@ extern int report_status( int code, char *_pFileNmae );
 extern int GetTimeDiff( struct timeval *_pStartTime, struct timeval *_pEndTime );
 extern int get_current_time( char *now_time );
 extern void SendFileName();
+extern void StartSocketLoggingTask();
 
 #endif  /*SOCKET_LOGGING_H*/

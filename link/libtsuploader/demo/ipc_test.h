@@ -33,6 +33,7 @@ typedef struct {
     char *ak;
     char *sk;
     unsigned char movingDetection;
+    int configUpdateInterval;
 } Config;
 
 #endif  /*IPC_TEST_H*/

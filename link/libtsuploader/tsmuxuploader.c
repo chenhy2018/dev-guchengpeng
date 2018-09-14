@@ -296,7 +296,7 @@ static int PushVideo(TsMuxUploader *_pTsMuxUploader, char * _pData, int _nDataLe
                    //at least 2 keyframe and aoubt last 5 second
                    || (_nIsSegStart && pFFTsMuxUploader->nFrameCount != 0)// new segment is specified
                    ||  pFFTsMuxUploader->ffMuxSatte == TK_UPLOAD_FAIL){   // upload fail
-                        printf("next ts:%d %lld\n", pFFTsMuxUploader->nKeyFrameCount, _nTimestamp - pFFTsMuxUploader->nLastUploadVideoTimestamp);
+                        //printf("next ts:%d %lld\n", pFFTsMuxUploader->nKeyFrameCount, _nTimestamp - pFFTsMuxUploader->nLastUploadVideoTimestamp);
                         pFFTsMuxUploader->nKeyFrameCount = 0;
                         pFFTsMuxUploader->nFrameCount = 0;
                         pFFTsMuxUploader->nLastUploadVideoTimestamp = _nTimestamp;
