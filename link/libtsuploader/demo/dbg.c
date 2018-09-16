@@ -31,6 +31,7 @@ int LoggerInit( unsigned printTime, int output, char *pLogFile, int logVerbose )
     gLogger.printTime = printTime;
     gLogger.logVerbose = logVerbose;
 
+    printf("output = %d\n", output );
     switch( output ) {
     case OUTPUT_FILE:
         fileOpen( gLogger.logFile );

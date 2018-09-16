@@ -74,6 +74,7 @@ add_executable(ipc-testupload
     ./demo/dbg.c
     ./demo/log2file.c
     ./demo/queue.c
+    ./demo/cfg_parse.c
 )
 add_definitions(-D__ARM)
 endif()
