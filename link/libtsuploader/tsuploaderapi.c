@@ -231,14 +231,17 @@ size_t writeData(void *pTokenStr, size_t size,  size_t nmemb,  void *pUserData) 
         return size * nmemb;
 }
 
-int GetUploadToken(char *pBuf, int nBufLen)
+int GetUploadToken(char *pBuf, int nBufLen, char *pUrl)
 {
 #ifdef DISABLE_OPENSSL
         memset(pBuf, 0, nBufLen);
         CURL *curl;
         curl_global_init(CURL_GLOBAL_ALL);
         curl = curl_easy_init();
-        curl_easy_setopt(curl, CURLOPT_URL, "http://39.107.247.14:8086/qiniu/upload/token");
+        if (pUrl != NULL)
+                curl_easy_setopt(curl, CURLOPT_URL, pUrl);
+        else
+                curl_easy_setopt(curl, CURLOPT_URL, "http://39.107.247.14:8086/qiniu/upload/token");
         curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, writeData);
         
         struct CurlToken token;

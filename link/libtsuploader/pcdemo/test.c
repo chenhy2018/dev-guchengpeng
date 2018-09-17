@@ -29,6 +29,7 @@ typedef struct {
         int nNewSetIntval;
         char *pAFilePath;
         char *pVFilePath;
+        char *pTokenUrl;
 }CmdArg;
 
 typedef struct {
@@ -556,7 +557,7 @@ static void * updateToken(void * opaque) {
         while(1) {
                 sleep(cmdArg.nUptokenInterval);
                 memset(gtestToken, 0, sizeof(gtestToken));
-                ret = GetUploadToken(gtestToken, sizeof(gtestToken));
+                ret = GetUploadToken(gtestToken, sizeof(gtestToken), cmdArg.pTokenUrl);
                 if (ret != 0) {
                         printf("update token file<<<<<<<<<<<<<\n");
                         return NULL;
@@ -674,6 +675,7 @@ int main(int argc, const char** argv)
         flag_int(&cmdArg.nUptokenInterval, "uptokenint", "update token interval. default(3550s)");
         flag_str(&cmdArg.pAFilePath, "afpath", "set audio file path.like /root/a.aac");
         flag_str(&cmdArg.pVFilePath, "vfpath", "set video file path.like /root/a.h264");
+        flag_str(&cmdArg.pTokenUrl, "tokenurl", "url where to send token request");
 
         flag_parse(argc, argv, VERSION);
         if (argc == 2 && (strcmp(argv[1], "-h") == 0 || strcmp(argv[1], "-help") == 0)) {
@@ -691,6 +693,10 @@ int main(int argc, const char** argv)
 	printf("cmdArg.nSleeptime=%d\n", cmdArg.nSleeptime);
 	printf("cmdArg.pAFilePath=%d\n", cmdArg.pAFilePath);
 	printf("cmdArg.pVFilePath=%d\n", cmdArg.pVFilePath);
+	printf("cmdArg.pTokenUrl=%d\n", cmdArg.pTokenUrl);
+	if (cmdArg.pTokenUrl) {
+                printf("cmdArg.pTokenUrl:%s\n", cmdArg.pTokenUrl);
+        }
 	if (cmdArg.pAFilePath) {
                 printf("AFilePath:%s\n", cmdArg.pAFilePath);
         }
@@ -762,7 +768,7 @@ int main(int argc, const char** argv)
         }
 #endif
         
-        ret = GetUploadToken(gtestToken, sizeof(gtestToken));
+        ret = GetUploadToken(gtestToken, sizeof(gtestToken), cmdArg.pTokenUrl);
         if (ret != 0)
                 return ret;
         printf("token:%s\n", gtestToken);
