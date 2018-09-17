@@ -110,32 +110,38 @@ func GetPlayBackm3u8(c *gin.Context) {
 		c.JSON(404, gin.H{"error": "can't find stream in this period"})
 		return
 	}
+	playlist, err := getPlaybackList(xl, segs, userInfo)
+	if err != nil {
+		xl.Errorf("get playback list error, error = %#v", err.Error())
+		c.JSON(500, gin.H{"error": "Service Internal Error"})
+		return
+	}
+	c.Header("Content-Type", "application/x-mpegURL")
+	c.Header("Access-Control-Allow-Origin", "*")
+	c.String(200, m3u8.Mkm3u8(playlist, xl))
+}
+func getPlaybackList(xl *xlog.Logger, segs []map[string]interface{}, user *userInfo) ([]map[string]interface{}, error) {
 	var playlist []map[string]interface{}
 
 	var total int64
 	for _, v := range segs {
 		start, ok := v[models.SEGMENT_ITEM_START_TIME].(int64)
 		if !ok {
-			xl.Errorf("start time format error %#v", v)
-			c.JSON(500, gin.H{"error": "Service Internal Error"})
-			return
+			return nil, errors.New("start time format error")
 		}
 		end, ok := v[models.SEGMENT_ITEM_END_TIME].(int64)
 		if !ok {
-			xl.Errorf("end time format error %#v", v)
-			c.JSON(500, gin.H{"error": "Service Internal Error"})
-			return
+			return nil, errors.New("end time format error")
 		}
 		duration := float64(end-start) / 1000
 		total += int64(duration)
 		filename, ok := v[models.SEGMENT_ITEM_FILE_NAME].(string)
 
 		if !ok {
-			xl.Errorf("filename format error %#v", v)
-			c.JSON(500, gin.H{"error": "Service Internal Error"})
-			return
+			return nil, errors.New("filename format error")
+
 		}
-		realUrl := GetUrlWithDownLoadToken(xl, "http://pdwjeyj6v.bkt.clouddn.com/", filename, total, userInfo)
+		realUrl := GetUrlWithDownLoadToken(xl, "http://pdwjeyj6v.bkt.clouddn.com/", filename, total, user)
 
 		m := map[string]interface{}{
 			"duration": duration,
@@ -144,11 +150,8 @@ func GetPlayBackm3u8(c *gin.Context) {
 		playlist = append(playlist, m)
 
 	}
-	c.Header("Content-Type", "application/x-mpegURL")
-	c.Header("Access-Control-Allow-Origin", "*")
-	c.String(200, m3u8.Mkm3u8(playlist, xl))
+	return playlist, nil
 }
-
 func getFastForwardStream(xl *xlog.Logger, params *requestParams, c *gin.Context, user *userInfo) error {
 	url := c.Request.URL.String()
 	fullUrl := "http://" + c.Request.Host + url
