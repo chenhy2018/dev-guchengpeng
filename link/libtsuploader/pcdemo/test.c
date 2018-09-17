@@ -30,6 +30,9 @@ typedef struct {
         char *pAFilePath;
         char *pVFilePath;
         char *pTokenUrl;
+        bool IsFileLoop;
+        int  nLoopSleeptime;
+        int nRoundCount;
 }CmdArg;
 
 typedef struct {
@@ -573,6 +576,7 @@ static void * updateToken(void * opaque) {
 }
 
 void signalHander(int s){
+        cmdArg.IsFileLoop = false;
         UninitUploader();
         exit(0);
 }
@@ -676,6 +680,8 @@ int main(int argc, const char** argv)
         flag_str(&cmdArg.pAFilePath, "afpath", "set audio file path.like /root/a.aac");
         flag_str(&cmdArg.pVFilePath, "vfpath", "set video file path.like /root/a.h264");
         flag_str(&cmdArg.pTokenUrl, "tokenurl", "url where to send token request");
+        flag_bool(&cmdArg.IsFileLoop, "fileloop", "in file mode and only one upload, will loop to push file");
+        flag_int(&cmdArg.nLoopSleeptime, "csleeptime", "next round sleeptime");
 
         flag_parse(argc, argv, VERSION);
         if (argc == 2 && (strcmp(argv[1], "-h") == 0 || strcmp(argv[1], "-help") == 0)) {
@@ -683,17 +689,19 @@ int main(int argc, const char** argv)
                 return 0;
         }
 
-	printf("cmdArg.IsInputFromFFmpeg=%d\n", cmdArg.IsInputFromFFmpeg);
-	printf("cmdArg.IsTestAAC=%d\n", cmdArg.IsTestAAC);
-	printf("cmdArg.IsTestAACWithoutAdts=%d\n", cmdArg.IsTestAACWithoutAdts);
-	printf("cmdArg.IsTestTimestampRollover=%d\n", cmdArg.IsTestTimestampRollover);
-	printf("cmdArg.IsTestH265=%d\n", cmdArg.IsTestH265);
-	printf("cmdArg.IsLocalToken=%d\n", cmdArg.IsLocalToken);
-	printf("cmdArg.IsTestMove=%d\n", cmdArg.IsTestMove);
-	printf("cmdArg.nSleeptime=%d\n", cmdArg.nSleeptime);
-	printf("cmdArg.pAFilePath=%d\n", cmdArg.pAFilePath);
-	printf("cmdArg.pVFilePath=%d\n", cmdArg.pVFilePath);
-	printf("cmdArg.pTokenUrl=%d\n", cmdArg.pTokenUrl);
+        printf("cmdArg.IsInputFromFFmpeg=%d\n", cmdArg.IsInputFromFFmpeg);
+        printf("cmdArg.IsTestAAC=%d\n", cmdArg.IsTestAAC);
+        printf("cmdArg.IsTestAACWithoutAdts=%d\n", cmdArg.IsTestAACWithoutAdts);
+        printf("cmdArg.IsTestTimestampRollover=%d\n", cmdArg.IsTestTimestampRollover);
+        printf("cmdArg.IsTestH265=%d\n", cmdArg.IsTestH265);
+        printf("cmdArg.IsLocalToken=%d\n", cmdArg.IsLocalToken);
+        printf("cmdArg.IsTestMove=%d\n", cmdArg.IsTestMove);
+        printf("cmdArg.nSleeptime=%d\n", cmdArg.nSleeptime);
+        printf("cmdArg.pAFilePath=%d\n", cmdArg.pAFilePath);
+        printf("cmdArg.pVFilePath=%d\n", cmdArg.pVFilePath);
+        printf("cmdArg.pTokenUrl=%s\n", cmdArg.pTokenUrl);
+        printf("cmdArg.IsFileLoop=%d\n", cmdArg.IsFileLoop);
+        printf("cmdArg.nLoopSleeptime=%d\n", cmdArg.nLoopSleeptime);
 	if (cmdArg.pTokenUrl) {
                 printf("cmdArg.pTokenUrl:%s\n", cmdArg.pTokenUrl);
         }
@@ -846,7 +854,16 @@ int main(int argc, const char** argv)
                         //start_ffmpeg_test("rtmp://live.hkstv.hk.lxdns.com/live/hks", dataCallback, NULL);
                 } else {
                         printf("%s\n%s\n", pAFile, pVFile);
-                        start_file_test(pAFile, pVFile, dataCallback, &avuploader);
+                        do {
+                                start_file_test(pAFile, pVFile, dataCallback, &avuploader);
+                                if (cmdArg.nLoopSleeptime > 0) {
+                                        sleep(cmdArg.nLoopSleeptime);
+                                }
+                                if (cmdArg.IsFileLoop) {
+                                        cmdArg.nRoundCount++;
+                                        printf(">>>>>>>>>next round<<<<<<<<<<<<\n");
+                                }
+                        } while(cmdArg.IsFileLoop);
                 }
         }
         
