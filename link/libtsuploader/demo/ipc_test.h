@@ -1,4 +1,4 @@
-// Last Update:2018-09-04 12:20:45
+// Last Update:2018-09-14 19:47:13
 /**
  * @file ipc_test.h
  * @brief 
@@ -33,6 +33,12 @@ typedef struct {
     char *ak;
     char *sk;
     unsigned char movingDetection;
+    int configUpdateInterval;
 } Config;
+
+extern Config *GetConfig();
+extern int GetKodoInitSts();
+extern int GetMovingDetectSts();
+extern int GetAudioType();
 
 #endif  /*IPC_TEST_H*/

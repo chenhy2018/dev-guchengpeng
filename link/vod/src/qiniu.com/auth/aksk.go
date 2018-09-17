@@ -26,7 +26,6 @@ func GetUserInfoFromQconf(xl *xlog.Logger, accessKey string) (*proto.AccessInfo,
 	resp := proto.AccessInfo{}
 	if QConfClient == nil {
 		return nil, errors.New("qconf client has not been initialized")
-
 	}
 	err := QConfClient.Get(nil, &resp, AK_PREFIX+accessKey, qconfapi.Cache_NoSuchEntry)
 	if err != nil {

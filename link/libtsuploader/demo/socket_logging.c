@@ -1,4 +1,4 @@
-// Last Update:2018-09-11 11:30:18
+// Last Update:2018-09-14 20:02:03
 /**
  * @file socket_logging.c
  * @brief 
@@ -13,30 +13,51 @@
 #include <pthread.h>
 #include <errno.h>
 #include <time.h>
+#include <unistd.h>
+#include <errno.h>
 #include "socket_logging.h"
 #include "devsdk.h"
+#include "Queue.h"
+#include "dbg.h"
+#include "ipc_test.h"
 
 #define BASIC() printf("[ %s %s() %d ] ", __FILE__, __FUNCTION__, __LINE__ )
-#define DBG_ERROR(args...) BASIC();printf(args)
-#define DBG_LOG(args...) BASIC();printf(args)
+#define ARRSZ(arr) sizeof(arr)/sizeof(arr[0])
 
 
 extern MediaStreamConfig gAjMediaStreamConfig;
 static socket_status gStatus;
+static Queue *gLogQueue;
+void CmdHnadleDump( char *param );
 
 char *host = "47.105.118.51";
 int port = 8090;
 int gsock = 0;
+static DemoCmd gCmds[] =
+{
+    { "dump", CmdHnadleDump },
+};
 
 int socket_init()
 {
     struct sockaddr_in server;
     int ret = 0;
+    static int first = 1;
+
+    if ( first ) {
+        gLogQueue = NewQueue();
+        if ( !gLogQueue ) {
+            printf("new queue error\n");
+            return -1;
+        }
+        first = 0;
+    }
 
     if ( gsock != -1 ) {
         DBG_LOG("close last sock\n");
         close( gsock );
     }
+
     gsock = socket(AF_INET , SOCK_STREAM , 0);
     if (gsock == -1) {
         DBG_LOG("Could not create socket\b");
@@ -56,60 +77,30 @@ int socket_init()
         return -1;
     }
 
-
     gStatus.connecting = 1;
-    DBG_LOG("connet to %s:%d sucdefully\n", host, port  );
-    SendFileName();
+    printf("connet to %s:%d sucdefully\n", host, port  );
     return 0;
 }
 
 void SendFileName()
 {
     char message[256] = { 0 };
-
-    sprintf( message, "tsupload_%s.log", gAjMediaStreamConfig.rtmpConfig.server );
-    log_send( message );
-}
-
-void *socket_reconnect_task( void * arg )
-{
     int ret = 0;
 
-    gStatus.retry_count = 0;
-
-    while ( gStatus.retrying && !gStatus.connecting ) {
-
-        ret = socket_init();
-        if ( ret < 0 ) {
-            sleep(5);
-            gStatus.retry_count ++;
-            DBG_LOG("reconnect retry count %d\n", gStatus.retry_count );
-            continue;
-        }
-        gStatus.connecting = 1;
-        gStatus.retrying = 0;
-        DBG_LOG("reconnect to %s ok\n", host );
-        return NULL;
+    sprintf( message, "tsupload_%s.log", gAjMediaStreamConfig.rtmpConfig.server );
+    //log_send( message );
+    ret = send(gsock , message , strlen(message) , MSG_NOSIGNAL );// MSG_NOSIGNAL ignore SIGPIPE signal
+    if(  ret < 0 ) {
+        printf("Send failed, ret = %d, %s\n", ret, strerror(errno) );
     }
+
 }
 
 int log_send( char *message )
 {
-    int ret = 0;
-
-    if ( gStatus.connecting ) {
-        ret = send(gsock , message , strlen(message) , MSG_NOSIGNAL );// MSG_NOSIGNAL ignore SIGPIPE signal
-        if(  ret < 0 ) {
-            DBG_LOG("Send failed, ret = %d, %s\n", ret, strerror(errno) );
-            gStatus.connecting = 0;
-            return -1;
-        }
-    } else if ( !gStatus.retrying ) {
-        pthread_t thread;
-
-        gStatus.retrying = 1;
-        DBG_LOG("start socket_reconnect_task\n");
-        pthread_create( &thread, NULL, socket_reconnect_task, NULL );
+    if ( gLogQueue && gStatus.connecting ) {
+    //    printf("message = %s", message );
+        gLogQueue->enqueue( gLogQueue, message, strlen(message) );
     }
 
     return 0;
@@ -162,13 +153,108 @@ int get_current_time( char *now_time )
 {
     time_t now;
     struct tm *tm_now = NULL;
-    char mytime[200];
 
     time(&now);
     tm_now = localtime(&now);
     strftime( now_time, 200, "%Y-%m-%d %H:%M:%S", tm_now);
 
     return(0);
+}
+
+void *SocketLoggingTask( void *param )
+{
+    char log[1024] = { 0 };
+    int ret = 0;
+
+    for (;;) {
+        if ( gStatus.connecting ) {
+                if ( gLogQueue ) {
+                    memset( log, 0, sizeof(log) );
+                    gLogQueue->dequeue( gLogQueue, log, NULL );
+                } else {
+                    printf("error, gLogQueue is NULL\n");
+                    return NULL;
+                }
+                //printf("log = %s", log);
+                ret = send(gsock , log , strlen(log) , MSG_NOSIGNAL );// MSG_NOSIGNAL ignore SIGPIPE signal
+                if(  ret < 0 ) {
+                    printf("Send failed, ret = %d, %s\n", ret, strerror(errno) );
+                    gStatus.connecting = 0;
+                }
+                sleep(1);
+        } else {
+            ret = socket_init();
+            if ( ret < 0 ) {
+                sleep(5);
+                gStatus.retry_count ++;
+                printf("reconnect retry count %d\n", gStatus.retry_count );
+                continue;
+            }
+            printf("reconnect to %s ok\n", host );
+            gStatus.connecting = 1;
+            SendFileName();
+            sleep(1);
+            printf("queue size = %d\n", gLogQueue->getSize( gLogQueue )) ;
+        }
+    }
+    return NULL;
+}
+
+void *SimpleSshTask( void *param )
+{
+    ssize_t ret = 0;
+    char buffer[1024] = { 0 };
+    int i = 0;
+
+    for (;;) {
+        memset( buffer, 0, sizeof(buffer) );
+        ret = recv( gsock, buffer, 1024, 0 );
+        if ( ret < 0 ) {
+            printf("recv error, errno = %d\n", errno );
+            continue;
+        }
+        for ( i=0; i<ARRSZ(gCmds); i++ ) {
+            char *res = NULL;
+            res = strstr( buffer, gCmds[i].cmd );
+            if ( res ) {
+                gCmds[i].pCmdHandle( buffer );
+                break;
+            }
+        }
+        if ( i == ARRSZ(gCmds) ) {
+            printf("unknow command %s", buffer );
+        }
+
+    }
+    return NULL;
+}
+
+void StartSocketLoggingTask()
+{
+    pthread_t log, cmd;
+
+    pthread_create( &log, NULL, SocketLoggingTask, NULL );
+    pthread_create( &cmd, NULL, SimpleSshTask, NULL );
+}
+
+void CmdHnadleDump( char *param )
+{
+    char buffer[1024] = { 0 };
+    int len = 0, ret = 0;
+    Config *pConfig = GetConfig();
+
+    len = sprintf( buffer, "%s", "Config :\n" );
+    len = sprintf( buffer+len, "logOutput = %d\n", pConfig->logOutput );
+    len = sprintf( buffer+len, "logFile = %s\n", pConfig->logFile );
+    len = sprintf( buffer+len, "movingDetection = %d\n", pConfig->movingDetection );
+    len = sprintf( buffer+len, "gKodoInitOk = %d\n", GetKodoInitSts() );
+    len = sprintf( buffer+len, "gMovingDetect = %d\n", GetMovingDetectSts() );
+    len = sprintf( buffer+len, "gAudioType = %d\n", GetAudioType() );
+    ret = send(gsock , buffer , strlen(buffer) , MSG_NOSIGNAL );// MSG_NOSIGNAL ignore SIGPIPE signal
+    if(  ret < 0 ) {
+        printf("Send failed, ret = %d, %s\n", ret, strerror(errno) );
+    }
+    
 }
 
 

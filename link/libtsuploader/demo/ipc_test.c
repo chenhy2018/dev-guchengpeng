@@ -11,6 +11,8 @@
 #include "log2file.h"
 #include "dbg.h"
 #include "media_cfg.h"
+#include "cfg_parse.h"
+#include "socket_logging.h"
 
 /* global variable */
 static DevSdkAudioType gAudioType =  AUDIO_TYPE_AAC;
@@ -18,9 +20,29 @@ static int gKodoInitOk = 0;
 static char gTestToken[1024] = { 0 };
 static Config gIpcConfig;
 static unsigned char gMovingDetect = 0;
-MediaStreamConfig gAjMediaStreamConfig = { 0 };
+MediaStreamConfig gAjMediaStreamConfig;
 TsMuxUploader *pTsMuxUploader;
+static struct cfg_struct *cfg;
 
+int GetKodoInitSts()
+{
+    return gKodoInitOk;
+}
+
+Config *GetConfig()
+{
+    return &gIpcConfig;
+}
+
+int GetAudioType()
+{
+    return gAudioType;
+}
+
+int GetMovingDetectSts()
+{
+    return gMovingDetect;
+}
 /*
  * TODO: config read from config file, ex: ipc.conf
  * */
@@ -38,6 +60,40 @@ void InitConfig()
     gIpcConfig.ak = "JAwTPb8dmrbiwt89Eaxa4VsL4_xSIYJoJh4rQfOQ";
     gIpcConfig.sk = "G5mtjT3QzG4Lf7jpCAN5PZHrGeoSH9jRdC96ecYS";
     gIpcConfig.movingDetection = 1;
+    gIpcConfig.configUpdateInterval = 10;
+}
+
+void LoadConfig()
+{
+    cfg = cfg_init();
+
+    if (cfg_load(cfg,"/tmp/oem/app/ipc.conf") < 0) {
+        fprintf(stderr,"Unable to load ipc.conf\n");
+    }
+}
+
+void UpdateConfig()
+{
+    const char *logOutput = NULL;
+    const char *logFile = NULL;
+
+    logOutput = cfg_get( cfg, "LOG_OUTPUT" );
+    if ( strcmp( logOutput, "socket") == 0 ) {
+        gIpcConfig.logOutput = OUTPUT_SOCKET;
+    } else if ( strcmp(logOutput, "console" ) == 0 ) {
+        gIpcConfig.logOutput = OUTPUT_CONSOLE;
+    } else if ( strcmp( logOutput, "mqtt") == 0  ) {
+        gIpcConfig.logOutput = OUTPUT_MQTT;
+    } else if ( strcmp ( logOutput, "file") == 0 ) {
+        gIpcConfig.logOutput = OUTPUT_FILE;
+    } else {
+        gIpcConfig.logOutput = OUTPUT_SOCKET;
+    }
+
+    logFile = cfg_get( cfg, "LOG_FILE" );
+    gIpcConfig.logFile = logFile;
+    printf("read from ipc.conf, logOutput = %s\n", logOutput );
+    printf("read from ipc.conf, logfile = %s\n", gIpcConfig.logFile );
 }
 
 
@@ -111,7 +167,6 @@ int AudioGetFrameCb( char *_pFrame, int _nLen, double _dTimeStamp,
 {
     static int first = 1;
     static double localTimeStamp = 0, timeStamp = 0;
-    static double min=0, max=0;
     int ret = 0;
 
     if ( !gKodoInitOk ) {
@@ -136,7 +191,7 @@ int AudioGetFrameCb( char *_pFrame, int _nLen, double _dTimeStamp,
         localTimeStamp += G711_TIMESTAMP_INTERVAL;
     }
 
-    if ( gAudioType = AUDIO_TYPE_AAC ) {
+    if ( gAudioType == AUDIO_TYPE_AAC ) {
         timeStamp = _dTimeStamp;
     } else {
         timeStamp = localTimeStamp;
@@ -157,7 +212,6 @@ static int InitIPC( )
     static int context = 1;
     int s32Ret = 0;
     AudioConfig audioConfig;
-    int ret = 0;
 
     DBG_LOG("start to init IPC\n");
     s32Ret = dev_sdk_init( DEV_SDK_PROCESS_APP );
@@ -166,8 +220,9 @@ static int InitIPC( )
         return -1;
     }
     GetMediaStreamConfig(&gAjMediaStreamConfig);
+    sleep( 2 );
     SendFileName();
-    ret = dev_sdk_start_video( 0, 0, VideoGetFrameCb, &context );
+    dev_sdk_start_video( 0, 0, VideoGetFrameCb, &context );
     dev_sdk_get_AudioConfig( &audioConfig );
     DBG_LOG("audioConfig.audioEncode.enable = %d\n", audioConfig.audioEncode.enable );
     if ( audioConfig.audioEncode.enable ) {
@@ -192,6 +247,7 @@ static int DeInitIPC()
     dev_sdk_stop_audio( 0, 1 );
     dev_sdk_stop_audio_play();
     dev_sdk_release();
+    return 0;
 }
 
 int InitKodo()
@@ -257,7 +313,7 @@ int InitKodo()
 
     DBG_LOG("[ %s ] kodo init ok\n", gAjMediaStreamConfig.rtmpConfig.server );
     gKodoInitOk = 1;
-
+    return 0;
 }
 
 static void * upadateToken() {
@@ -265,7 +321,7 @@ static void * upadateToken() {
 
         while( 1 ) {
             sleep( gIpcConfig.tokenUploadInterval );// 59 minutes
-            memset(gtestToken, 0, sizeof(gtestToken));
+            memset(gTestToken, 0, sizeof(gTestToken));
             ret = GetUploadToken(gTestToken, sizeof(gTestToken));
             if ( ret != 0 ) {
                 DBG_ERROR("GetUploadToken error, ret = %d\n", ret );
@@ -295,6 +351,8 @@ int StartTokenUpdateTask()
         return ret;
     }
     pthread_attr_destroy (&attr);
+
+    return 0;
 }
 
 int WaitForNetworkOk()
@@ -337,11 +395,28 @@ int AlarmCallback(ALARM_ENTRY alarm, void *pcontext)
     return 0;
 }
 
+void *ConfigUpdateTask( void *param )
+{
+    for (;;) {
+        UpdateConfig();
+        sleep( gIpcConfig.configUpdateInterval );
+    }
+}
+
+void StartConfigUpdateTask()
+{
+    pthread_t thread;
+
+    pthread_create( &thread, NULL, ConfigUpdateTask, NULL );
+}
+
 int main()
 {
     int ret = 0;
 
     InitConfig();
+    LoadConfig();
+    UpdateConfig();
     WaitForNetworkOk();
     LoggerInit( gIpcConfig.logPrintTime, gIpcConfig.logOutput, gIpcConfig.logFile, gIpcConfig.logVerbose );
     SetLogCallback( SdkLogCallback );
@@ -349,6 +424,10 @@ int main()
     DBG_LOG("compile tile : %s %s \n", __DATE__, __TIME__ );
 
     StartTokenUpdateTask();
+    StartConfigUpdateTask();
+    if ( gIpcConfig.logOutput == OUTPUT_SOCKET)
+        StartSocketLoggingTask();
+
     ret = InitIPC();
     if ( 0 != ret ) {
         DBG_ERROR("InitIPC() fail\n");

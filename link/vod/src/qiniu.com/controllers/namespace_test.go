@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"qiniu.com/db"
+	"qiniu.com/system"
 	"testing"
 )
 
@@ -59,7 +60,7 @@ func TestRegisterNamespace(t *testing.T) {
 	c.Params = append(c.Params, param)
 	c.Request = req
 	monkey.Patch(getUserInfo, func(xl *xlog.Logger, req *http.Request) (*userInfo, error) { return &user, nil })
-
+	monkey.Patch(system.HaveDb, func() bool { fmt.Printf("111111"); return true })
 	RegisterNamespace(c)
 
 	// bucket already exit. return 400
@@ -105,7 +106,7 @@ func TestGetNamespace(t *testing.T) {
 	c, _ := gin.CreateTestContext(recoder)
 	c.Request = req
 	monkey.Patch(getUserInfo, func(xl *xlog.Logger, req *http.Request) (*userInfo, error) { return &user, nil })
-
+	monkey.Patch(system.HaveDb, func() bool { return true })
 	GetNamespaceInfo(c)
 	body, err := ioutil.ReadAll(recoder.Body)
 	if err != nil {
@@ -159,7 +160,7 @@ func TestUpdateNamespace(t *testing.T) {
 	c, _ := gin.CreateTestContext(recoder)
 	c.Request = req
 	monkey.Patch(getUserInfo, func(xl *xlog.Logger, req *http.Request) (*userInfo, error) { return &user, nil })
-
+	monkey.Patch(system.HaveDb, func() bool { return true })
 	// namespace is not exist
 	param := gin.Param{
 		Key:   "namespace",
@@ -254,7 +255,7 @@ func TestUpdateNamespace(t *testing.T) {
 func TestDeleteNamespace(t *testing.T) {
 	initDb()
 	monkey.Patch(getUserInfo, func(xl *xlog.Logger, req *http.Request) (*userInfo, error) { return &user, nil })
-
+	monkey.Patch(system.HaveDb, func() bool { return true })
 	// remove invaild namespace aab, return 400
 	req, _ := http.NewRequest("Put", "/v1/namespaces/aab", nil)
 	recoder := httptest.NewRecorder()
@@ -285,8 +286,9 @@ func TestDeleteNamespace(t *testing.T) {
 
 func TestAutoCreateUa(t *testing.T) {
 	initDb()
+	defer monkey.UnpatchAll()
 	monkey.Patch(getUserInfo, func(xl *xlog.Logger, req *http.Request) (*userInfo, error) { return &user, nil })
-
+	monkey.Patch(system.HaveDb, func() bool { return true })
 	xl := xlog.NewDummy()
 	// bucket maybe already exist. so not check this response.
 	body := namespacebody{
@@ -341,7 +343,7 @@ func TestAutoCreateUa(t *testing.T) {
 func TestHandleUaControl(t *testing.T) {
 	initDb()
 	monkey.Patch(getUserInfo, func(xl *xlog.Logger, req *http.Request) (*userInfo, error) { return &user, nil })
-
+	monkey.Patch(system.HaveDb, func() bool { return true })
 	xl := xlog.NewDummy()
 	err := HandleUaControl(xl, "ipcamera", "test1")
 	assert.Equal(t, err.Error(), "can't find namespace", "they should be equal")
