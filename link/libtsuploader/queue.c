@@ -172,9 +172,13 @@ static int PopQueueWithTimeout(CircleQueue *_pQueue, char *pBuf_, int nBufLen, i
 }
 
 
-static int PopQueue(CircleQueue *_pQueue, char *pBuf_, int nBufLen)
+static int PopQueue(CircleQueue *_pQueue, char *pBuf_, int nBufLen, int64_t nUSec)
 {
         int64_t usec = 1000000;
+        CircleQueueImp *pQueueImp = (CircleQueueImp *)_pQueue;
+        if (pQueueImp->statInfo.nOverwriteCnt > 0) {
+                return TK_Q_OVERWRIT;
+        }
         return PopQueueWithTimeout(_pQueue, pBuf_, nBufLen, usec * 60 * 60 * 24 * 365);
 }
 
@@ -240,9 +244,9 @@ int NewCircleQueue(CircleQueue **_pQueue, int nIsAvailableAfterTimeout, enum Cir
         pQueueImp->pData_ = (char *)pQueueImp + sizeof(CircleQueueImp);
         pQueueImp->nCap_ = _nInitItemCount;
         pQueueImp->nItemLen_ = _nMaxItemLen + sizeof(int); //前缀int类型的一个长度
-        pQueueImp->circleQueue.Pop = PopQueueWithNoOverwrite;
+        pQueueImp->circleQueue.PopWithTimeout = PopQueue;
         pQueueImp->circleQueue.Push = PushQueue;
-        pQueueImp->circleQueue.PopWithTimeout = PopQueueWithTimeout;
+        pQueueImp->circleQueue.PopWithNoOverwrite = PopQueueWithNoOverwrite;
         pQueueImp->circleQueue.StopPush = StopPush;
         pQueueImp->circleQueue.GetStatInfo = getStatInfo;
         pQueueImp->nIsAvailableAfterTimeout = nIsAvailableAfterTimeout;

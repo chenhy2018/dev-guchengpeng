@@ -336,7 +336,7 @@ size_t getDataCallback(void* buffer, size_t size, size_t n, void* rptr)
 {
         KodoUploader * pUploader = (KodoUploader *) rptr;
         int nPopLen = 0;
-        nPopLen = pUploader->pQueue_->Pop(pUploader->pQueue_, buffer, size * n);
+        nPopLen = pUploader->pQueue_->PopWithNoOverwrite(pUploader->pQueue_, buffer, size * n);
         if (nPopLen < 0) {
 		if (nPopLen == TK_TIMEOUT) {
                         if (pUploader->nLastFrameTimestamp >= 0 &&  pUploader->nFirstFrameTimestamp >= 0) {
@@ -356,7 +356,7 @@ size_t getDataCallback(void* buffer, size_t size, size_t n, void* rptr)
         int nTmp = 0;
         char *pBuf = (char *)buffer;
         while (size * n - nPopLen > 0) {
-                nTmp = pUploader->pQueue_->Pop(pUploader->pQueue_, pBuf + nPopLen, size * n - nPopLen);
+                nTmp = pUploader->pQueue_->PopWithNoOverwrite(pUploader->pQueue_, pBuf + nPopLen, size * n - nPopLen);
                 if (nTmp == 0)
                         break;
                 if (nTmp < 0) {
