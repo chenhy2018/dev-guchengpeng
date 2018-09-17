@@ -33,7 +33,7 @@ func FFGrpcClientInit() {
 	//conn, err := grpc.Dial("47.105.118.51:50051", grpc.WithInsecure())
 	conn, err := grpc.Dial("127.0.0.1:50051", grpc.WithInsecure())
 	if err != nil {
-		fmt.Println("Init gprc failedgrpcgrpc")
+		fmt.Println("Init gprc failed")
 
 	}
 	fastForwardClint = pb.NewFastForwardClient(conn)
