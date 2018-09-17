@@ -40,7 +40,7 @@ var (
 	localInfo userInfo
 )
 
-func setUserInfo(xl *xlog.Logger, ak, sk string) {
+func SetUserInfo(ak, sk string) {
 	localInfo.uid = 0
 	localInfo.ak = ak
 	localInfo.sk = sk

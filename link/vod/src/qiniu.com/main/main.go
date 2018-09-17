@@ -1,16 +1,19 @@
 package main
 
 import (
+	"flag"
 	"fmt"
-	"os"
-
 	"github.com/gin-gonic/gin"
+	"os"
 	"qiniu.com/auth"
 	"qiniu.com/controllers"
 	"qiniu.com/db"
 	"qiniu.com/system"
 	log "qiniupkg.com/x/log.v7"
 )
+
+var ak = flag.String("access_key", "", "help message for flagname")
+var sk = flag.String("secret_key", "", "help message for flagname")
 
 func main() {
 
@@ -20,9 +23,13 @@ func main() {
 		log.Error("Load conf fail", err)
 		return
 	}
-
+	flag.Parse()
+	fmt.Println(*ak, *sk)
+	controllers.SetUserInfo(*ak, *sk)
 	initDb(conf)
-	auth.Init(conf)
+	if system.HaveQconf() == true {
+		auth.Init(conf)
+	}
 	r.POST("/v1/namespaces/:namespace/uas/:uaid", controllers.RegisterUa)
 	r.DELETE("/v1/namespaces/:namespace/uas/:uaid", controllers.DeleteUa)
 	r.PUT("/v1/namespaces/:namespace/uas/:uaid", controllers.UpdateUa)
