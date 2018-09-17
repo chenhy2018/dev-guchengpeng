@@ -29,6 +29,7 @@ type requestParams struct {
 	namespace string
 	regex     string
 	exact     bool
+	speed     int32
 }
 type userInfo struct {
 	uid uint32
@@ -164,6 +165,7 @@ func ParseRequest(c *gin.Context, xl *xlog.Logger) (*requestParams, error) {
 	marker := c.DefaultQuery("marker", "")
 	regex := c.DefaultQuery("regex", "")
 	exact := c.DefaultQuery("exact", "false")
+	speed := c.DefaultQuery("speed", "1")
 
 	if strings.Contains(uaid, ".m3u8") {
 		uaid = strings.Split(uaid, ".")[0]
@@ -192,6 +194,11 @@ func ParseRequest(c *gin.Context, xl *xlog.Logger) (*requestParams, error) {
 		return nil, errors.New("Parse exact failed")
 	}
 
+	speedT, err := strconv.ParseInt(speed, 10, 32)
+	if err != nil || !isValidSpeed(speedT) {
+		return nil, errors.New("Parse speed failed")
+	}
+
 	params := &requestParams{
 		uaid:      uaid,
 		from:      fromT * 1000,
@@ -203,9 +210,19 @@ func ParseRequest(c *gin.Context, xl *xlog.Logger) (*requestParams, error) {
 		namespace: namespace,
 		regex:     regex,
 		exact:     exactT,
+		speed:     int32(speedT),
 	}
 
 	return params, nil
+}
+func isValidSpeed(speed int64) bool {
+	s := []int64{1, 2, 4, 8, 16, 32}
+	for _, v := range s {
+		if speed == v {
+			return true
+		}
+	}
+	return false
 }
 
 func HandleUaControl(xl *xlog.Logger, bucket, uaid string) error {
