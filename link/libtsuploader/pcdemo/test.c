@@ -27,6 +27,8 @@ typedef struct {
         int nUptokenInterval;
         int nQbufSize;
         int nNewSetIntval;
+        char *pAFilePath;
+        char *pVFilePath;
 }CmdArg;
 
 typedef struct {
@@ -670,6 +672,8 @@ int main(int argc, const char** argv)
         flag_int(&cmdArg.nQbufSize, "qbufsize", "upload queue buffer size");
         flag_int(&cmdArg.nNewSetIntval, "segint", "new segment interval");
         flag_int(&cmdArg.nUptokenInterval, "uptokenint", "update token interval. default(3550s)");
+        flag_str(&cmdArg.pAFilePath, "afpath", "set audio file path.like /root/a.aac");
+        flag_str(&cmdArg.pVFilePath, "vfpath", "set video file path.like /root/a.h264");
 
         flag_parse(argc, argv, VERSION);
         if (argc == 2 && (strcmp(argv[1], "-h") == 0 || strcmp(argv[1], "-help") == 0)) {
@@ -685,7 +689,52 @@ int main(int argc, const char** argv)
 	printf("cmdArg.IsLocalToken=%d\n", cmdArg.IsLocalToken);
 	printf("cmdArg.IsTestMove=%d\n", cmdArg.IsTestMove);
 	printf("cmdArg.nSleeptime=%d\n", cmdArg.nSleeptime);
+	printf("cmdArg.pAFilePath=%d\n", cmdArg.pAFilePath);
+	printf("cmdArg.pVFilePath=%d\n", cmdArg.pVFilePath);
+	if (cmdArg.pAFilePath) {
+                printf("AFilePath:%s\n", cmdArg.pAFilePath);
+        }
+	if (cmdArg.pVFilePath) {
+                printf("VFilePath:%s\n", cmdArg.pVFilePath);
+        }
         checkCmdArg(argv[0]);
+
+        char *pVFile = NULL;
+        char *pAFile = NULL;
+#ifdef __APPLE__
+        if(cmdArg.IsTestAAC) {
+                pAFile = "/Users/liuye/Documents/material/h265_aac_1_16000_a.aac";
+	} else {
+                pAFile = "/Users/liuye/Documents/material/h265_aac_1_16000_pcmu_8000.mulaw";
+        }
+        if(cmdArg.IsTestH265) {
+                pVFile = "/Users/liuye/Documents/material/h265_aac_1_16000_v.h265";
+	} else {
+                pVFile = "/Users/liuye/Documents/material/h265_aac_1_16000_h264.h264";
+        }
+#else
+
+        if(cmdArg.IsTestAAC) {
+                pAFile = "./material/h265_aac_1_16000_a.aac";
+	} else {
+                pAFile = "./material/h265_aac_1_16000_pcmu_8000.mulaw";
+        }
+        if(cmdArg.IsTestH265) {
+                pVFile = "./material/h265_aac_1_16000_v.h265";
+	} else {
+                pVFile = "./material/h265_aac_1_16000_h264.h264";
+        }
+#endif
+	if (cmdArg.pAFilePath) {
+                pAFile = cmdArg.pAFilePath;
+        }
+	if (cmdArg.pAFilePath) {
+                pVFile = cmdArg.pVFilePath;
+        }
+        if (cmdArg.IsNoAudio)
+                pAFile = NULL;
+        if (cmdArg.IsNoVideo)
+                pVFile = NULL;
 
         int ret = 0;
 #ifdef TEST_WITH_FFMPEG
@@ -775,36 +824,6 @@ int main(int argc, const char** argv)
         }
         pthread_attr_destroy (&attr);
 
-        char *pVFile = NULL;
-        char *pAFile = NULL;
-#ifdef __APPLE__
-        if(cmdArg.IsTestAAC) {
-                pAFile = "/Users/liuye/Documents/material/h265_aac_1_16000_a.aac";
-	} else {
-                pAFile = "/Users/liuye/Documents/material/h265_aac_1_16000_pcmu_8000.mulaw";
-        }
-        if(cmdArg.IsTestH265) {
-                pVFile = "/Users/liuye/Documents/material/h265_aac_1_16000_v.h265";
-	} else {
-                pVFile = "/Users/liuye/Documents/material/h265_aac_1_16000_h264.h264";
-        }
-#else
-
-        if(cmdArg.IsTestAAC) {
-                pAFile = "/liuye/Documents/material/h265_aac_1_16000_a.aac";
-	} else {
-                pAFile = "/liuye/Documents/material/h265_aac_1_16000_pcmu_8000.mulaw";
-        }
-        if(cmdArg.IsTestH265) {
-                pVFile = "/liuye/Documents/material/h265_aac_1_16000_v.h265";
-	} else {
-                pVFile = "/liuye/Documents/material/h265_aac_1_16000_h264.h264";
-        }
-#endif
-        if (cmdArg.IsNoAudio)
-                pAFile = NULL;
-        if (cmdArg.IsNoVideo)
-                pVFile = NULL;
         
         pthread_t secondUploadThread = 0;
         if (cmdArg.IsTwoUpload) {
