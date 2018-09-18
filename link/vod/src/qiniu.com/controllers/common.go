@@ -15,6 +15,7 @@ import (
 	xlog "github.com/qiniu/xlog.v1"
 	"qiniu.com/auth"
 	"qiniu.com/models"
+	"qiniu.com/system"
 )
 
 type requestParams struct {
@@ -28,11 +29,22 @@ type requestParams struct {
 	namespace string
 	regex     string
 	exact     bool
+	speed     int32
 }
 type userInfo struct {
 	uid uint32
 	ak  string
 	sk  string
+}
+
+var (
+	localInfo userInfo
+)
+
+func SetUserInfo(ak, sk string) {
+	localInfo.uid = 0
+	localInfo.ak = ak
+	localInfo.sk = sk
 }
 
 func getUserInfo(xl *xlog.Logger, req *http.Request) (*userInfo, error) {
@@ -51,17 +63,28 @@ func getUserInfo(xl *xlog.Logger, req *http.Request) (*userInfo, error) {
 		return nil, errors.New("Parse auth header Failed")
 	}
 	ak := u["ak"][0]
-	user, err := auth.GetUserInfoFromQconf(xl, ak)
-	if err != nil {
-		return nil, errors.New("get userinfo error")
+	var info userInfo
+	if system.HaveQconf() == true {
+		user, err := auth.GetUserInfoFromQconf(xl, ak)
+		if err != nil {
+			return nil, errors.New("get userinfo error")
+		}
+		uid := user.Uid
+		info = userInfo{
+			uid: uid,
+			ak:  ak,
+			sk:  string(user.Secret[:]),
+		}
+	} else {
+		if ak == localInfo.ak {
+			info = userInfo{
+				uid: localInfo.uid,
+				ak:  localInfo.ak,
+				sk:  localInfo.sk,
+			}
+		}
 	}
-	uid := user.Uid
-	userInfo := userInfo{
-		uid: uid,
-		ak:  ak,
-		sk:  string(user.Secret[:]),
-	}
-	return &userInfo, nil
+	return &info, nil
 }
 
 func getUid(uid uint32) string {
@@ -76,6 +99,9 @@ func GetUrlWithDownLoadToken(xl *xlog.Logger, domain, fname string, tsExpire int
 }
 
 func GetBucket(xl *xlog.Logger, uid, namespace string) (string, error) {
+	if system.HaveDb() == false {
+		return namespace, nil
+	}
 	namespaceMod = &models.NamespaceModel{}
 	info, err := namespaceMod.GetNamespaceInfo(xl, uid, namespace)
 	if err != nil {
@@ -88,6 +114,10 @@ func GetBucket(xl *xlog.Logger, uid, namespace string) (string, error) {
 }
 
 func IsAutoCreateUa(xl *xlog.Logger, bucket string) (bool, []models.NamespaceInfo, error) {
+	if system.HaveDb() == false {
+		return true, []models.NamespaceInfo{}, nil
+	}
+
 	namespaceMod = &models.NamespaceModel{}
 	info, err := namespaceMod.GetNamespaceByBucket(xl, bucket)
 	if err != nil {
@@ -135,6 +165,7 @@ func ParseRequest(c *gin.Context, xl *xlog.Logger) (*requestParams, error) {
 	marker := c.DefaultQuery("marker", "")
 	regex := c.DefaultQuery("regex", "")
 	exact := c.DefaultQuery("exact", "false")
+	speed := c.DefaultQuery("speed", "1")
 
 	if strings.Contains(uaid, ".m3u8") {
 		uaid = strings.Split(uaid, ".")[0]
@@ -163,6 +194,11 @@ func ParseRequest(c *gin.Context, xl *xlog.Logger) (*requestParams, error) {
 		return nil, errors.New("Parse exact failed")
 	}
 
+	speedT, err := strconv.ParseInt(speed, 10, 32)
+	if err != nil || !isValidSpeed(speedT) {
+		return nil, errors.New("Parse speed failed")
+	}
+
 	params := &requestParams{
 		uaid:      uaid,
 		from:      fromT * 1000,
@@ -174,12 +210,26 @@ func ParseRequest(c *gin.Context, xl *xlog.Logger) (*requestParams, error) {
 		namespace: namespace,
 		regex:     regex,
 		exact:     exactT,
+		speed:     int32(speedT),
 	}
 
 	return params, nil
 }
+func isValidSpeed(speed int64) bool {
+	s := []int64{1, 2, 4, 8, 16, 32}
+	for _, v := range s {
+		if speed == v {
+			return true
+		}
+	}
+	return false
+}
 
 func HandleUaControl(xl *xlog.Logger, bucket, uaid string) error {
+	if system.HaveDb() == false {
+		return nil
+	}
+
 	isAuto, info, err := IsAutoCreateUa(xl, bucket)
 	if err != nil {
 		return err
@@ -193,18 +243,6 @@ func HandleUaControl(xl *xlog.Logger, bucket, uaid string) error {
 	if isAuto == false {
 		if len(r) == 0 {
 			return fmt.Errorf("Can't find ua info")
-		}
-	} else {
-		if len(r) == 0 {
-			ua := models.UaInfo{
-				Uid:       info[0].Uid,
-				UaId:      uaid,
-				Namespace: info[0].Space,
-			}
-			err = UaMod.Register(xl, ua)
-			if err != nil {
-				return err
-			}
 		}
 	}
 	return nil

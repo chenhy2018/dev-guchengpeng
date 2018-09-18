@@ -30,6 +30,7 @@ static int PushQueue(CircleQueue *_pQueue, char *pData_, int nDataLen)
         
         if (!pQueueImp->nIsAvailableAfterTimeout && pQueueImp->nQState_ == QUEUE_TIMEOUT_STATE) {
                 pQueueImp->statInfo.nDropped += nDataLen;
+                logwarn("queue is is timeout dropped");
                 pthread_mutex_unlock(&pQueueImp->mutex_);
                 return 0;
         }
@@ -134,14 +135,14 @@ static int PopQueueWithTimeout(CircleQueue *_pQueue, char *pBuf_, int nBufLen, i
                 timeout.tv_nsec = (now.tv_usec + nUSec % 1000000) * 1000;
                 
                 ret = pthread_cond_timedwait(&pQueueImp->condition_, &pQueueImp->mutex_, &timeout);
-                if (pQueueImp->nQState_ == QUEUE_READ_ONLY_STATE && pQueueImp->nLen_ == 0) {
-                        pthread_mutex_unlock(&pQueueImp->mutex_);
-                        return 0;
-                }
                 if (ret == ETIMEDOUT) {
                         pthread_mutex_unlock(&pQueueImp->mutex_);
                         pQueueImp->nQState_ = QUEUE_TIMEOUT_STATE;
                         return TK_TIMEOUT;
+                }
+                if (pQueueImp->nLen_ == 0) {
+                        pthread_mutex_unlock(&pQueueImp->mutex_);
+                        return 0;
                 }
         }
         assert (pQueueImp->nLen_ != 0);
@@ -172,9 +173,13 @@ static int PopQueueWithTimeout(CircleQueue *_pQueue, char *pBuf_, int nBufLen, i
 }
 
 
-static int PopQueue(CircleQueue *_pQueue, char *pBuf_, int nBufLen)
+static int PopQueue(CircleQueue *_pQueue, char *pBuf_, int nBufLen, int64_t nUSec)
 {
         int64_t usec = 1000000;
+        CircleQueueImp *pQueueImp = (CircleQueueImp *)_pQueue;
+        if (pQueueImp->statInfo.nOverwriteCnt > 0) {
+                return TK_Q_OVERWRIT;
+        }
         return PopQueueWithTimeout(_pQueue, pBuf_, nBufLen, usec * 60 * 60 * 24 * 365);
 }
 
@@ -240,9 +245,9 @@ int NewCircleQueue(CircleQueue **_pQueue, int nIsAvailableAfterTimeout, enum Cir
         pQueueImp->pData_ = (char *)pQueueImp + sizeof(CircleQueueImp);
         pQueueImp->nCap_ = _nInitItemCount;
         pQueueImp->nItemLen_ = _nMaxItemLen + sizeof(int); //前缀int类型的一个长度
-        pQueueImp->circleQueue.Pop = PopQueueWithNoOverwrite;
+        pQueueImp->circleQueue.PopWithTimeout = PopQueue;
         pQueueImp->circleQueue.Push = PushQueue;
-        pQueueImp->circleQueue.PopWithTimeout = PopQueueWithTimeout;
+        pQueueImp->circleQueue.PopWithNoOverwrite = PopQueueWithNoOverwrite;
         pQueueImp->circleQueue.StopPush = StopPush;
         pQueueImp->circleQueue.GetStatInfo = getStatInfo;
         pQueueImp->nIsAvailableAfterTimeout = nIsAvailableAfterTimeout;

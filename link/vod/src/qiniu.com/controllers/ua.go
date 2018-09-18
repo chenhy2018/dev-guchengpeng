@@ -74,7 +74,7 @@ func RegisterUa(c *gin.Context) {
 		return
 	}
 
-	info, err := UaMod.GetUaInfo(xl, uaData.Namespace, params.uaid)
+	info, err := UaMod.GetUaInfo(xl, params.namespace, params.uaid)
 	if len(info) != 0 {
 		xl.Errorf("ua is exist")
 		c.JSON(400, gin.H{
@@ -186,15 +186,13 @@ func UpdateUa(c *gin.Context) {
 		ua.Password = info[0].Password
 	}
 
-	if ua.Namespace != params.namespace {
-		info, _ = UaMod.GetUaInfo(xl, ua.Namespace, ua.UaId)
-		if len(info) != 0 {
-			xl.Errorf("ua is exist")
-			c.JSON(400, gin.H{
-				"error": "ua is exist",
-			})
-			return
-		}
+	info, _ = UaMod.GetUaInfo(xl, ua.Namespace, ua.UaId)
+	if len(info) != 0 {
+		xl.Errorf("ua is exist")
+		c.JSON(400, gin.H{
+			"error": "ua is exist",
+		})
+		return
 	}
 	err = UaMod.UpdateUa(xl, params.namespace, params.uaid, ua)
 	if err != nil {

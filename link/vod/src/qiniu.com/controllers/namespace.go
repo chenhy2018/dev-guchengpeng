@@ -127,6 +127,14 @@ func RegisterNamespace(c *gin.Context) {
 		})
 		return
 	}
+	oldinfo, err := namespaceMod.GetNamespaceInfo(xl, getUid(info.uid), params.namespace)
+	if err != nil || len(oldinfo) != 0 {
+		xl.Errorf("namespace is exist")
+		c.JSON(400, gin.H{
+			"error": "namespace is exist",
+		})
+		return
+	}
 	namespace := models.NamespaceInfo{
 		Uid:          getUid(info.uid),
 		Space:        params.namespace,
@@ -134,6 +142,7 @@ func RegisterNamespace(c *gin.Context) {
 		Domain:       domain,
 		AutoCreateUa: namespaceData.AutoCreateUa,
 	}
+
 	err = namespaceMod.Register(xl, namespace)
 	if err != nil {
 		xl.Errorf("Register falied error = %#v", err.Error())
@@ -168,7 +177,7 @@ func DeleteNamespace(c *gin.Context) {
 
 	err = namespaceMod.Delete(xl, getUid(info.uid), params.namespace)
 	if err != nil {
-		xl.Errorf("Register falied error = %#v", err.Error())
+		xl.Errorf("Delete falied error = %#v", err.Error())
 		c.JSON(400, gin.H{
 			"error": err.Error(),
 		})

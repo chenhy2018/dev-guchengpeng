@@ -1,36 +1,37 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"os"
 
 	"github.com/gin-gonic/gin"
-	"qbox.us/cc/config"
 	"qiniu.com/auth"
 	"qiniu.com/controllers"
 	"qiniu.com/db"
-	"qiniu.com/models"
 	"qiniu.com/system"
 	log "qiniupkg.com/x/log.v7"
 )
 
+var ak = flag.String("access_key", "", "help message for flagname")
+var sk = flag.String("secret_key", "", "help message for flagname")
+
 func main() {
 
 	r := gin.Default()
-	config.Init("f", "qbox", "linking_vod.conf")
-	var conf system.Configuration
-	err := config.Load(&conf)
+	conf, err := system.LoadConf("qbox", "linking_vod.conf")
 	if err != nil {
 		log.Error("Load conf fail", err)
 		return
-
 	}
-	if err != nil {
-		fmt.Println("read conf file error, error = ", err)
-		os.Exit(3)
+	flag.Parse()
+	fmt.Println(*ak, *sk)
+	controllers.SetUserInfo(*ak, *sk)
+	initDb(conf)
+	if system.HaveQconf() == true {
+		auth.Init(conf)
 	}
-	initDb()
-	auth.Init(&conf)
+	controllers.Init(&conf.GrpcConf)
 	r.POST("/v1/namespaces/:namespace/uas/:uaid", controllers.RegisterUa)
 	r.DELETE("/v1/namespaces/:namespace/uas/:uaid", controllers.DeleteUa)
 	r.PUT("/v1/namespaces/:namespace/uas/:uaid", controllers.UpdateUa)
@@ -49,24 +50,22 @@ func main() {
 
 }
 
-func initDb() {
-	url := "mongodb://root:public@180.97.147.164:27017,180.97.147.179:27017/admin"
-	dbName := "vod"
+func initDb(conf *system.Configuration) {
+	if system.HaveDb() == false {
+		return
+	}
+	//url := "mongodb://root:public@180.97.147.164:27017,180.97.147.179:27017/admin"
+	url := conf.DbConf.Host
 	config := db.MgoConfig{
 		Host:     url,
-		DB:       dbName,
-		Mode:     "",
-		Username: "root",
-		Password: "public",
+		DB:       conf.DbConf.Db,
+		Mode:     conf.DbConf.Mode,
+		Username: conf.DbConf.User,
+		Password: conf.DbConf.Password,
 		AuthDB:   "admin",
 		Proxies:  nil,
 	}
 	if err := db.InitDb(&config); err != nil {
-		fmt.Println(err)
-		os.Exit(3)
-	}
-	segment := models.SegmentModel{}
-	if err := segment.Init(); err != nil {
 		fmt.Println(err)
 		os.Exit(3)
 	}

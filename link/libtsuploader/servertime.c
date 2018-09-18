@@ -69,7 +69,7 @@ static size_t writeTime(void *pTimeStr, size_t size,  size_t nmemb,  void *pUser
                 pTokenEnd++;
         }
         memcpy(pTime->pData, pTokenStart, pTokenEnd - pTokenStart);
-
+        
         return size * nmemb;
 }
 

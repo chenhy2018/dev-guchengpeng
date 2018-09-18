@@ -29,7 +29,7 @@ void UninitUploader();
 
 
 //for test
-int GetUploadToken(char *pBuf, int nBufLen);
+int GetUploadToken(char *pBuf, int nBufLen, char *pUrl);
 void SetAk(char *pAk);
 void SetSk(char *pSk);
 void SetBucketName(char *_pName);

@@ -6,7 +6,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"qiniu.com/db"
 	"testing"
-	"time"
+	//"time"
 )
 
 func TestUa(t *testing.T) {
@@ -72,8 +72,8 @@ func TestWrongPriUrl(t *testing.T) {
 	xl.Infof("DB init\n")
 	db.InitDb(&config)
 	assert.Equal(t, 0, 0, "they should be equal")
-	xl.Infof("Test sleep 60s, please use rs.stepDown(20) to switch secondard by manual\n")
-	time.Sleep(time.Duration(1) * time.Second)
+	// xl.Infof("Test sleep 60s, please use rs.stepDown(20) to switch secondard by manual\n")
+	// time.Sleep(time.Duration(1) * time.Second)
 	model := UaModel{}
 	// Add ua, count size 10, from 0 to 10.
 	for count := 0; count < 100; count++ {
