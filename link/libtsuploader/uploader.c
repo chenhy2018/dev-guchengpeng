@@ -44,7 +44,7 @@ typedef struct _KodoUploader{
         curl_off_t nLastUlnow;
         int64_t nUlnowRecTime;
         int nLowSpeedCnt;
-        int nIsFinished;
+        int isTimeoutWithData;
         
         pthread_mutex_t waitFirstMutex_;
         enum WaitFirstFlag nWaitFirstMutexLocked_;
@@ -75,7 +75,7 @@ int timeoutCallback(void *clientp, curl_off_t dltotal, curl_off_t dlnow, curl_of
         if (nDiff > 0) {
                 //printf("%d,==========dltotal:%lld dlnow:%lld ultotal:%lld ulnow-reculnow=%lld, now - lastrectime=%lld\n",
                 //       pUploader->nLowSpeedCnt, dltotal, dlnow, ultotal, ulnow - pUploader->nLastUlnow, (nNow - pUploader->nUlnowRecTime)/1000000);
-                if ((ulnow - pUploader->nLastUlnow) / nDiff < 1024) { //} && !pUploader->nIsFinished) {
+                if ((ulnow - pUploader->nLastUlnow) / nDiff < 1024) { //} && !pUploader->isTimeoutWithData) {
                         pUploader->nLowSpeedCnt += nDiff;
                         if (pUploader->nLowSpeedCnt > 3) {
                                 logerror("accumulate upload timeout:%d %d", pUploader->nLowSpeedCnt, nDiff);
@@ -336,6 +336,11 @@ size_t getDataCallback(void* buffer, size_t size, size_t n, void* rptr)
 {
         KodoUploader * pUploader = (KodoUploader *) rptr;
         int nPopLen = 0;
+        if (pUploader->isTimeoutWithData != 0) {
+                pUploader->isTimeoutWithData++;
+                printf("isTimeoutWithData:%d\n", pUploader->isTimeoutWithData);;
+                return 0;
+        }
         nPopLen = pUploader->pQueue_->PopWithNoOverwrite(pUploader->pQueue_, buffer, size * n);
         if (nPopLen < 0) {
 		if (nPopLen == TK_TIMEOUT) {
@@ -362,6 +367,7 @@ size_t getDataCallback(void* buffer, size_t size, size_t n, void* rptr)
                 if (nTmp < 0) {
 		        if (nTmp == TK_TIMEOUT) {
                                 if (pUploader->nLastFrameTimestamp >= 0 &&  pUploader->nFirstFrameTimestamp >= 0) {
+                                        pUploader->isTimeoutWithData = 1;
                                         goto RET;
                                 }
                                 logerror("next pop from queue timeout:%d %lld %lld", nTmp, pUploader->nLastFrameTimestamp, pUploader->nFirstFrameTimestamp);
@@ -372,9 +378,6 @@ size_t getDataCallback(void* buffer, size_t size, size_t n, void* rptr)
         }
         UploaderStatInfo info;
         pUploader->pQueue_->GetStatInfo(rptr, &info);
-        //if (!info.nIsReadOnly) {
-        //        pUploader->nIsFinished = 1;
-        //}
 RET:
         pUploader->getDataBytes += nPopLen;
         return nPopLen;

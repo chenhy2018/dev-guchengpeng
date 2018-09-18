@@ -108,7 +108,6 @@ static void pushRecycle(FFTsMuxUploader *_pFFTsMuxUploader)
 {
         if (_pFFTsMuxUploader) {
                 
-                pthread_mutex_lock(&_pFFTsMuxUploader->muxUploaderMutex_);
                 if (_pFFTsMuxUploader->pTsMuxCtx) {
 #ifndef USE_OWN_TSMUX
                         av_write_trailer(_pFFTsMuxUploader->pTsMuxCtx->pFmtCtx_);
@@ -117,8 +116,6 @@ static void pushRecycle(FFTsMuxUploader *_pFFTsMuxUploader)
                         PushFunction(_pFFTsMuxUploader->pTsMuxCtx);
                         _pFFTsMuxUploader->pTsMuxCtx = NULL;
                 }
-                
-                pthread_mutex_unlock(&_pFFTsMuxUploader->muxUploaderMutex_);
         }
         return;
 }
@@ -150,31 +147,20 @@ static int push(FFTsMuxUploader *pFFTsMuxUploader, char * _pData, int _nDataLen,
 #endif
         
         //logtrace("push thread id:%d\n", (int)pthread_self());
-        pthread_mutex_lock(&pFFTsMuxUploader->muxUploaderMutex_);
         
         FFTsMuxContext *pTsMuxCtx = NULL;
         int count = 0;
 
-        count = 1;
+        count = 2;
         pTsMuxCtx = pFFTsMuxUploader->pTsMuxCtx;
         while(pTsMuxCtx == NULL && count) {
-                pthread_mutex_unlock(&pFFTsMuxUploader->muxUploaderMutex_);
-                usleep(3*1000);
-                pthread_mutex_lock(&pFFTsMuxUploader->muxUploaderMutex_);
+                logwarn("mux context is null");
+                usleep(2000);
                 pTsMuxCtx = pFFTsMuxUploader->pTsMuxCtx;
                 count--;
         }
         if (pTsMuxCtx == NULL) {
-                pthread_mutex_unlock(&pFFTsMuxUploader->muxUploaderMutex_);
                 logwarn("upload context is NULL");
-                return 0;
-        }
-        if (pTsMuxCtx->pTsUploader_->GetUploaderState(pTsMuxCtx->pTsUploader_) == TK_UPLOAD_FAIL) {
-                if (pFFTsMuxUploader->ffMuxSatte != TK_UPLOAD_FAIL) {
-                        logdebug("upload fail. drop the data");
-                }
-                pFFTsMuxUploader->ffMuxSatte = TK_UPLOAD_FAIL;
-                pthread_mutex_unlock(&pFFTsMuxUploader->muxUploaderMutex_);
                 return 0;
         }
 
@@ -184,7 +170,6 @@ static int push(FFTsMuxUploader *pFFTsMuxUploader, char * _pData, int _nDataLen,
         if (_nFlag == TK_STREAM_TYPE_AUDIO){
                 //fprintf(stderr, "audio frame: len:%d pts:%lld\n", _nDataLen, _nTimestamp);
                 if (pTsMuxCtx->nPrevAudioTimestamp != 0 && _nTimestamp - pTsMuxCtx->nPrevAudioTimestamp <= 0) {
-                        pthread_mutex_unlock(&pFFTsMuxUploader->muxUploaderMutex_);
                         logwarn("audio pts not monotonically: prev:%lld now:%lld", pTsMuxCtx->nPrevAudioTimestamp, _nTimestamp);
                         return 0;
                 }
@@ -214,7 +199,6 @@ static int push(FFTsMuxUploader *pFFTsMuxUploader, char * _pData, int _nDataLen,
                         }
                         if(pFFTsMuxUploader->pAACBuf == NULL || pFFTsMuxUploader->avArg.nChannels < 1 || pFFTsMuxUploader->avArg.nChannels > 2
                            || nFreqIdx < 0) {
-                                pthread_mutex_unlock(&pFFTsMuxUploader->muxUploaderMutex_);
                                 if (pFFTsMuxUploader->pAACBuf == NULL) {
                                         logwarn("malloc %d size memory fail", varHeader.aac_frame_length);
                                         return TK_NO_MEMORY;
@@ -243,7 +227,6 @@ static int push(FFTsMuxUploader *pFFTsMuxUploader, char * _pData, int _nDataLen,
         }else{
                 //fprintf(stderr, "video frame: len:%d pts:%lld\n", _nDataLen, _nTimestamp);
                 if (pTsMuxCtx->nPrevVideoTimestamp != 0 && _nTimestamp - pTsMuxCtx->nPrevVideoTimestamp <= 0) {
-                        pthread_mutex_unlock(&pFFTsMuxUploader->muxUploaderMutex_);
                         logwarn("video pts not monotonically: prev:%lld now:%lld", pTsMuxCtx->nPrevVideoTimestamp, _nTimestamp);
                         return 0;
                 }
@@ -269,7 +252,6 @@ static int push(FFTsMuxUploader *pFFTsMuxUploader, char * _pData, int _nDataLen,
                 pFFTsMuxUploader->ffMuxSatte = TK_UPLOAD_FAIL;
         }
 
-        pthread_mutex_unlock(&pFFTsMuxUploader->muxUploaderMutex_);
 #ifndef USE_OWN_TSMUX
         if (isAdtsAdded) {
                 free(pkt.data);
@@ -281,21 +263,30 @@ static int push(FFTsMuxUploader *pFFTsMuxUploader, char * _pData, int _nDataLen,
 static int PushVideo(TsMuxUploader *_pTsMuxUploader, char * _pData, int _nDataLen, int64_t _nTimestamp, int nIsKeyFrame, int _nIsSegStart)
 {
         FFTsMuxUploader *pFFTsMuxUploader = (FFTsMuxUploader *)_pTsMuxUploader;
-
+        pthread_mutex_lock(&pFFTsMuxUploader->muxUploaderMutex_);
         int ret = 0;
         if (pFFTsMuxUploader->nKeyFrameCount == 0 && !nIsKeyFrame) {
                 logwarn("first video frame not IDR. drop this frame\n");
+                pthread_mutex_unlock(&pFFTsMuxUploader->muxUploaderMutex_);
                 return 0;
         }
         if (pFFTsMuxUploader->nLastUploadVideoTimestamp == -1) {
                 pFFTsMuxUploader->nLastUploadVideoTimestamp = _nTimestamp;
+        }
+        UploadState ustate = pFFTsMuxUploader->pTsMuxCtx->pTsUploader_->GetUploaderState(pFFTsMuxUploader->pTsMuxCtx->pTsUploader_);
+        //if (pFFTsMuxUploader->pTsMuxCtx->pTsUploader_->GetUploaderState(pTsMuxCtx->pTsUploader_) == TK_UPLOAD_FAIL) {
+        if ( ustate != TK_UPLOAD_INIT) {
+                if (ustate == TK_UPLOAD_FAIL && pFFTsMuxUploader->ffMuxSatte != TK_UPLOAD_FAIL) {
+                        logdebug("upload fail. drop the data");
+                }
+                pFFTsMuxUploader->ffMuxSatte = ustate;
         }
         // if start new uploader, start from keyframe
         if (nIsKeyFrame) {
                 if( (_nTimestamp - pFFTsMuxUploader->nLastUploadVideoTimestamp) > 4980
                    //at least 2 keyframe and aoubt last 5 second
                    || (_nIsSegStart && pFFTsMuxUploader->nFrameCount != 0)// new segment is specified
-                   ||  pFFTsMuxUploader->ffMuxSatte == TK_UPLOAD_FAIL){   // upload fail
+                   ||  pFFTsMuxUploader->ffMuxSatte != TK_UPLOAD_INIT){   // upload finished
                         //printf("next ts:%d %lld\n", pFFTsMuxUploader->nKeyFrameCount, _nTimestamp - pFFTsMuxUploader->nLastUploadVideoTimestamp);
                         pFFTsMuxUploader->nKeyFrameCount = 0;
                         pFFTsMuxUploader->nFrameCount = 0;
@@ -319,16 +310,19 @@ static int PushVideo(TsMuxUploader *_pTsMuxUploader, char * _pData, int _nDataLe
         if (ret == 0){
                 pFFTsMuxUploader->nFrameCount++;
         }
+        pthread_mutex_unlock(&pFFTsMuxUploader->muxUploaderMutex_);
         return ret;
 }
 
 static int PushAudio(TsMuxUploader *_pTsMuxUploader, char * _pData, int _nDataLen, int64_t _nTimestamp)
 {
         FFTsMuxUploader *pFFTsMuxUploader = (FFTsMuxUploader *)_pTsMuxUploader;
+        pthread_mutex_lock(&pFFTsMuxUploader->muxUploaderMutex_);
         int ret = push(pFFTsMuxUploader, _pData, _nDataLen, _nTimestamp, TK_STREAM_TYPE_AUDIO);
         if (ret == 0){
                 pFFTsMuxUploader->nFrameCount++;
         }
+        pthread_mutex_unlock(&pFFTsMuxUploader->muxUploaderMutex_);
         return ret;
 }
 
@@ -750,7 +744,9 @@ void DestroyTsMuxUploader(TsMuxUploader **_pTsMuxUploader)
         if (pFFTsMuxUploader->pTsMuxCtx) {
                 pFFTsMuxUploader->pTsMuxCtx->pTsMuxUploader = (TsMuxUploader*)pFFTsMuxUploader;
         }
+        pthread_mutex_lock(&pFFTsMuxUploader->muxUploaderMutex_);
         pushRecycle(pFFTsMuxUploader);
+        pthread_mutex_unlock(&pFFTsMuxUploader->muxUploaderMutex_);
         *_pTsMuxUploader = NULL;
         return;
 }

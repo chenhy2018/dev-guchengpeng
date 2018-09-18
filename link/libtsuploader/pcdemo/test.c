@@ -33,6 +33,7 @@ typedef struct {
         bool IsFileLoop;
         int  nLoopSleeptime;
         int nRoundCount;
+	bool IsNoNet;
 }CmdArg;
 
 typedef struct {
@@ -682,6 +683,7 @@ int main(int argc, const char** argv)
         flag_str(&cmdArg.pTokenUrl, "tokenurl", "url where to send token request");
         flag_bool(&cmdArg.IsFileLoop, "fileloop", "in file mode and only one upload, will loop to push file");
         flag_int(&cmdArg.nLoopSleeptime, "csleeptime", "next round sleeptime");
+        flag_bool(&cmdArg.IsNoNet, "nonet", "no network");
 
         flag_parse(argc, argv, VERSION);
         if (argc == 2 && (strcmp(argv[1], "-h") == 0 || strcmp(argv[1], "-help") == 0)) {
@@ -776,12 +778,27 @@ int main(int argc, const char** argv)
         }
 #endif
         
-        ret = GetUploadToken(gtestToken, sizeof(gtestToken), cmdArg.pTokenUrl);
-        if (ret != 0)
-                return ret;
-        printf("token:%s\n", gtestToken);
-        
         AVuploader avuploader;
+        if (!cmdArg.IsNoNet) {
+                ret = GetUploadToken(gtestToken, sizeof(gtestToken), cmdArg.pTokenUrl);
+                if (ret != 0)
+                        return ret;
+                printf("token:%s\n", gtestToken);
+
+                pthread_t updateTokenThread;
+                pthread_attr_t attr;
+                pthread_attr_init (&attr);
+                pthread_attr_setdetachstate (&attr, PTHREAD_CREATE_DETACHED);
+                ret = pthread_create(&updateTokenThread, &attr, updateToken, (void*)avuploader.pTsMuxUploader);
+                if (ret != 0) {
+                        printf("create update token thread fail\n");
+                        return ret;
+                }
+                pthread_attr_destroy (&attr);
+	} else {
+		strcpy(gtestToken, "invalid_token");
+        }
+        
         memset(&avuploader, 0, sizeof(avuploader));
         avuploader.avArg.nChannels = 1;
         if (!cmdArg.IsNoAudio) {
@@ -827,16 +844,6 @@ int main(int argc, const char** argv)
                 return ret;
         }
         
-        pthread_t updateTokenThread;
-        pthread_attr_t attr;
-        pthread_attr_init (&attr);
-        pthread_attr_setdetachstate (&attr, PTHREAD_CREATE_DETACHED);
-        ret = pthread_create(&updateTokenThread, &attr, updateToken, (void*)avuploader.pTsMuxUploader);
-        if (ret != 0) {
-                printf("create update token thread fail\n");
-                return ret;
-        }
-        pthread_attr_destroy (&attr);
 
         
         pthread_t secondUploadThread = 0;
