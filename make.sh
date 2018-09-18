@@ -34,8 +34,8 @@ fi
 if [ -f CMakeCache.txt ];then
 rm CMakeCache.txt
 fi
-
-cmake .
+echo $PATH
+/usr/bin/cmake .
 if ! make VERBOSE=1; then echo "build failed"; exit 1; fi
 
 if [ "$WITH_PJSIP" = "ON" ];then
