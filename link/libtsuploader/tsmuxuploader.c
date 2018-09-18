@@ -132,6 +132,9 @@ static int writeTsPacketToMem(void *opaque, uint8_t *buf, int buf_size)
                         logdebug("write ts to queue fail:%d", ret);
                 }
                 return ret;
+	} else if (ret == 0){
+                logdebug("push queue return zero");
+                return TK_Q_WRONGSTATE;
         } else {
                 logtrace("write_packet: should write:len:%d  actual:%d\n", buf_size, ret);
         }
@@ -741,10 +744,10 @@ void DestroyTsMuxUploader(TsMuxUploader **_pTsMuxUploader)
 {
         FFTsMuxUploader *pFFTsMuxUploader = (FFTsMuxUploader *)(*_pTsMuxUploader);
         
+        pthread_mutex_lock(&pFFTsMuxUploader->muxUploaderMutex_);
         if (pFFTsMuxUploader->pTsMuxCtx) {
                 pFFTsMuxUploader->pTsMuxCtx->pTsMuxUploader = (TsMuxUploader*)pFFTsMuxUploader;
         }
-        pthread_mutex_lock(&pFFTsMuxUploader->muxUploaderMutex_);
         pushRecycle(pFFTsMuxUploader);
         pthread_mutex_unlock(&pFFTsMuxUploader->muxUploaderMutex_);
         *_pTsMuxUploader = NULL;

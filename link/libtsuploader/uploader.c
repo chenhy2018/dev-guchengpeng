@@ -263,7 +263,6 @@ static void * streamUpload(void *_pOpaque)
         if (pUploader->nWaitFirstMutexLocked_ != WF_FIRST) {
                 goto END;
         }
-        logdebug("upload start");
         
         int64_t curTime = GetCurrentNanosecond();
         // ts/uid/ua_id/yyyy/mm/dd/hh/mm/ss/mmm/fragment_start_ts/expiry.ts
@@ -282,6 +281,7 @@ static void * streamUpload(void *_pOpaque)
         //ts/uaid/startts/fragment_start_ts/expiry.ts
         sprintf(key, "ts/%s/%lld/%lld/%d.ts", pUploader->uploadArg.pDeviceId_,
                 curTime / 1000000, nSegmentId / 1000000, nDeleteAfterDays_);
+        logdebug("upload start:%s q:%p", key, pUploader->pQueue_);
 #ifdef TK_STREAM_UPLOAD
         client.xferinfoData = _pOpaque;
         client.xferinfoCb = timeoutCallback;
@@ -338,7 +338,7 @@ size_t getDataCallback(void* buffer, size_t size, size_t n, void* rptr)
         int nPopLen = 0;
         if (pUploader->isTimeoutWithData != 0) {
                 pUploader->isTimeoutWithData++;
-                printf("isTimeoutWithData:%d\n", pUploader->isTimeoutWithData);;
+                loginfo("isTimeoutWithData:%d\n", pUploader->isTimeoutWithData);;
                 return 0;
         }
         nPopLen = pUploader->pQueue_->PopWithNoOverwrite(pUploader->pQueue_, buffer, size * n);
