@@ -30,5 +30,6 @@ void cfg_set(struct cfg_struct *, const char *, const char *);
 
 /* Delete key (+value) from cfg_struct */
 void cfg_delete(struct cfg_struct *, const char *);
+void cfg_dump(struct cfg_struct *cfg);
 
 #endif
