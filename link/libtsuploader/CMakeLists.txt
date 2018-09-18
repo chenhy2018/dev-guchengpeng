@@ -64,7 +64,9 @@ add_library(tsuploader STATIC
 )
 
 if ( $ENV{ARCH} STREQUAL x86 )
-    add_subdirectory(pcdemo)
+        if ($ENV{WITH_FFMPEG} STREQUAL "ON")
+            add_subdirectory(pcdemo)
+        endif()
 endif()
 
 if ( $ENV{ARCH} STREQUAL mstar )
