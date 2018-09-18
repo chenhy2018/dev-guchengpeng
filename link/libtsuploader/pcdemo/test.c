@@ -27,6 +27,13 @@ typedef struct {
         int nUptokenInterval;
         int nQbufSize;
         int nNewSetIntval;
+        char *pAFilePath;
+        char *pVFilePath;
+        char *pTokenUrl;
+        bool IsFileLoop;
+        int  nLoopSleeptime;
+        int nRoundCount;
+	bool IsNoNet;
 }CmdArg;
 
 typedef struct {
@@ -554,7 +561,7 @@ static void * updateToken(void * opaque) {
         while(1) {
                 sleep(cmdArg.nUptokenInterval);
                 memset(gtestToken, 0, sizeof(gtestToken));
-                ret = GetUploadToken(gtestToken, sizeof(gtestToken));
+                ret = GetUploadToken(gtestToken, sizeof(gtestToken), cmdArg.pTokenUrl);
                 if (ret != 0) {
                         printf("update token file<<<<<<<<<<<<<\n");
                         return NULL;
@@ -570,6 +577,7 @@ static void * updateToken(void * opaque) {
 }
 
 void signalHander(int s){
+        cmdArg.IsFileLoop = false;
         UninitUploader();
         exit(0);
 }
@@ -670,6 +678,12 @@ int main(int argc, const char** argv)
         flag_int(&cmdArg.nQbufSize, "qbufsize", "upload queue buffer size");
         flag_int(&cmdArg.nNewSetIntval, "segint", "new segment interval");
         flag_int(&cmdArg.nUptokenInterval, "uptokenint", "update token interval. default(3550s)");
+        flag_str(&cmdArg.pAFilePath, "afpath", "set audio file path.like /root/a.aac");
+        flag_str(&cmdArg.pVFilePath, "vfpath", "set video file path.like /root/a.h264");
+        flag_str(&cmdArg.pTokenUrl, "tokenurl", "url where to send token request");
+        flag_bool(&cmdArg.IsFileLoop, "fileloop", "in file mode and only one upload, will loop to push file");
+        flag_int(&cmdArg.nLoopSleeptime, "csleeptime", "next round sleeptime");
+        flag_bool(&cmdArg.IsNoNet, "nonet", "no network");
 
         flag_parse(argc, argv, VERSION);
         if (argc == 2 && (strcmp(argv[1], "-h") == 0 || strcmp(argv[1], "-help") == 0)) {
@@ -677,15 +691,66 @@ int main(int argc, const char** argv)
                 return 0;
         }
 
-	printf("cmdArg.IsInputFromFFmpeg=%d\n", cmdArg.IsInputFromFFmpeg);
-	printf("cmdArg.IsTestAAC=%d\n", cmdArg.IsTestAAC);
-	printf("cmdArg.IsTestAACWithoutAdts=%d\n", cmdArg.IsTestAACWithoutAdts);
-	printf("cmdArg.IsTestTimestampRollover=%d\n", cmdArg.IsTestTimestampRollover);
-	printf("cmdArg.IsTestH265=%d\n", cmdArg.IsTestH265);
-	printf("cmdArg.IsLocalToken=%d\n", cmdArg.IsLocalToken);
-	printf("cmdArg.IsTestMove=%d\n", cmdArg.IsTestMove);
-	printf("cmdArg.nSleeptime=%d\n", cmdArg.nSleeptime);
+        printf("cmdArg.IsInputFromFFmpeg=%d\n", cmdArg.IsInputFromFFmpeg);
+        printf("cmdArg.IsTestAAC=%d\n", cmdArg.IsTestAAC);
+        printf("cmdArg.IsTestAACWithoutAdts=%d\n", cmdArg.IsTestAACWithoutAdts);
+        printf("cmdArg.IsTestTimestampRollover=%d\n", cmdArg.IsTestTimestampRollover);
+        printf("cmdArg.IsTestH265=%d\n", cmdArg.IsTestH265);
+        printf("cmdArg.IsLocalToken=%d\n", cmdArg.IsLocalToken);
+        printf("cmdArg.IsTestMove=%d\n", cmdArg.IsTestMove);
+        printf("cmdArg.nSleeptime=%d\n", cmdArg.nSleeptime);
+        printf("cmdArg.pAFilePath=%d\n", cmdArg.pAFilePath);
+        printf("cmdArg.pVFilePath=%d\n", cmdArg.pVFilePath);
+        printf("cmdArg.pTokenUrl=%s\n", cmdArg.pTokenUrl);
+        printf("cmdArg.IsFileLoop=%d\n", cmdArg.IsFileLoop);
+        printf("cmdArg.nLoopSleeptime=%d\n", cmdArg.nLoopSleeptime);
+	if (cmdArg.pTokenUrl) {
+                printf("cmdArg.pTokenUrl:%s\n", cmdArg.pTokenUrl);
+        }
+	if (cmdArg.pAFilePath) {
+                printf("AFilePath:%s\n", cmdArg.pAFilePath);
+        }
+	if (cmdArg.pVFilePath) {
+                printf("VFilePath:%s\n", cmdArg.pVFilePath);
+        }
         checkCmdArg(argv[0]);
+
+        char *pVFile = NULL;
+        char *pAFile = NULL;
+#ifdef __APPLE__
+        if(cmdArg.IsTestAAC) {
+                pAFile = "/Users/liuye/Documents/material/h265_aac_1_16000_a.aac";
+	} else {
+                pAFile = "/Users/liuye/Documents/material/h265_aac_1_16000_pcmu_8000.mulaw";
+        }
+        if(cmdArg.IsTestH265) {
+                pVFile = "/Users/liuye/Documents/material/h265_aac_1_16000_v.h265";
+	} else {
+                pVFile = "/Users/liuye/Documents/material/h265_aac_1_16000_h264.h264";
+        }
+#else
+
+        if(cmdArg.IsTestAAC) {
+                pAFile = "./material/h265_aac_1_16000_a.aac";
+	} else {
+                pAFile = "./material/h265_aac_1_16000_pcmu_8000.mulaw";
+        }
+        if(cmdArg.IsTestH265) {
+                pVFile = "./material/h265_aac_1_16000_v.h265";
+	} else {
+                pVFile = "./material/h265_aac_1_16000_h264.h264";
+        }
+#endif
+	if (cmdArg.pAFilePath) {
+                pAFile = cmdArg.pAFilePath;
+        }
+	if (cmdArg.pAFilePath) {
+                pVFile = cmdArg.pVFilePath;
+        }
+        if (cmdArg.IsNoAudio)
+                pAFile = NULL;
+        if (cmdArg.IsNoVideo)
+                pVFile = NULL;
 
         int ret = 0;
 #ifdef TEST_WITH_FFMPEG
@@ -713,12 +778,27 @@ int main(int argc, const char** argv)
         }
 #endif
         
-        ret = GetUploadToken(gtestToken, sizeof(gtestToken));
-        if (ret != 0)
-                return ret;
-        printf("token:%s\n", gtestToken);
-        
         AVuploader avuploader;
+        if (!cmdArg.IsNoNet) {
+                ret = GetUploadToken(gtestToken, sizeof(gtestToken), cmdArg.pTokenUrl);
+                if (ret != 0)
+                        return ret;
+                printf("token:%s\n", gtestToken);
+
+                pthread_t updateTokenThread;
+                pthread_attr_t attr;
+                pthread_attr_init (&attr);
+                pthread_attr_setdetachstate (&attr, PTHREAD_CREATE_DETACHED);
+                ret = pthread_create(&updateTokenThread, &attr, updateToken, (void*)avuploader.pTsMuxUploader);
+                if (ret != 0) {
+                        printf("create update token thread fail\n");
+                        return ret;
+                }
+                pthread_attr_destroy (&attr);
+	} else {
+		strcpy(gtestToken, "invalid_token");
+        }
+        
         memset(&avuploader, 0, sizeof(avuploader));
         avuploader.avArg.nChannels = 1;
         if (!cmdArg.IsNoAudio) {
@@ -764,47 +844,7 @@ int main(int argc, const char** argv)
                 return ret;
         }
         
-        pthread_t updateTokenThread;
-        pthread_attr_t attr;
-        pthread_attr_init (&attr);
-        pthread_attr_setdetachstate (&attr, PTHREAD_CREATE_DETACHED);
-        ret = pthread_create(&updateTokenThread, &attr, updateToken, (void*)avuploader.pTsMuxUploader);
-        if (ret != 0) {
-                printf("create update token thread fail\n");
-                return ret;
-        }
-        pthread_attr_destroy (&attr);
 
-        char *pVFile = NULL;
-        char *pAFile = NULL;
-#ifdef __APPLE__
-        if(cmdArg.IsTestAAC) {
-                pAFile = "/Users/liuye/Documents/material/h265_aac_1_16000_a.aac";
-	} else {
-                pAFile = "/Users/liuye/Documents/material/h265_aac_1_16000_pcmu_8000.mulaw";
-        }
-        if(cmdArg.IsTestH265) {
-                pVFile = "/Users/liuye/Documents/material/h265_aac_1_16000_v.h265";
-	} else {
-                pVFile = "/Users/liuye/Documents/material/h265_aac_1_16000_h264.h264";
-        }
-#else
-
-        if(cmdArg.IsTestAAC) {
-                pAFile = "/liuye/Documents/material/h265_aac_1_16000_a.aac";
-	} else {
-                pAFile = "/liuye/Documents/material/h265_aac_1_16000_pcmu_8000.mulaw";
-        }
-        if(cmdArg.IsTestH265) {
-                pVFile = "/liuye/Documents/material/h265_aac_1_16000_v.h265";
-	} else {
-                pVFile = "/liuye/Documents/material/h265_aac_1_16000_h264.h264";
-        }
-#endif
-        if (cmdArg.IsNoAudio)
-                pAFile = NULL;
-        if (cmdArg.IsNoVideo)
-                pVFile = NULL;
         
         pthread_t secondUploadThread = 0;
         if (cmdArg.IsTwoUpload) {
@@ -821,7 +861,16 @@ int main(int argc, const char** argv)
                         //start_ffmpeg_test("rtmp://live.hkstv.hk.lxdns.com/live/hks", dataCallback, NULL);
                 } else {
                         printf("%s\n%s\n", pAFile, pVFile);
-                        start_file_test(pAFile, pVFile, dataCallback, &avuploader);
+                        do {
+                                start_file_test(pAFile, pVFile, dataCallback, &avuploader);
+                                if (cmdArg.nLoopSleeptime > 0) {
+                                        sleep(cmdArg.nLoopSleeptime);
+                                }
+                                if (cmdArg.IsFileLoop) {
+                                        cmdArg.nRoundCount++;
+                                        printf(">>>>>>>>>next round<<<<<<<<<<<<\n");
+                                }
+                        } while(cmdArg.IsFileLoop);
                 }
         }
         

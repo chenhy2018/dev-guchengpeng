@@ -108,7 +108,6 @@ static void pushRecycle(FFTsMuxUploader *_pFFTsMuxUploader)
 {
         if (_pFFTsMuxUploader) {
                 
-                pthread_mutex_lock(&_pFFTsMuxUploader->muxUploaderMutex_);
                 if (_pFFTsMuxUploader->pTsMuxCtx) {
 #ifndef USE_OWN_TSMUX
                         av_write_trailer(_pFFTsMuxUploader->pTsMuxCtx->pFmtCtx_);
@@ -117,8 +116,6 @@ static void pushRecycle(FFTsMuxUploader *_pFFTsMuxUploader)
                         PushFunction(_pFFTsMuxUploader->pTsMuxCtx);
                         _pFFTsMuxUploader->pTsMuxCtx = NULL;
                 }
-                
-                pthread_mutex_unlock(&_pFFTsMuxUploader->muxUploaderMutex_);
         }
         return;
 }
@@ -150,41 +147,29 @@ static int push(FFTsMuxUploader *pFFTsMuxUploader, char * _pData, int _nDataLen,
 #endif
         
         //logtrace("push thread id:%d\n", (int)pthread_self());
-        pthread_mutex_lock(&pFFTsMuxUploader->muxUploaderMutex_);
         
         FFTsMuxContext *pTsMuxCtx = NULL;
         int count = 0;
-
-        count = 1;
+        
+        count = 2;
         pTsMuxCtx = pFFTsMuxUploader->pTsMuxCtx;
         while(pTsMuxCtx == NULL && count) {
-                pthread_mutex_unlock(&pFFTsMuxUploader->muxUploaderMutex_);
-                usleep(3*1000);
-                pthread_mutex_lock(&pFFTsMuxUploader->muxUploaderMutex_);
+                logwarn("mux context is null");
+                usleep(2000);
                 pTsMuxCtx = pFFTsMuxUploader->pTsMuxCtx;
                 count--;
         }
         if (pTsMuxCtx == NULL) {
-                pthread_mutex_unlock(&pFFTsMuxUploader->muxUploaderMutex_);
                 logwarn("upload context is NULL");
                 return 0;
         }
-        if (pTsMuxCtx->pTsUploader_->GetUploaderState(pTsMuxCtx->pTsUploader_) == TK_UPLOAD_FAIL) {
-                if (pFFTsMuxUploader->ffMuxSatte != TK_UPLOAD_FAIL) {
-                        logdebug("upload fail. drop the data");
-                }
-                pFFTsMuxUploader->ffMuxSatte = TK_UPLOAD_FAIL;
-                pthread_mutex_unlock(&pFFTsMuxUploader->muxUploaderMutex_);
-                return 0;
-        }
-
+        
         int ret = 0;
         int isAdtsAdded = 0;
         
         if (_nFlag == TK_STREAM_TYPE_AUDIO){
                 //fprintf(stderr, "audio frame: len:%d pts:%lld\n", _nDataLen, _nTimestamp);
                 if (pTsMuxCtx->nPrevAudioTimestamp != 0 && _nTimestamp - pTsMuxCtx->nPrevAudioTimestamp <= 0) {
-                        pthread_mutex_unlock(&pFFTsMuxUploader->muxUploaderMutex_);
                         logwarn("audio pts not monotonically: prev:%lld now:%lld", pTsMuxCtx->nPrevAudioTimestamp, _nTimestamp);
                         return 0;
                 }
@@ -214,7 +199,6 @@ static int push(FFTsMuxUploader *pFFTsMuxUploader, char * _pData, int _nDataLen,
                         }
                         if(pFFTsMuxUploader->pAACBuf == NULL || pFFTsMuxUploader->avArg.nChannels < 1 || pFFTsMuxUploader->avArg.nChannels > 2
                            || nFreqIdx < 0) {
-                                pthread_mutex_unlock(&pFFTsMuxUploader->muxUploaderMutex_);
                                 if (pFFTsMuxUploader->pAACBuf == NULL) {
                                         logwarn("malloc %d size memory fail", varHeader.aac_frame_length);
                                         return TK_NO_MEMORY;
@@ -243,7 +227,6 @@ static int push(FFTsMuxUploader *pFFTsMuxUploader, char * _pData, int _nDataLen,
         }else{
                 //fprintf(stderr, "video frame: len:%d pts:%lld\n", _nDataLen, _nTimestamp);
                 if (pTsMuxCtx->nPrevVideoTimestamp != 0 && _nTimestamp - pTsMuxCtx->nPrevVideoTimestamp <= 0) {
-                        pthread_mutex_unlock(&pFFTsMuxUploader->muxUploaderMutex_);
                         logwarn("video pts not monotonically: prev:%lld now:%lld", pTsMuxCtx->nPrevVideoTimestamp, _nTimestamp);
                         return 0;
                 }
@@ -257,7 +240,7 @@ static int push(FFTsMuxUploader *pFFTsMuxUploader, char * _pData, int _nDataLen,
 #endif
         }
         
-
+        
 #ifndef USE_OWN_TSMUX
         ret = av_interleaved_write_frame(pTsMuxCtx->pFmtCtx_, &pkt);
 #endif
@@ -268,8 +251,7 @@ static int push(FFTsMuxUploader *pFFTsMuxUploader, char * _pData, int _nDataLen,
                         logerror("Error muxing packet:%d", ret);
                 pFFTsMuxUploader->ffMuxSatte = TK_UPLOAD_FAIL;
         }
-
-        pthread_mutex_unlock(&pFFTsMuxUploader->muxUploaderMutex_);
+        
 #ifndef USE_OWN_TSMUX
         if (isAdtsAdded) {
                 free(pkt.data);
@@ -281,21 +263,30 @@ static int push(FFTsMuxUploader *pFFTsMuxUploader, char * _pData, int _nDataLen,
 static int PushVideo(TsMuxUploader *_pTsMuxUploader, char * _pData, int _nDataLen, int64_t _nTimestamp, int nIsKeyFrame, int _nIsSegStart)
 {
         FFTsMuxUploader *pFFTsMuxUploader = (FFTsMuxUploader *)_pTsMuxUploader;
-
+        pthread_mutex_lock(&pFFTsMuxUploader->muxUploaderMutex_);
         int ret = 0;
         if (pFFTsMuxUploader->nKeyFrameCount == 0 && !nIsKeyFrame) {
                 logwarn("first video frame not IDR. drop this frame\n");
+                pthread_mutex_unlock(&pFFTsMuxUploader->muxUploaderMutex_);
                 return 0;
         }
         if (pFFTsMuxUploader->nLastUploadVideoTimestamp == -1) {
                 pFFTsMuxUploader->nLastUploadVideoTimestamp = _nTimestamp;
+        }
+        UploadState ustate = pFFTsMuxUploader->pTsMuxCtx->pTsUploader_->GetUploaderState(pFFTsMuxUploader->pTsMuxCtx->pTsUploader_);
+        //if (pFFTsMuxUploader->pTsMuxCtx->pTsUploader_->GetUploaderState(pTsMuxCtx->pTsUploader_) == TK_UPLOAD_FAIL) {
+        if ( ustate != TK_UPLOAD_INIT) {
+                if (ustate == TK_UPLOAD_FAIL && pFFTsMuxUploader->ffMuxSatte != TK_UPLOAD_FAIL) {
+                        logdebug("upload fail. drop the data");
+                }
+                pFFTsMuxUploader->ffMuxSatte = ustate;
         }
         // if start new uploader, start from keyframe
         if (nIsKeyFrame) {
                 if( (_nTimestamp - pFFTsMuxUploader->nLastUploadVideoTimestamp) > 4980
                    //at least 2 keyframe and aoubt last 5 second
                    || (_nIsSegStart && pFFTsMuxUploader->nFrameCount != 0)// new segment is specified
-                   ||  pFFTsMuxUploader->ffMuxSatte == TK_UPLOAD_FAIL){   // upload fail
+                   ||  pFFTsMuxUploader->ffMuxSatte != TK_UPLOAD_INIT){   // upload finished
                         //printf("next ts:%d %lld\n", pFFTsMuxUploader->nKeyFrameCount, _nTimestamp - pFFTsMuxUploader->nLastUploadVideoTimestamp);
                         pFFTsMuxUploader->nKeyFrameCount = 0;
                         pFFTsMuxUploader->nFrameCount = 0;
@@ -312,23 +303,26 @@ static int PushVideo(TsMuxUploader *_pTsMuxUploader, char * _pData, int _nDataLe
                 }
                 pFFTsMuxUploader->nKeyFrameCount++;
         }
-
+        
         pFFTsMuxUploader->nLastVideoTimestamp = _nTimestamp;
         
         ret = push(pFFTsMuxUploader, _pData, _nDataLen, _nTimestamp, TK_STREAM_TYPE_VIDEO);
         if (ret == 0){
                 pFFTsMuxUploader->nFrameCount++;
         }
+        pthread_mutex_unlock(&pFFTsMuxUploader->muxUploaderMutex_);
         return ret;
 }
 
 static int PushAudio(TsMuxUploader *_pTsMuxUploader, char * _pData, int _nDataLen, int64_t _nTimestamp)
 {
         FFTsMuxUploader *pFFTsMuxUploader = (FFTsMuxUploader *)_pTsMuxUploader;
+        pthread_mutex_lock(&pFFTsMuxUploader->muxUploaderMutex_);
         int ret = push(pFFTsMuxUploader, _pData, _nDataLen, _nTimestamp, TK_STREAM_TYPE_AUDIO);
         if (ret == 0){
                 pFFTsMuxUploader->nFrameCount++;
         }
+        pthread_mutex_unlock(&pFFTsMuxUploader->muxUploaderMutex_);
         return ret;
 }
 
@@ -345,7 +339,7 @@ static int waitToCompleUploadAndDestroyTsMuxContext(void *_pOpaque)
                 }
 #endif
                 pTsMuxCtx->pTsUploader_->UploadStop(pTsMuxCtx->pTsUploader_);
-
+                
                 UploaderStatInfo statInfo = {0};
                 pTsMuxCtx->pTsUploader_->GetStatInfo(pTsMuxCtx->pTsUploader_, &statInfo);
                 logdebug("uploader push:%d pop:%d remainItemCount:%d dropped:%d", statInfo.nPushDataBytes_,
@@ -385,7 +379,7 @@ static int waitToCompleUploadAndDestroyTsMuxContext(void *_pOpaque)
 }
 
 #define getFFmpegErrorMsg(errcode) char msg[128];\
-                av_strerror(errcode, msg, sizeof(msg))
+av_strerror(errcode, msg, sizeof(msg))
 
 static void inline setQBufferSize(FFTsMuxUploader *pFFTsMuxUploader, char *desc, int s)
 {
@@ -458,30 +452,30 @@ static int newTsMuxContext(FFTsMuxContext ** _pTsMuxCtx, AvArg *_pAvArg, UploadA
                 return TK_NO_MEMORY;
         }
         memset(pTsMuxCtx, 0, sizeof(FFTsMuxContext));
-
+        
         int ret = NewUploader(&pTsMuxCtx->pTsUploader_, _pUploadArg, TSQ_FIX_LENGTH, 188, nQBufSize / 188);
         if (ret != 0) {
                 free(pTsMuxCtx);
                 return ret;
         }
-
+        
         TsMuxerArg avArg;
         avArg.nAudioFormat = _pAvArg->nAudioFormat;
         avArg.nAudioChannels = _pAvArg->nChannels;
         avArg.nAudioSampleRate = _pAvArg->nSamplerate;
-
+        
         avArg.output = writeTsPacketToMem;
         avArg.nVideoFormat = _pAvArg->nVideoFormat;
         avArg.pOpaque = pTsMuxCtx;
-
+        
         ret = NewTsMuxerContext(&avArg, &pTsMuxCtx->pFmtCtx_);
         if (ret != 0) {
                 DestroyUploader(&pTsMuxCtx->pTsUploader_);
                 free(pTsMuxCtx);
                 return ret;
         }
-
-
+        
+        
         pTsMuxCtx->asyncWait.function = waitToCompleUploadAndDestroyTsMuxContext;
         * _pTsMuxCtx = pTsMuxCtx;
         return 0;
@@ -535,18 +529,18 @@ static int newTsMuxContext(FFTsMuxContext ** _pTsMuxCtx, AvArg *_pAvArg, UploadA
         pOutStream->codecpar->codec_type = AVMEDIA_TYPE_VIDEO;
         if (_pAvArg->nVideoFormat == TK_VIDEO_H264)
                 pOutStream->codecpar->codec_id = AV_CODEC_ID_H264;
-        else
-                pOutStream->codecpar->codec_id = AV_CODEC_ID_H265;
-        //end add video
-        
-        //add audio
-        pOutStream = avformat_new_stream(pTsMuxCtx->pFmtCtx_, NULL);
-        if (!pOutStream) {
-                getFFmpegErrorMsg(ret);
-                logerror("Failed allocating output stream:%d(%s)", ret, msg);
-                ret = TK_NO_MEMORY;
-                goto end;
-        }
+                else
+                        pOutStream->codecpar->codec_id = AV_CODEC_ID_H265;
+                        //end add video
+                        
+                        //add audio
+                        pOutStream = avformat_new_stream(pTsMuxCtx->pFmtCtx_, NULL);
+                        if (!pOutStream) {
+                                getFFmpegErrorMsg(ret);
+                                logerror("Failed allocating output stream:%d(%s)", ret, msg);
+                                ret = TK_NO_MEMORY;
+                                goto end;
+                        }
         pOutStream->time_base.num = 1;
         pOutStream->time_base.den = 90000;
         pTsMuxCtx->nOutAudioindex_ = pOutStream->index;
@@ -571,7 +565,7 @@ static int newTsMuxContext(FFTsMuxContext ** _pTsMuxCtx, AvArg *_pAvArg, UploadA
         //printf("==========Output Information==========\n");
         //av_dump_format(pTsMuxCtx->pFmtCtx_, 0, "xx.ts", 1);
         //printf("======================================\n");
-
+        
         //Open output file
         if (!(pOutFmt->flags & AVFMT_NOFILE)) {
                 if ((ret = avio_open(&pTsMuxCtx->pFmtCtx_->pb, "xx.ts", AVIO_FLAG_WRITE)) < 0) {
@@ -599,15 +593,15 @@ end:
         }
         if (pTsMuxCtx->pFmtCtx_->pb)
                 avio_context_free(&pTsMuxCtx->pFmtCtx_->pb);
-        if (pTsMuxCtx->pFmtCtx_) {
-                if (pTsMuxCtx->pFmtCtx_ && !(pOutFmt->flags & AVFMT_NOFILE))
-                        avio_close(pTsMuxCtx->pFmtCtx_->pb);
-                avformat_free_context(pTsMuxCtx->pFmtCtx_);
-        }
+                if (pTsMuxCtx->pFmtCtx_) {
+                        if (pTsMuxCtx->pFmtCtx_ && !(pOutFmt->flags & AVFMT_NOFILE))
+                                avio_close(pTsMuxCtx->pFmtCtx_->pb);
+                        avformat_free_context(pTsMuxCtx->pFmtCtx_);
+                }
         if (pTsMuxCtx->pTsUploader_)
                 DestroyUploader(&pTsMuxCtx->pTsUploader_);
-        
-        return ret;
+                
+                return ret;
 }
 #endif
 
@@ -691,7 +685,7 @@ int NewTsMuxUploader(TsMuxUploader **_pTsMuxUploader, AvArg *_pAvArg, char *_pDe
         if (ret != 0) {
                 return ret;
         }
-
+        
         if (_nDeviceIdLen >= sizeof(pFFTsMuxUploader->deviceId_)) {
                 free(pFFTsMuxUploader);
                 logerror("device max support lenght is 64");
@@ -738,7 +732,7 @@ int TsMuxUploaderStart(TsMuxUploader *_pTsMuxUploader)
                 free(pFFTsMuxUploader);
                 return ret;
         }
-
+        
         pFFTsMuxUploader->pTsMuxCtx->pTsUploader_->UploadStart(pFFTsMuxUploader->pTsMuxCtx->pTsUploader_);
         return 0;
 }
@@ -750,7 +744,9 @@ void DestroyTsMuxUploader(TsMuxUploader **_pTsMuxUploader)
         if (pFFTsMuxUploader->pTsMuxCtx) {
                 pFFTsMuxUploader->pTsMuxCtx->pTsMuxUploader = (TsMuxUploader*)pFFTsMuxUploader;
         }
+        pthread_mutex_lock(&pFFTsMuxUploader->muxUploaderMutex_);
         pushRecycle(pFFTsMuxUploader);
+        pthread_mutex_unlock(&pFFTsMuxUploader->muxUploaderMutex_);
         *_pTsMuxUploader = NULL;
         return;
 }

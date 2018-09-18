@@ -35,7 +35,7 @@ typedef struct _KodoUploader{
         int isThreadStarted_;
         
         UploadArg uploadArg;
-
+        
         int64_t nFirstFrameTimestamp;
         int64_t nLastFrameTimestamp;
         UploadState state;
@@ -44,7 +44,7 @@ typedef struct _KodoUploader{
         curl_off_t nLastUlnow;
         int64_t nUlnowRecTime;
         int nLowSpeedCnt;
-        int nIsFinished;
+        int isTimeoutWithData;
         
         pthread_mutex_t waitFirstMutex_;
         enum WaitFirstFlag nWaitFirstMutexLocked_;
@@ -75,7 +75,7 @@ int timeoutCallback(void *clientp, curl_off_t dltotal, curl_off_t dlnow, curl_of
         if (nDiff > 0) {
                 //printf("%d,==========dltotal:%lld dlnow:%lld ultotal:%lld ulnow-reculnow=%lld, now - lastrectime=%lld\n",
                 //       pUploader->nLowSpeedCnt, dltotal, dlnow, ultotal, ulnow - pUploader->nLastUlnow, (nNow - pUploader->nUlnowRecTime)/1000000);
-                if ((ulnow - pUploader->nLastUlnow) / nDiff < 1024) { //} && !pUploader->nIsFinished) {
+                if ((ulnow - pUploader->nLastUlnow) / nDiff < 1024) { //} && !pUploader->isTimeoutWithData) {
                         pUploader->nLowSpeedCnt += nDiff;
                         if (pUploader->nLowSpeedCnt > 3) {
                                 logerror("accumulate upload timeout:%d %d", pUploader->nLowSpeedCnt, nDiff);
@@ -92,7 +92,7 @@ int timeoutCallback(void *clientp, curl_off_t dltotal, curl_off_t dlnow, curl_of
                         }
                         logwarn("accumulate2 upload timeout:%d %d", pUploader->nLowSpeedCnt, nDiff);
                         pUploader->nLowSpeedCnt = 2;
-
+                        
                 }
                 pUploader->nLastUlnow = ulnow;
                 pUploader->nUlnowRecTime = nNow;
@@ -108,12 +108,12 @@ static char * getErrorMsg(const char *_pJson, char *_pBuf, int _nBufLen)
         if (pStart == NULL)
                 return NULL;
         pStart += strlen("\\\"error\\\"");
-
+        
         while(*pStart != '"') {
                 pStart++;
         }
         pStart++;
-
+        
         const char * pEnd = strchr(pStart+1, '\\');
         if (pEnd == NULL)
                 return NULL;
@@ -232,10 +232,10 @@ static void * streamUpload(void *_pOpaque)
         char *uptoken = NULL;
         Qiniu_Client client;
         int canFreeToken = 0;
-
+        
         uptoken = pUploader->uploadArg.pToken_;
         Qiniu_Client_InitNoAuth(&client, 1024);
-
+        
         Qiniu_Io_PutRet putRet;
         Qiniu_Io_PutExtra putExtra;
         Qiniu_Zero(putExtra);
@@ -309,25 +309,25 @@ static void * streamUpload(void *_pOpaque)
                                          pFullErrMsg);
                         }
                 } else {
-			const char *pCurlErrMsg = curl_easy_strerror(error.code);
-			if (pCurlErrMsg != NULL) {
+                        const char *pCurlErrMsg = curl_easy_strerror(error.code);
+                        if (pCurlErrMsg != NULL) {
                                 logerror("upload file :%s expsize:%d errorcode=%d errmsg={\"error\":\"%s\"}", key, pUploader->getDataBytes, error.code, pCurlErrMsg);
-			} else {
+                        } else {
                                 logerror("upload file :%s expsize:%d errorcode=%d errmsg={\"error\":\"unknown error\"}", key, pUploader->getDataBytes, error.code);
-			}
+                        }
                 }
                 //debug_log(&client, error);
         } else {
                 pUploader->state = TK_UPLOAD_OK;
                 logdebug("upload file size:(exp:%lld real:%lld) key:%s success",
-                          pUploader->getDataBytes, pUploader->nLastUlnow, key);
+                         pUploader->getDataBytes, pUploader->nLastUlnow, key);
         }
 END:
         if (canFreeToken) {
                 Qiniu_Free(uptoken);
         }
         Qiniu_Client_Cleanup(&client);
-
+        
         return 0;
 }
 
@@ -336,14 +336,19 @@ size_t getDataCallback(void* buffer, size_t size, size_t n, void* rptr)
 {
         KodoUploader * pUploader = (KodoUploader *) rptr;
         int nPopLen = 0;
-        nPopLen = pUploader->pQueue_->Pop(pUploader->pQueue_, buffer, size * n);
+        if (pUploader->isTimeoutWithData != 0) {
+                pUploader->isTimeoutWithData++;
+                printf("isTimeoutWithData:%d\n", pUploader->isTimeoutWithData);;
+                return 0;
+        }
+        nPopLen = pUploader->pQueue_->PopWithNoOverwrite(pUploader->pQueue_, buffer, size * n);
         if (nPopLen < 0) {
-		if (nPopLen == TK_TIMEOUT) {
+                if (nPopLen == TK_TIMEOUT) {
                         if (pUploader->nLastFrameTimestamp >= 0 &&  pUploader->nFirstFrameTimestamp >= 0) {
                                 return 0;
                         }
                         logerror("first pop from queue timeout:%d %lld %lld", nPopLen, pUploader->nLastFrameTimestamp, pUploader->nFirstFrameTimestamp);
-		}
+                }
                 return CURL_READFUNC_ABORT;
         }
         if (nPopLen == 0) {
@@ -352,16 +357,17 @@ size_t getDataCallback(void* buffer, size_t size, size_t n, void* rptr)
                 }
                 return 0;
         }
-
+        
         int nTmp = 0;
         char *pBuf = (char *)buffer;
         while (size * n - nPopLen > 0) {
-                nTmp = pUploader->pQueue_->Pop(pUploader->pQueue_, pBuf + nPopLen, size * n - nPopLen);
+                nTmp = pUploader->pQueue_->PopWithNoOverwrite(pUploader->pQueue_, pBuf + nPopLen, size * n - nPopLen);
                 if (nTmp == 0)
                         break;
                 if (nTmp < 0) {
-		        if (nTmp == TK_TIMEOUT) {
+                        if (nTmp == TK_TIMEOUT) {
                                 if (pUploader->nLastFrameTimestamp >= 0 &&  pUploader->nFirstFrameTimestamp >= 0) {
+                                        pUploader->isTimeoutWithData = 1;
                                         goto RET;
                                 }
                                 logerror("next pop from queue timeout:%d %lld %lld", nTmp, pUploader->nLastFrameTimestamp, pUploader->nFirstFrameTimestamp);
@@ -372,9 +378,6 @@ size_t getDataCallback(void* buffer, size_t size, size_t n, void* rptr)
         }
         UploaderStatInfo info;
         pUploader->pQueue_->GetStatInfo(rptr, &info);
-        //if (!info.nIsReadOnly) {
-        //        pUploader->nIsFinished = 1;
-        //}
 RET:
         pUploader->getDataBytes += nPopLen;
         return nPopLen;
@@ -488,14 +491,14 @@ UploadState getUploaderState(TsUploader *_pTsUploader)
         KodoUploader * pKodoUploader = (KodoUploader *)_pTsUploader;
         return pKodoUploader->state;
 }
-        
+
 int NewUploader(TsUploader ** _pUploader, UploadArg *_pArg, enum CircleQueuePolicy _policy, int _nMaxItemLen, int _nInitItemCount)
 {
         KodoUploader * pKodoUploader = (KodoUploader *) malloc(sizeof(KodoUploader));
         if (pKodoUploader == NULL) {
                 return TK_NO_MEMORY;
         }
-
+        
         memset(pKodoUploader, 0, sizeof(KodoUploader));
         
         int ret = pthread_mutex_init(&pKodoUploader->waitFirstMutex_, NULL);
