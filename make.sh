@@ -35,6 +35,8 @@ if [ -f CMakeCache.txt ];then
 rm CMakeCache.txt
 fi
 echo $PATH
+echo $CMAKE_PREFIX_PATH
+
 /usr/bin/cmake .
 if ! make VERBOSE=1; then echo "build failed"; exit 1; fi
 
