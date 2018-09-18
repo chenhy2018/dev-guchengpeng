@@ -34,6 +34,7 @@ typedef struct {
         int  nLoopSleeptime;
         int nRoundCount;
 	bool IsNoNet;
+        bool IsQuit;
 }CmdArg;
 
 typedef struct {
@@ -197,6 +198,7 @@ static int readFileToBuf(char * _pFilename, char ** _pBuf, int *_pLen)
                 free(pData);
                 return -2;
         }
+        fclose(pFile);
         *_pBuf = pData;
         *_pLen = nLen;
         return 0;
@@ -276,7 +278,7 @@ int start_file_test(char * _pAudioFile, char * _pVideoFile, DataCallback callbac
                 if (cmdArg.IsTestAAC)
                         isAAC = 1;
         }
-        while (bAudioOk || bVideoOk) {
+        while (!cmdArg.IsQuit && (bAudioOk || bVideoOk)) {
                 if (bVideoOk && nNow+1 > nNextVideoTime) {
                         
                         uint8_t * start = NULL;
@@ -577,9 +579,8 @@ static void * updateToken(void * opaque) {
 }
 
 void signalHander(int s){
-        cmdArg.IsFileLoop = false;
-        UninitUploader();
-        exit(0);
+        printf("SIGINT catched\n");
+        cmdArg.IsQuit = true;
 }
 
 void logCb(char * pLog)
@@ -870,7 +871,7 @@ int main(int argc, const char** argv)
                                         cmdArg.nRoundCount++;
                                         printf(">>>>>>>>>next round<<<<<<<<<<<<\n");
                                 }
-                        } while(cmdArg.IsFileLoop);
+                        } while(cmdArg.IsFileLoop && !cmdArg.IsQuit);
                 }
         }
         
