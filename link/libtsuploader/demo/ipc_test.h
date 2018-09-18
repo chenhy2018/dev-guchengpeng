@@ -34,6 +34,7 @@ typedef struct {
     char *sk;
     unsigned char movingDetection;
     int configUpdateInterval;
+    unsigned char multiChannel;
 } Config;
 
 extern Config *GetConfig();

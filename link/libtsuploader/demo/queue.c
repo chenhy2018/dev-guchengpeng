@@ -1,4 +1,4 @@
-// Last Update:2018-09-12 18:26:34
+// Last Update:2018-09-18 15:15:54
 /**
  * @file queue.c
  * @brief 
@@ -109,6 +109,7 @@ static int Dequeue( Queue *q, void *data, int *outSize )
     }
     q->size--;
     if ( q->pLast ) {
+//        printf("free the mem %x\n", q->pLast );
         free( q->pLast->data );
         free( q->pLast );
         q->pLast = NULL;
