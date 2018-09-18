@@ -47,12 +47,12 @@ int StartMgr()
         if (manager.nIsStarted_) {
                 return 0;
         }
-
+        
         int ret = NewCircleQueue(&manager.pQueue_, 1, TSQ_FIX_LENGTH, sizeof(void *), 100);
         if (ret != 0){
                 return ret;
         }
-
+        
         ret = pthread_create(&manager.mgrThreadId_, NULL, recycle, NULL);
         if (ret != 0) {
                 manager.nIsStarted_ = 0;

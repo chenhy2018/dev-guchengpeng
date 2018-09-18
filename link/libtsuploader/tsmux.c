@@ -26,7 +26,7 @@ static uint16_t getPidCounter(TsMuxerContext* _pMuxCtx, uint64_t _nPID)
 {
         int nCount = 0;
         int i;
-
+        
         for ( i = 0; i  < _pMuxCtx->nPidCounterMapLen; i++) {
                 if (_pMuxCtx->pidCounterMap[i].nPID == _nPID) {
                         if (_pMuxCtx->pidCounterMap[i].nCounter == 0x0F){
@@ -61,10 +61,10 @@ static void writeTable(TsMuxerContext* _pMuxCtx, int64_t _nPts)
         int nCount = 0;
         if (_pMuxCtx->nLastPts == 0 || _nPts - _pMuxCtx->nLastPts > 300 * 90) { //300毫米间隔
                 /*
-                nCount =getPidCounter(_pMuxCtx, 0x11);
-                nLen = WriteSDT(_pMuxCtx->tsPacket, 1, nCount, ADAPTATION_JUST_PAYLOAD);
-                memset(&_pMuxCtx->tsPacket[nLen], 0xff, 188 - nLen);
-                _pMuxCtx->arg.output(_pMuxCtx->arg.pOpaque,_pMuxCtx->tsPacket, 188);
+                 nCount =getPidCounter(_pMuxCtx, 0x11);
+                 nLen = WriteSDT(_pMuxCtx->tsPacket, 1, nCount, ADAPTATION_JUST_PAYLOAD);
+                 memset(&_pMuxCtx->tsPacket[nLen], 0xff, 188 - nLen);
+                 _pMuxCtx->arg.output(_pMuxCtx->arg.pOpaque,_pMuxCtx->tsPacket, 188);
                  */
                 
                 nCount =getPidCounter(_pMuxCtx, 0x00);
@@ -113,7 +113,7 @@ int NewTsMuxerContext(TsMuxerArg *pArg, TsMuxerContext **_pTsMuxerCtx)
                 free(pTsMuxerCtx);
                 return TK_MUTEX_ERROR;
         }
-	*_pTsMuxerCtx = pTsMuxerCtx;
+        *_pTsMuxerCtx = pTsMuxerCtx;
         return 0;
 }
 
@@ -145,7 +145,7 @@ int MuxerAudio(TsMuxerContext* _pMuxCtx, uint8_t *_pData, int _nDataLen, int64_t
         } else {
                 InitPrivateTypePES(&_pMuxCtx->pes, _pData, _nDataLen, _nPts);
         }
-
+        
         int nRet = makeTsPacket(_pMuxCtx, AUDIO_PID);
         pthread_mutex_unlock(&_pMuxCtx->tsMutex_);
         if (nRet < 0)
@@ -163,7 +163,7 @@ int MuxerVideo(TsMuxerContext* _pMuxCtx, uint8_t *_pData, int _nDataLen, int64_t
         } else {
                 InitVideoPES(&_pMuxCtx->pes, _pMuxCtx->arg.nVideoFormat, _pData, _nDataLen, _nPts);
         }
-
+        
         int nRet = makeTsPacket(_pMuxCtx, VIDEO_PID);
         pthread_mutex_unlock(&_pMuxCtx->tsMutex_);
         if (nRet < 0)
@@ -178,5 +178,5 @@ int MuxerFlush(TsMuxerContext* pMuxerCtx)
 
 void DestroyTsMuxerContext(TsMuxerContext *pTsMuxerCtx)
 {
-        free(pTsMuxerCtx);        
+        free(pTsMuxerCtx);
 }
