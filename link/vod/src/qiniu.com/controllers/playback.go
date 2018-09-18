@@ -16,6 +16,7 @@ import (
 	"qiniu.com/m3u8"
 	"qiniu.com/models"
 	pb "qiniu.com/proto"
+	"qiniu.com/system"
 )
 
 var (
@@ -23,18 +24,16 @@ var (
 	fastForwardClint pb.FastForwardClient
 )
 
-func init() {
+func Init(conf *system.GrpcConf) {
 	SegMod = &models.SegmentKodoModel{}
 	SegMod.Init()
-	FFGrpcClientInit()
+	FFGrpcClientInit(conf)
 
 }
-func FFGrpcClientInit() {
-	//conn, err := grpc.Dial("47.105.118.51:50051", grpc.WithInsecure())
-	conn, err := grpc.Dial("127.0.0.1:50051", grpc.WithInsecure())
+func FFGrpcClientInit(conf *system.GrpcConf) {
+	conn, err := grpc.Dial(conf.Addr, grpc.WithInsecure())
 	if err != nil {
 		fmt.Println("Init gprc failed")
-
 	}
 	fastForwardClint = pb.NewFastForwardClient(conn)
 }
