@@ -211,7 +211,7 @@ FileSink::~FileSink()
 
 int FileSink::Write(IN const std::shared_ptr<MediaPacket>& _pPacket)
 {
-        path_ = "output.ts";
+        path_ = "output.mp4";
 
         // initialize contexts
         if (Init() == false) {
@@ -326,7 +326,12 @@ bool FileSink::Init()
                 pMemBuffer_ = (uint8_t*)av_malloc(nBlockSize_);
                 pAvIoContext_ = avio_alloc_context(pMemBuffer_, nBlockSize_, 1, this, nullptr, WriteFunction, nullptr);
                 pOutputContext_->pb = pAvIoContext_;
-                pOutputContext_->oformat = av_guess_format("mpegts", nullptr, nullptr);
+                auto pFormat = av_guess_format("mp4", nullptr, nullptr);
+                if (pFormat == nullptr) {
+                        Error("format not found");
+                        return false;
+                }
+                pOutputContext_->oformat = pFormat;
         }
 
         return true;
@@ -373,8 +378,11 @@ int FileSink::AddStream(IN const std::shared_ptr<MediaPacket>& _pPacket)
 
 bool FileSink::WriteHeader()
 {
+        AVDictionary *pOption = nullptr;
+        av_dict_set(&pOption, "movflags", "frag_keyframe+empty_moov", 0);
+
         // write file header according to the file suffix
-        auto nStatus = avformat_write_header(pOutputContext_, nullptr);
+        auto nStatus = avformat_write_header(pOutputContext_, &pOption);
         if (nStatus < 0) {
                 Error("file sink: could not write file header: %d", nStatus);
                 return false;
@@ -531,7 +539,7 @@ bool AvReceiver::EmulateFramerate(IN int64_t _nPts, OUT StreamInfo& _stream, IN 
 
         _stream.nCount++;
 
-//        Info("wall_clock=%ld vs play_clock=%ld", nDuration, nPlaytime);
+        Info("wall_clock=%ld vs play_clock=%ld", nDuration, nPlaytime);
 
         return true;
 }
@@ -593,7 +601,9 @@ void StreamPumper::StartPumper()
 
                         //_pPacket->Print();
 
-                        pSink_->Write(_pPacket);
+                        if (pSink_->Write(_pPacket) < 0) {
+                                return -1;
+                        }
 
                         return 0;
                 };
