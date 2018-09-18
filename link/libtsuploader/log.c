@@ -30,22 +30,22 @@ void SetLogLevelToError()
 
 void SetLogCallback(LogFunc f)
 {
-	logFunc = f;
+        logFunc = f;
 }
 
 
 void Log(int nLevel, char * pFmt, ...)
 {
-	if (nLevel >= nLogLevel){
-	        va_list ap;
+        if (nLevel >= nLogLevel){
+                va_list ap;
                 va_start(ap, pFmt);
                 if (logFunc == NULL) {
                         vprintf(pFmt, ap);
-		} else {
+                } else {
                         char logStr[257] = {0};
                         vsnprintf(logStr, sizeof(logStr), pFmt, ap);
                         logFunc(logStr);
-		}
+                }
                 va_end(ap);
-	}
+        }
 }

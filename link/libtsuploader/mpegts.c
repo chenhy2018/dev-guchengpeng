@@ -157,8 +157,8 @@ static int writeAdaptationFieldJustWithPravatePadding(uint8_t *_pBuf)
 }
 
 #define AV_RB16(x)                           \
-     ((((const uint8_t*)(x))[0] << 8) |          \
-       ((const uint8_t*)(x))[1])
+((((const uint8_t*)(x))[0] << 8) |          \
+((const uint8_t*)(x))[1])
 static void printPts(uint8_t *buf){
         int64_t pts = (int64_t)(*buf & 0x0e) << 29 |
         (AV_RB16(buf+1) >> 1) << 15 |
@@ -204,21 +204,21 @@ static int writePESHeaderJustWithPts(PES *_pPes, uint8_t *pData)
         }
         
         pData[6] = 0x80; //'10' 2bit(固定的)；PES_scrambling_control 2bit(0);PES_priority 1bit(0);data_alignment_indicator 1bit(0)
-                         //copyright 1bit(0); original_or_copy 1bit(0)
+        //copyright 1bit(0); original_or_copy 1bit(0)
         pData[7] = 0x80; //PTS_DTS_flags 2bit(2, just PTS); ESCR_flag 1bit(0); ES_rate_flag 1bit(0); DSM_trick_mode_flag 1bit(0)
-                         //additional_copy_info_flag 1bit(0); PES_CRC_flag 1bit(0); PES_extension_flag 1bit(0)
+        //additional_copy_info_flag 1bit(0); PES_CRC_flag 1bit(0); PES_extension_flag 1bit(0)
         pData[8] = 5;//PES_header_data_length 8bit. 剩下长度， 只有pts，pes中pts/dts长度为5
         
         int64_t nPts = _pPes->nPts;
         //pts
         /*
-        '0010'              4bit
-        PTS [32..30]        3bit
-        marker_bit          1bit
-        PTS [29..15]        15bit
-        marker_bit          1bit
-        PTS [14..0]         15bit
-        marker_bit          1bit
+         '0010'              4bit
+         PTS [32..30]        3bit
+         marker_bit          1bit
+         PTS [29..15]        15bit
+         marker_bit          1bit
+         PTS [14..0]         15bit
+         marker_bit          1bit
          */
         pData[9]   = 0x21 | ((nPts >> 29) & 0x0E); //0x21 --> 0010 0001
         pData[10] =  (nPts >>22 & 0xFF);
@@ -234,12 +234,12 @@ static int writePESHeaderJustWithPts(PES *_pPes, uint8_t *pData)
                 memcpy(&pData[nRetLen], h265Aud, sizeof(h265Aud));
                 nRetLen += sizeof(h265Aud);
         }
-
+        
         pPts=pData+9; //for debug
         
         //if (pPts != NULL && (_pPes->videoFormat == TK_VIDEO_H264 || _pPes->videoFormat == TK_VIDEO_H265))
         //        printPts(pPts);
-
+        
         return nRetLen;
 }
 
@@ -247,11 +247,11 @@ int GetPESData(PES *_pPes, int _nCounter, int _nPid, uint8_t *_pData, int _nLen)
 {
         if (_pPes->nPos == _pPes->nESDataLen)
                 return 0;
-
+        
         int nRetLen = 0;
         int nRemainLen = _pPes->nESDataLen - _pPes->nPos;
         uint8_t * pData = _pData;
-
+        
         int isPaddingBeforePesHdr = 0;
         int nPesHdrLen = 0;
         if (_pPes->nPos == 0) {
@@ -264,7 +264,7 @@ int GetPESData(PES *_pPes, int _nCounter, int _nPid, uint8_t *_pData, int _nLen)
                         int nAdaLen = writeAdaptationFieldJustWithPCR(pData, _pPes->nPts);
                         nRetLen += nAdaLen;
                         pData += nAdaLen;
-
+                        
                         int nPesHdrLen = writePESHeaderJustWithPts(_pPes, pData);
                         nRetLen += nPesHdrLen;
                         pData += nPesHdrLen;
@@ -276,14 +276,14 @@ int GetPESData(PES *_pPes, int _nCounter, int _nPid, uint8_t *_pData, int _nLen)
                                 writePESHeaderJustWithPts(_pPes, pData);
                                 nRetLen += nPesHdrLen;
                                 pData += nPesHdrLen;
-			        nPesHdrLen = 0;
+                                nPesHdrLen = 0;
                         }
-		}
-
+                }
+                
         }  else {
                 nRetLen = WriteTsHeader(pData, 0, _nCounter, _nPid, ADAPTATION_JUST_PAYLOAD);
         }
-
+        
         int nAdapLen = 0;
         int nReadLen = nRemainLen > _nLen ? _nLen : nRemainLen;
         if (nReadLen + nRetLen + nPesHdrLen >= 188) {
@@ -295,17 +295,17 @@ int GetPESData(PES *_pPes, int _nCounter, int _nPid, uint8_t *_pData, int _nLen)
                         nReadLen = 188 - nRetLen - nPesHdrLen;
                 }
                 nAdapLen = 188 - nRetLen - nPesHdrLen - nReadLen;
-
+                
                 _pData[nRetLen-2] = nAdapLen + 1; //adaptation_field_lenght不算，但是后面的一个字节算
                 _pData[nRetLen-1] = 0x00;
                 SetAdaptationFieldFlag(_pData, ADAPTATION_BOTH); //前面填充ff,然后才是数据
-
+                
                 memset(_pData + nRetLen, 0xff, nAdapLen);
-
-		nRetLen += nAdapLen; 
+                
+                nRetLen += nAdapLen; 
                 if (isPaddingBeforePesHdr) {
                         nRetLen += writePESHeaderJustWithPts(_pPes, &_pData[nRetLen]);
-		}
+                }
                 memcpy(&_pData[188 - nReadLen], _pPes->pESData + _pPes->nPos, nReadLen);
         }
         
@@ -481,7 +481,7 @@ int WritePMT(uint8_t *_pBuf, int _nUinitStartIndicator, int _nCount, int _nAdapt
         } else {
                 _pBuf[2] = 0x12; //section_length 12bit
                 noAOrV = -5;
-	}
+        }
         
         if (_nAStreamType != 0) {
                 _pBuf[17] = _nAStreamType; //stream_type 8bit STREAM_TYPE_VIDEO_H264
@@ -492,7 +492,7 @@ int WritePMT(uint8_t *_pBuf, int _nUinitStartIndicator, int _nCount, int _nAdapt
         } else {
                 noAOrV = -5;
                 _pBuf[2] = 0x12; //section_length 12bit
-	}
+        }
         
         uint32_t c32 = crc32(_pBuf, 22);
         uint8_t *pTmp =  (uint8_t*)&c32;

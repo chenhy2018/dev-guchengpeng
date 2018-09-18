@@ -17,7 +17,7 @@ static void * recycle(void *_pOpaque)
         manager.pQueue_->GetStatInfo(manager.pQueue_, &info);
         while(!manager.nQuit_ && info.nLen_ == 0) {
                 AsyncInterface *pAsync = NULL;
-                int ret = manager.pQueue_->Pop(manager.pQueue_, (char *)(&pAsync), sizeof(AsyncInterface *));
+                int ret = manager.pQueue_->PopWithTimeout(manager.pQueue_, (char *)(&pAsync), sizeof(AsyncInterface *), 24 * 60 * 60 * 1000000);
                 if (ret == TK_TIMEOUT) {
                         continue;
                 }
@@ -47,12 +47,12 @@ int StartMgr()
         if (manager.nIsStarted_) {
                 return 0;
         }
-
+        
         int ret = NewCircleQueue(&manager.pQueue_, 1, TSQ_FIX_LENGTH, sizeof(void *), 100);
         if (ret != 0){
                 return ret;
         }
-
+        
         ret = pthread_create(&manager.mgrThreadId_, NULL, recycle, NULL);
         if (ret != 0) {
                 manager.nIsStarted_ = 0;
