@@ -138,7 +138,7 @@ func (m *UaModel) GetUaInfos(xl *xlog.Logger, limit int, mark, namespace, catego
 		return []UaInfo{}, "", err
 	}
 	if count > limit {
-		nextMark = fmt.Sprintf("%d", count)
+		nextMark = fmt.Sprintf("%d", limit)
 	}
 	return r, nextMark, nil
 }

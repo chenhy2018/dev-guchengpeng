@@ -22,9 +22,21 @@ if ($ENV{ARCH} STREQUAL "x86")
                 INSTALL_COMMAND ""
                 BUILD_IN_SOURCE 1
         )
+
+        include(ExternalProject)
+        ExternalProject_Add(fastfwd
+                SOURCE_DIR fastfwd
+                BUILD_COMMAND  make
+                CONFIGURE_COMMAND ""
+                INSTALL_COMMAND ""
+                BUILD_IN_SOURCE 1
+        )
 endif()
 
-add_subdirectory(libsip)
-add_subdirectory(libmqtt)
-#add_subdirectory(libsdk)
+if ($ENV{WITH_PJSIP} STREQUAL "ON")
+        add_subdirectory(libsip)
+        add_subdirectory(libmqtt)
+        add_subdirectory(libsdk)
+endif()
+
 add_subdirectory(libtsuploader)
