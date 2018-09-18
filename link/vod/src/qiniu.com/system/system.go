@@ -19,16 +19,14 @@ type DBConfiguration struct {
 	User     string `json:"user"`
 	Password string `json:"password"`
 }
-type RedisConf struct {
-	Addr     string `json:"addr"`
-	Password string `json:"password"`
-	DB       int    `json:"db"`
+type GrpcConf struct {
+	Addr string `json:"addr"`
 }
 type Configuration struct {
-	Bind      string          `json:"bind"`
-	DbConf    DBConfiguration `json:"db_conf"`
-	Qconf     qconfapi.Config `json:"qconfg"`
-	RedisConf RedisConf       `json:"redis_conf"`
+	Bind     string          `json:"bind"`
+	DbConf   DBConfiguration `json:"db_conf"`
+	Qconf    qconfapi.Config `json:"qconfg"`
+	GrpcConf GrpcConf        `json:"grpc_conf"`
 }
 
 func LoadConf(dir, file string) (conf *Configuration, err error) {

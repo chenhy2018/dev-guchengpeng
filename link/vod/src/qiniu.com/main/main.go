@@ -3,8 +3,9 @@ package main
 import (
 	"flag"
 	"fmt"
-	"github.com/gin-gonic/gin"
 	"os"
+
+	"github.com/gin-gonic/gin"
 	"qiniu.com/auth"
 	"qiniu.com/controllers"
 	"qiniu.com/db"
@@ -30,6 +31,7 @@ func main() {
 	if system.HaveQconf() == true {
 		auth.Init(conf)
 	}
+	controllers.Init(&conf.GrpcConf)
 	r.POST("/v1/namespaces/:namespace/uas/:uaid", controllers.RegisterUa)
 	r.DELETE("/v1/namespaces/:namespace/uas/:uaid", controllers.DeleteUa)
 	r.PUT("/v1/namespaces/:namespace/uas/:uaid", controllers.UpdateUa)
