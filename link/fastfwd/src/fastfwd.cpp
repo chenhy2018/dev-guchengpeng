@@ -565,7 +565,6 @@ StreamPumper::StreamPumper(IN const std::string& _url, IN int _nXspeed, IN int _
          nBlockSize_(_nBlockSize)
 {
         std::call_once(avformatInit_, [](){
-                        av_register_all();
                         avformat_network_init();
                 });
 
