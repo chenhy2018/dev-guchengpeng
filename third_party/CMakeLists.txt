@@ -65,16 +65,15 @@ ExternalProject_Add(curl-7.61.0
 #        BUILD_IN_SOURCE 1
 #)
 
-if ($ENV{WITH_FFMPEG} STREQUAL "ON")
+SET(FASTFWD_RELEASE_PATH  "${CMAKE_CURRENT_SOURCE_DIR}/../release/fastfwd")
 include(ExternalProject)
 ExternalProject_Add(ffmpeg
         SOURCE_DIR ffmpeg-4.0
-        CONFIGURE_COMMAND PKG_CONFIG_PATH=${X264_PREFIX_PATH}/pkgconfig:${FDKAAC_PREFIX_PATH}/pkgconfig ./configure --disable-x86asm --disable-zlib --enable-small --disable-programs --disable-doc --disable-avdevice --disable-swresample --disable-swscale --disable-postproc --disable-avfilter --disable-network --disable-dct --disable-dwt --disable-error-resilience --disable-lsp --disable-lzo --disable-mdct --disable-rdft --disable-fft --disable-faan --disable-pixelutils --disable-everything --enable-muxer=mpegts --bindir=./bin --datadir=./data --docdir=./doc --libdir=./lib
+	CONFIGURE_COMMAND ./configure --libdir=${FASTFWD_RELEASE_PATH}/lib/x86_64/ffmpeg --incdir=${FASTFWD_RELEASE_PATH}/include --enable-gpl --enable-version3 --enable-nonfree --disable-shared --disable-shared --enable-static --enable-small --disable-doc --disable-programs --disable-debug --disable-avdevice --enable-avcodec --enable-avformat --enable-swresample --enable-swscale --disable-postproc --enable-avfilter --disable-avresample --disable-encoders --disable-decoders --enable-decoder=aac --enable-decoder=aac_latm --enable-decoder=h264 --enable-decoder=mpeg4 --disable-hwaccels --enable-muxers --enable-demuxers --enable-parsers --enable-bsfs --enable-protocols --disable-devices --disable-filters --disable-cuda --disable-cuvid --disable-nvenc --disable-v4l2_m2m
         BUILD_COMMAND make
-        INSTALL_COMMAND ""
+        INSTALL_COMMAND make install
         BUILD_IN_SOURCE 1
 )
-endif()
 
 #include(ExternalProject)
 #ExternalProject_Add(librtmp
@@ -84,5 +83,4 @@ endif()
 #        INSTALL_COMMAND ""
 #        BUILD_IN_SOURCE 1
 #)
-
 #add_dependencies(ffmpeg fdkaac x264)
