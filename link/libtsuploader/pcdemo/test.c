@@ -21,6 +21,7 @@ typedef struct {
         bool IsNoVideo;
         bool IsTestMove;
         bool IsTwoUpload;
+        bool IsTwoFileUpload;
         int nSleeptime;
         int nFirstFrameSleeptime;
         int64_t nRolloverTestBase;
@@ -45,6 +46,9 @@ typedef struct {
         int segStartCount;
         int nByteCount;
         int nVideoKeyframeAccLen;
+        char * pAFile;
+        char * pVFile;
+        char * pUrl;;
 }AVuploader;
 
 #define VERSION "v1.0.0"
@@ -417,7 +421,9 @@ int start_file_test(char * _pAudioFile, char * _pVideoFile, DataCallback callbac
                 }
                 if (nSleepTime != 0) {
                         //printf("sleeptime:%lld\n", nSleepTime);
-			assert(nSleepTime < 200000);
+                        if (nSleepTime > 40 * 1000) {
+			        logwarn("abnormal time diff:%lld", nSleepTime);
+			}
                         usleep(nSleepTime);
                 }
                 nNow = getCurrentMilliSecond();
@@ -660,6 +666,38 @@ static void * second_test(void * opaque) {
         return NULL;
 }
 
+static void do_start_file_test(AVuploader *pAvuploader){
+        printf("%s\n%s\n", pAvuploader->pAFile, pAvuploader->pVFile);
+        do {
+                start_file_test(pAvuploader->pAFile, pAvuploader->pVFile, dataCallback, pAvuploader);
+                if (cmdArg.nLoopSleeptime > 0) {
+                        sleep(cmdArg.nLoopSleeptime);
+                }
+                if (cmdArg.IsFileLoop) {
+                        cmdArg.nRoundCount++;
+                        printf(">>>>>>>>>%s:next round<<<<<<<<<<<<\n", pAvuploader->userUploadArg.pDeviceId_);
+                }
+        } while(cmdArg.IsFileLoop && !cmdArg.IsQuit);
+}
+
+static void * second_file_test(void * opaque) {
+        AVuploader *pAuploader = (AVuploader *)opaque;;
+        AVuploader avuploader = *pAuploader;
+        avuploader.userUploadArg.pDeviceId_ = "testdeviceid0";
+        avuploader.userUploadArg.nDeviceIdLen_ = strlen("testdeviceid0");
+        
+        int ret = CreateAndStartAVUploader(&avuploader.pTsMuxUploader, &avuploader.avArg, &avuploader.userUploadArg);
+        if (ret != 0) {
+                fprintf(stderr, "CreateAndStartAVUploader err:%d\n", ret);
+                return NULL;
+        }
+        
+        do_start_file_test(&avuploader);
+        sleep(1);
+        DestroyAVUploader(&avuploader.pTsMuxUploader);
+        return NULL;
+}
+
 int main(int argc, const char** argv)
 {
 	flag_bool(&cmdArg.IsInputFromFFmpeg, "ffmpeg", "is input from ffmpeg. will set --testaac and not set noadts");
@@ -674,6 +712,7 @@ int main(int argc, const char** argv)
 #ifdef TEST_WITH_FFMPEG
         flag_bool(&cmdArg.IsTwoUpload, "two", "test two instance upload. ffmpeg and file");
 #endif
+        flag_bool(&cmdArg.IsTwoFileUpload, "twofile", "test two file instance upload");
         flag_int(&cmdArg.nSleeptime, "sleeptime", "sleep time(milli) used by testmove.default(2s) if testmove is enable");
         flag_int(&cmdArg.nFirstFrameSleeptime, "fsleeptime", "first video key frame sleep time(milli)");
         flag_int(&cmdArg.nQbufSize, "qbufsize", "upload queue buffer size");
@@ -698,6 +737,7 @@ int main(int argc, const char** argv)
         printf("cmdArg.IsTestTimestampRollover=%d\n", cmdArg.IsTestTimestampRollover);
         printf("cmdArg.IsTestH265=%d\n", cmdArg.IsTestH265);
         printf("cmdArg.IsLocalToken=%d\n", cmdArg.IsLocalToken);
+        printf("cmdArg.IsTwoFileUpload=%d\n", cmdArg.IsTwoFileUpload);
         printf("cmdArg.IsTestMove=%d\n", cmdArg.IsTestMove);
         printf("cmdArg.nSleeptime=%d\n", cmdArg.nSleeptime);
         printf("cmdArg.pAFilePath=%d\n", cmdArg.pAFilePath);
@@ -845,39 +885,40 @@ int main(int argc, const char** argv)
                 return ret;
         }
         
-
         
+        avuploader.pAFile = pAFile;
+        avuploader.pVFile = pVFile;
+
         pthread_t secondUploadThread = 0;
-        if (cmdArg.IsTwoUpload) {
+        if (cmdArg.IsTwoFileUpload) {
+                AVuploader avu = avuploader;
+                ret = pthread_create(&secondUploadThread, NULL, second_file_test, &avu);
+                if (ret != 0) {
+                        printf("create update token thread fail\n");
+                        return ret;
+                }
+                printf("two file upload\n");
+                do_start_file_test(&avuploader);
+	} else if (cmdArg.IsTwoUpload) {
                 ret = pthread_create(&secondUploadThread, NULL, second_test, NULL);
                 if (ret != 0) {
                         printf("create update token thread fail\n");
                         return ret;
                 }
                 
-                start_file_test(pAFile, pVFile, dataCallback, &avuploader);
+                do_start_file_test(&avuploader);
         } else {
                 if (cmdArg.IsInputFromFFmpeg) {
                         start_ffmpeg_test("rtmp://localhost:1935/live/movie", dataCallback, &avuploader);
                         //start_ffmpeg_test("rtmp://live.hkstv.hk.lxdns.com/live/hks", dataCallback, NULL);
                 } else {
-                        printf("%s\n%s\n", pAFile, pVFile);
-                        do {
-                                start_file_test(pAFile, pVFile, dataCallback, &avuploader);
-                                if (cmdArg.nLoopSleeptime > 0) {
-                                        sleep(cmdArg.nLoopSleeptime);
-                                }
-                                if (cmdArg.IsFileLoop) {
-                                        cmdArg.nRoundCount++;
-                                        printf(">>>>>>>>>next round<<<<<<<<<<<<\n");
-                                }
-                        } while(cmdArg.IsFileLoop && !cmdArg.IsQuit);
+                        do_start_file_test(&avuploader);
                 }
         }
         
         sleep(1);
         DestroyAVUploader(&avuploader.pTsMuxUploader);
-        if (cmdArg.IsTwoUpload) {
+        if (cmdArg.IsTwoUpload || cmdArg.IsTwoFileUpload) {
                 pthread_join(secondUploadThread, NULL);
         }
         UninitUploader();
