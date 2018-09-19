@@ -11,6 +11,7 @@
 #define DBG_H
 
 #include <stdio.h>
+#include "mymalloc.h"
 
 typedef enum {
     OUTPUT_NONE,

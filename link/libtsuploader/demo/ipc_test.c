@@ -13,6 +13,7 @@
 #include "media_cfg.h"
 #include "cfg_parse.h"
 #include "socket_logging.h"
+//#include "mymalloc.h"
 
 /* global variable */
 MediaStreamConfig gAjMediaStreamConfig;
@@ -26,6 +27,7 @@ static TsMuxUploader *pSubUploader;
 static struct cfg_struct *cfg;
 static char gMainStreamDeviceId[128] = { 0 };
 static char gSubStreamDeviceId[128] = { 0 };
+static char gLogFile[128] = { 0 };
 
 int GetKodoInitSts()
 {
@@ -102,7 +104,7 @@ void UpdateConfig()
     }
 
     if ( last ) {
-        printf("last = %d, logOutput = %d\n", last, gIpcConfig.logOutput );
+     //   printf("last = %d, logOutput = %d\n", last, gIpcConfig.logOutput );
         if ( last != gIpcConfig.logOutput ) {
             last = gIpcConfig.logOutput;
             printf("%s %s %d reinit the logger, logOutput = %s\n", __FILE__, __FUNCTION__, __LINE__, logOutput );
@@ -113,7 +115,9 @@ void UpdateConfig()
     }
 
     logFile = cfg_get( cfg, "LOG_FILE" );
-    gIpcConfig.logFile = logFile;
+    strcpy( gLogFile, logFile );
+    gIpcConfig.logFile = gLogFile;
+    //printf("logFile = %s\n", logFile );
     cfg_free( cfg );
     //printf("read from ipc.conf, logOutput = %s\n", logOutput );
     //printf("read from ipc.conf, logfile = %s\n", gIpcConfig.logFile );
@@ -170,6 +174,13 @@ int VideoGetFrameCb( int streamno, char *_pFrame,
                    unsigned long _nFrameIndex, unsigned long _nKeyFrameIndex,
                    void *_pContext)
 {
+    static int first = 1;
+
+    if ( first ) {
+        printf("%s thread id = %d\n", __FUNCTION__, pthread_self() );
+        first = 0;
+    }
+
     if ( !gKodoInitOk ) {
         ReportKodoInitError( "main stream","kodo not init" );
         return 0;
@@ -192,6 +203,12 @@ int SubStreamVideoGetFrameCb( int streamno, char *_pFrame,
                    unsigned long _nFrameIndex, unsigned long _nKeyFrameIndex,
                    void *_pContext)
 {
+    static int first = 1;
+
+    if ( first ) {
+        printf("%s thread id = %d\n", __FUNCTION__, pthread_self() );
+        first = 0;
+    }
     if ( !gKodoInitOk ) {
         ReportKodoInitError( "sub stream","kodo not init" );
         return 0;
@@ -215,6 +232,12 @@ int AudioGetFrameCb( char *_pFrame, int _nLen, double _dTimeStamp,
     static int first = 1;
     static double localTimeStamp = 0, timeStamp = 0;
     int ret = 0;
+    static int isfirst = 1;
+
+    if ( isfirst ) {
+        printf("%s thread id = %d\n", __FUNCTION__, pthread_self() );
+        isfirst = 0;
+    }
 
     if ( !gKodoInitOk ) {
         ReportKodoInitError("main stream", "gKodoInitOk");
@@ -260,6 +283,12 @@ int SubStreamAudioGetFrameCb( char *_pFrame, int _nLen, double _dTimeStamp,
     static int first = 1;
     static double localTimeStamp = 0, timeStamp = 0;
     int ret = 0;
+    static int isfirst = 1;
+
+    if ( isfirst ) {
+        printf("%s thread id = %d\n", __FUNCTION__, pthread_self() );
+        isfirst = 0;
+    }
 
     if ( !gKodoInitOk ) {
         ReportKodoInitError("sub stream", "gKodoInitOk");
@@ -327,12 +356,6 @@ static int InitIPC( )
         if ( gIpcConfig.multiChannel ) {
             dev_sdk_start_audio( 0, 1, SubStreamAudioGetFrameCb, NULL );
         }
-        DBG_LOG("channels = %d\n", audioConfig.audioCapture.channels );
-        DBG_LOG("bitspersample = %d\n", audioConfig.audioCapture.bitspersample );
-        DBG_LOG("samplerate = %d\n", audioConfig.audioCapture.samplerate );
-        DBG_LOG("volume_capture = %d\n", audioConfig.audioCapture.volume_capture );
-        DBG_LOG("amplify = %d\n", audioConfig.audioCapture.amplify );
-        DBG_LOG("ra_answer = %d\n", audioConfig.audioCapture.ra_answer );
     } else {
         DBG_ERROR("not enabled\n");
     }
@@ -374,7 +397,7 @@ int InitKodo()
     SetBucketName( gIpcConfig.bucketName );
 
     for ( i=0; i<gIpcConfig.tokenRetryCount; i++ ) {
-        ret = GetUploadToken( gTestToken, sizeof(gTestToken) );
+        ret = GetUploadToken( gTestToken, sizeof(gTestToken), NULL );
         if ( ret != 0 ) {
             DBG_ERROR("GetUploadToken error, ret = %d, retry = %d\n", ret, i );
             continue;
@@ -428,32 +451,32 @@ int InitKodo()
 }
 
 static void * upadateToken() {
-        int ret = 0;
+    int ret = 0;
 
-        while( 1 ) {
-            sleep( gIpcConfig.tokenUploadInterval );// 59 minutes
-            memset(gTestToken, 0, sizeof(gTestToken));
-            ret = GetUploadToken(gTestToken, sizeof(gTestToken));
-            if ( ret != 0 ) {
-                DBG_ERROR("GetUploadToken error, ret = %d\n", ret );
-                return NULL;
-            }
-            DBG_LOG("token:%s\n", gTestToken);
-            ret = UpdateToken(pMainUploader, gTestToken, strlen(gTestToken));
+    while( 1 ) {
+        sleep( gIpcConfig.tokenUploadInterval );// 59 minutes
+        memset(gTestToken, 0, sizeof(gTestToken));
+        ret = GetUploadToken(gTestToken, sizeof(gTestToken), NULL );
+        if ( ret != 0 ) {
+            DBG_ERROR("GetUploadToken error, ret = %d\n", ret );
+            return NULL;
+        }
+        DBG_LOG("token:%s\n", gTestToken);
+        ret = UpdateToken(pMainUploader, gTestToken, strlen(gTestToken));
+        if (ret != 0) {
+            DBG_ERROR("UpdateToken error, ret = %d\n", ret );
+            return NULL;
+        }
+
+        if ( gIpcConfig.multiChannel ) {
+            ret = UpdateToken(pSubUploader, gTestToken, strlen(gTestToken));
             if (ret != 0) {
                 DBG_ERROR("UpdateToken error, ret = %d\n", ret );
                 return NULL;
             }
-
-            if ( gIpcConfig.multiChannel ) {
-                ret = UpdateToken(pSubUploader, gTestToken, strlen(gTestToken));
-                if (ret != 0) {
-                    DBG_ERROR("UpdateToken error, ret = %d\n", ret );
-                    return NULL;
-                }
-            }
         }
-        return NULL;
+    }
+    return NULL;
 }
 
 int StartTokenUpdateTask()
@@ -479,7 +502,7 @@ int WaitForNetworkOk()
     int i = 0, ret = 0;
 
     for ( i=0; i<gIpcConfig.tokenRetryCount; i++ ) {
-        ret = GetUploadToken( gTestToken, sizeof(gTestToken) );
+        ret = GetUploadToken(  gTestToken, sizeof(gTestToken), NULL );
         if ( ret != 0 ) {
             DBG_ERROR("GetUploadToken error, ret = %d, retry = %d\n", ret, i );
             continue;
@@ -503,11 +526,11 @@ void SdkLogCallback( char *log )
 
 int AlarmCallback(ALARM_ENTRY alarm, void *pcontext)
 {
-    DBG_LOG("[ %s ] alarm.code = %d\n", gAjMediaStreamConfig.rtmpConfig.server, alarm.code );
-
     if ( alarm.code == ALARM_CODE_MOTION_DETECT ) {
+        DBG_LOG("get event ALARM_CODE_MOTION_DETECT\n");
         gMovingDetect = 1;
     } else if ( alarm.code == ALARM_CODE_MOTION_DETECT_DISAPPEAR ) {
+        DBG_LOG("get event ALARM_CODE_MOTION_DETECT_DISAPPEAR\n");
         gMovingDetect = 0;
     }
 
@@ -534,9 +557,10 @@ int main()
     int ret = 0;
 
     InitConfig();
-    //LoadConfig();
+    MyMallocInit();
     UpdateConfig();
     WaitForNetworkOk();
+    printf("gIpcConfig.logFile = %s\n", gIpcConfig.logFile );
     LoggerInit( gIpcConfig.logPrintTime, gIpcConfig.logOutput, gIpcConfig.logFile, gIpcConfig.logVerbose );
     /* sdk log callback */
     SetLogCallback( SdkLogCallback );
@@ -545,8 +569,12 @@ int main()
 
     StartTokenUpdateTask();
     StartConfigUpdateTask();
-    if ( gIpcConfig.logOutput == OUTPUT_SOCKET)
-        StartSocketLoggingTask();
+    /* 
+     * ipc need to receive server command
+     * so socket logging task must been started
+     *
+     * */
+    StartSocketLoggingTask();
 
     ret = InitIPC();
     if ( 0 != ret ) {

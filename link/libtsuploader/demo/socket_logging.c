@@ -1,4 +1,4 @@
-// Last Update:2018-09-18 14:25:55
+// Last Update:2018-09-19 14:25:00
 /**
  * @file socket_logging.c
  * @brief 
@@ -185,6 +185,9 @@ void *SocketLoggingTask( void *param )
                 if(  ret < 0 ) {
                     printf("Send failed, ret = %d, %s\n", ret, strerror(errno) );
                     gStatus.connecting = 0;
+                    shutdown( gsock, SHUT_RDWR );
+                    close( gsock );
+                    gsock = -1;
                 }
             } else {
                 ret = socket_init();
@@ -197,7 +200,7 @@ void *SocketLoggingTask( void *param )
                 printf("reconnect to %s ok\n", host );
                 gStatus.connecting = 1;
                 SendFileName( gAjMediaStreamConfig.rtmpConfig.server );
-                sleep(1);
+                sleep(2);
                 printf("queue size = %d\n", gLogQueue->getSize( gLogQueue )) ;
             }
         } else {
@@ -249,27 +252,30 @@ void *SimpleSshTask( void *param )
 
 void StartSocketLoggingTask()
 {
-    pthread_t log, cmd;
+    static pthread_t log = 0, cmd;
 
-    pthread_create( &log, NULL, SocketLoggingTask, NULL );
-    pthread_create( &cmd, NULL, SimpleSshTask, NULL );
+    if ( !log ) {
+        printf("%s %s %d start socket logging thread\n", __FILE__, __FUNCTION__, __LINE__);
+        pthread_create( &log, NULL, SocketLoggingTask, NULL );
+        pthread_create( &cmd, NULL, SimpleSshTask, NULL );
+    }
 }
 
 void CmdHnadleDump( char *param )
 {
     char buffer[1024] = { 0 } ;
-    int len = 0, ret = 0;
+    int ret = 0;
     Config *pConfig = GetConfig();
 
     printf("get command dump\n");
-    len = sprintf( buffer, "%s", "Config :\n" );
-    len = sprintf( buffer+strlen(buffer), "logOutput = %d\n", pConfig->logOutput );
-    len = sprintf( buffer+strlen(buffer), "logFile = %s\n", pConfig->logFile );
-    len = sprintf( buffer+strlen(buffer), "movingDetection = %d\n", pConfig->movingDetection );
-    len = sprintf( buffer+strlen(buffer), "gKodoInitOk = %d\n", GetKodoInitSts() );
-    len = sprintf( buffer+strlen(buffer), "gMovingDetect = %d\n", GetMovingDetectSts() );
-    len = sprintf( buffer+strlen(buffer), "gAudioType = %d\n", GetAudioType() );
-    len = sprintf( buffer+strlen(buffer), "queue = %d\n", gLogQueue->getSize( gLogQueue ) );
+    sprintf( buffer, "%s", "Config :\n" );
+    sprintf( buffer+strlen(buffer), "logOutput = %d\n", pConfig->logOutput );
+    sprintf( buffer+strlen(buffer), "logFile = %s\n", pConfig->logFile );
+    sprintf( buffer+strlen(buffer), "movingDetection = %d\n", pConfig->movingDetection );
+    sprintf( buffer+strlen(buffer), "gKodoInitOk = %d\n", GetKodoInitSts() );
+    sprintf( buffer+strlen(buffer), "gMovingDetect = %d\n", GetMovingDetectSts() );
+    sprintf( buffer+strlen(buffer), "gAudioType = %d\n", GetAudioType() );
+    sprintf( buffer+strlen(buffer), "queue = %d\n", gLogQueue->getSize( gLogQueue ) );
     ret = send(gsock , buffer , strlen(buffer) , MSG_NOSIGNAL );// MSG_NOSIGNAL ignore SIGPIPE signal
     if(  ret < 0 ) {
         printf("Send failed, ret = %d, %s\n", ret, strerror(errno) );
