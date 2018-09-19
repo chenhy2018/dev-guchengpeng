@@ -284,6 +284,7 @@ bool FileSink::WritePackets(IN int _nXspeed)
                         pAvPkt->pts = nLastPtsMod_ + nTimeDelta / _nXspeed;
                         nLastPtsMod_ = pAvPkt->pts;
                 }
+                pAvPkt->dts = pAvPkt->pts;
                 //Info("pts ===> %ld, nCount_ = %u", pAvPkt->pts, static_cast<unsigned int>(nCount_));
 
                 // handle stream index
