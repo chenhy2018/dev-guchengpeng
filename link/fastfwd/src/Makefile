@@ -16,17 +16,14 @@ LIBP_GLIBC=${LIBP}/glibc
 CXX = g++
 CXXFLAGS += -I$(INCP) -std=c++14
 LDFLAGS += -L$(LIBP_FFMPEG) -lavfilter -lavformat -lavcodec -lavutil -lswscale -lswresample \
-    -L$(LIBP_GRPC) -lprotobuf -lgrpc++ -lgrpc -Wl,--whole-archive -lgrpc++_reflection -Wl,--no-whole-archive \
+    -L$(LIBP_GRPC) -lprotobuf -lgrpc++ -lgrpc -lgrpc++_reflection \
     -L$(LIBP_GLIBC) $(LIBP_GLIBC)/libm-2.27.a -Wl,--whole-archive $(LIBP_GLIBC)/libpthread.a -Wl,--no-whole-archive $(LIBP_GLIBC)/libc.a $(LIBP_GLIBC)/libdl.a \
     -static -static-libstdc++
 
-TARGETS = fast_forward_async_server fast_forward_server
+TARGETS = linking_fastfwd
 build: $(TARGETS)
 
-fast_forward_server: fast_forward.pb.o fast_forward.grpc.pb.o fast_forward_server.o fastfwd.o
-	$(CXX) $^ $(LDFLAGS) -o $@
-
-fast_forward_async_server: fast_forward.pb.o fast_forward.grpc.pb.o fast_forward_async_server.o fastfwd.o
+linking_fastfwd: fast_forward.pb.o fast_forward.grpc.pb.o linking_fastfwd.o fastfwd.o
 	$(CXX) $^ $(LDFLAGS) -o $@
 
 clean:
