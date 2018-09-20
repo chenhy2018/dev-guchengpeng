@@ -37,6 +37,8 @@ type userInfo struct {
 	sk  string
 }
 
+const TOKEN_HEADER_LEN = 5
+
 var (
 	localInfo userInfo
 )
@@ -91,7 +93,7 @@ func getUserInfo(xl *xlog.Logger, req *http.Request) (*userInfo, error) {
 func HandleToken(c *gin.Context) {
 	xl := xlog.New(c.Writer, c.Request)
 	token := c.Request.Header.Get("Authorization")
-	if len(token) < 6 && !strings.Contains(c.Request.URL.String(), "playback") {
+	if len(token) <= TOKEN_HEADER_LEN && !strings.Contains(c.Request.URL.String(), "playback") {
 		xl.Errorf("bad token")
 		c.AbortWithStatusJSON(401, gin.H{
 			"error": "bad token",
@@ -99,8 +101,8 @@ func HandleToken(c *gin.Context) {
 		return
 	}
 	if !strings.Contains(c.Request.URL.String(), "playback") {
-		c.Request.Header.Set("Authorization", "Qbox ak="+strings.Split(token[5:], ":")[0])
-		fmt.Println(strings.Split(token[5:], ":")[0])
+		c.Request.Header.Set("Authorization", "Qbox ak="+strings.Split(token[TOKEN_HEADER_LEN:], ":")[0])
+		fmt.Println(strings.Split(token[TOKEN_HEADER_LEN:], ":")[0])
 	}
 	c.Next()
 }
