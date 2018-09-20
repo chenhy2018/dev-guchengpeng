@@ -1,4 +1,4 @@
-// Last Update:2018-09-14 15:37:10
+// Last Update:2018-09-18 19:40:02
 /**
  * @file log2file.c
  * @brief 
@@ -9,6 +9,7 @@
 
 #include <stdio.h>
 #include <string.h>
+#include <errno.h>
 
 static FILE *gFd = NULL;
 
@@ -34,7 +35,7 @@ int writeLog( char *log )
     if ( ret != 1 ) {
         printf("error, ret != 1\n");
     } else {
-        printf("log = %s\n", log );
+//        printf("log = %s\n", log );
     }
     fflush( gFd );
 

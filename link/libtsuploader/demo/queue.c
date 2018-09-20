@@ -1,4 +1,4 @@
-// Last Update:2018-09-12 18:26:34
+// Last Update:2018-09-18 19:12:50
 /**
  * @file queue.c
  * @brief 
@@ -11,6 +11,7 @@
 #include <stdio.h>
 #include <string.h>
 #include "queue.h"
+//#include "mymalloc.h"
 
 static int Enqueue( Queue *q, void *data, int size );
 static int Dequeue( Queue *q, void *data, int *outSize );
@@ -109,6 +110,7 @@ static int Dequeue( Queue *q, void *data, int *outSize )
     }
     q->size--;
     if ( q->pLast ) {
+//        printf("free the mem %x\n", q->pLast );
         free( q->pLast->data );
         free( q->pLast );
         q->pLast = NULL;

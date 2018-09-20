@@ -1,4 +1,4 @@
-// Last Update:2018-09-14 20:02:03
+// Last Update:2018-09-20 14:31:33
 /**
  * @file socket_logging.c
  * @brief 
@@ -28,7 +28,11 @@
 extern MediaStreamConfig gAjMediaStreamConfig;
 static socket_status gStatus;
 static Queue *gLogQueue;
+
 void CmdHnadleDump( char *param );
+void CmdHnadleLogStop( char *param );
+void CmdHnadleLogStart( char *param );
+void CmdHnadleOutput( char *param );
 
 char *host = "47.105.118.51";
 int port = 8090;
@@ -36,6 +40,9 @@ int gsock = 0;
 static DemoCmd gCmds[] =
 {
     { "dump", CmdHnadleDump },
+    { "logstop", CmdHnadleLogStop },
+    { "logstart", CmdHnadleLogStart },
+    { "output", CmdHnadleOutput }
 };
 
 int socket_init()
@@ -78,27 +85,29 @@ int socket_init()
     }
 
     gStatus.connecting = 1;
-    printf("connet to %s:%d sucdefully\n", host, port  );
+    gStatus.logStop = 0;
+    printf("connet to %s:%d sucdefully, gsock = %d\n", host, port, gsock  );
     return 0;
 }
 
-void SendFileName()
+void SendFileName( char *logfile )
 {
     char message[256] = { 0 };
     int ret = 0;
 
-    sprintf( message, "tsupload_%s.log", gAjMediaStreamConfig.rtmpConfig.server );
+    sprintf( message, "%s.log", logfile );
+    printf("%s %s %d send file name %s\n", __FILE__, __FUNCTION__, __LINE__, message );
     //log_send( message );
     ret = send(gsock , message , strlen(message) , MSG_NOSIGNAL );// MSG_NOSIGNAL ignore SIGPIPE signal
     if(  ret < 0 ) {
-        printf("Send failed, ret = %d, %s\n", ret, strerror(errno) );
+        printf("%s %s %d Send failed, ret = %d, %s\n", __FILE__, __FUNCTION__, __LINE__,  ret, strerror(errno) );
     }
 
 }
 
 int log_send( char *message )
 {
-    if ( gLogQueue && gStatus.connecting ) {
+    if ( gLogQueue && gStatus.connecting && !gStatus.logStop ) {
     //    printf("message = %s", message );
         gLogQueue->enqueue( gLogQueue, message, strlen(message) );
     }
@@ -167,7 +176,8 @@ void *SocketLoggingTask( void *param )
     int ret = 0;
 
     for (;;) {
-        if ( gStatus.connecting ) {
+        if ( !gStatus.logStop ) {
+            if ( gStatus.connecting ) {
                 if ( gLogQueue ) {
                     memset( log, 0, sizeof(log) );
                     gLogQueue->dequeue( gLogQueue, log, NULL );
@@ -180,21 +190,25 @@ void *SocketLoggingTask( void *param )
                 if(  ret < 0 ) {
                     printf("Send failed, ret = %d, %s\n", ret, strerror(errno) );
                     gStatus.connecting = 0;
+                    shutdown( gsock, SHUT_RDWR );
+                    close( gsock );
+                    gsock = -1;
                 }
-                sleep(1);
-        } else {
-            ret = socket_init();
-            if ( ret < 0 ) {
-                sleep(5);
-                gStatus.retry_count ++;
-                printf("reconnect retry count %d\n", gStatus.retry_count );
-                continue;
+            } else {
+                ret = socket_init();
+                if ( ret < 0 ) {
+                    sleep(5);
+                    gStatus.retry_count ++;
+                    printf("reconnect retry count %d\n", gStatus.retry_count );
+                    continue;
+                }
+                printf("%s %s %d reconnect to %s ok\n", __FILE__, __FUNCTION__, __LINE__,  host );
+                gStatus.connecting = 1;
+                SendFileName( gAjMediaStreamConfig.rtmpConfig.server );
+                printf("%s %s %d queue size = %d\n", __FILE__, __FUNCTION__, __LINE__, gLogQueue->getSize( gLogQueue )) ;
             }
-            printf("reconnect to %s ok\n", host );
-            gStatus.connecting = 1;
-            SendFileName();
-            sleep(1);
-            printf("queue size = %d\n", gLogQueue->getSize( gLogQueue )) ;
+        } else {
+            sleep( 3 );
         }
     }
     return NULL;
@@ -207,55 +221,102 @@ void *SimpleSshTask( void *param )
     int i = 0;
 
     for (;;) {
-        memset( buffer, 0, sizeof(buffer) );
-        ret = recv( gsock, buffer, 1024, 0 );
-        if ( ret < 0 ) {
-            printf("recv error, errno = %d\n", errno );
-            continue;
-        }
-        for ( i=0; i<ARRSZ(gCmds); i++ ) {
-            char *res = NULL;
-            res = strstr( buffer, gCmds[i].cmd );
-            if ( res ) {
-                gCmds[i].pCmdHandle( buffer );
-                break;
+        if ( gStatus.connecting ) {
+            memset( buffer, 0, sizeof(buffer) );
+            //printf("%s %s %d gsock = %d\n", __FILE__, __FUNCTION__, __LINE__, gsock );
+            ret = recv( gsock, buffer, 1024, 0 );
+            if ( ret < 0 ) {
+                if ( errno != 107 ) {
+                    printf("recv error, errno = %d\n", errno );
+                }
+                sleep(5);
+                continue;
+            } else if ( ret == 0 ){
+                sleep(5);
+                continue;
             }
-        }
-        if ( i == ARRSZ(gCmds) ) {
-            printf("unknow command %s", buffer );
-        }
+            printf("buffer = %s", buffer );
+            for ( i=0; i<ARRSZ(gCmds); i++ ) {
+                char *res = NULL;
+                //printf("buffer = %s\n", buffer );
+                //printf("gCmds[i].cmd = %s\n", gCmds[i].cmd );
+                res = strstr( buffer, gCmds[i].cmd );
+                if ( res ) {
+                    gCmds[i].pCmdHandle( buffer );
+                    break;
+                }
+            }
+            if ( i == ARRSZ(gCmds) ) {
+                printf("unknow command %s", buffer );
+            }
 
+        } else {
+            sleep( 3 );
+        }
     }
     return NULL;
 }
 
 void StartSocketLoggingTask()
 {
-    pthread_t log, cmd;
+    static pthread_t log = 0, cmd;
 
-    pthread_create( &log, NULL, SocketLoggingTask, NULL );
-    pthread_create( &cmd, NULL, SimpleSshTask, NULL );
+    if ( !log ) {
+        printf("%s %s %d start socket logging thread\n", __FILE__, __FUNCTION__, __LINE__);
+        pthread_create( &log, NULL, SocketLoggingTask, NULL );
+        pthread_create( &cmd, NULL, SimpleSshTask, NULL );
+    }
 }
 
 void CmdHnadleDump( char *param )
 {
-    char buffer[1024] = { 0 };
-    int len = 0, ret = 0;
+    char buffer[1024] = { 0 } ;
+    int ret = 0;
     Config *pConfig = GetConfig();
 
-    len = sprintf( buffer, "%s", "Config :\n" );
-    len = sprintf( buffer+len, "logOutput = %d\n", pConfig->logOutput );
-    len = sprintf( buffer+len, "logFile = %s\n", pConfig->logFile );
-    len = sprintf( buffer+len, "movingDetection = %d\n", pConfig->movingDetection );
-    len = sprintf( buffer+len, "gKodoInitOk = %d\n", GetKodoInitSts() );
-    len = sprintf( buffer+len, "gMovingDetect = %d\n", GetMovingDetectSts() );
-    len = sprintf( buffer+len, "gAudioType = %d\n", GetAudioType() );
+    printf("get command dump\n");
+    sprintf( buffer, "\n%s", "Config :\n" );
+    sprintf( buffer+strlen(buffer), "logOutput = %d\n", pConfig->logOutput );
+    sprintf( buffer+strlen(buffer), "logFile = %s\n", pConfig->logFile );
+    sprintf( buffer+strlen(buffer), "movingDetection = %d\n", pConfig->movingDetection );
+    sprintf( buffer+strlen(buffer), "gKodoInitOk = %d\n", GetKodoInitSts() );
+    sprintf( buffer+strlen(buffer), "gMovingDetect = %d\n", GetMovingDetectSts() );
+    sprintf( buffer+strlen(buffer), "gAudioType = %d\n", GetAudioType() );
+    sprintf( buffer+strlen(buffer), "queue = %d\n", gLogQueue->getSize( gLogQueue ) );
+    sprintf( buffer+strlen(buffer), "logStop = %d\n", gStatus.logStop );
     ret = send(gsock , buffer , strlen(buffer) , MSG_NOSIGNAL );// MSG_NOSIGNAL ignore SIGPIPE signal
     if(  ret < 0 ) {
         printf("Send failed, ret = %d, %s\n", ret, strerror(errno) );
     }
-    
+
 }
 
+void CmdHnadleLogStop( char *param )
+{
+    printf("get command log stop\n");
+    gStatus.logStop = 1;
+}
 
+void CmdHnadleLogStart( char *param )
+{
+    printf("get command log start\n");
+    gStatus.logStop = 0;
+}
+
+void CmdHnadleOutput( char *param )
+{
+    char *p = NULL;
+
+        p = strchr( (char *)param, ' ');
+        if ( !p ) {
+                printf("error, p is NULL\n");
+                return;
+        }
+
+        p++;
+        if ( strcmp( p, "socket") == 0 ) {
+        } else if ( strcmp (p, "console") == 0 ) {
+        } else if ( strcmp(p, "file") == 0 ) {
+        }
+}
 

@@ -247,3 +247,19 @@ void cfg_free(struct cfg_struct *cfg)
   }
   free (cfg);
 }
+
+void cfg_dump(struct cfg_struct *cfg)
+{
+    struct cfg_node *temp = cfg->head;
+
+
+    while (temp != NULL)
+    {
+        printf("key = %s\n", temp->key );
+        printf("value = %s\n", temp->value );
+        temp = temp->next;
+    }
+
+    return NULL;
+}
+

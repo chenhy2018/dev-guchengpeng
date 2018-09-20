@@ -6,15 +6,18 @@ add_definitions("-Wall -g")
 include_directories("${CMAKE_CURRENT_SOURCE_DIR}/../../third_party/curl-7.61.0/include")
 include_directories("${CMAKE_CURRENT_SOURCE_DIR}/c-sdk")
 
-if ( $ENV{ARCH} STREQUAL mstar )
+#if ( $ENV{ARCH} STREQUAL mstar )
 include_directories("${CMAKE_CURRENT_SOURCE_DIR}/demo/include")
 include_directories("${CMAKE_CURRENT_SOURCE_DIR}/")
-endif()
+#endif()
 
 
 link_directories("${CMAKE_CURRENT_SOURCE_DIR}/../../third_party/curl-7.61.0/lib/.libs")
 if ( $ENV{ARCH} STREQUAL mstar )
 link_directories("${CMAKE_CURRENT_SOURCE_DIR}/libs")
+else()
+set( MOCK_ANJIA_API ON)
+add_definitions(-DMOCK_ANJIA )
 endif()
 
 set(DISABLE_OPENSSL OFF)
@@ -25,9 +28,10 @@ if(NOT WITH_OPENSSL)
 endif()
 
 if ( $ENV{ARCH} STREQUAL mstar )
-set(LIBFFMPEG "")
+    set(LIBFFMPEG "")
 else()
-set(LIBFFMPEG avformat avcodec swresample avutil)
+    set(LIBFFMPEG "")
+    #set(LIBFFMPEG avformat avcodec swresample avutil)
 endif()
 
 if ($ENV{WITH_FFMPEG} STREQUAL "OFF")
@@ -69,7 +73,7 @@ if ( $ENV{ARCH} STREQUAL x86 )
         endif()
 endif()
 
-if ( $ENV{ARCH} STREQUAL mstar )
+#if ( $ENV{ARCH} STREQUAL mstar )
 add_executable(ipc-testupload
     ./demo/ipc_test.c
     ./demo/socket_logging.c
@@ -77,15 +81,22 @@ add_executable(ipc-testupload
     ./demo/log2file.c
     ./demo/queue.c
     ./demo/cfg_parse.c
+    ./demo/mymalloc.c
+    ./demo/mock_anjia.c
 )
 add_definitions(-D__ARM)
-endif()
+#endif()
 
-if ( $ENV{ARCH} STREQUAL mstar )
+#if ( $ENV{ARCH} STREQUAL mstar )
     if(DISABLE_OPENSSL)
-        target_link_libraries(ipc-testupload tsuploader ${LIBFFMPEG} qiniu curl m pthread devsdk tools)
+        if(MOCK_ANJIA_API)
+            message("mock an-jia")
+            target_link_libraries(ipc-testupload tsuploader ${LIBFFMPEG} qiniu curl m pthread )
+        else()
+            target_link_libraries(ipc-testupload tsuploader ${LIBFFMPEG} qiniu curl m pthread devsdk tools)
+        endif()
     else()
         target_link_libraries(ipc-testupload tsuploader ${LIBFFMPEG} qiniu curl crypto m pthread devsdk tools)
     endif()
-endif()
+#endif()
 
