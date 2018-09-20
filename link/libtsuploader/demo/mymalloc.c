@@ -1,4 +1,4 @@
-// Last Update:2018-09-19 15:20:54
+// Last Update:2018-09-19 18:12:54
 /**
  * @file mymalloc.c
  * @brief 
@@ -10,6 +10,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <pthread.h>
+#include "dbg.h"
 
 static int up = 0, down = 0;
 static pthread_mutex_t gMutex, gFreeMutex;
@@ -42,14 +43,17 @@ void myfree( void *ptr, char *function, int line )
 
 void *mymalloc( size_t size, char *function, int line )
 {
-    fprintf(stderr, "+++ malloc, %s() ---> %d, up = %d\n", function, line,__sync_fetch_and_add(&up,1));
+//    fprintf(stderr, "+++ malloc, %s() ---> %d, up = %d\n", function, line,__sync_fetch_and_add(&up,1));
+    DBG_LOG("+++ malloc, %s() ---> %d, up = %d\n", function, line,  __sync_fetch_and_add(&up,1));
 
     return malloc( size );
 }
 
 void myfree( void *ptr, char *function, int line )
 {
-    fprintf(stderr, "+++ free, %s() ---> %d, down = %d\n", function, line, __sync_fetch_and_sub(&down,1));
+    char buffer[1024] = {0};
+    /*fprintf(stderr, "+++ free, %s() ---> %d, down = %d\n", function, line, __sync_fetch_and_sub(&down,1));*/
+    DBG_LOG( "+++ free, %s() ---> %d, down = %d\n", function, line, __sync_fetch_and_sub(&down,1) );
 
     free( ptr );
 }

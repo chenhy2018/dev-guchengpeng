@@ -66,7 +66,7 @@ void InitConfig()
     gIpcConfig.sk = "G5mtjT3QzG4Lf7jpCAN5PZHrGeoSH9jRdC96ecYS";
     gIpcConfig.movingDetection = 1;
     gIpcConfig.configUpdateInterval = 10;
-    gIpcConfig.multiChannel = 1;
+    gIpcConfig.multiChannel = 0;
 }
 
 void LoadConfig()
