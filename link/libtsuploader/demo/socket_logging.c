@@ -1,4 +1,4 @@
-// Last Update:2018-09-20 14:31:33
+// Last Update:2018-09-20 16:43:34
 /**
  * @file socket_logging.c
  * @brief 
@@ -17,7 +17,7 @@
 #include <errno.h>
 #include "socket_logging.h"
 #include "devsdk.h"
-#include "Queue.h"
+#include "queue.h"
 #include "dbg.h"
 #include "ipc_test.h"
 
