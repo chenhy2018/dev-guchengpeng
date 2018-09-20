@@ -284,6 +284,7 @@ bool FileSink::WritePackets(IN int _nXspeed)
                         pAvPkt->pts = nLastPtsMod_ + nTimeDelta / _nXspeed;
                         nLastPtsMod_ = pAvPkt->pts;
                 }
+                pAvPkt->dts = pAvPkt->pts;
                 //Info("pts ===> %ld, nCount_ = %u", pAvPkt->pts, static_cast<unsigned int>(nCount_));
 
                 // handle stream index
@@ -564,7 +565,6 @@ StreamPumper::StreamPumper(IN const std::string& _url, IN int _nXspeed, IN int _
          nBlockSize_(_nBlockSize)
 {
         std::call_once(avformatInit_, [](){
-                        av_register_all();
                         avformat_network_init();
                 });
 
