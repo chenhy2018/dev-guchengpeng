@@ -84,7 +84,25 @@ func getUserInfo(xl *xlog.Logger, req *http.Request) (*userInfo, error) {
 			}
 		}
 	}
+	xl.Infof("info = %v", info)
 	return &info, nil
+}
+
+func HandleToken(c *gin.Context) {
+	xl := xlog.New(c.Writer, c.Request)
+	token := c.Request.Header.Get("Authorization")
+	if len(token) < 6 && !strings.Contains(c.Request.URL.String(), "playback") {
+		xl.Errorf("bad token")
+		c.AbortWithStatusJSON(401, gin.H{
+			"error": "bad token",
+		})
+		return
+	}
+	if !strings.Contains(c.Request.URL.String(), "playback") {
+		c.Request.Header.Set("Authorization", "Qbox ak="+strings.Split(token[5:], ":")[0])
+		fmt.Println(strings.Split(token[5:], ":")[0])
+	}
+	c.Next()
 }
 
 func getUid(uid uint32) string {
