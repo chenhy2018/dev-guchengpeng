@@ -3,9 +3,8 @@ package main
 import (
 	"flag"
 	"fmt"
-	"os"
-
 	"github.com/gin-gonic/gin"
+	"os"
 	"qiniu.com/auth"
 	"qiniu.com/controllers"
 	"qiniu.com/db"
@@ -32,6 +31,7 @@ func main() {
 		auth.Init(conf)
 	}
 	controllers.Init(&conf.GrpcConf)
+	r.Use(controllers.HandleToken)
 	r.POST("/v1/namespaces/:namespace/uas/:uaid", controllers.RegisterUa)
 	r.DELETE("/v1/namespaces/:namespace/uas/:uaid", controllers.DeleteUa)
 	r.PUT("/v1/namespaces/:namespace/uas/:uaid", controllers.UpdateUa)
@@ -46,6 +46,9 @@ func main() {
 	r.GET("/v1/namespaces/:namespace/uas/:uaid/segments", controllers.GetSegments)
 	r.GET("/v1/namespaces/:namespace/uas/:uaid/frames", controllers.GetFrames)
 	r.POST("/qiniu/upload/callback", controllers.UploadTs)
+
+	//Priavte api
+	r.POST("/v1/aksk", controllers.SetPrivateAkSk)
 	r.Run(conf.Bind) // listen and serve on 0.0.0.0:8080
 
 }
