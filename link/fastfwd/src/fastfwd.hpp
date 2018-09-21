@@ -274,8 +274,6 @@ namespace fastfwd {
 
                 std::string path_ = "";
                 size_t nCount_ = 0;
-                long long nLastPtsOri_ = -1;
-                long long nLastPtsMod_ = -1;
 
                 AVIOContext* pAvIoContext_ = nullptr;
                 uint8_t* pMemBuffer_ = nullptr;
