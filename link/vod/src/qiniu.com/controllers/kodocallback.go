@@ -60,7 +60,7 @@ func UploadTs(c *gin.Context) {
 	}
 
 	// Add namespace&ua check
-	err = HandleUaControl(xl, kodoData.Bucket, ids[1])
+	err, exprie := GetNameSpaceInfo(xl, kodoData.Bucket, ids[1])
 	if err != nil {
 		xl.Errorf("error = %#v", err.Error())
 		c.JSON(400, gin.H{
@@ -69,7 +69,7 @@ func UploadTs(c *gin.Context) {
 		return
 	}
 
-	err = HandleTs(xl, kodoData.Bucket, ids, kodoData, c.Request)
+	err = HandleTs(xl, kodoData.Bucket, ids, kodoData, c.Request, exprie)
 	if err != nil {
 		xl.Errorf("error = %#v", err.Error())
 		c.JSON(500, gin.H{
@@ -83,7 +83,7 @@ func UploadTs(c *gin.Context) {
 	})
 }
 
-func HandleTs(xl *xlog.Logger, bucket string, ids []string, kodoData kodoCallBack, req *http.Request) error {
+func HandleTs(xl *xlog.Logger, bucket string, ids []string, kodoData kodoCallBack, req *http.Request, dbExprie int) error {
 	startTime, err := strconv.ParseInt(ids[2], 10, 64)
 	if err != nil {
 		return fmt.Errorf("parse ts file name failed, filename = %#v", ids[2])
@@ -93,14 +93,19 @@ func HandleTs(xl *xlog.Logger, bucket string, ids []string, kodoData kodoCallBac
 		return fmt.Errorf("parse duration failed, duration = %#v", kodoData.Duration)
 	}
 	endTime := startTime + int64(duration*1000)
-	expire := strings.Split(ids[4], ".")
-	if len(expire) != 2 {
-		return fmt.Errorf("bad file name, expire = %#v", ids[4])
-	}
-	tsExpire, err := strconv.ParseInt(expire[0], 10, 32)
-
-	if err != nil {
-		return fmt.Errorf("parse ts expire failed tsExpire = %#v", ids[4])
+	var tsExpire int
+	if dbExprie == 0 {
+		expire := strings.Split(ids[4], ".")
+		if len(expire) != 2 {
+			return fmt.Errorf("bad file name, expire = %#v", ids[4])
+		}
+		e, err := strconv.ParseInt(expire[0], 10, 32)
+		tsExpire = int(e)
+		if err != nil {
+			return fmt.Errorf("parse ts expire failed tsExpire = %#v", ids[4])
+		}
+	} else {
+		tsExpire = dbExprie
 	}
 	// key -->ts/ua_id/start_ts/endts/segment_start_ts/expiry.ts
 	newFilName := append(ids[:3], append([]string{strconv.FormatInt(endTime, 10)}, ids[3:]...)...)
