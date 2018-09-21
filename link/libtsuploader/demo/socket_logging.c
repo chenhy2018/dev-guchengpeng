@@ -1,4 +1,4 @@
-// Last Update:2018-09-20 16:43:34
+// Last Update:2018-09-21 17:01:10
 /**
  * @file socket_logging.c
  * @brief 
@@ -61,7 +61,7 @@ int socket_init()
     }
 
     if ( gsock != -1 ) {
-        DBG_LOG("close last sock\n");
+//        DBG_LOG("close last sock\n");
         close( gsock );
     }
 
@@ -71,7 +71,7 @@ int socket_init()
         gStatus.connecting = 0;
         return -1;
     }
-    DBG_LOG("Socket created\n");
+//    DBG_LOG("Socket created\n");
 
     server.sin_addr.s_addr = inet_addr( host );
     server.sin_family = AF_INET;
@@ -79,7 +79,7 @@ int socket_init()
 
     ret = connect(gsock , (struct sockaddr *)&server , sizeof(server));
     if ( ret < 0) {
-        DBG_ERROR("connect failed. Error, ret = %d, %s \n", ret , strerror(errno) );
+//        DBG_ERROR("connect failed. Error, ret = %d, %s \n", ret , strerror(errno) );
         gStatus.connecting = 0;
         return -1;
     }

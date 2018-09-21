@@ -13,7 +13,6 @@
 #include "dbg.h"
 
 static int up = 0, down = 0;
-static pthread_mutex_t gMutex, gFreeMutex;
 
 void MyMallocInit()
 {

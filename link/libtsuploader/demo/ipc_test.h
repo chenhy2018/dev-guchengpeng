@@ -1,4 +1,4 @@
-// Last Update:2018-09-14 19:47:13
+// Last Update:2018-09-21 16:49:39
 /**
  * @file ipc_test.h
  * @brief 
@@ -14,6 +14,8 @@
 #define TIMESTAMP_REPORT_INTERVAL 20
 #define TOKEN_RETRY_COUNT 1000
 #define G711_TIMESTAMP_INTERVAL 40
+#define FRAME_DATA_LEN 1024
+#define STREAM_CACHE_SIZE 75
 
 typedef enum {
     TYPE_VIDEO,
@@ -35,7 +37,16 @@ typedef struct {
     unsigned char movingDetection;
     int configUpdateInterval;
     unsigned char multiChannel;
+    unsigned char openCache;
+    int cacheSize;
 } Config;
+
+typedef struct {
+    char *data;
+    unsigned char isKey;
+    double timeStamp;
+    int len;
+} Frame;
 
 extern Config *GetConfig();
 extern int GetKodoInitSts();
