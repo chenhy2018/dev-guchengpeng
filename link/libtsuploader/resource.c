@@ -18,6 +18,9 @@ static void * recycle(void *_pOpaque)
         while(!manager.nQuit_ && info.nLen_ == 0) {
                 AsyncInterface *pAsync = NULL;
                 int ret = manager.pQueue_->PopWithTimeout(manager.pQueue_, (char *)(&pAsync), sizeof(AsyncInterface *), 24 * 60 * 60 * 1000000);
+                UploaderStatInfo info;
+                manager.pQueue_->GetStatInfo(manager.pQueue_, &info);
+                logdebug("thread queue:%d", info.nLen_);
                 if (ret == TK_TIMEOUT) {
                         continue;
                 }
