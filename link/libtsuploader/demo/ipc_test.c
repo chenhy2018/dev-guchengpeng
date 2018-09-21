@@ -13,7 +13,7 @@
 #include "media_cfg.h"
 #include "cfg_parse.h"
 #include "socket_logging.h"
-//#include "mymalloc.h"
+#include "queue.h"
 
 /* global variable */
 MediaStreamConfig gAjMediaStreamConfig;
@@ -28,6 +28,10 @@ static struct cfg_struct *cfg;
 static char gMainStreamDeviceId[128] = { 0 };
 static char gSubStreamDeviceId[128] = { 0 };
 static char gLogFile[128] = { 0 };
+static Queue *pVideoMainStreamCache = NULL;
+static Queue *pVideoSubStreamCache = NULL;
+static Queue *pAudioSubStreamCache = NULL;
+static Queue *pAudioMainStreamCache = NULL;
 
 int GetKodoInitSts()
 {
@@ -66,7 +70,9 @@ void InitConfig()
     gIpcConfig.sk = "G5mtjT3QzG4Lf7jpCAN5PZHrGeoSH9jRdC96ecYS";
     gIpcConfig.movingDetection = 1;
     gIpcConfig.configUpdateInterval = 10;
-    gIpcConfig.multiChannel = 0;
+    gIpcConfig.multiChannel = 1;
+    gIpcConfig.openCache = 1;
+    gIpcConfig.cacheSize = STREAM_CACHE_SIZE;
 }
 
 void LoadConfig()
@@ -111,7 +117,7 @@ void UpdateConfig()
             LoggerInit( gIpcConfig.logPrintTime, gIpcConfig.logOutput, gIpcConfig.logFile, gIpcConfig.logVerbose );
         }
     } else {
-        last = logOutput;
+        last = gIpcConfig.logOutput;
     }
 
     logFile = cfg_get( cfg, "LOG_FILE" );
@@ -169,6 +175,64 @@ void ReportKodoInitError( char *stream, char *reason )
     }
 }
 
+int CacheHandle( Queue *pQueue, TsMuxUploader *pUploader,
+                 int _nStreamType, char *_pFrame,
+                 int _nLen, int _nIskey, double _dTimeStamp
+  )
+{
+    Frame frame;
+    static int count = STREAM_CACHE_SIZE;
+
+    if ( !pQueue || !pUploader  ) {
+        return -1;
+    }
+
+    memset( &frame, 0, sizeof(frame) );
+    frame.data = (char *) malloc ( _nLen );
+    if ( !frame.data ) {
+        printf("%s %s %d malloc error\n", __FILE__, __FUNCTION__, __LINE__);
+        return -1;
+    }
+    memcpy( frame.data, _pFrame, _nLen );
+    frame.len = _nLen;
+    frame.timeStamp = _dTimeStamp;
+    frame.isKey = _nIskey;
+    pQueue->enqueue( pQueue, (void *)&frame, sizeof(frame) );
+
+    if (  pQueue->getSize( pQueue ) == gIpcConfig.cacheSize ) {
+        memset( &frame, 0, sizeof(frame) );
+        pQueue->dequeue( pQueue, (void *)&frame, NULL );
+        if ( !frame.data ) {
+            printf("%s %s %d data is NULL\n", __FILE__, __FUNCTION__, __LINE__ );
+            return -1;
+        }
+
+        if (  gMovingDetect == ALARM_CODE_MOTION_DETECT  ) {
+            count = STREAM_CACHE_SIZE;
+            if ( _nStreamType == TYPE_VIDEO ) {
+                PushVideo( pUploader, frame.data, frame.len, (int64_t)frame.timeStamp, frame.isKey, 0 );
+            } else {
+                PushAudio( pUploader, frame.data, frame.len, (int64_t)frame.timeStamp );
+            }
+        } else if ( gMovingDetect == ALARM_CODE_MOTION_DETECT_DISAPPEAR ) {
+            if ( count-- > 0 ) {
+                if ( _nStreamType == TYPE_VIDEO ) {
+                    PushVideo( pUploader, frame.data, frame.len, (int64_t)frame.timeStamp, frame.isKey, 0 );
+                } else {
+                    PushAudio( pUploader, frame.data, frame.len, (int64_t)frame.timeStamp );
+                }
+            } else {
+                ReportKodoInitError( "main stream", "not detect moving" );
+            }
+        } else {
+            ReportKodoInitError( "main stream", "not detect moving" );
+        }
+        free( frame.data );
+    }
+
+    return 0;
+}
+
 int VideoGetFrameCb( int streamno, char *_pFrame,
                    int _nLen, int _nIskey, double _dTimeStamp,
                    unsigned long _nFrameIndex, unsigned long _nKeyFrameIndex,
@@ -177,7 +241,7 @@ int VideoGetFrameCb( int streamno, char *_pFrame,
     static int first = 1;
 
     if ( first ) {
-        printf("%s thread id = %d\n", __FUNCTION__, pthread_self() );
+        printf("%s thread id = %d\n", __FUNCTION__, (int)pthread_self() );
         first = 0;
     }
 
@@ -186,14 +250,15 @@ int VideoGetFrameCb( int streamno, char *_pFrame,
         return 0;
     }
 
-    if ( gIpcConfig.movingDetection && !gMovingDetect ) {
-        ReportKodoInitError( "main stream", "not detect moving" );
-        return 0;
-    }
-
-
     TraceTimeStamp( TYPE_VIDEO, _dTimeStamp, "main stream" );
-    PushVideo(pMainUploader, _pFrame, _nLen, (int64_t)_dTimeStamp, _nIskey, 0 );
+
+    if ( gIpcConfig.movingDetection && 
+         gIpcConfig.openCache  && 
+         pVideoMainStreamCache ) {
+        CacheHandle( pVideoMainStreamCache, pMainUploader, TYPE_VIDEO, _pFrame, _nLen, _nIskey,  _dTimeStamp );
+    } else {
+        PushVideo(pMainUploader, _pFrame, _nLen, (int64_t)_dTimeStamp, _nIskey, 0 );
+    }
 
     return 0;
 }
@@ -206,7 +271,7 @@ int SubStreamVideoGetFrameCb( int streamno, char *_pFrame,
     static int first = 1;
 
     if ( first ) {
-        printf("%s thread id = %d\n", __FUNCTION__, pthread_self() );
+        printf("%s thread id = %d\n", __FUNCTION__, (int)pthread_self() );
         first = 0;
     }
     if ( !gKodoInitOk ) {
@@ -235,7 +300,7 @@ int AudioGetFrameCb( char *_pFrame, int _nLen, double _dTimeStamp,
     static int isfirst = 1;
 
     if ( isfirst ) {
-        printf("%s thread id = %d\n", __FUNCTION__, pthread_self() );
+        printf("%s thread id = %d\n", __FUNCTION__, (int)pthread_self() );
         isfirst = 0;
     }
 
@@ -286,7 +351,7 @@ int SubStreamAudioGetFrameCb( char *_pFrame, int _nLen, double _dTimeStamp,
     static int isfirst = 1;
 
     if ( isfirst ) {
-        printf("%s thread id = %d\n", __FUNCTION__, pthread_self() );
+        printf("%s thread id = %d\n", __FUNCTION__, (int)pthread_self() );
         isfirst = 0;
     }
 
@@ -344,16 +409,20 @@ static int InitIPC( )
     GetMediaStreamConfig(&gAjMediaStreamConfig);
     sleep( 2 );
     SendFileName( gAjMediaStreamConfig.rtmpConfig.server );
+    pVideoMainStreamCache = NewQueue();
     dev_sdk_start_video( 0, 0, VideoGetFrameCb, &context );
     if ( gIpcConfig.multiChannel ) {
+        pVideoSubStreamCache = NewQueue();
         dev_sdk_start_video( 0, 1, SubStreamVideoGetFrameCb, &context );
     }
     dev_sdk_get_AudioConfig( &audioConfig );
     DBG_LOG("audioConfig.audioEncode.enable = %d\n", audioConfig.audioEncode.enable );
     if ( audioConfig.audioEncode.enable ) {
+        pAudioMainStreamCache = NewQueue();
         dev_sdk_start_audio_play( gAudioType );
         dev_sdk_start_audio( 0, 0, AudioGetFrameCb, NULL );
         if ( gIpcConfig.multiChannel ) {
+            pAudioSubStreamCache = NewQueue();
             dev_sdk_start_audio( 0, 1, SubStreamAudioGetFrameCb, NULL );
         }
     } else {
@@ -528,10 +597,12 @@ int AlarmCallback(ALARM_ENTRY alarm, void *pcontext)
 {
     if ( alarm.code == ALARM_CODE_MOTION_DETECT ) {
         DBG_LOG("get event ALARM_CODE_MOTION_DETECT\n");
-        gMovingDetect = 1;
+        gMovingDetect = alarm.code;
+        /*gMovingDetect = 1;*/
     } else if ( alarm.code == ALARM_CODE_MOTION_DETECT_DISAPPEAR ) {
         DBG_LOG("get event ALARM_CODE_MOTION_DETECT_DISAPPEAR\n");
-        gMovingDetect = 0;
+        gMovingDetect = alarm.code;
+        /*gMovingDetect = 0;*/
     }
 
     return 0;
@@ -557,7 +628,6 @@ int main()
     int ret = 0;
 
     InitConfig();
-    MyMallocInit();
     UpdateConfig();
     WaitForNetworkOk();
     printf("gIpcConfig.logFile = %s\n", gIpcConfig.logFile );
