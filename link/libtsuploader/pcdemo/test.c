@@ -31,6 +31,8 @@ typedef struct {
         char *pAFilePath;
         char *pVFilePath;
         char *pTokenUrl;
+        char *pUa1;
+        char *pUa2;
         bool IsFileLoop;
         int  nLoopSleeptime;
         int nRoundCount;
@@ -635,6 +637,16 @@ static void checkCmdArg(const char * name)
         if (cmdArg.nUptokenInterval == 0) {
                 cmdArg.nUptokenInterval = 3550;
         }
+        if (cmdArg.IsTwoUpload || cmdArg.IsTwoFileUpload) {
+                if (cmdArg.pUa1 == NULL || cmdArg.pUa2 == NULL) {
+                        logerror("ua1 or ua2 is NULL");
+                        exit(6);
+                }
+        } else {
+                if (cmdArg.pUa1 == NULL) {
+                        cmdArg.pUa1 = "ipc00a";
+                }
+        }
         return;
 }
 
@@ -649,8 +661,8 @@ static void * second_test(void * opaque) {
 
         avuploader.userUploadArg.pToken_ = gtestToken;
         avuploader.userUploadArg.nTokenLen_ = strlen(gtestToken);
-        avuploader.userUploadArg.pDeviceId_ = "testdeviceid0";
-        avuploader.userUploadArg.nDeviceIdLen_ = strlen("testdeviceid0");
+        avuploader.userUploadArg.pDeviceId_ = cmdArg.pUa2;
+        avuploader.userUploadArg.nDeviceIdLen_ = strlen(cmdArg.pUa2);
         avuploader.userUploadArg.nUploaderBufferSize = cmdArg.nQbufSize;
         avuploader.userUploadArg.nNewSegmentInterval = cmdArg.nNewSetIntval;
         
@@ -683,8 +695,8 @@ static void do_start_file_test(AVuploader *pAvuploader){
 static void * second_file_test(void * opaque) {
         AVuploader *pAuploader = (AVuploader *)opaque;;
         AVuploader avuploader = *pAuploader;
-        avuploader.userUploadArg.pDeviceId_ = "testdeviceid0";
-        avuploader.userUploadArg.nDeviceIdLen_ = strlen("testdeviceid0");
+        avuploader.userUploadArg.pDeviceId_ = cmdArg.pUa2;
+        avuploader.userUploadArg.nDeviceIdLen_ = strlen(cmdArg.pUa2);
         
         int ret = CreateAndStartAVUploader(&avuploader.pTsMuxUploader, &avuploader.avArg, &avuploader.userUploadArg);
         if (ret != 0) {
@@ -710,9 +722,9 @@ int main(int argc, const char** argv)
 	flag_bool(&cmdArg.IsNoVideo, "nv", "no video(not support now)");
 	flag_bool(&cmdArg.IsTestMove, "testmove", "testmove seperated by key frame");
 #ifdef TEST_WITH_FFMPEG
-        flag_bool(&cmdArg.IsTwoUpload, "two", "test two instance upload. ffmpeg and file");
+        flag_bool(&cmdArg.IsTwoUpload, "two", "test two instance upload. ffmpeg and file. must set ua1 nad ua2");
 #endif
-        flag_bool(&cmdArg.IsTwoFileUpload, "twofile", "test two file instance upload");
+        flag_bool(&cmdArg.IsTwoFileUpload, "twofile", "test two file instance upload. must set ua1 nad ua2");
         flag_int(&cmdArg.nSleeptime, "sleeptime", "sleep time(milli) used by testmove.default(2s) if testmove is enable");
         flag_int(&cmdArg.nFirstFrameSleeptime, "fsleeptime", "first video key frame sleep time(milli)");
         flag_int(&cmdArg.nQbufSize, "qbufsize", "upload queue buffer size");
@@ -721,6 +733,8 @@ int main(int argc, const char** argv)
         flag_str(&cmdArg.pAFilePath, "afpath", "set audio file path.like /root/a.aac");
         flag_str(&cmdArg.pVFilePath, "vfpath", "set video file path.like /root/a.h264");
         flag_str(&cmdArg.pTokenUrl, "tokenurl", "url where to send token request");
+        flag_str(&cmdArg.pUa1, "ua1", "ua(deviceid) name. default value is ipc00a");
+        flag_str(&cmdArg.pUa2, "ua2", "ua(deviceid) name");
         flag_bool(&cmdArg.IsFileLoop, "fileloop", "in file mode and only one upload, will loop to push file");
         flag_int(&cmdArg.nLoopSleeptime, "csleeptime", "next round sleeptime");
         flag_bool(&cmdArg.IsNoNet, "nonet", "no network");
@@ -874,8 +888,8 @@ int main(int argc, const char** argv)
         
         avuploader.userUploadArg.pToken_ = gtestToken;
         avuploader.userUploadArg.nTokenLen_ = strlen(gtestToken);
-        avuploader.userUploadArg.pDeviceId_ = "testdeviceid";
-        avuploader.userUploadArg.nDeviceIdLen_ = strlen("testdeviceid");
+        avuploader.userUploadArg.pDeviceId_ = cmdArg.pUa1;
+        avuploader.userUploadArg.nDeviceIdLen_ = strlen(cmdArg.pUa1);
         avuploader.userUploadArg.nUploaderBufferSize = cmdArg.nQbufSize;
         avuploader.userUploadArg.nNewSegmentInterval = cmdArg.nNewSetIntval;
         
