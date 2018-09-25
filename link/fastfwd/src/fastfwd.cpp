@@ -272,9 +272,30 @@ bool FileSink::WritePackets(IN int _nXspeed)
                         continue;
                 }
 
-                // framerate control
-                pAvPkt->pts = nCount_ * 90000 * 2 / _nXspeed;
+                /* Frame rate control principle:
+                 * 1. We assume that the GOP of one stream is constant and the maximum of GOP is 8 second.
+                 * 2. nCurrentGOP is interval of current frame's PTS and last frame's PTS. nMinGOP_ is the
+                 * minimum GOP of a stream. if nCurrentGOP is larger than two time of nMinGOP_, we assume
+                 * that the frame is not in the same time slot as the last frame and fitted the PTS as
+                 * last frame's PTS + nMinGOP_ / _nXspeed.
+                */
+                if (bIsFirstPkt_) {
+                        bIsFirstPkt_ = false;
+                        nLastPtsOriginal_ = pAvPkt->pts;
+                        pAvPkt->pts = 0;
+                } else {
+                        long long nCurrentGOP = pAvPkt->pts - nLastPtsOriginal_;
+                        nLastPtsOriginal_ = pAvPkt->pts;
+                        if (nCurrentGOP > nMinGOP_ * 2) {
+                                pAvPkt->pts = nLastPtsFitted_ + nMinGOP_ / _nXspeed;
+                        } else {
+                                nMinGOP_ = (nCurrentGOP < nMinGOP_) ? nCurrentGOP : nMinGOP_;
+                                pAvPkt->pts = nLastPtsFitted_ + nCurrentGOP / _nXspeed;
+                        }
+                        nLastPtsFitted_ = pAvPkt->pts;
+                }
                 pAvPkt->dts = pAvPkt->pts;
+                Debug("count: %ld, pts: %ld", nCount_, pAvPkt->pts);
 
                 // handle stream index
                 pAvPkt->stream_index = streams_[static_cast<int>(pPkt->Stream())];
@@ -489,7 +510,7 @@ int AvReceiver::Receive(IN const std::string& _url, IN int _nXspeed, IN PacketHa
                 // if avformat detects another stream during transport, we have to ignore the packets of the stream
                 if (static_cast<size_t>(avPacket.stream_index) < streams_.size()) {
                         // we need all PTS/DTS use milliseconds, sometimes they are macroseconds such as TS streams
-                        AVRational tb = AVRational{1, 1000};
+                        AVRational tb = AVRational{1, FASTFWD_TIME_BASE};
                         AVRounding r = static_cast<AVRounding>(AV_ROUND_NEAR_INF|AV_ROUND_PASS_MINMAX);
                         avPacket.dts = av_rescale_q_rnd(avPacket.dts, streams_[avPacket.stream_index].pAvStream->time_base, tb, r);
                         avPacket.pts = av_rescale_q_rnd(avPacket.pts, streams_[avPacket.stream_index].pAvStream->time_base, tb, r);
