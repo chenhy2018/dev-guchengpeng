@@ -36,7 +36,7 @@ typedef struct {
         bool IsFileLoop;
         int  nLoopSleeptime;
         int nRoundCount;
-	bool IsNoNet;
+        bool IsNoNet;
         bool IsQuit;
         int64_t nBaseAudioTime; //for loop test
         int64_t nBaseVideoTime; //for loop test
@@ -726,15 +726,15 @@ static void * second_file_test(void * opaque) {
 
 int main(int argc, const char** argv)
 {
-	flag_bool(&cmdArg.IsInputFromFFmpeg, "ffmpeg", "is input from ffmpeg. will set --testaac and not set noadts");
-	flag_bool(&cmdArg.IsTestAAC, "testaac", "input aac audio");
-	flag_bool(&cmdArg.IsTestAACWithoutAdts, "noadts", "input aac audio without adts. will set --testaac");
-	flag_bool(&cmdArg.IsTestTimestampRollover, "rollover", "will set start pts to 95437000. ts will roll over about 6.x second laetr.only effect for not input from ffmpeg");
-	flag_bool(&cmdArg.IsTestH265, "testh265", "input h264 video");
-	flag_bool(&cmdArg.IsLocalToken, "localtoken", "use kodo server mode");
-	flag_bool(&cmdArg.IsNoAudio, "na", "no audio");
-	flag_bool(&cmdArg.IsNoVideo, "nv", "no video(not support now)");
-	flag_bool(&cmdArg.IsTestMove, "testmove", "testmove seperated by key frame");
+        flag_bool(&cmdArg.IsInputFromFFmpeg, "ffmpeg", "is input from ffmpeg. will set --testaac and not set noadts");
+        flag_bool(&cmdArg.IsTestAAC, "testaac", "input aac audio");
+        flag_bool(&cmdArg.IsTestAACWithoutAdts, "noadts", "input aac audio without adts. will set --testaac");
+        flag_bool(&cmdArg.IsTestTimestampRollover, "rollover", "will set start pts to 95437000. ts will roll over about 6.x second laetr.only effect for not input from ffmpeg");
+        flag_bool(&cmdArg.IsTestH265, "testh265", "input h264 video");
+        flag_bool(&cmdArg.IsLocalToken, "localtoken", "use kodo server mode");
+        flag_bool(&cmdArg.IsNoAudio, "na", "no audio");
+        flag_bool(&cmdArg.IsNoVideo, "nv", "no video(not support now)");
+        flag_bool(&cmdArg.IsTestMove, "testmove", "testmove seperated by key frame");
 #ifdef TEST_WITH_FFMPEG
         flag_bool(&cmdArg.IsTwoUpload, "two", "test two instance upload. ffmpeg and file. must set ua1 nad ua2");
 #endif

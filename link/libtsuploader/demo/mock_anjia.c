@@ -529,7 +529,7 @@ int dev_sdk_stop_audio(int camera, int stream)
         memset(&tid, 0, sizeof(tid));
         if(memcmp(&tid, &cameras[camera].audioStreams[stream].tid, sizeof(tid)) != 0) {
                 pthread_join(cameras[camera].audioStreams[stream].tid, NULL);
-	}
+        }
         cameras[camera].audioStreams[stream].audioCb = NULL;
         memset(&cameras[camera].audioStreams[stream].tid, 0, sizeof(pthread_t));
         return 0;
