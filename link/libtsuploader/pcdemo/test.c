@@ -38,6 +38,8 @@ typedef struct {
         int nRoundCount;
 	bool IsNoNet;
         bool IsQuit;
+        int64_t nBaseAudioTime; //for loop test
+        int64_t nBaseVideoTime; //for loop test
 }CmdArg;
 
 typedef struct {
@@ -433,10 +435,21 @@ int start_file_test(char * _pAudioFile, char * _pVideoFile, DataCallback callbac
         
         if (pAudioData) {
                 free(pAudioData);
+                cmdArg.nBaseAudioTime += nNextAudioTime;
         }
         if (pVideoData) {
                 free(pVideoData);
                 printf("IDR:%d nonIDR:%d\n", nIDR, nNonIDR);
+                cmdArg.nBaseVideoTime += nNextVideoTime;
+        }
+        if (cmdArg.nBaseVideoTime > 0 && cmdArg.nBaseAudioTime) {
+                if (cmdArg.nBaseVideoTime > cmdArg.nBaseAudioTime) {
+                        cmdArg.nBaseAudioTime = cmdArg.nBaseVideoTime + 40;
+                        cmdArg.nBaseVideoTime += 40;
+                } else {
+                        cmdArg.nBaseVideoTime = cmdArg.nBaseAudioTime + 40;
+                        cmdArg.nBaseAudioTime += 40;
+                }
         }
         return 0;
 }
@@ -534,6 +547,7 @@ end:
                 return -1;
         }
         
+        
         return 0;
 }
 #endif
@@ -545,7 +559,7 @@ static int dataCallback(void *opaque, void *pData, int nDataLen, int nFlag, int6
         pAvuploader->nByteCount += nDataLen;
         if (nFlag == THIS_IS_AUDIO){
                 //fprintf(stderr, "push audio ts:%lld\n", timestamp);
-                ret = PushAudio(pAvuploader->pTsMuxUploader, pData, nDataLen, timestamp);
+                ret = PushAudio(pAvuploader->pTsMuxUploader, pData, nDataLen, timestamp + cmdArg.nBaseAudioTime);
         } else {
                 if (pAvuploader->firstTimeStamp == -1){
                         pAvuploader->firstTimeStamp = timestamp;
@@ -561,7 +575,7 @@ static int dataCallback(void *opaque, void *pData, int nDataLen, int nFlag, int6
                 }
                 pAvuploader->nVideoKeyframeAccLen += nDataLen;
                 //printf("------->push video key:%d ts:%lld size:%d\n",nIsKeyFrame, timestamp, nDataLen);
-                ret = PushVideo(pAvuploader->pTsMuxUploader, pData, nDataLen, timestamp, nIsKeyFrame, nNewSegMent);
+                ret = PushVideo(pAvuploader->pTsMuxUploader, pData, nDataLen, timestamp + cmdArg.nBaseVideoTime, nIsKeyFrame, nNewSegMent);
         }
         return ret;
 }
