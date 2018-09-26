@@ -667,7 +667,7 @@ static void checkCmdArg(const char * name)
                 }
         } else {
                 if (cmdArg.pUa1 == NULL) {
-                        cmdArg.pUa1 = "ipc00a";
+                        cmdArg.pUa1 = "ipcxxa";
                 }
         }
         return;
@@ -756,7 +756,7 @@ int main(int argc, const char** argv)
         flag_str(&cmdArg.pAFilePath, "afpath", "set audio file path.like /root/a.aac");
         flag_str(&cmdArg.pVFilePath, "vfpath", "set video file path.like /root/a.h264");
         flag_str(&cmdArg.pTokenUrl, "tokenurl", "url where to send token request");
-        flag_str(&cmdArg.pUa1, "ua1", "ua(deviceid) name. default value is ipc00a");
+        flag_str(&cmdArg.pUa1, "ua1", "ua(deviceid) name. default value is ipcxxa");
         flag_str(&cmdArg.pUa2, "ua2", "ua(deviceid) name");
         flag_bool(&cmdArg.IsFileLoop, "fileloop", "in file mode and only one upload, will loop to push file");
         flag_int(&cmdArg.nLoopSleeptime, "csleeptime", "next round sleeptime");
