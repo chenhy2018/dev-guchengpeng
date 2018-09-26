@@ -619,13 +619,13 @@ func TestAutoCreateUa(t *testing.T) {
 	assert.Equal(t, c.Writer.Status(), 200, "they should be equal")
 }
 
-func TestHandleUaControl(t *testing.T) {
+func TestGetNameSpaceInfo(t *testing.T) {
 	initDb()
 	monkey.UnpatchAll()
 	monkey.Patch(getUserInfo, func(xl *xlog.Logger, req *http.Request) (*userInfo, error) { return &user, nil })
 	monkey.Patch(system.HaveDb, func() bool { return true })
 	xl := xlog.NewDummy()
-	err := HandleUaControl(xl, "ipcamera", "test1")
+	err, _ := GetNameSpaceInfo(xl, "ipcamera", "test1")
 	assert.Equal(t, err.Error(), "can't find namespace", "they should be equal")
 
 	// bucket maybe already exist. so not check this response.
@@ -645,7 +645,7 @@ func TestHandleUaControl(t *testing.T) {
 	c.Params = append(c.Params, param)
 	c.Request = req
 	RegisterNamespace(c)
-	err = HandleUaControl(xl, "ipcamera", "test1a")
+	err, _ = GetNameSpaceInfo(xl, "ipcamera", "test1a")
 
 	assert.Equal(t, err.Error(), "Can't find ua info", "they should be equal")
 	// bucket maybe already exit. so not check this response.
@@ -664,7 +664,7 @@ func TestHandleUaControl(t *testing.T) {
 	c.Params = append(c.Params, param)
 	c.Request = req
 	UpdateNamespace(c)
-	err = HandleUaControl(xl, "ipcamera", "test1a")
+	err, _ = GetNameSpaceInfo(xl, "ipcamera", "test1a")
 	assert.Equal(t, err, nil, "they should be equal")
 
 	req, _ = http.NewRequest("Delete", "/v1/namespaces/test1", nil)

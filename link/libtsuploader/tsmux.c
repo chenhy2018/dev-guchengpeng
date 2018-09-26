@@ -178,5 +178,6 @@ int MuxerFlush(TsMuxerContext* pMuxerCtx)
 
 void DestroyTsMuxerContext(TsMuxerContext *pTsMuxerCtx)
 {
-        free(pTsMuxerCtx);
+        if (pTsMuxerCtx)
+                free(pTsMuxerCtx);
 }

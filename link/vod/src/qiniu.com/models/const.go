@@ -27,4 +27,5 @@ const (
 	NAMESPACE_ITEM_UID               = "uid"
 	NAMESPACE_ITEM_DOMAIN            = "domain"
 	NAMESPACE_ITEM_AUTO_CREATE_UA    = "auto"
+	NAMESPACE_ITEM_EXPIRE            = "expire"
 )

@@ -13,7 +13,8 @@ import (
 )
 
 const (
-	DOMAIN_URL = "http://api.qiniu.com/v6/domain/list?tbl="
+	DOMAIN_URL     = "http://api.qiniu.com/v6/domain/list?tbl="
+	DEFAULT_EXPIRE = 7
 )
 
 type namespacebody struct {
@@ -23,6 +24,7 @@ type namespacebody struct {
 	CreatedAt    int64  `json:"createdAt"`
 	UpdatedAt    int64  `json:"updatedAt"`
 	AutoCreateUa bool   `json:"auto"`
+	Expire       int    `json:"expire"`
 }
 
 func getDomain(xl *xlog.Logger, bucket string, info *userInfo) (string, error) {
@@ -136,12 +138,17 @@ func RegisterNamespace(c *gin.Context) {
 		})
 		return
 	}
+	expire := namespaceData.Expire
+	if expire <= 0 {
+		expire = DEFAULT_EXPIRE
+	}
 	namespace := models.NamespaceInfo{
 		Uid:          getUid(info.uid),
 		Space:        params.namespace,
 		Bucket:       namespaceData.Bucket,
 		Domain:       domain,
 		AutoCreateUa: namespaceData.AutoCreateUa,
+		Expire:       expire,
 	}
 
 	err = namespaceMod.Register(xl, namespace)
@@ -262,6 +269,18 @@ func updateAutoCreateUa(xl *xlog.Logger, uid, space string, auto, newauto bool) 
 	return nil
 }
 
+func updateExpire(xl *xlog.Logger, uid, space string, expire, newExpire int) error {
+	if expire != newExpire && newExpire != 0 {
+		namespaceMod := models.NamespaceModel{}
+		err := namespaceMod.UpdateExpire(xl, uid, space, newExpire)
+		if err != nil {
+			xl.Errorf("Update falied error = %#v", err.Error())
+			return err
+		}
+	}
+	return nil
+}
+
 // sample requset url = /v1/namespaces/<Namespace>
 func UpdateNamespace(c *gin.Context) {
 	xl := xlog.New(c.Writer, c.Request)
@@ -330,6 +349,14 @@ func UpdateNamespace(c *gin.Context) {
 		xl.Errorf("update auto create ua failed")
 		c.JSON(500, gin.H{
 			"error": "Service Internal Error",
+		})
+		return
+	}
+	err = updateExpire(xl, getUid(info.uid), params.namespace, oldinfo[0].Expire, namespaceData.Expire)
+	if err != nil {
+		xl.Errorf("update expire failed")
+		c.JSON(500, gin.H{
+			"error": "update expire failed",
 		})
 		return
 	}

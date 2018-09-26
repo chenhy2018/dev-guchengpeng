@@ -6,10 +6,8 @@ add_definitions("-Wall -g")
 include_directories("${CMAKE_CURRENT_SOURCE_DIR}/../../third_party/curl-7.61.0/include")
 include_directories("${CMAKE_CURRENT_SOURCE_DIR}/c-sdk")
 
-#if ( $ENV{ARCH} STREQUAL mstar )
 include_directories("${CMAKE_CURRENT_SOURCE_DIR}/demo/include")
 include_directories("${CMAKE_CURRENT_SOURCE_DIR}/")
-#endif()
 
 
 link_directories("${CMAKE_CURRENT_SOURCE_DIR}/../../third_party/curl-7.61.0/lib/.libs")
@@ -73,7 +71,6 @@ if ( $ENV{ARCH} STREQUAL x86 )
         endif()
 endif()
 
-#if ( $ENV{ARCH} STREQUAL mstar )
 add_executable(ipc-testupload
     ./demo/ipc_test.c
     ./demo/socket_logging.c
@@ -84,8 +81,9 @@ add_executable(ipc-testupload
     ./demo/mymalloc.c
     ./demo/mock_anjia.c
 )
-add_definitions(-D__ARM)
-#endif()
+if ( $ENV{ARCH} STREQUAL mstar )
+    add_definitions(-D__ARM)
+endif()
 
 #if ( $ENV{ARCH} STREQUAL mstar )
     if(DISABLE_OPENSSL)

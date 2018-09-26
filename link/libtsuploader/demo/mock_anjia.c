@@ -18,6 +18,7 @@
 #include "adts.h"
 #include "flag.h"
 #include "devsdk.h"
+#include <stdint.h>
 
 #define VERSION "v1.0.0"
 
@@ -85,12 +86,12 @@ enum HevcType {
 static const uint8_t *ff_avc_find_startcode_internal(const uint8_t *p, const uint8_t *end)
 {
         const uint8_t *a = p + 4 - ((intptr_t)p & 3);
-
+        
         for (end -= 3; p < a && p < end; p++) {
                 if (p[0] == 0 && p[1] == 0 && p[2] == 1)
                         return p;
         }
-
+        
         for (end -= 3; p < end; p += 4) {
                 uint32_t x = *(const uint32_t*)p;
                 //      if ((x - 0x01000100) & (~x) & 0x80008000) // little endian
@@ -110,12 +111,12 @@ static const uint8_t *ff_avc_find_startcode_internal(const uint8_t *p, const uin
                         }
                 }
         }
-
+        
         for (end += 3; p < end; p++) {
                 if (p[0] == 0 && p[1] == 0 && p[2] == 1)
                         return p;
         }
-
+        
         return end + 3;
 }
 
@@ -201,12 +202,15 @@ typedef struct {
         unsigned char isStop;
         unsigned char isH265;
         unsigned char IsTestAACWithoutAdts;
+        unsigned char isAudio;
         int64_t nRolloverTestBase;
+        
 }Stream;
 
 typedef struct  {
         int nId;
-        Stream streams[2];
+        Stream audioStreams[2];
+        Stream videoStreams[2];
 }Camera;
 
 Camera cameras[10];
@@ -227,11 +231,15 @@ static int dataCallback(void *opaque, void *pData, int nDataLen, int nFlag, int6
         return ret;
 }
 
+char h264Aud3[3]={0, 0, 1};
+char h264Aud4[3]={0, 0, 0, 1};
 int start_video_file_test(void *opaque)
 {
+        sleep(3);
+        printf("----------_>start_video_file_test\n");
         Stream *pStream = (Stream*)opaque;
         int ret;
-
+        
         char * pVideoData = NULL;
         int nVideoDataLen = 0;
         ret = readFileToBuf(pStream->file, &pVideoData, &nVideoDataLen);
@@ -241,104 +249,86 @@ int start_video_file_test(void *opaque)
                 return -2;
         }
 
-
-        int bVideoOk = 1;
-
         int64_t nSysTimeBase = getCurrentMilliSecond();
         int64_t nNextVideoTime = nSysTimeBase;
         int64_t nNow = nSysTimeBase;
-
-        uint8_t * nextstart = (uint8_t *)pVideoData;
-        uint8_t * endptr = nextstart + nVideoDataLen;
+        
+        int bVideoOk = 1;
+        int videoOffset = 0;
         int cbRet = 0;
         int nIDR = 0;
         int nNonIDR = 0;
-
+        
          while (!pStream->isStop && bVideoOk) {
-                if (bVideoOk && nNow+1 > nNextVideoTime) {
-
-                        uint8_t * start = NULL;
-                        uint8_t * end = NULL;
-                        uint8_t * sendp = NULL;
-                        int type = -1;
-                        do{
-                                start = (uint8_t *)ff_avc_find_startcode((const uint8_t *)nextstart, (const uint8_t *)endptr);
-                                end = (uint8_t *)ff_avc_find_startcode(start+4, endptr);
-
-                                nextstart = end;
-                                if(sendp == NULL)
-                                        sendp = start;
-
-                                if(start == end || end > endptr){
-                                        nNextVideoTime += 40;
-                                        nextstart = (uint8_t *)pVideoData;
-                                        endptr = nextstart + nVideoDataLen;
-                                        break;
-                                }
-
-                                if (!pStream->isH265) {
-                                        if(start[2] == 0x01){//0x 00 00 01
-                                                type = start[3] & 0x1F;
-                                        }else{ // 0x 00 00 00 01
-                                                type = start[4] & 0x1F;
-                                        }
-                                        if(type == 1 || type == 5 ){
-                                                if (type == 1) {
-                                                        nNonIDR++;
-                                                } else {
-                                                        nIDR++;
-                                                }
-                                                //printf("send one video(%d) frame packet:%ld", type, end - sendp);
-                                                cbRet = dataCallback(opaque, sendp, end - sendp, THIS_IS_VIDEO, pStream->nRolloverTestBase+nNextVideoTime-nSysTimeBase, type == 5);
-                                                if (cbRet != 0) {
-                                                        bVideoOk = 0;
-                                                }
-                                                nNextVideoTime += 40;
-                                                break;
-                                        }
-                                }else{
-                                        if(start[2] == 0x01){//0x 00 00 01
-                                                type = start[3] & 0x7E;
-                                        }else{ // 0x 00 00 00 01
-                                                type = start[4] & 0x7E;
-                                        }
-                                        type = (type >> 1);
-                                        int hevctype = is_h265_picture(type);
-                                        if (hevctype == -1) {
-                                                printf("unknown type:%d\n", type);
-                                                continue;
-                                        }
-                                        if(hevctype == HEVC_I || hevctype == HEVC_B ){
-                                                if (hevctype == HEVC_I) {
-                                                        nIDR++;
-                                                } else {
-                                                        nNonIDR++;
-                                                }
-                                                //printf("send one video(%d) frame packet:%ld", type, end - sendp);
-                                                cbRet = dataCallback(opaque, sendp, end - sendp, THIS_IS_VIDEO,pStream->nRolloverTestBase+nNextVideoTime-nSysTimeBase, hevctype == HEVC_I);
-                                                if (cbRet != 0) {
-                                                        bVideoOk = 0;
-                                                }
-                                                nNextVideoTime += 40;
-                                                break;
-                                        }
-                                }
-                        }while(1);
-                }
-
-
-                int64_t nSleepTime = 0;
-                nSleepTime = (nNextVideoTime - nNow - 1) * 1000;
-                if (nSleepTime != 0) {
-                        //printf("sleeptime:%lld\n", nSleepTime);
-                        if (nSleepTime > 40 * 1000) {
-                                logwarn("abnormal time diff:%lld", nSleepTime);
-                        }
-                        usleep(nSleepTime);
-                }
-                nNow = getCurrentMilliSecond();
+                 int nLen;
+                 int shouldReset = 1;
+                 int type = -1;
+                 
+                 if (videoOffset+4 < nVideoDataLen) {
+                         memcpy(&nLen, pVideoData+videoOffset, 4);
+                         if (videoOffset + 4 + nLen < nVideoDataLen) {
+                                 shouldReset = 0;
+                                 if (!pStream->isH265) {
+                                         if (memcmp(h264Aud3, pVideoData + videoOffset + 4, 3) == 0) {
+                                                 type = pVideoData[videoOffset + 7] & 0x1F;
+                                         } else {
+                                                 type = pVideoData[videoOffset + 8] & 0x1F;
+                                         }
+                                         if (type == 1) {
+                                                 nNonIDR++;
+                                         } else {
+                                                 nIDR++;
+                                         }
+                                         cbRet = dataCallback(opaque, pVideoData + videoOffset + 4, nLen, THIS_IS_VIDEO, pStream->nRolloverTestBase+nNextVideoTime-nSysTimeBase, !(type == 1));
+                                         if (cbRet != 0) {
+                                                 bVideoOk = 0;
+                                         }
+                                         videoOffset = videoOffset + 4 + nLen;
+                                 }else {
+                                         if (memcmp(h264Aud3, pVideoData + videoOffset + 4, 3) == 0) {
+                                                 type = pVideoData[videoOffset + 7] & 0x7F;
+                                         } else {
+                                                 type = pVideoData[videoOffset + 8] & 0x7F;
+                                         }
+                                         type = (type >> 1);
+                                         int hevctype = is_h265_picture(type);
+                                         if (hevctype == -1) {
+                                                 printf("unknown type:%d\n", type);
+                                                 continue;
+                                         }
+                                         if(hevctype == HEVC_I || hevctype == HEVC_B ){
+                                                 if (hevctype == HEVC_I) {
+                                                         nIDR++;
+                                                 } else {
+                                                         nNonIDR++;
+                                                 }
+                                                 //printf("send one video(%d) frame packet:%ld", type, end - sendp);
+                                                 cbRet = dataCallback(opaque, pVideoData + videoOffset + 4, nLen, THIS_IS_VIDEO,pStream->nRolloverTestBase+nNextVideoTime-nSysTimeBase, hevctype == HEVC_I);
+                                                 if (cbRet != 0) {
+                                                         bVideoOk = 0;
+                                                 }
+                                         }
+                                         videoOffset = videoOffset + 4 + nLen;
+                                 }
+                         }
+                 }
+                 nNextVideoTime += 40;
+                 if (shouldReset){
+                         videoOffset = 0;
+                 }
+                 
+                 int64_t nSleepTime = 0;
+                 nSleepTime = (nNextVideoTime - nNow - 1) * 1000;
+                 if (nSleepTime > 0) {
+                         //printf("sleeptime:%lld\n", nSleepTime);
+                         if (nSleepTime > 40 * 1000) {
+                                 logwarn("abnormal time diff:%lld", nSleepTime);
+                         }
+                         usleep(nSleepTime);
+                 }
+                 nNow = getCurrentMilliSecond();
         }
-
+        
         if (pVideoData) {
                 free(pVideoData);
                 printf("IDR:%d nonIDR:%d\n", nIDR, nNonIDR);
@@ -349,9 +339,11 @@ int start_video_file_test(void *opaque)
 
 int start_audio_file_test(void *opaque)
 {
+        sleep(3);
+        printf("----------_>start_audio_file_test\n");
         Stream *pStream = (Stream*)opaque;
         int ret;
-
+        
         char * pAudioData = NULL;
         int nAudioDataLen = 0;
         ret = readFileToBuf(pStream->file, &pAudioData, &nAudioDataLen);
@@ -359,158 +351,179 @@ int start_audio_file_test(void *opaque)
                 printf("map data to buffer fail:%s", pStream->file);
                 return -1;
         }
-
+        
         int bAudioOk = 1;
         int64_t nSysTimeBase = getCurrentMilliSecond();
         int64_t nNextAudioTime = nSysTimeBase;
         int64_t nNow = nSysTimeBase;
+        
         int audioOffset = 0;
-
-
         int isAAC = 1;
         int64_t aacFrameCount = 0;
-
         if (!pStream->isAac)
                 isAAC = 0;
-
         int cbRet = 0;
+        
+        int duration = 0;
+        
         while (!pStream->isStop && bAudioOk) {
-                if (bAudioOk && nNow+1 > nNextAudioTime) {
-                        if (isAAC) {
-                                ADTS adts;
-                                if(audioOffset+7 <= nAudioDataLen) {
-                                        ParseAdtsfixedHeader((unsigned char *)(pAudioData + audioOffset), &adts.fix);
-                                        int hlen = adts.fix.protection_absent == 1 ? 7 : 9;
-                                        ParseAdtsVariableHeader((unsigned char *)(pAudioData + audioOffset), &adts.var);
-                                        if (audioOffset+hlen+adts.var.aac_frame_length <= nAudioDataLen) {
-
-                                                if (pStream->IsTestAACWithoutAdts)
-                                                        cbRet = dataCallback(opaque, pAudioData + audioOffset + hlen, adts.var.aac_frame_length - hlen,
-                                                                         THIS_IS_AUDIO, nNextAudioTime-nSysTimeBase+pStream->nRolloverTestBase, 0);
-                                                else
-                                                        cbRet = dataCallback(opaque, pAudioData + audioOffset, adts.var.aac_frame_length,
-                                                                         THIS_IS_AUDIO, nNextAudioTime-nSysTimeBase+pStream->nRolloverTestBase, 0);
-                                                if (cbRet != 0) {
-                                                        bAudioOk = 0;
-                                                        continue;
-                                                }
-                                                audioOffset += adts.var.aac_frame_length;
-                                                aacFrameCount++;
-                                                int64_t d = ((1024*1000.0)/aacfreq[adts.fix.sampling_frequency_index]) * aacFrameCount;
-                                                nNextAudioTime = nSysTimeBase + d;
-                                        } else {
-                                                int64_t d = ((1024*1000.0)/aacfreq[adts.fix.sampling_frequency_index]) * aacFrameCount;
-                                                nNextAudioTime = nSysTimeBase + d;
-                                                bAudioOk = 0;
-                                        }
-                                } else {
-                                        audioOffset = 0;
-                                }
-                        } else {
-                                if(audioOffset+160 <= nAudioDataLen) {
-                                        cbRet = dataCallback(opaque, pAudioData + audioOffset, 160, THIS_IS_AUDIO, nNextAudioTime-nSysTimeBase+pStream->nRolloverTestBase, 0);
+                if (isAAC) {
+                        ADTS adts;
+                        if(audioOffset+7 <= nAudioDataLen) {
+                                ParseAdtsfixedHeader((unsigned char *)(pAudioData + audioOffset), &adts.fix);
+                                int hlen = adts.fix.protection_absent == 1 ? 7 : 9;
+                                ParseAdtsVariableHeader((unsigned char *)(pAudioData + audioOffset), &adts.var);
+                                if (audioOffset+hlen+adts.var.aac_frame_length <= nAudioDataLen) {
+                                        
+                                        if (pStream->IsTestAACWithoutAdts)
+                                                cbRet = dataCallback(opaque, pAudioData + audioOffset + hlen, adts.var.aac_frame_length - hlen,
+                                                                     THIS_IS_AUDIO, nNextAudioTime-nSysTimeBase+pStream->nRolloverTestBase, 0);
+                                        else
+                                                cbRet = dataCallback(opaque, pAudioData + audioOffset, adts.var.aac_frame_length,
+                                                                     THIS_IS_AUDIO, nNextAudioTime-nSysTimeBase+pStream->nRolloverTestBase, 0);
                                         if (cbRet != 0) {
                                                 bAudioOk = 0;
                                                 continue;
                                         }
-                                        audioOffset += 160;
-                                        nNextAudioTime += 20;
+                                        audioOffset += adts.var.aac_frame_length;
+                                        aacFrameCount++;
+                                        int64_t d = ((1024*1000.0)/aacfreq[adts.fix.sampling_frequency_index]) * aacFrameCount;
+                                        nNextAudioTime = nSysTimeBase + d;
                                 } else {
-                                        nNextAudioTime += 20;
-                                        audioOffset = 0;
+                                        aacFrameCount++;
+                                        int64_t d = ((1024*1000.0)/aacfreq[adts.fix.sampling_frequency_index]) * aacFrameCount;
+                                        nNextAudioTime = nSysTimeBase + d;
                                 }
+                                if (duration == 0) {
+                                        duration = ((1024*1000.0)/aacfreq[adts.fix.sampling_frequency_index]);
+                                }
+                        } else {
+                                nNextAudioTime = nSysTimeBase + duration;
+                        }
+                } else {
+                        duration = 20;
+                        if(audioOffset+160 <= nAudioDataLen) {
+                                cbRet = dataCallback(opaque, pAudioData + audioOffset, 160, THIS_IS_AUDIO, nNextAudioTime-nSysTimeBase+pStream->nRolloverTestBase, 0);
+                                if (cbRet != 0) {
+                                        bAudioOk = 0;
+                                        continue;
+                                }
+                                audioOffset += 160;
+                                nNextAudioTime += 20;
+                        } else {
+                                nNextAudioTime += 20;
+                                audioOffset = 0;
                         }
                 }
-
-
+               
                 int64_t nSleepTime = (nNextAudioTime - nNow - 1) * 1000;
-                if (nSleepTime != 0) {
+                if (nSleepTime > 0) {
                         //printf("sleeptime:%lld\n", nSleepTime);
-                        if (nSleepTime > 40 * 1000) {
+                        if (nSleepTime > duration * 1000) {
                                 logwarn("abnormal time diff:%lld", nSleepTime);
                         }
                         usleep(nSleepTime);
                 }
                 nNow = getCurrentMilliSecond();
         }
-
+        
         if (pAudioData) {
                 free(pAudioData);
+                printf("quie audio test");
         }
         return 0;
 }
 
 
-void dev_sdk_set_filepath(int camera, int stream, char *pFile, int nFileLen)
+void dev_sdk_set_audio_filepath(int camera, int stream, char *pFile, int nFileLen)
 {
         int nLen = nFileLen;
         if (nLen > 255) {
                 nLen = 255;
         }
-        cameras[camera].streams[stream].file[nLen] = 0;
+        cameras[camera].audioStreams[stream].file[nLen] = 0;
+        memcpy(cameras[camera].audioStreams[stream].file, pFile, nLen);
+}
 
-        memcpy(cameras[camera].streams[stream].file, pFile, nLen);
+void dev_sdk_set_video_filepath(int camera, int stream, char *pFile, int nFileLen)
+{
+        int nLen = nFileLen;
+        if (nLen > 255) {
+                nLen = 255;
+        }
+        cameras[camera].videoStreams[stream].file[nLen] = 0;
+        memcpy(cameras[camera].videoStreams[stream].file, pFile, nLen);
 }
 
 void dev_sdk_set_audio_format(int camera, int stream, int isAac)
 {
-        cameras[camera].streams[stream].isAac = isAac;
+        cameras[camera].audioStreams[stream].isAac = isAac;
 }
 
 void dev_sdk_set_video_format(int camera, int stream, int isH265)
 {
-        cameras[camera].streams[stream].isH265 = isH265;
+        cameras[camera].audioStreams[stream].isH265 = isH265;
 }
 
 int dev_sdk_init(DevSdkServerType type)
 {
         (void)type;
-
+        memset(&cameras, 0, sizeof(cameras));
         int i = 0;
         for (i = 0; i < sizeof(cameras) / sizeof(Camera); i++) {
                 cameras[i].nId = i;
-                cameras[i].streams[0].nStreamNo = 0;
-                cameras[i].streams[1].nStreamNo = 1;
-                cameras[i].streams[0].isAac = 1;
-                cameras[i].streams[1].isAac = 1;
+                cameras[i].audioStreams[0].nStreamNo = 0;
+                cameras[i].audioStreams[1].nStreamNo = 1;
+                cameras[i].videoStreams[0].nStreamNo = 0;
+                cameras[i].videoStreams[1].nStreamNo = 1;
+                cameras[i].audioStreams[0].isAac = 1;
+                cameras[i].audioStreams[1].isAac = 1;
                 //TODO default file
-                //strcpy(cameras[i].streams[0], "");
-                //strcpy(cameras[i].streams[0], "");
+                strcpy(cameras[i].audioStreams[0].file, "h265_aac_1_16000_a.aac");
+                strcpy(cameras[i].audioStreams[1].file, "h265_aac_1_16000_a.aac");
+                strcpy(cameras[i].videoStreams[0].file, "len.h264");
+                strcpy(cameras[i].videoStreams[1].file, "len.h264");
         }
-
+        
         return 0;
 }
 
 int GetMediaStreamConfig( MediaStreamConfig  *config)
 {
         strcpy( config->rtmpConfig.server, "ipc99" );
-
+        
         return 0;
 }
 
 int dev_sdk_get_AudioConfig(AudioConfig *pAudioCfg)
 {
-        pAudioCfg->audioEncode.enable = 0;
-
+        pAudioCfg->audioEncode.enable = 1;
+        
         return 0;
 }
 
 int dev_sdk_start_audio_play(DevSdkAudioType audiotype)
 {
         (void) audiotype;
-
+        
         return 0;
 }
 
 int dev_sdk_stop_video(int camera, int stream)
 {
-        cameras[camera].streams[stream].isStop = 1;
+        cameras[camera].videoStreams[stream].isStop = 1;
+        cameras[camera].videoStreams[stream].videoCb = NULL;
+        pthread_join(&cameras[camera].videoStreams[stream].tid, NULL);
+        memset(&cameras[camera].videoStreams[stream].tid, 0, sizeof(pthread_t));
         return 0;
 }
 
 int dev_sdk_stop_audio(int camera, int stream)
 {
-        cameras[camera].streams[stream].isStop = 1;
+        cameras[camera].audioStreams[stream].isStop = 1;
+        cameras[camera].audioStreams[stream].audioCb = NULL;
+        pthread_join(&cameras[camera].audioStreams[stream].tid, NULL);
+        memset(&cameras[camera].audioStreams[stream].tid, 0, sizeof(pthread_t));
         return 0;
 }
 
@@ -529,12 +542,12 @@ void *VideoCaptureTask( void *param )
 int dev_sdk_start_video(int camera, int stream, VIDEO_CALLBACK vcb, void *pcontext)
 {
         (void)pcontext;
-        Stream *pStream = &cameras[camera].streams[stream];
+        Stream *pStream = &cameras[camera].videoStreams[stream];
         if (pStream->videoCb != NULL) {
                 return 0;
         }
         pStream->videoCb = vcb;
-
+        
         pthread_create( &pStream->tid, NULL, VideoCaptureTask, (void *)pStream );
         return 0;
 }
@@ -547,14 +560,14 @@ void *AudioCaptureTask( void *param )
 
 int dev_sdk_start_audio(int camera, int stream, AUDIO_CALLBACK acb, void *pcontext)
 {
-        Stream *pStream = &cameras[camera].streams[stream];
+        Stream *pStream = &cameras[camera].audioStreams[stream];
         if (pStream->audioCb != NULL) {
                 return 0;
         }
         pStream->audioCb = acb;
-
+        
         pthread_create( &pStream->tid, NULL, AudioCaptureTask, (void *)pStream );
-
+        
         return 0;
 }
 
@@ -569,4 +582,3 @@ int dev_sdk_release(void)
 }
 
 #endif
-

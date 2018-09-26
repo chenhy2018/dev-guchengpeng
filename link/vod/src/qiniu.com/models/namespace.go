@@ -44,6 +44,7 @@ func (m *NamespaceModel) Register(xl *xlog.Logger, req NamespaceInfo) error {
 						NAMESPACE_ITEM_UID:            req.Uid,
 						NAMESPACE_ITEM_DOMAIN:         req.Domain,
 						NAMESPACE_ITEM_AUTO_CREATE_UA: req.AutoCreateUa,
+						NAMESPACE_ITEM_EXPIRE:         req.Expire,
 					},
 				},
 			)
@@ -81,6 +82,7 @@ type NamespaceInfo struct {
 	Uid          string `bson:"uid"        json:"uid"`
 	Domain       string `bson:"domain"     json:"domain"`
 	AutoCreateUa bool   `bson:"auto"       json:"auto"`
+	Expire       int    `bson:"expire"     json:"expire"`
 }
 
 func (m *NamespaceModel) GetNamespaceInfo(xl *xlog.Logger, uid, namespace string) ([]NamespaceInfo, error) {
@@ -230,6 +232,28 @@ func (m *NamespaceModel) UpdateAutoCreateUa(xl *xlog.Logger, uid, space string, 
 					"$set": bson.M{
 						NAMESPACE_ITEM_AUTO_CREATE_UA: auto,
 						ITEM_UPDATA_TIME:              time.Now().Unix(),
+					},
+				},
+			)
+		},
+	)
+}
+
+func (m *NamespaceModel) UpdateExpire(xl *xlog.Logger, uid, space string, expire int) error {
+	/*
+	   db.namespace.update({"uid": uid, "namespace": space}, bson.M{"$set":{"expire": expire}}),
+	*/
+	return db.WithCollection(
+		NAMESPACE_COL,
+		func(c *mgo.Collection) error {
+			return c.Update(
+				bson.M{
+					NAMESPACE_ITEM_ID:  space,
+					NAMESPACE_ITEM_UID: uid,
+				},
+				bson.M{
+					"$set": bson.M{
+						NAMESPACE_ITEM_EXPIRE: expire,
 					},
 				},
 			)

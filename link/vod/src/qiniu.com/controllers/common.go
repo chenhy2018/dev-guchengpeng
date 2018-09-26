@@ -269,25 +269,26 @@ func isValidSpeed(speed int64) bool {
 	return false
 }
 
-func HandleUaControl(xl *xlog.Logger, bucket, uaid string) error {
+func GetNameSpaceInfo(xl *xlog.Logger, bucket, uaid string) (error, int) {
+
 	if system.HaveDb() == false {
-		return nil
+		return nil, 0
 	}
 
 	isAuto, info, err := IsAutoCreateUa(xl, bucket)
 	if err != nil {
-		return err
+		return err, 0
 	}
 
 	if isAuto == false {
 		model := models.UaModel{}
 		r, err := model.GetUaInfo(xl, info[0].Space, uaid)
 		if err != nil {
-			return err
+			return err, 0
 		}
 		if len(r) == 0 {
-			return fmt.Errorf("Can't find ua info")
+			return fmt.Errorf("Can't find ua info"), 0
 		}
 	}
-	return nil
+	return nil, info[0].Expire
 }
