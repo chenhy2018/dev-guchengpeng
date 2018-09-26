@@ -92,7 +92,7 @@ void InitConfig()
     gIpcConfig.movingDetection = 1;
     gIpcConfig.configUpdateInterval = 10;
     gIpcConfig.multiChannel = 1;
-    gIpcConfig.openCache = 0;
+    gIpcConfig.openCache = 1;
     gIpcConfig.cacheSize = STREAM_CACHE_SIZE;
 }
 
@@ -262,7 +262,6 @@ int CacheHandle( Queue *pQueue, TsMuxUploader *pUploader,
                 PushAudio( pUploader, frame.data, frame.len, (int64_t)frame.timeStamp );
             }
         } else if ( gMovingDetect == ALARM_CODE_MOTION_DETECT_DISAPPEAR ) {
-#if 0
             if ( count-- > 0 ) {
                 if ( _nStreamType == TYPE_VIDEO ) {
                     PushVideo( pUploader, frame.data, frame.len, (int64_t)frame.timeStamp, frame.isKey, 0 );
@@ -270,11 +269,10 @@ int CacheHandle( Queue *pQueue, TsMuxUploader *pUploader,
                     PushAudio( pUploader, frame.data, frame.len, (int64_t)frame.timeStamp );
                 }
             } else {
-                ReportKodoInitError( "main stream", "not detect moving" );
+                ReportKodoInitError( "main stream", "use cache, not detect moving" );
             }
-#endif
         } else {
-            ReportKodoInitError( "main stream", "not detect moving" );
+            ReportKodoInitError( "main stream", "use cache, not detect moving" );
         }
         free( frame.data );
     }
