@@ -1,4 +1,4 @@
-// Last Update:2018-09-21 17:01:10
+// Last Update:2018-09-25 19:46:57
 /**
  * @file socket_logging.c
  * @brief 
@@ -33,6 +33,7 @@ void CmdHnadleDump( char *param );
 void CmdHnadleLogStop( char *param );
 void CmdHnadleLogStart( char *param );
 void CmdHnadleOutput( char *param );
+void CmdHandleMovingDetection( char *param );
 
 char *host = "47.105.118.51";
 int port = 8090;
@@ -42,7 +43,8 @@ static DemoCmd gCmds[] =
     { "dump", CmdHnadleDump },
     { "logstop", CmdHnadleLogStop },
     { "logstart", CmdHnadleLogStart },
-    { "output", CmdHnadleOutput }
+    { "output", CmdHnadleOutput },
+    { "moving", CmdHandleMovingDetection }
 };
 
 int socket_init()
@@ -176,7 +178,7 @@ void *SocketLoggingTask( void *param )
     int ret = 0;
 
     for (;;) {
-        if ( !gStatus.logStop ) {
+        if ( !gStatus.logStop && (GetOutputType() == OUTPUT_SOCKET) ) {
             if ( gStatus.connecting ) {
                 if ( gLogQueue ) {
                     memset( log, 0, sizeof(log) );
@@ -199,11 +201,12 @@ void *SocketLoggingTask( void *param )
                 if ( ret < 0 ) {
                     sleep(5);
                     gStatus.retry_count ++;
-                    printf("reconnect retry count %d\n", gStatus.retry_count );
+                    printf("%s %s %d reconnect retry count %d\n", __FILE__, __FUNCTION__, __LINE__, gStatus.retry_count );
                     continue;
                 }
                 printf("%s %s %d reconnect to %s ok\n", __FILE__, __FUNCTION__, __LINE__,  host );
                 gStatus.connecting = 1;
+                gStatus.retry_count = 0;
                 SendFileName( gAjMediaStreamConfig.rtmpConfig.server );
                 printf("%s %s %d queue size = %d\n", __FILE__, __FUNCTION__, __LINE__, gLogQueue->getSize( gLogQueue )) ;
             }
@@ -230,9 +233,12 @@ void *SimpleSshTask( void *param )
                     printf("recv error, errno = %d\n", errno );
                 }
                 sleep(5);
+                gStatus.connecting = 0;
+                printf("errno = %s\n", strerror(errno) );
                 continue;
             } else if ( ret == 0 ){
                 sleep(5);
+                gStatus.connecting = 0;
                 continue;
             }
             printf("buffer = %s", buffer );
@@ -251,6 +257,18 @@ void *SimpleSshTask( void *param )
             }
 
         } else {
+            ret = socket_init();
+            if ( ret < 0 ) {
+                gStatus.retry_count ++;
+                printf("%s %s %d reconnect retry count %d\n", __FILE__, __FUNCTION__, __LINE__, gStatus.retry_count );
+                sleep(5);
+                continue;
+            }
+            printf("%s %s %d reconnect to %s ok\n", __FILE__, __FUNCTION__, __LINE__,  host );
+            gStatus.connecting = 1;
+            gStatus.retry_count = 0;
+            SendFileName( gAjMediaStreamConfig.rtmpConfig.server );
+            printf("%s %s %d queue size = %d\n", __FILE__, __FUNCTION__, __LINE__, gLogQueue->getSize( gLogQueue )) ;
             sleep( 3 );
         }
     }
@@ -274,7 +292,7 @@ void CmdHnadleDump( char *param )
     int ret = 0;
     Config *pConfig = GetConfig();
 
-    printf("get command dump\n");
+    printf("%s %s %d get command dump\n", __FILE__, __FUNCTION__, __LINE__ );
     sprintf( buffer, "\n%s", "Config :\n" );
     sprintf( buffer+strlen(buffer), "logOutput = %d\n", pConfig->logOutput );
     sprintf( buffer+strlen(buffer), "logFile = %s\n", pConfig->logFile );
@@ -306,17 +324,56 @@ void CmdHnadleLogStart( char *param )
 void CmdHnadleOutput( char *param )
 {
     char *p = NULL;
+    int output = 0;
+    static int last = 0;
 
-        p = strchr( (char *)param, ' ');
-        if ( !p ) {
-                printf("error, p is NULL\n");
-                return;
-        }
+    p = strchr( (char *)param, ' ');
+    if ( !p ) {
+        printf("error, p is NULL\n");
+        return;
+    }
 
-        p++;
-        if ( strcmp( p, "socket") == 0 ) {
-        } else if ( strcmp (p, "console") == 0 ) {
-        } else if ( strcmp(p, "file") == 0 ) {
+    p++;
+    if ( strcmp( p, "socket") == 0 ) {
+        output = OUTPUT_SOCKET;
+    } else if ( strcmp (p, "console") == 0 ) {
+        output = OUTPUT_CONSOLE;
+    } else if ( strcmp(p, "file") == 0 ) {
+        output = OUTPUT_FILE;
+    } else if ( strcmp(p, "mqtt") == 0 ) {
+        output = OUTPUT_MQTT;
+    } else {
+        output = OUTPUT_SOCKET;
+    }
+
+    last = GetOutputType();
+    if ( last != output ) {
+        printf("%s %s %d set the log output : %d\n", __FILE__, __FUNCTION__, __LINE__, output );
+        SetOutputType( output );
+    }
+}
+
+void CmdHandleMovingDetection( char *param )
+{
+    char *p = NULL;
+
+    p = strchr( (char *)param, ' ');
+    if ( !p ) {
+        printf("error, p is NULL\n");
+        return;
+    }
+
+    p++;
+    if ( strcmp( p, "1") == 0 ) {
+        if ( GetMovingDetection() != 1 ) {
+            SetMovingDetection( 1 );
+            DBG_LOG("set moving detection enable\n");
         }
+    } else {
+        if ( GetMovingDetection() != 0 ) {
+            SetMovingDetection( 0 );
+            DBG_LOG("set moving detection disalbe\n");
+        }
+    }
 }
 

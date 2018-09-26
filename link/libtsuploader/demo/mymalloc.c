@@ -1,4 +1,4 @@
-// Last Update:2018-09-19 18:12:54
+// Last Update:2018-09-26 11:29:14
 /**
  * @file mymalloc.c
  * @brief 
@@ -52,7 +52,7 @@ void myfree( void *ptr, char *function, int line )
 {
     char buffer[1024] = {0};
     /*fprintf(stderr, "+++ free, %s() ---> %d, down = %d\n", function, line, __sync_fetch_and_sub(&down,1));*/
-    DBG_LOG( "+++ free, %s() ---> %d, down = %d\n", function, line, __sync_fetch_and_sub(&down,1) );
+    DBG_LOG( "+++ free, %s() ---> %d, down = %d, ptr = %p \n", function, line, __sync_fetch_and_sub(&down,1), ptr );
 
     free( ptr );
 }

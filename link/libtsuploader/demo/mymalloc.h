@@ -10,6 +10,7 @@
 #ifndef MYMALLOC_H
 #define MYMALLOC_H
 
+#define USE_OWN_MALLOC
 #ifdef USE_OWN_MALLOC
 #define malloc( size ) mymalloc( size, __FUNCTION__, __LINE__ )
 #define free( ptr ) myfree( ptr, __FUNCTION__, __LINE__ )
