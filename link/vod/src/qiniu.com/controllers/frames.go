@@ -74,6 +74,7 @@ func GetFrames(c *gin.Context) {
 		return
 	}
 
+	domain = "http://" + domain
 	mac := qbox.NewMac(user.ak, user.sk)
 	frames, err := segMod.GetFrameInfo(xl, params.from, params.to, bucket, params.uaid, mac)
 	if err != nil {

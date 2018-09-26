@@ -12,15 +12,6 @@ import (
 	//"strconv"
 )
 
-var (
-	UaMod *models.UaModel
-)
-
-func init() {
-	UaMod = &models.UaModel{}
-	UaMod.Init()
-}
-
 type uabody struct {
 	Uaid      string `json:"uaid"`
 	Namespace string `json:"namespace"`

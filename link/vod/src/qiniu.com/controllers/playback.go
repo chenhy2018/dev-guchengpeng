@@ -3,7 +3,6 @@ package controllers
 import (
 	"context"
 	"errors"
-	"fmt"
 	"io"
 	"strconv"
 	"strings"
@@ -105,6 +104,7 @@ func GetPlayBackm3u8(c *gin.Context) {
 		})
 		return
 	}
+	domain = "http://" + domain
 	playlist, err := getPlaybackList(xl, segs, userInfo, domain)
 	if err != nil {
 		xl.Errorf("get playback list error, error = %#v", err.Error())
@@ -113,7 +113,6 @@ func GetPlayBackm3u8(c *gin.Context) {
 	}
 	c.Header("Content-Type", "application/x-mpegURL")
 	c.Header("Access-Control-Allow-Origin", "*")
-	fmt.Println(playlist)
 	c.String(200, m3u8.Mkm3u8(playlist, xl))
 }
 func getPlaybackList(xl *xlog.Logger, segs []map[string]interface{}, user *userInfo, domain string) ([]map[string]interface{}, error) {

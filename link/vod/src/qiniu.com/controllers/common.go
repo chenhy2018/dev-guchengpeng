@@ -24,6 +24,7 @@ var (
 	namespaceMod     *models.NamespaceModel
 	segMod           *models.SegmentKodoModel
 	fastForwardClint pb.FastForwardClient
+	UaMod            *models.UaModel
 )
 
 func Init(conf *system.GrpcConf) {
@@ -32,6 +33,8 @@ func Init(conf *system.GrpcConf) {
 	segMod = &models.SegmentKodoModel{}
 	segMod.Init()
 	FFGrpcClientInit(conf)
+	UaMod = &models.UaModel{}
+	UaMod.Init()
 
 }
 
