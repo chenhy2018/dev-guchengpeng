@@ -2,12 +2,13 @@ package models
 
 import (
 	"fmt"
+	"strconv"
+	"time"
+
 	"github.com/qiniu/xlog.v1"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 	"qiniu.com/db"
-	"strconv"
-	"time"
 )
 
 type UaModel struct {
@@ -69,7 +70,7 @@ func (m *UaModel) Register(xl *xlog.Logger, req UaInfo) error {
 	return nil
 }
 
-func (m *UaModel) Delete(xl *xlog.Logger, namespace, uaid string) error {
+func (m *UaModel) Delete(xl *xlog.Logger, cond map[string]interface{}) error {
 	/*
 	   db.ua.remove({space: namespace, uaid: id})
 	*/
@@ -77,10 +78,7 @@ func (m *UaModel) Delete(xl *xlog.Logger, namespace, uaid string) error {
 		UA_COL,
 		func(c *mgo.Collection) error {
 			return c.Remove(
-				bson.M{
-					UA_ITEM_NAMESPACE: namespace,
-					UA_ITEM_UAID:      uaid,
-				},
+				cond,
 			)
 		},
 	)

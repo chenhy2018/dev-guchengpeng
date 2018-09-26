@@ -3,17 +3,21 @@ package controllers
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io/ioutil"
+	"net/http"
+	"net/http/httptest"
+	"reflect"
+	"testing"
+
 	"github.com/bouk/monkey"
 	"github.com/gin-gonic/gin"
 	"github.com/qiniu/xlog.v1"
 	"github.com/stretchr/testify/assert"
-	"io/ioutil"
-	"net/http"
-	"net/http/httptest"
 	"qiniu.com/db"
+	"qiniu.com/models"
 	"qiniu.com/system"
-	"testing"
 )
 
 var (
@@ -48,7 +52,6 @@ func TestRegisterNamespace(t *testing.T) {
 		Bucket:    "ipcamera",
 		Namespace: "test1",
 	}
-
 	bodyBuffer, _ := json.Marshal(body)
 	bodyT := bytes.NewBuffer(bodyBuffer)
 	req, _ := http.NewRequest("POST", "/v1/namespaces/test1", bodyT)
@@ -64,6 +67,7 @@ func TestRegisterNamespace(t *testing.T) {
 	RegisterNamespace(c)
 
 	// bucket already exit. return 400
+	monkey.Patch(getUserInfo, func(xl *xlog.Logger, req *http.Request) (*userInfo, error) { return &user, nil })
 	req, _ = http.NewRequest("POST", "/v1/namespaces/test1", bodyT)
 	c, _ = gin.CreateTestContext(httptest.NewRecorder())
 	c.Request = req
@@ -84,11 +88,80 @@ func TestRegisterNamespace(t *testing.T) {
 	RegisterNamespace(c)
 	assert.Equal(t, c.Writer.Status(), 403, "they should be equal")
 
+	// get namespace  info error
+	body = namespacebody{
+		Bucket:    "doman",
+		Namespace: "aabbdd",
+	}
+	bodyBuffer, _ = json.Marshal(body)
+	bodyT = bytes.NewBuffer(bodyBuffer)
+	req, _ = http.NewRequest("POST", "/v1/namespaces/test1", bodyT)
+	c, _ = gin.CreateTestContext(httptest.NewRecorder())
+	c.Request = req
+	guard := monkey.PatchInstanceMethod(
+		reflect.TypeOf((*models.NamespaceModel)(nil)), "GetNamespaceInfo", func(ss *models.NamespaceModel, xl *xlog.Logger, uid, namespace string) ([]models.NamespaceInfo, error) {
+			return nil, errors.New("xxxxx error")
+		})
+	RegisterNamespace(c)
+	assert.Equal(t, c.Writer.Status(), 500, "they should be equal")
+	guard.Unpatch()
+	// namesapce already exist
+	body = namespacebody{
+		Bucket:    "doman",
+		Namespace: "aabbccc",
+	}
+	guard2 := monkey.PatchInstanceMethod(
+		reflect.TypeOf((*models.NamespaceModel)(nil)), "GetNamespaceInfo", func(ss *models.NamespaceModel, xl *xlog.Logger, uid, namespace string) ([]models.NamespaceInfo, error) {
+			return []models.NamespaceInfo{models.NamespaceInfo{}}, nil
+		})
+	bodyBuffer, _ = json.Marshal(body)
+	bodyT = bytes.NewBuffer(bodyBuffer)
+	req, _ = http.NewRequest("POST", "/v1/namespaces/test1", bodyT)
+	c, _ = gin.CreateTestContext(httptest.NewRecorder())
+	c.Request = req
+	RegisterNamespace(c)
+	assert.Equal(t, c.Writer.Status(), 400, "they should be equal")
+	guard2.Unpatch()
+	// get user info failed. return 500
+	guard4 := monkey.Patch(getUserInfo, func(xl *xlog.Logger, req *http.Request) (*userInfo, error) {
+		return &userInfo{}, errors.New("get user  info error")
+	})
+	body = namespacebody{
+		Bucket:    "ipcamera1",
+		Namespace: "aabb",
+	}
+	bodyBuffer, _ = json.Marshal(body)
+	bodyT = bytes.NewBuffer(bodyBuffer)
+	req, _ = http.NewRequest("POST", "/v1/namespaces/test1", bodyT)
+	c, _ = gin.CreateTestContext(httptest.NewRecorder())
+	c.Request = req
+	RegisterNamespace(c)
+	assert.Equal(t, c.Writer.Status(), 500, "they should be equal")
+	guard4.Unpatch()
 	// body is not correct. return 403
 	/*
 	   body = namespacebody{
 	   }
 	*/
+	// namesapce already exist
+	body = namespacebody{
+		Bucket:    "doman",
+		Namespace: "aabbccc",
+	}
+	guard3 := monkey.PatchInstanceMethod(
+		reflect.TypeOf((*models.NamespaceModel)(nil)), "Register", func(ss *models.NamespaceModel, xl *xlog.Logger, namespace models.NamespaceInfo) error {
+			return errors.New("register namesapce failed")
+		})
+	monkey.Patch(getUserInfo, func(xl *xlog.Logger, req *http.Request) (*userInfo, error) { return &user, nil })
+	bodyBuffer, _ = json.Marshal(body)
+	bodyT = bytes.NewBuffer(bodyBuffer)
+	req, _ = http.NewRequest("POST", "/v1/namespaces/test1", bodyT)
+	c, _ = gin.CreateTestContext(httptest.NewRecorder())
+	c.Request = req
+	RegisterNamespace(c)
+	assert.Equal(t, c.Writer.Status(), 500, "internal error for register namesapce failed")
+	guard3.Unpatch()
+
 	body1 := "asddhjk"
 	bodyBuffer, _ = json.Marshal(body1)
 	bodyT = bytes.NewBuffer(bodyBuffer)
@@ -97,10 +170,12 @@ func TestRegisterNamespace(t *testing.T) {
 	c.Request = req
 	RegisterNamespace(c)
 	assert.Equal(t, c.Writer.Status(), 400, "they should be equal")
+	monkey.UnpatchAll()
 }
 
 func TestGetNamespace(t *testing.T) {
 	initDb()
+	monkey.UnpatchAll()
 	req, _ := http.NewRequest("Get", "/v1/namespaces?regex=test1&limit=10&marker=&exact=true", nil)
 	recoder := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(recoder)
@@ -142,10 +217,48 @@ func TestGetNamespace(t *testing.T) {
 	//{"item":[],"marker":""}
 	assert.Equal(t, c.Writer.Status(), 200, "they should be equal")
 	//assert.Equal(t, body, bodye, "they should be equal")
+
+	// 500 internal error if get userinfo failed
+	guard1 := monkey.Patch(getUserInfo, func(xl *xlog.Logger, req *http.Request) (*userInfo, error) {
+		return &userInfo{}, errors.New("get user  info error")
+	})
+	req, _ = http.NewRequest("Get", "/v1/namespaces?regex=test&limit=10&marker=&exact=true", nil)
+	recoder = httptest.NewRecorder()
+	c, _ = gin.CreateTestContext(recoder)
+	c.Request = req
+	GetNamespaceInfo(c)
+	body, err = ioutil.ReadAll(recoder.Body)
+	if err != nil {
+		fmt.Printf("parse request body failed, body = %#v", body)
+	}
+	//{"item":[],"marker":""}
+	assert.Equal(t, c.Writer.Status(), 500, "they should be equal")
+	guard1.Unpatch()
+
+	monkey.PatchInstanceMethod(
+		reflect.TypeOf((*models.NamespaceModel)(nil)), "GetNamespaceInfo", func(ss *models.NamespaceModel, xl *xlog.Logger, uid, namespace string) ([]models.NamespaceInfo, error) {
+			return nil, errors.New("xxxxx error")
+		})
+	monkey.Patch(getUserInfo, func(xl *xlog.Logger, req *http.Request) (*userInfo, error) {
+		return &userInfo{}, errors.New("get user  info error")
+	})
+	req, _ = http.NewRequest("Get", "/v1/namespaces?regex=test&limit=10&marker=&exact=true", nil)
+	recoder = httptest.NewRecorder()
+	c, _ = gin.CreateTestContext(recoder)
+	c.Request = req
+	GetNamespaceInfo(c)
+	body, err = ioutil.ReadAll(recoder.Body)
+	if err != nil {
+		fmt.Printf("parse request body failed, body = %#v", body)
+	}
+	//{"item":[],"marker":""}
+	assert.Equal(t, c.Writer.Status(), 500, "they should be equal")
+	monkey.UnpatchAll()
 }
 
 func TestUpdateNamespace(t *testing.T) {
 	initDb()
+	monkey.UnpatchAll()
 	// bucket maybe already exit. so not check this response.
 	body := namespacebody{
 		Bucket:    "ipcamera",
@@ -250,10 +363,108 @@ func TestUpdateNamespace(t *testing.T) {
 	c.Request = req
 	UpdateNamespace(c)
 	assert.Equal(t, c.Writer.Status(), 200, "they should be equal")
+
+	// get user info failed if get user info failed
+	guard1 := monkey.Patch(getUserInfo, func(xl *xlog.Logger, req *http.Request) (*userInfo, error) {
+		return &userInfo{}, errors.New("get user  info error")
+	})
+	body = namespacebody{
+		Bucket:    "ipcamera",
+		Namespace: "test1",
+	}
+
+	bodyBuffer, _ = json.Marshal(body)
+	bodyT = bytes.NewBuffer(bodyBuffer)
+
+	req, _ = http.NewRequest("Put", "/v1/namespaces/aab", bodyT)
+	recoder = httptest.NewRecorder()
+	c, _ = gin.CreateTestContext(recoder)
+	param = gin.Param{
+		Key:   "namespace",
+		Value: "aab",
+	}
+	c.Params = append(c.Params, param)
+	c.Request = req
+	UpdateNamespace(c)
+	assert.Equal(t, c.Writer.Status(), 500, "500 internal error if get user info error")
+	guard1.Unpatch()
+
+	// 500 if update namesapce error
+	monkey.PatchInstanceMethod(
+		reflect.TypeOf((*models.NamespaceModel)(nil)), "GetNamespaceInfo", func(ss *models.NamespaceModel, xl *xlog.Logger, uid, namespace string) ([]models.NamespaceInfo, error) {
+			return []models.NamespaceInfo{models.NamespaceInfo{}}, nil
+		})
+	guard2 := monkey.Patch(getUserInfo, func(xl *xlog.Logger, req *http.Request) (*userInfo, error) {
+		return &user, nil
+	})
+	guard3 := monkey.Patch(updateNamespace, func(xl *xlog.Logger, uid, space, newSpace string) error {
+		return errors.New("update namespace failed")
+	})
+	body = namespacebody{
+		Bucket:    "ipcamera",
+		Namespace: "test1",
+	}
+
+	bodyBuffer, _ = json.Marshal(body)
+	bodyT = bytes.NewBuffer(bodyBuffer)
+
+	req, _ = http.NewRequest("Put", "/v1/namespaces/aab", bodyT)
+	recoder = httptest.NewRecorder()
+	c, _ = gin.CreateTestContext(recoder)
+	param = gin.Param{
+		Key:   "namespace",
+		Value: "aab",
+	}
+	c.Params = append(c.Params, param)
+	c.Request = req
+	UpdateNamespace(c)
+	assert.Equal(t, c.Writer.Status(), 500, "500 internal error if get namesapce info error")
+	guard2.Unpatch()
+	guard3.Unpatch()
+
+	// get user info failed if get update autocraeteUa error
+	guard4 := monkey.Patch(getUserInfo, func(xl *xlog.Logger, req *http.Request) (*userInfo, error) {
+		return &user, nil
+	})
+	guard5 := monkey.Patch(updateNamespace, func(xl *xlog.Logger, uid, space, newSpace string) error {
+		return nil
+	})
+
+	guard6 := monkey.Patch(updateAutoCreateUa, func(xl *xlog.Logger, uid, space string, auto, newauto bool) error {
+		return errors.New("update auto create ua failed")
+	})
+	monkey.Patch(updateBucket, func(xl *xlog.Logger, uid, space, bucket, newBucket string, info *userInfo) error {
+		return nil
+	})
+	body = namespacebody{
+		Bucket:    "ipcamera",
+		Namespace: "test1",
+	}
+
+	bodyBuffer, _ = json.Marshal(body)
+	bodyT = bytes.NewBuffer(bodyBuffer)
+
+	req, _ = http.NewRequest("Put", "/v1/namespaces/aab", bodyT)
+	recoder = httptest.NewRecorder()
+	c, _ = gin.CreateTestContext(recoder)
+	param = gin.Param{
+		Key:   "namespace",
+		Value: "aab",
+	}
+	c.Params = append(c.Params, param)
+	c.Request = req
+	UpdateNamespace(c)
+	assert.Equal(t, c.Writer.Status(), 500, "500 internal error if get namesapce info error")
+	guard4.Unpatch()
+	guard5.Unpatch()
+	guard6.Unpatch()
+
+	monkey.UnpatchAll()
 }
 
 func TestDeleteNamespace(t *testing.T) {
 	initDb()
+	monkey.UnpatchAll()
 	monkey.Patch(getUserInfo, func(xl *xlog.Logger, req *http.Request) (*userInfo, error) { return &user, nil })
 	monkey.Patch(system.HaveDb, func() bool { return true })
 	// remove invaild namespace aab, return 400
@@ -282,10 +493,78 @@ func TestDeleteNamespace(t *testing.T) {
 	c.Request = req
 	DeleteNamespace(c)
 	assert.Equal(t, c.Writer.Status(), 200, "they should be equal")
+
+	monkey.PatchInstanceMethod(
+		reflect.TypeOf((*models.NamespaceModel)(nil)), "GetNamespaceInfo", func(ss *models.NamespaceModel, xl *xlog.Logger, uid, namespace string) ([]models.NamespaceInfo, error) {
+			return []models.NamespaceInfo{models.NamespaceInfo{}}, nil
+		})
+	// 500 internal error if get user info failed
+	guard1 := monkey.Patch(getUserInfo, func(xl *xlog.Logger, req *http.Request) (*userInfo, error) {
+		return nil, errors.New("get user info failed")
+	})
+	req, _ = http.NewRequest("Put", "/v1/namespaces/test1", nil)
+	recoder = httptest.NewRecorder()
+	c, _ = gin.CreateTestContext(recoder)
+	param = gin.Param{
+		Key:   "namespace",
+		Value: "test1",
+	}
+	c.Params = append(c.Params, param)
+	c.Request = req
+	DeleteNamespace(c)
+	assert.Equal(t, c.Writer.Status(), 500, "internal error if get user info failed")
+	guard1.Unpatch()
+
+	// 500 internal error if get namespace info error
+	guard2 := monkey.Patch(getUserInfo, func(xl *xlog.Logger, req *http.Request) (*userInfo, error) {
+		return &user, nil
+	})
+	guard3 := monkey.PatchInstanceMethod(
+		reflect.TypeOf((*models.NamespaceModel)(nil)), "GetNamespaceInfo", func(ss *models.NamespaceModel, xl *xlog.Logger, uid, namespace string) ([]models.NamespaceInfo, error) {
+			return nil, errors.New("get namespace error")
+		})
+	req, _ = http.NewRequest("Put", "/v1/namespaces/test1", nil)
+	recoder = httptest.NewRecorder()
+	c, _ = gin.CreateTestContext(recoder)
+	param = gin.Param{
+		Key:   "namespace",
+		Value: "test1",
+	}
+	c.Params = append(c.Params, param)
+	c.Request = req
+	DeleteNamespace(c)
+	assert.Equal(t, c.Writer.Status(), 500, "internal error if get user info failed")
+	guard2.Unpatch()
+	guard3.Unpatch()
+
+	// 500 internal error if get namespace info error
+	guard4 := monkey.Patch(getUserInfo, func(xl *xlog.Logger, req *http.Request) (*userInfo, error) {
+		return &user, nil
+	})
+	guard5 := monkey.PatchInstanceMethod(
+		reflect.TypeOf((*models.NamespaceModel)(nil)), "GetNamespaceInfo", func(ss *models.NamespaceModel, xl *xlog.Logger, uid, namespace string) ([]models.NamespaceInfo, error) {
+			return []models.NamespaceInfo{models.NamespaceInfo{}}, nil
+		})
+	req, _ = http.NewRequest("Put", "/v1/namespaces/test1", nil)
+	recoder = httptest.NewRecorder()
+	c, _ = gin.CreateTestContext(recoder)
+	param = gin.Param{
+		Key:   "namespace",
+		Value: "test1",
+	}
+	c.Params = append(c.Params, param)
+	c.Request = req
+	DeleteNamespace(c)
+	assert.Equal(t, c.Writer.Status(), 500, "internal error if get user info failed")
+	guard4.Unpatch()
+	guard5.Unpatch()
+
+	monkey.UnpatchAll()
 }
 
 func TestAutoCreateUa(t *testing.T) {
 	initDb()
+	monkey.UnpatchAll()
 	defer monkey.UnpatchAll()
 	monkey.Patch(getUserInfo, func(xl *xlog.Logger, req *http.Request) (*userInfo, error) { return &user, nil })
 	monkey.Patch(system.HaveDb, func() bool { return true })
@@ -342,6 +621,7 @@ func TestAutoCreateUa(t *testing.T) {
 
 func TestHandleUaControl(t *testing.T) {
 	initDb()
+	monkey.UnpatchAll()
 	monkey.Patch(getUserInfo, func(xl *xlog.Logger, req *http.Request) (*userInfo, error) { return &user, nil })
 	monkey.Patch(system.HaveDb, func() bool { return true })
 	xl := xlog.NewDummy()

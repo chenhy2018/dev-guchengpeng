@@ -13,10 +13,35 @@ import (
 	"github.com/qiniu/api.v7/auth/qbox"
 	"github.com/qiniu/api.v7/storage"
 	xlog "github.com/qiniu/xlog.v1"
+	"google.golang.org/grpc"
 	"qiniu.com/auth"
 	"qiniu.com/models"
+	pb "qiniu.com/proto"
 	"qiniu.com/system"
 )
+
+var (
+	namespaceMod     *models.NamespaceModel
+	segMod           *models.SegmentKodoModel
+	fastForwardClint pb.FastForwardClient
+)
+
+func Init(conf *system.GrpcConf) {
+	namespaceMod = &models.NamespaceModel{}
+	namespaceMod.Init()
+	segMod = &models.SegmentKodoModel{}
+	segMod.Init()
+	FFGrpcClientInit(conf)
+
+}
+
+func FFGrpcClientInit(conf *system.GrpcConf) {
+	conn, err := grpc.Dial(conf.Addr, grpc.WithInsecure())
+	if err != nil {
+		fmt.Println("Init gprc failed")
+	}
+	fastForwardClint = pb.NewFastForwardClient(conn)
+}
 
 type requestParams struct {
 	uaid      string
@@ -52,8 +77,8 @@ func SetUserInfo(ak, sk string) {
 func getUserInfo(xl *xlog.Logger, req *http.Request) (*userInfo, error) {
 	reqUrl := req.URL.String()
 	if strings.Contains(reqUrl, "token=") {
-		tokenIndex := strings.Index(reqUrl, "&token=")
-		req.Header.Set("Authorization", "Qbox ak="+strings.Split(reqUrl[tokenIndex+7:], ":")[0])
+		token := strings.Split(reqUrl, "&token=")[1]
+		req.Header.Set("Authorization", "QBox ak="+strings.Split(token, ":")[0])
 	}
 	authHeader := req.Header.Get("Authorization")
 	auths := strings.Split(authHeader, " ")
@@ -84,13 +109,18 @@ func getUserInfo(xl *xlog.Logger, req *http.Request) (*userInfo, error) {
 				ak:  localInfo.ak,
 				sk:  localInfo.sk,
 			}
+		} else {
+			return nil, errors.New("private ak/sk not set")
 		}
 	}
-	xl.Infof("info = %v", info)
 	return &info, nil
 }
 
 func HandleToken(c *gin.Context) {
+
+	if system.HaveQconf() {
+		return
+	}
 	xl := xlog.New(c.Writer, c.Request)
 	token := c.Request.Header.Get("Authorization")
 	if len(token) <= TOKEN_HEADER_LEN && !strings.Contains(c.Request.URL.String(), "playback") {
@@ -101,8 +131,7 @@ func HandleToken(c *gin.Context) {
 		return
 	}
 	if !strings.Contains(c.Request.URL.String(), "playback") {
-		c.Request.Header.Set("Authorization", "Qbox ak="+strings.Split(token[TOKEN_HEADER_LEN:], ":")[0])
-		fmt.Println(strings.Split(token[TOKEN_HEADER_LEN:], ":")[0])
+		c.Request.Header.Set("Authorization", "QBox ak="+strings.Split(token[TOKEN_HEADER_LEN:], ":")[0])
 	}
 	c.Next()
 }
@@ -149,18 +178,13 @@ func IsAutoCreateUa(xl *xlog.Logger, bucket string) (bool, []models.NamespaceInf
 	return info[0].AutoCreateUa, info, nil
 }
 
-func VerifyToken(xl *xlog.Logger, expire int64, realToken string, req *http.Request) bool {
+func VerifyToken(xl *xlog.Logger, expire int64, realToken string, req *http.Request, userInfo *userInfo) bool {
 	if expire == 0 || realToken == "" {
 		return false
 	}
 	if expire < time.Now().Unix() {
 		return false
 	}
-	userInfo, err := getUserInfo(xl, req)
-	if err != nil {
-		return false
-	}
-	xl.Infof("info = %v", userInfo)
 	url := "http://" + req.Host + req.URL.String()
 	tokenIndex := strings.Index(url, "&token=")
 	mac := qbox.NewMac(userInfo.ak, userInfo.sk)
@@ -255,12 +279,12 @@ func HandleUaControl(xl *xlog.Logger, bucket, uaid string) error {
 		return err
 	}
 
-	model := models.UaModel{}
-	r, err := model.GetUaInfo(xl, info[0].Space, uaid)
-	if err != nil {
-		return err
-	}
 	if isAuto == false {
+		model := models.UaModel{}
+		r, err := model.GetUaInfo(xl, info[0].Space, uaid)
+		if err != nil {
+			return err
+		}
 		if len(r) == 0 {
 			return fmt.Errorf("Can't find ua info")
 		}
