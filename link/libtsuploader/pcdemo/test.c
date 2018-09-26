@@ -38,6 +38,8 @@ typedef struct {
         int nRoundCount;
         bool IsNoNet;
         bool IsQuit;
+        bool IsDropFirstKeyFrame;
+        int64_t nKeyFrameCount;
         int64_t nBaseAudioTime; //for loop test
         int64_t nBaseVideoTime; //for loop test
 }CmdArg;
@@ -575,6 +577,13 @@ static int dataCallback(void *opaque, void *pData, int nDataLen, int nFlag, int6
                 }
                 pAvuploader->nVideoKeyframeAccLen += nDataLen;
                 //printf("------->push video key:%d ts:%lld size:%d\n",nIsKeyFrame, timestamp, nDataLen);
+                if (nIsKeyFrame) {
+                        if (cmdArg.IsDropFirstKeyFrame && cmdArg.nKeyFrameCount == 0 ) {
+                                return 0;
+                        }
+                        cmdArg.nKeyFrameCount++;
+                }
+                
                 ret = PushVideo(pAvuploader->pTsMuxUploader, pData, nDataLen, timestamp + cmdArg.nBaseVideoTime, nIsKeyFrame, nNewSegMent);
         }
         return ret;
@@ -752,6 +761,7 @@ int main(int argc, const char** argv)
         flag_bool(&cmdArg.IsFileLoop, "fileloop", "in file mode and only one upload, will loop to push file");
         flag_int(&cmdArg.nLoopSleeptime, "csleeptime", "next round sleeptime");
         flag_bool(&cmdArg.IsNoNet, "nonet", "no network");
+        flag_bool(&cmdArg.IsDropFirstKeyFrame, "drop_first_keyframe", "drop first keyframe");
 
         flag_parse(argc, argv, VERSION);
         if (argc == 2 && (strcmp(argv[1], "-h") == 0 || strcmp(argv[1], "-help") == 0)) {
