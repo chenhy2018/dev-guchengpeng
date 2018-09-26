@@ -2,9 +2,10 @@ package controllers
 
 import (
 	"encoding/json"
+	"io/ioutil"
+
 	"github.com/gin-gonic/gin"
 	xlog "github.com/qiniu/xlog.v1"
-	"io/ioutil"
 	"qiniu.com/system"
 )
 
@@ -40,7 +41,6 @@ func SetPrivateAkSk(c *gin.Context) {
 		})
 		return
 	}
-	xl.Infof("#%v #%v", aksk, body)
 	SetUserInfo(aksk.Ak, aksk.Sk)
 	c.JSON(200, gin.H{"success": "true"})
 }

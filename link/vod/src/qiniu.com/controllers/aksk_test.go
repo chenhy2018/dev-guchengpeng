@@ -3,6 +3,7 @@ package controllers
 import (
 	"bytes"
 	"encoding/json"
+
 	"github.com/bouk/monkey"
 	"github.com/gin-gonic/gin"
 	//"github.com/qiniu/xlog.v1"
@@ -10,8 +11,9 @@ import (
 	//"io/ioutil"
 	"net/http"
 	"net/http/httptest"
-	"qiniu.com/system"
 	"testing"
+
+	"qiniu.com/system"
 )
 
 func TestAkSk(t *testing.T) {
@@ -43,11 +45,13 @@ func TestAkSk(t *testing.T) {
 	c.Request = req
 	defer monkey.UnpatchAll()
 	monkey.Patch(system.HaveQconf, func() bool { return false })
+	SetPrivateAkSk(c)
 	assert.Equal(t, c.Writer.Status(), 200, "they should be equal")
 }
 
 func TestHandleToken(t *testing.T) {
 	// test handle token api
+	monkey.Patch(system.HaveQconf, func() bool { return false })
 	req, _ := http.NewRequest("Post", "/v1/aksk", nil)
 	recoder := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(recoder)

@@ -3,15 +3,19 @@ package controllers
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io/ioutil"
+	"net/http"
+	"net/http/httptest"
+	"reflect"
+	"testing"
+
 	"github.com/bouk/monkey"
 	"github.com/gin-gonic/gin"
 	"github.com/qiniu/xlog.v1"
 	"github.com/stretchr/testify/assert"
-	"io/ioutil"
-	"net/http"
-	"net/http/httptest"
-	"testing"
+	"qiniu.com/models"
 )
 
 func TestRegisterUa(t *testing.T) {
@@ -96,6 +100,122 @@ func TestRegisterUa(t *testing.T) {
 	c.Params = append(c.Params, param)
 	c.Request = req
 	RegisterUa(c)
+
+	// 500 if get user info failed
+	guard1 := monkey.Patch(getUserInfo, func(xl *xlog.Logger, req *http.Request) (*userInfo, error) {
+		return &userInfo{}, errors.New("get user  info error")
+	})
+	body = uabody{
+		Namespace: "test1",
+	}
+
+	bodyBuffer, _ = json.Marshal(body)
+	bodyT = bytes.NewBuffer(bodyBuffer)
+	req, _ = http.NewRequest("POST", "/v1/namespaces/test/uas/ipcamera1", bodyT)
+	c, _ = gin.CreateTestContext(httptest.NewRecorder())
+	c.Request = req
+	RegisterUa(c)
+	assert.Equal(t, c.Writer.Status(), 500, "they should be equal")
+	guard1.Unpatch()
+	monkey.Patch(getUserInfo, func(xl *xlog.Logger, req *http.Request) (*userInfo, error) { return &user, nil })
+	// get name space info failed
+	guard2 := monkey.PatchInstanceMethod(
+		reflect.TypeOf((*models.NamespaceModel)(nil)), "GetNamespaceInfo", func(ss *models.NamespaceModel, xl *xlog.Logger, uid, namespace string) ([]models.NamespaceInfo, error) {
+			return nil, errors.New("xxxxx error")
+		})
+	body = uabody{
+		Namespace: "test1",
+	}
+
+	bodyBuffer, _ = json.Marshal(body)
+	bodyT = bytes.NewBuffer(bodyBuffer)
+	req, _ = http.NewRequest("POST", "/v1/namespaces/test/uas/ipcamera1", bodyT)
+	c, _ = gin.CreateTestContext(httptest.NewRecorder())
+	c.Request = req
+	RegisterUa(c)
+	assert.Equal(t, c.Writer.Status(), 500, "they should be equal")
+	guard2.Unpatch()
+
+	// get name space info failed 2
+	guard3 := monkey.PatchInstanceMethod(
+		reflect.TypeOf((*models.NamespaceModel)(nil)), "GetNamespaceInfo", func(ss *models.NamespaceModel, xl *xlog.Logger, uid, namespace string) ([]models.NamespaceInfo, error) {
+			return []models.NamespaceInfo{}, nil
+		})
+	body = uabody{
+		Namespace: "test1",
+	}
+
+	bodyBuffer, _ = json.Marshal(body)
+	bodyT = bytes.NewBuffer(bodyBuffer)
+	req, _ = http.NewRequest("POST", "/v1/namespaces/test/uas/ipcamera1", bodyT)
+	c, _ = gin.CreateTestContext(httptest.NewRecorder())
+	c.Request = req
+	RegisterUa(c)
+	assert.Equal(t, c.Writer.Status(), 400, "they should be equal")
+	guard3.Unpatch()
+
+	// get Ua info failed
+	guard4 := monkey.PatchInstanceMethod(
+		reflect.TypeOf((*models.UaModel)(nil)), "GetUaInfo", func(ss *models.UaModel, xl *xlog.Logger, namesapce, uaid string) ([]models.UaInfo, error) {
+			return []models.UaInfo{}, errors.New("get ua  info failed")
+		})
+	monkey.PatchInstanceMethod(
+		reflect.TypeOf((*models.NamespaceModel)(nil)), "GetNamespaceInfo", func(ss *models.NamespaceModel, xl *xlog.Logger, uid, namespace string) ([]models.NamespaceInfo, error) {
+			return []models.NamespaceInfo{models.NamespaceInfo{}}, nil
+		})
+	body = uabody{
+		Namespace: "test1",
+	}
+
+	bodyBuffer, _ = json.Marshal(body)
+	bodyT = bytes.NewBuffer(bodyBuffer)
+	req, _ = http.NewRequest("POST", "/v1/namespaces/test/uas/ipcamera1", bodyT)
+	c, _ = gin.CreateTestContext(httptest.NewRecorder())
+	c.Request = req
+	RegisterUa(c)
+	assert.Equal(t, c.Writer.Status(), 500, "they should be equal")
+	guard4.Unpatch()
+
+	// ua is exist
+	guard5 := monkey.PatchInstanceMethod(
+		reflect.TypeOf((*models.UaModel)(nil)), "GetUaInfo", func(ss *models.UaModel, xl *xlog.Logger, namesapce, uaid string) ([]models.UaInfo, error) {
+			return []models.UaInfo{models.UaInfo{}}, nil
+		})
+	body = uabody{
+		Namespace: "test1",
+	}
+
+	bodyBuffer, _ = json.Marshal(body)
+	bodyT = bytes.NewBuffer(bodyBuffer)
+	req, _ = http.NewRequest("POST", "/v1/namespaces/test/uas/ipcamera1", bodyT)
+	c, _ = gin.CreateTestContext(httptest.NewRecorder())
+	c.Request = req
+	RegisterUa(c)
+	assert.Equal(t, c.Writer.Status(), 400, "they should be equal")
+	guard5.Unpatch()
+
+	// register ua failed
+	monkey.PatchInstanceMethod(
+		reflect.TypeOf((*models.UaModel)(nil)), "GetUaInfo", func(ss *models.UaModel, xl *xlog.Logger, namesapce, uaid string) ([]models.UaInfo, error) {
+			return []models.UaInfo{}, nil
+		})
+	monkey.PatchInstanceMethod(
+		reflect.TypeOf((*models.UaModel)(nil)), "Register", func(ss *models.UaModel, xl *xlog.Logger, ua models.UaInfo) error {
+			return errors.New("register ua failed")
+		})
+	body = uabody{
+		Namespace: "test1",
+	}
+
+	bodyBuffer, _ = json.Marshal(body)
+	bodyT = bytes.NewBuffer(bodyBuffer)
+	req, _ = http.NewRequest("POST", "/v1/namespaces/test/uas/ipcamera1", bodyT)
+	c, _ = gin.CreateTestContext(httptest.NewRecorder())
+	c.Request = req
+	RegisterUa(c)
+	assert.Equal(t, c.Writer.Status(), 500, "they should be equal")
+	monkey.UnpatchAll()
+
 }
 
 func TestGetUa(t *testing.T) {
@@ -154,6 +274,28 @@ func TestGetUa(t *testing.T) {
 	}
 	//{"item":[],"marker":""}
 	assert.Equal(t, c.Writer.Status(), 200, "they should be equal")
+
+	// get ua info failed
+	monkey.PatchInstanceMethod(
+		reflect.TypeOf((*models.UaModel)(nil)), "GetUaInfo", func(ss *models.UaModel, xl *xlog.Logger, namesapce, uaid string) ([]models.UaInfo, error) {
+			return []models.UaInfo{}, errors.New("get ua info failed")
+		})
+	req, _ = http.NewRequest("Get", "/v1/namespaces?regex=ip&limit=10&marker=&exact=true", nil)
+	recoder = httptest.NewRecorder()
+	c, _ = gin.CreateTestContext(recoder)
+	param = gin.Param{
+		Key:   "namespace",
+		Value: "test1",
+	}
+	c.Params = append(c.Params, param)
+	c.Request = req
+	GetUaInfo(c)
+	body, err = ioutil.ReadAll(recoder.Body)
+	if err != nil {
+		fmt.Printf("parse request body failed, body = %#v", body)
+	}
+	assert.Equal(t, c.Writer.Status(), 500, "they should be equal")
+	monkey.UnpatchAll()
 }
 
 func TestUpdateUa(t *testing.T) {
@@ -293,6 +435,216 @@ func TestUpdateUa(t *testing.T) {
 	c.Request = req
 	UpdateUa(c)
 	assert.Equal(t, c.Writer.Status(), 200, "they should be equal")
+
+	// get userinfo failed
+	guard1 := monkey.Patch(getUserInfo, func(xl *xlog.Logger, req *http.Request) (*userInfo, error) {
+		return &userInfo{}, errors.New("get user  info error")
+	})
+	body = uabody{
+		Uaid:      "aaaaa",
+		Namespace: "test1",
+	}
+
+	bodyBuffer, _ = json.Marshal(body)
+	bodyT = bytes.NewBuffer(bodyBuffer)
+
+	req, _ = http.NewRequest("Put", "/v1/namespaces/test1/uas/ipcamera1", bodyT)
+	recoder = httptest.NewRecorder()
+	c, _ = gin.CreateTestContext(recoder)
+	param = gin.Param{
+		Key:   "namespace",
+		Value: "test1",
+	}
+	c.Params = append(c.Params, param)
+
+	param = gin.Param{
+		Key:   "uaid",
+		Value: "ipcamera1",
+	}
+	c.Params = append(c.Params, param)
+	c.Request = req
+	UpdateUa(c)
+	assert.Equal(t, c.Writer.Status(), 500, "they should be equal")
+	guard1.Unpatch()
+
+	// get namesapce info failed
+	monkey.Patch(getUserInfo, func(xl *xlog.Logger, req *http.Request) (*userInfo, error) { return &user, nil })
+	// get name space info failed
+	guard2 := monkey.PatchInstanceMethod(
+		reflect.TypeOf((*models.NamespaceModel)(nil)), "GetNamespaceInfo", func(ss *models.NamespaceModel, xl *xlog.Logger, uid, namespace string) ([]models.NamespaceInfo, error) {
+			return nil, errors.New("xxxxx error")
+		})
+	body = uabody{
+		Uaid:      "aaaaa",
+		Namespace: "test1",
+	}
+
+	bodyBuffer, _ = json.Marshal(body)
+	bodyT = bytes.NewBuffer(bodyBuffer)
+
+	req, _ = http.NewRequest("Put", "/v1/namespaces/test1/uas/ipcamera1", bodyT)
+	recoder = httptest.NewRecorder()
+	c, _ = gin.CreateTestContext(recoder)
+	param = gin.Param{
+		Key:   "namespace",
+		Value: "test1",
+	}
+	c.Params = append(c.Params, param)
+
+	param = gin.Param{
+		Key:   "uaid",
+		Value: "ipcamera1",
+	}
+	c.Params = append(c.Params, param)
+	c.Request = req
+	UpdateUa(c)
+	assert.Equal(t, c.Writer.Status(), 500, "they should be equal")
+	guard2.Unpatch()
+
+	// get ua info failed
+	monkey.PatchInstanceMethod(
+		reflect.TypeOf((*models.NamespaceModel)(nil)), "GetNamespaceInfo", func(ss *models.NamespaceModel, xl *xlog.Logger, uid, namespace string) ([]models.NamespaceInfo, error) {
+			return []models.NamespaceInfo{models.NamespaceInfo{}}, nil
+		})
+	guard4 := monkey.PatchInstanceMethod(
+		reflect.TypeOf((*models.UaModel)(nil)), "GetUaInfo", func(ss *models.UaModel, xl *xlog.Logger, namesapce, uaid string) ([]models.UaInfo, error) {
+			return []models.UaInfo{}, errors.New("get ua  info failed")
+		})
+	body = uabody{
+		Uaid:      "aaaaa",
+		Namespace: "test1",
+	}
+
+	bodyBuffer, _ = json.Marshal(body)
+	bodyT = bytes.NewBuffer(bodyBuffer)
+
+	req, _ = http.NewRequest("Put", "/v1/namespaces/test1/uas/ipcamera1", bodyT)
+	recoder = httptest.NewRecorder()
+	c, _ = gin.CreateTestContext(recoder)
+	param = gin.Param{
+		Key:   "namespace",
+		Value: "test1",
+	}
+	c.Params = append(c.Params, param)
+
+	param = gin.Param{
+		Key:   "uaid",
+		Value: "ipcamera1",
+	}
+	c.Params = append(c.Params, param)
+	c.Request = req
+	UpdateUa(c)
+	assert.Equal(t, c.Writer.Status(), 500, "they should be equal")
+	guard4.Unpatch()
+
+	guard5 := monkey.PatchInstanceMethod(
+		reflect.TypeOf((*models.UaModel)(nil)), "GetUaInfo", func(ss *models.UaModel, xl *xlog.Logger, namesapce, uaid string) ([]models.UaInfo, error) {
+			if uaid == "ipcamera1" {
+				return []models.UaInfo{models.UaInfo{}}, nil
+			}
+			return []models.UaInfo{models.UaInfo{}}, nil
+		})
+	body = uabody{
+		Uaid:      "aaaaa",
+		Namespace: "test1",
+	}
+
+	bodyBuffer, _ = json.Marshal(body)
+	bodyT = bytes.NewBuffer(bodyBuffer)
+
+	req, _ = http.NewRequest("Put", "/v1/namespaces/test1/uas/ipcamera1", bodyT)
+	recoder = httptest.NewRecorder()
+	c, _ = gin.CreateTestContext(recoder)
+	param = gin.Param{
+		Key:   "namespace",
+		Value: "test1",
+	}
+	c.Params = append(c.Params, param)
+
+	param = gin.Param{
+		Key:   "uaid",
+		Value: "ipcamera1",
+	}
+	c.Params = append(c.Params, param)
+	c.Request = req
+	UpdateUa(c)
+	assert.Equal(t, c.Writer.Status(), 400, "they should be equal")
+	guard5.Unpatch()
+
+	// get ua info failed
+	guard6 := monkey.PatchInstanceMethod(
+		reflect.TypeOf((*models.UaModel)(nil)), "GetUaInfo", func(ss *models.UaModel, xl *xlog.Logger, namesapce, uaid string) ([]models.UaInfo, error) {
+			if uaid == "ipcamera1" {
+				return []models.UaInfo{models.UaInfo{}}, nil
+			}
+			return []models.UaInfo{}, errors.New("get ua info failed")
+		})
+	body = uabody{
+		Uaid:      "aaaaa",
+		Namespace: "test1",
+	}
+
+	bodyBuffer, _ = json.Marshal(body)
+	bodyT = bytes.NewBuffer(bodyBuffer)
+
+	req, _ = http.NewRequest("Put", "/v1/namespaces/test1/uas/ipcamera1", bodyT)
+	recoder = httptest.NewRecorder()
+	c, _ = gin.CreateTestContext(recoder)
+	param = gin.Param{
+		Key:   "namespace",
+		Value: "test1",
+	}
+	c.Params = append(c.Params, param)
+
+	param = gin.Param{
+		Key:   "uaid",
+		Value: "ipcamera1",
+	}
+	c.Params = append(c.Params, param)
+	c.Request = req
+	UpdateUa(c)
+	assert.Equal(t, c.Writer.Status(), 500, "they should be equal")
+	guard6.Unpatch()
+
+	// update ua failed
+	guard7 := monkey.PatchInstanceMethod(
+		reflect.TypeOf((*models.UaModel)(nil)), "GetUaInfo", func(ss *models.UaModel, xl *xlog.Logger, namesapce, uaid string) ([]models.UaInfo, error) {
+			if uaid == "ipcamera1" {
+				return []models.UaInfo{models.UaInfo{}}, nil
+			}
+			return []models.UaInfo{}, nil
+		})
+	monkey.PatchInstanceMethod(
+		reflect.TypeOf((*models.UaModel)(nil)), "UpdateUa", func(ss *models.UaModel, xl *xlog.Logger, namesapce, uaid string, ua models.UaInfo) error {
+			return errors.New("update ua failed")
+		})
+	body = uabody{
+		Uaid:      "aaaaa",
+		Namespace: "test1",
+	}
+
+	bodyBuffer, _ = json.Marshal(body)
+	bodyT = bytes.NewBuffer(bodyBuffer)
+
+	req, _ = http.NewRequest("Put", "/v1/namespaces/test1/uas/ipcamera1", bodyT)
+	recoder = httptest.NewRecorder()
+	c, _ = gin.CreateTestContext(recoder)
+	param = gin.Param{
+		Key:   "namespace",
+		Value: "test1",
+	}
+	c.Params = append(c.Params, param)
+
+	param = gin.Param{
+		Key:   "uaid",
+		Value: "ipcamera1",
+	}
+	c.Params = append(c.Params, param)
+	c.Request = req
+	UpdateUa(c)
+	assert.Equal(t, c.Writer.Status(), 500, "they should be equal")
+	guard7.Unpatch()
+	monkey.UnpatchAll()
 }
 
 func TestDeleteUa(t *testing.T) {
@@ -354,7 +706,7 @@ func TestDeleteUa(t *testing.T) {
 	assert.Equal(t, c.Writer.Status(), 200, "they should be equal")
 
 	// remove namespace test1, return 200
-
+	monkey.Patch(getUserInfo, func(xl *xlog.Logger, req *http.Request) (*userInfo, error) { return &user, nil })
 	req, _ = http.NewRequest("Del", "/v1/namespaces/test1", nil)
 	recoder = httptest.NewRecorder()
 	c, _ = gin.CreateTestContext(recoder)
@@ -366,4 +718,45 @@ func TestDeleteUa(t *testing.T) {
 	c.Request = req
 	DeleteNamespace(c)
 	assert.Equal(t, c.Writer.Status(), 200, "they should be equal")
+
+	// get userinfo failed
+	guard1 := monkey.PatchInstanceMethod(
+		reflect.TypeOf((*models.UaModel)(nil)), "GetUaInfo", func(ss *models.UaModel, xl *xlog.Logger, namesapce, uaid string) ([]models.UaInfo, error) {
+			return []models.UaInfo{}, errors.New("get ua  info failed")
+		})
+	req, _ = http.NewRequest("Del", "/v1/namespaces/test1", nil)
+	recoder = httptest.NewRecorder()
+	c, _ = gin.CreateTestContext(recoder)
+	param = gin.Param{
+		Key:   "namespace",
+		Value: "test1",
+	}
+	c.Params = append(c.Params, param)
+	c.Request = req
+	DeleteUa(c)
+	assert.Equal(t, c.Writer.Status(), 500, "they should be equal")
+	guard1.Unpatch()
+
+	// delete ua failed
+	monkey.PatchInstanceMethod(
+		reflect.TypeOf((*models.UaModel)(nil)), "GetUaInfo", func(ss *models.UaModel, xl *xlog.Logger, namesapce, uaid string) ([]models.UaInfo, error) {
+			return []models.UaInfo{models.UaInfo{}}, nil
+		})
+	monkey.PatchInstanceMethod(
+		reflect.TypeOf((*models.UaModel)(nil)), "Delete", func(ss *models.UaModel, xl *xlog.Logger, cond map[string]interface{}) error {
+			return errors.New("delete ua failed")
+		})
+	req, _ = http.NewRequest("Del", "/v1/namespaces/test1", nil)
+	recoder = httptest.NewRecorder()
+	c, _ = gin.CreateTestContext(recoder)
+	param = gin.Param{
+		Key:   "namespace",
+		Value: "test1",
+	}
+	c.Params = append(c.Params, param)
+	c.Request = req
+	DeleteUa(c)
+	assert.Equal(t, c.Writer.Status(), 500, "they should be equal")
+	monkey.UnpatchAll()
+
 }

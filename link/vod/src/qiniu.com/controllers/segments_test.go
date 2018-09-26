@@ -2,11 +2,13 @@ package controllers
 
 import (
 	"encoding/json"
-	"github.com/qiniu/api.v7/auth/qbox"
+	"errors"
 	"io/ioutil"
 	"net/http"
 	"reflect"
 	"testing"
+
+	"github.com/qiniu/api.v7/auth/qbox"
 
 	"github.com/bouk/monkey"
 	xlog "github.com/qiniu/xlog.v1"
@@ -493,6 +495,73 @@ func (suite *SegmentsTestSuite) TestFromEndInTwoSeg8() {
 	suite.Equal(int64(1532499340), segInfos.Segs[2].EndTime, "should be 1532499340")
 }
 
+func (suite *SegmentsTestSuite) TestFromEndInTwoSeg9() {
+	req, _ := http.NewRequest("GET", "/v1/namespaces/ipcamera/uas/testdeviceid8/segments?from=1532499fdsfs325&to=1532499345", nil)
+	w := PerformRequest(suite.r, req)
+	suite.Equal(400, w.Code, "400 for request params error")
+
+}
+func (suite *SegmentsTestSuite) TestFromEndInTwoSeg10() {
+	req, _ := http.NewRequest("GET", "/v1/namespaces/ipcamera/uas/testdeviceid8/segments?from=1532499355&to=1532499345", nil)
+	w := PerformRequest(suite.r, req)
+	suite.Equal(400, w.Code, "400 for request from great than to")
+
+}
+func (suite *SegmentsTestSuite) TestFromEndInTwoSeg11() {
+	req, _ := http.NewRequest("GET", "/v1/namespaces/ipcamera/uas/testdeviceid8/segments?from=1530499355&to=1532499345", nil)
+	w := PerformRequest(suite.r, req)
+	suite.Equal(400, w.Code, "400 for request from great than to")
+
+}
+
+func (suite *SegmentsTestSuite) TestFromEndInTwoSeg12() {
+	req, _ := http.NewRequest("GET", "/v1/namespaces/ipcamera/uas/testdeviceid8/segments?from=1537872668&to=1537876443", nil)
+	monkey.Patch(getUserInfo, func(xl *xlog.Logger, req *http.Request) (*userInfo, error) {
+		return &userInfo{}, errors.New("get user info failed")
+	})
+	w := PerformRequest(suite.r, req)
+	suite.Equal(500, w.Code, "500 for get user info  failed")
+
+}
+func (suite *SegmentsTestSuite) TestFromEndInTwoSeg13() {
+	req, _ := http.NewRequest("GET", "/v1/namespaces/ipcamera/uas/testdeviceid8/segments?from=1537872668&to=1537876443", nil)
+	monkey.Patch(getUserInfo, func(xl *xlog.Logger, req *http.Request) (*userInfo, error) {
+		return &userinfo, nil
+	})
+	w := PerformRequest(suite.r, req)
+	suite.Equal(400, w.Code, "400 for can't find namesapce")
+}
+
+func (suite *SegmentsTestSuite) TestFromEndInTwoSeg14() {
+	req, _ := http.NewRequest("GET", "/v1/namespaces/ipcamera/uas/testdeviceid8/segments?from=1537872668&to=1537876443", nil)
+	monkey.Patch(getUserInfo, func(xl *xlog.Logger, req *http.Request) (*userInfo, error) {
+		return &userinfo, nil
+	})
+
+	monkey.Patch(GetBucket, func(xl *xlog.Logger, uid, namespace string) (string, error) {
+		return "ipcamera", nil
+	})
+	w := PerformRequest(suite.r, req)
+	suite.Equal(200, w.Code, "")
+
+}
+func (suite *SegmentsTestSuite) TestFromEndInTwoSeg15() {
+	req, _ := http.NewRequest("GET", "/v1/namespaces/ipcamera/uas/testdeviceid8/segments?from=1537872668&to=1537876443", nil)
+	monkey.Patch(getUserInfo, func(xl *xlog.Logger, req *http.Request) (*userInfo, error) {
+		return &userinfo, nil
+	})
+
+	monkey.Patch(GetBucket, func(xl *xlog.Logger, uid, namespace string) (string, error) {
+		return "ipcamera", nil
+	})
+	monkey.PatchInstanceMethod(
+		reflect.TypeOf((*models.SegmentKodoModel)(nil)), "GetFragmentTsInfo", func(ss *models.SegmentKodoModel, xl *xlog.Logger, count int, starttime, endtime int64, bucketurl, uaid, mark string, mac *qbox.Mac) ([]map[string]interface{}, string, error) {
+			return nil, "", errors.New("can't  find segments")
+		})
+	w := PerformRequest(suite.r, req)
+	suite.Equal(500, w.Code, "")
+
+}
 func TestSegmentsTestSuite(t *testing.T) {
 	suite.Run(t, new(SegmentsTestSuite))
 }
