@@ -1,4 +1,4 @@
-// Last Update:2018-09-21 12:17:48
+// Last Update:2018-09-26 11:27:00
 /**
  * @file mymalloc.h
  * @brief 
@@ -10,7 +10,7 @@
 #ifndef MYMALLOC_H
 #define MYMALLOC_H
 
-#define USE_OWN_MALLOC
+//#define USE_OWN_MALLOC
 #ifdef USE_OWN_MALLOC
 #define malloc( size ) mymalloc( size, __FUNCTION__, __LINE__ )
 #define free( ptr ) myfree( ptr, __FUNCTION__, __LINE__ )

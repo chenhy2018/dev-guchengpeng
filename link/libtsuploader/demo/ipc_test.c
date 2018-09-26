@@ -34,6 +34,7 @@ static Queue *pVideoMainStreamCache = NULL;
 static Queue *pVideoSubStreamCache = NULL;
 static Queue *pAudioSubStreamCache = NULL;
 static Queue *pAudioMainStreamCache = NULL;
+static __thread int count = STREAM_CACHE_SIZE;
 
 int GetKodoInitSts()
 {
@@ -91,7 +92,7 @@ void InitConfig()
     gIpcConfig.movingDetection = 1;
     gIpcConfig.configUpdateInterval = 10;
     gIpcConfig.multiChannel = 1;
-    gIpcConfig.openCache = 1;
+    gIpcConfig.openCache = 0;
     gIpcConfig.cacheSize = STREAM_CACHE_SIZE;
 }
 
@@ -228,7 +229,6 @@ int CacheHandle( Queue *pQueue, TsMuxUploader *pUploader,
   )
 {
     Frame frame;
-    static int count = STREAM_CACHE_SIZE;
 
     if ( !pQueue || !pUploader  ) {
         return -1;
@@ -262,6 +262,7 @@ int CacheHandle( Queue *pQueue, TsMuxUploader *pUploader,
                 PushAudio( pUploader, frame.data, frame.len, (int64_t)frame.timeStamp );
             }
         } else if ( gMovingDetect == ALARM_CODE_MOTION_DETECT_DISAPPEAR ) {
+#if 0
             if ( count-- > 0 ) {
                 if ( _nStreamType == TYPE_VIDEO ) {
                     PushVideo( pUploader, frame.data, frame.len, (int64_t)frame.timeStamp, frame.isKey, 0 );
@@ -271,6 +272,7 @@ int CacheHandle( Queue *pQueue, TsMuxUploader *pUploader,
             } else {
                 ReportKodoInitError( "main stream", "not detect moving" );
             }
+#endif
         } else {
             ReportKodoInitError( "main stream", "not detect moving" );
         }
@@ -335,7 +337,7 @@ int SubStreamVideoGetFrameCb( int streamno, char *_pFrame,
     TraceTimeStamp( TYPE_VIDEO, _dTimeStamp, "sub stream" );
     if ( gIpcConfig.movingDetection ) {
         if ( gIpcConfig.openCache && pVideoSubStreamCache ) {
-            CacheHandle( pVideoMainStreamCache, pMainUploader, TYPE_VIDEO, _pFrame, _nLen, _nIskey,  _dTimeStamp );
+            CacheHandle( pVideoSubStreamCache, pSubUploader, TYPE_VIDEO, _pFrame, _nLen, _nIskey,  _dTimeStamp );
         } else if ( gMovingDetect == ALARM_CODE_MOTION_DETECT ) {
             PushVideo(pSubUploader, _pFrame, _nLen, (int64_t)_dTimeStamp, _nIskey, 0 );
         } else if (gMovingDetect == ALARM_CODE_MOTION_DETECT_DISAPPEAR )  {
@@ -390,7 +392,7 @@ int AudioGetFrameCb( char *_pFrame, int _nLen, double _dTimeStamp,
 
     if ( gIpcConfig.movingDetection ) {
         if ( gIpcConfig.openCache && pAudioMainStreamCache ) {
-            CacheHandle( pVideoMainStreamCache, pMainUploader, TYPE_AUDIO, _pFrame, _nLen, 0,  _dTimeStamp );
+            CacheHandle( pAudioMainStreamCache, pMainUploader, TYPE_AUDIO, _pFrame, _nLen, 0,  _dTimeStamp );
         } else if ( gMovingDetect == ALARM_CODE_MOTION_DETECT ) {
             ret = PushAudio( pMainUploader, _pFrame, _nLen, (int64_t)timeStamp );
             if ( ret != 0 ) {
@@ -456,7 +458,7 @@ int SubStreamAudioGetFrameCb( char *_pFrame, int _nLen, double _dTimeStamp,
 
     if ( gIpcConfig.movingDetection ) {
         if ( gIpcConfig.openCache && pAudioSubStreamCache ) {
-            CacheHandle( pVideoMainStreamCache, pMainUploader, TYPE_AUDIO, _pFrame, _nLen, 0,  _dTimeStamp );
+            CacheHandle( pAudioSubStreamCache, pSubUploader, TYPE_AUDIO, _pFrame, _nLen, 0,  _dTimeStamp );
         } else if ( gMovingDetect == ALARM_CODE_MOTION_DETECT ) {
             ret = PushAudio( pSubUploader, _pFrame, _nLen, (int64_t)timeStamp );
             if ( ret != 0 ) {
