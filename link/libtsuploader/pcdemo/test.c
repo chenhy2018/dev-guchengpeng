@@ -393,8 +393,9 @@ int start_file_test(char * _pAudioFile, char * _pVideoFile, DataCallback callbac
                                                 }
                                                 audioOffset += adts.var.aac_frame_length;
                                                 aacFrameCount++;
-                                                int64_t d = ((1024*1000.0)/aacfreq[adts.fix.sampling_frequency_index]) * aacFrameCount;
-                                                nNextAudioTime = nSysTimeBase + d;
+                                                int64_t d1 = ((1024*1000.0)/aacfreq[adts.fix.sampling_frequency_index]) * aacFrameCount;
+                                                int64_t d2 = ((1024*1000.0)/aacfreq[adts.fix.sampling_frequency_index]) * (aacFrameCount - 1);
+                                                nNextAudioTime += (d1 - d2); 
                                         } else {
                                                 bAudioOk = 0;
                                         }
@@ -616,7 +617,7 @@ void signalHander(int s){
 
 void logCb(char * pLog)
 {
-        printf("-%s", pLog);
+        fprintf(stderr, "-%s", pLog);
 }
 
 static void checkCmdArg(const char * name)
