@@ -579,7 +579,8 @@ static int dataCallback(void *opaque, void *pData, int nDataLen, int nFlag, int6
                 pAvuploader->nVideoKeyframeAccLen += nDataLen;
                 //printf("------->push video key:%d ts:%lld size:%d\n",nIsKeyFrame, timestamp, nDataLen);
                 if (nIsKeyFrame) {
-                        if (cmdArg.IsDropFirstKeyFrame && cmdArg.nKeyFrameCount == 0 ) {
+                        if (cmdArg.IsDropFirstKeyFrame) {
+                                cmdArg.IsDropFirstKeyFrame = 0;
                                 return 0;
                         }
                         cmdArg.nKeyFrameCount++;
