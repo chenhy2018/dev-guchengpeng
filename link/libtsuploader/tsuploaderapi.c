@@ -241,7 +241,7 @@ int GetUploadToken(char *pBuf, int nBufLen, char *pUrl)
         if (pUrl != NULL)
                 curl_easy_setopt(curl, CURLOPT_URL, pUrl);
         else
-                curl_easy_setopt(curl, CURLOPT_URL, "http://39.107.247.14:8086/qiniu/upload/token");
+                curl_easy_setopt(curl, CURLOPT_URL, "http://47.105.118.51:8086/qiniu/upload/token/testdvice009");
         curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, writeData);
         
         struct CurlToken token;

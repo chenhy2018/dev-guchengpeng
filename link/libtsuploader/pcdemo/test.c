@@ -31,11 +31,17 @@ typedef struct {
         char *pAFilePath;
         char *pVFilePath;
         char *pTokenUrl;
+        char *pUa1;
+        char *pUa2;
         bool IsFileLoop;
         int  nLoopSleeptime;
         int nRoundCount;
-	bool IsNoNet;
+        bool IsNoNet;
         bool IsQuit;
+        bool IsDropFirstKeyFrame;
+        int64_t nKeyFrameCount;
+        int64_t nBaseAudioTime; //for loop test
+        int64_t nBaseVideoTime; //for loop test
 }CmdArg;
 
 typedef struct {
@@ -387,8 +393,9 @@ int start_file_test(char * _pAudioFile, char * _pVideoFile, DataCallback callbac
                                                 }
                                                 audioOffset += adts.var.aac_frame_length;
                                                 aacFrameCount++;
-                                                int64_t d = ((1024*1000.0)/aacfreq[adts.fix.sampling_frequency_index]) * aacFrameCount;
-                                                nNextAudioTime = nSysTimeBase + d;
+                                                int64_t d1 = ((1024*1000.0)/aacfreq[adts.fix.sampling_frequency_index]) * aacFrameCount;
+                                                int64_t d2 = ((1024*1000.0)/aacfreq[adts.fix.sampling_frequency_index]) * (aacFrameCount - 1);
+                                                nNextAudioTime += (d1 - d2); 
                                         } else {
                                                 bAudioOk = 0;
                                         }
@@ -431,10 +438,21 @@ int start_file_test(char * _pAudioFile, char * _pVideoFile, DataCallback callbac
         
         if (pAudioData) {
                 free(pAudioData);
+                cmdArg.nBaseAudioTime += nNextAudioTime;
         }
         if (pVideoData) {
                 free(pVideoData);
                 printf("IDR:%d nonIDR:%d\n", nIDR, nNonIDR);
+                cmdArg.nBaseVideoTime += nNextVideoTime;
+        }
+        if (cmdArg.nBaseVideoTime > 0 && cmdArg.nBaseAudioTime) {
+                if (cmdArg.nBaseVideoTime > cmdArg.nBaseAudioTime) {
+                        cmdArg.nBaseAudioTime = cmdArg.nBaseVideoTime + 40;
+                        cmdArg.nBaseVideoTime += 40;
+                } else {
+                        cmdArg.nBaseVideoTime = cmdArg.nBaseAudioTime + 40;
+                        cmdArg.nBaseAudioTime += 40;
+                }
         }
         return 0;
 }
@@ -532,6 +550,7 @@ end:
                 return -1;
         }
         
+        
         return 0;
 }
 #endif
@@ -543,7 +562,7 @@ static int dataCallback(void *opaque, void *pData, int nDataLen, int nFlag, int6
         pAvuploader->nByteCount += nDataLen;
         if (nFlag == THIS_IS_AUDIO){
                 //fprintf(stderr, "push audio ts:%lld\n", timestamp);
-                ret = PushAudio(pAvuploader->pTsMuxUploader, pData, nDataLen, timestamp);
+                ret = PushAudio(pAvuploader->pTsMuxUploader, pData, nDataLen, timestamp + cmdArg.nBaseAudioTime);
         } else {
                 if (pAvuploader->firstTimeStamp == -1){
                         pAvuploader->firstTimeStamp = timestamp;
@@ -559,7 +578,15 @@ static int dataCallback(void *opaque, void *pData, int nDataLen, int nFlag, int6
                 }
                 pAvuploader->nVideoKeyframeAccLen += nDataLen;
                 //printf("------->push video key:%d ts:%lld size:%d\n",nIsKeyFrame, timestamp, nDataLen);
-                ret = PushVideo(pAvuploader->pTsMuxUploader, pData, nDataLen, timestamp, nIsKeyFrame, nNewSegMent);
+                if (nIsKeyFrame) {
+                        if (cmdArg.IsDropFirstKeyFrame) {
+                                cmdArg.IsDropFirstKeyFrame = 0;
+                                return 0;
+                        }
+                        cmdArg.nKeyFrameCount++;
+                }
+                
+                ret = PushVideo(pAvuploader->pTsMuxUploader, pData, nDataLen, timestamp + cmdArg.nBaseVideoTime, nIsKeyFrame, nNewSegMent);
         }
         return ret;
 }
@@ -591,7 +618,7 @@ void signalHander(int s){
 
 void logCb(char * pLog)
 {
-        printf("-%s", pLog);
+        fprintf(stderr, "-%s", pLog);
 }
 
 static void checkCmdArg(const char * name)
@@ -635,6 +662,16 @@ static void checkCmdArg(const char * name)
         if (cmdArg.nUptokenInterval == 0) {
                 cmdArg.nUptokenInterval = 3550;
         }
+        if (cmdArg.IsTwoUpload || cmdArg.IsTwoFileUpload) {
+                if (cmdArg.pUa1 == NULL || cmdArg.pUa2 == NULL) {
+                        logerror("ua1 or ua2 is NULL");
+                        exit(6);
+                }
+        } else {
+                if (cmdArg.pUa1 == NULL) {
+                        cmdArg.pUa1 = "ipcxxa";
+                }
+        }
         return;
 }
 
@@ -649,8 +686,8 @@ static void * second_test(void * opaque) {
 
         avuploader.userUploadArg.pToken_ = gtestToken;
         avuploader.userUploadArg.nTokenLen_ = strlen(gtestToken);
-        avuploader.userUploadArg.pDeviceId_ = "testdeviceid0";
-        avuploader.userUploadArg.nDeviceIdLen_ = strlen("testdeviceid0");
+        avuploader.userUploadArg.pDeviceId_ = cmdArg.pUa2;
+        avuploader.userUploadArg.nDeviceIdLen_ = strlen(cmdArg.pUa2);
         avuploader.userUploadArg.nUploaderBufferSize = cmdArg.nQbufSize;
         avuploader.userUploadArg.nNewSegmentInterval = cmdArg.nNewSetIntval;
         
@@ -683,8 +720,8 @@ static void do_start_file_test(AVuploader *pAvuploader){
 static void * second_file_test(void * opaque) {
         AVuploader *pAuploader = (AVuploader *)opaque;;
         AVuploader avuploader = *pAuploader;
-        avuploader.userUploadArg.pDeviceId_ = "testdeviceid0";
-        avuploader.userUploadArg.nDeviceIdLen_ = strlen("testdeviceid0");
+        avuploader.userUploadArg.pDeviceId_ = cmdArg.pUa2;
+        avuploader.userUploadArg.nDeviceIdLen_ = strlen(cmdArg.pUa2);
         
         int ret = CreateAndStartAVUploader(&avuploader.pTsMuxUploader, &avuploader.avArg, &avuploader.userUploadArg);
         if (ret != 0) {
@@ -700,19 +737,19 @@ static void * second_file_test(void * opaque) {
 
 int main(int argc, const char** argv)
 {
-	flag_bool(&cmdArg.IsInputFromFFmpeg, "ffmpeg", "is input from ffmpeg. will set --testaac and not set noadts");
-	flag_bool(&cmdArg.IsTestAAC, "testaac", "input aac audio");
-	flag_bool(&cmdArg.IsTestAACWithoutAdts, "noadts", "input aac audio without adts. will set --testaac");
-	flag_bool(&cmdArg.IsTestTimestampRollover, "rollover", "will set start pts to 95437000. ts will roll over about 6.x second laetr.only effect for not input from ffmpeg");
-	flag_bool(&cmdArg.IsTestH265, "testh265", "input h264 video");
-	flag_bool(&cmdArg.IsLocalToken, "localtoken", "use kodo server mode");
-	flag_bool(&cmdArg.IsNoAudio, "na", "no audio");
-	flag_bool(&cmdArg.IsNoVideo, "nv", "no video(not support now)");
-	flag_bool(&cmdArg.IsTestMove, "testmove", "testmove seperated by key frame");
+        flag_bool(&cmdArg.IsInputFromFFmpeg, "ffmpeg", "is input from ffmpeg. will set --testaac and not set noadts");
+        flag_bool(&cmdArg.IsTestAAC, "testaac", "input aac audio");
+        flag_bool(&cmdArg.IsTestAACWithoutAdts, "noadts", "input aac audio without adts. will set --testaac");
+        flag_bool(&cmdArg.IsTestTimestampRollover, "rollover", "will set start pts to 95437000. ts will roll over about 6.x second laetr.only effect for not input from ffmpeg");
+        flag_bool(&cmdArg.IsTestH265, "testh265", "input h264 video");
+        flag_bool(&cmdArg.IsLocalToken, "localtoken", "use kodo server mode");
+        flag_bool(&cmdArg.IsNoAudio, "na", "no audio");
+        flag_bool(&cmdArg.IsNoVideo, "nv", "no video(not support now)");
+        flag_bool(&cmdArg.IsTestMove, "testmove", "testmove seperated by key frame");
 #ifdef TEST_WITH_FFMPEG
-        flag_bool(&cmdArg.IsTwoUpload, "two", "test two instance upload. ffmpeg and file");
+        flag_bool(&cmdArg.IsTwoUpload, "two", "test two instance upload. ffmpeg and file. must set ua1 nad ua2");
 #endif
-        flag_bool(&cmdArg.IsTwoFileUpload, "twofile", "test two file instance upload");
+        flag_bool(&cmdArg.IsTwoFileUpload, "twofile", "test two file instance upload. must set ua1 nad ua2");
         flag_int(&cmdArg.nSleeptime, "sleeptime", "sleep time(milli) used by testmove.default(2s) if testmove is enable");
         flag_int(&cmdArg.nFirstFrameSleeptime, "fsleeptime", "first video key frame sleep time(milli)");
         flag_int(&cmdArg.nQbufSize, "qbufsize", "upload queue buffer size");
@@ -721,9 +758,12 @@ int main(int argc, const char** argv)
         flag_str(&cmdArg.pAFilePath, "afpath", "set audio file path.like /root/a.aac");
         flag_str(&cmdArg.pVFilePath, "vfpath", "set video file path.like /root/a.h264");
         flag_str(&cmdArg.pTokenUrl, "tokenurl", "url where to send token request");
+        flag_str(&cmdArg.pUa1, "ua1", "ua(deviceid) name. default value is ipcxxa");
+        flag_str(&cmdArg.pUa2, "ua2", "ua(deviceid) name");
         flag_bool(&cmdArg.IsFileLoop, "fileloop", "in file mode and only one upload, will loop to push file");
         flag_int(&cmdArg.nLoopSleeptime, "csleeptime", "next round sleeptime");
         flag_bool(&cmdArg.IsNoNet, "nonet", "no network");
+        flag_bool(&cmdArg.IsDropFirstKeyFrame, "drop_first_keyframe", "drop first keyframe");
 
         flag_parse(argc, argv, VERSION);
         if (argc == 2 && (strcmp(argv[1], "-h") == 0 || strcmp(argv[1], "-help") == 0)) {
@@ -874,8 +914,8 @@ int main(int argc, const char** argv)
         
         avuploader.userUploadArg.pToken_ = gtestToken;
         avuploader.userUploadArg.nTokenLen_ = strlen(gtestToken);
-        avuploader.userUploadArg.pDeviceId_ = "testdeviceid";
-        avuploader.userUploadArg.nDeviceIdLen_ = strlen("testdeviceid");
+        avuploader.userUploadArg.pDeviceId_ = cmdArg.pUa1;
+        avuploader.userUploadArg.nDeviceIdLen_ = strlen(cmdArg.pUa1);
         avuploader.userUploadArg.nUploaderBufferSize = cmdArg.nQbufSize;
         avuploader.userUploadArg.nNewSegmentInterval = cmdArg.nNewSetIntval;
         
