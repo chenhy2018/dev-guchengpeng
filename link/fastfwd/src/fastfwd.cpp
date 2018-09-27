@@ -177,6 +177,68 @@ void MediaPacket::SetKey()
         pAvPacket_->flags |= AV_PKT_FLAG_KEY;
 }
 
+
+//
+// Statistic
+//
+
+Statistic::Statistic()
+        : nInBytes_(0),
+          nOutBytes_(0),
+          nCounts_(0)
+{
+        bThreadExit_.store(false);
+        stat_ = std::thread([this]() {
+                int nInBytes = 0, nOutBytes = 0, nCount = 0;
+                while (bThreadExit_.load() == false) {
+                        std::this_thread::sleep_for(std::chrono::seconds(nStatPeriod));
+                        GetStat(nInBytes, nOutBytes, nCount);
+                        Info("STAT: in=%dkbps (%d bytes), out=%dkbps (%d bytes), pumper_concurrent=%d",
+                                nInBytes * 8 / (1024 * nStatPeriod), nInBytes,
+                                nOutBytes * 8 / (1024 * nStatPeriod), nOutBytes,
+                                nCount);
+                nInBytes = nOutBytes = nCount = 0;
+                }
+        });
+}
+
+Statistic::~Statistic()
+{
+        bThreadExit_ = true;
+        if (stat_.joinable()) {
+                stat_.join();
+        }
+        return;
+}
+
+void Statistic::IncInBytes(IN int _nBytes)
+{
+        nInBytes_ += _nBytes;
+}
+
+void Statistic::IncOutBytes(IN int _nBytes)
+{
+        nOutBytes_ += _nBytes;
+}
+
+void Statistic::IncCount()
+{
+        nCounts_++;
+}
+
+void Statistic::DecCount()
+{
+        nCounts_--;
+}
+
+void Statistic::GetStat(OUT int& _nInBytes,OUT int& _nOutBytes, OUT int& _nCounts)
+{
+        _nInBytes = nInBytes_.exchange(0);
+        _nOutBytes = nOutBytes_.exchange(0);
+        _nCounts = nCounts_;
+}
+
+
 //
 // FileSink
 //
@@ -455,13 +517,13 @@ int AvReceiver::Receive(IN const std::string& _url, IN int _nXspeed, IN PacketHa
         // for timeout timer
         std::string option;
         nTimeout_ = 10 * 1000; // 10 seconds
-        Info("receiver timeout=%lu milliseconds", nTimeout_);
+        Warn("receiver timeout=%lu milliseconds", nTimeout_);
         pAvContext_->interrupt_callback.callback = AvReceiver::AvInterruptCallback;
         pAvContext_->interrupt_callback.opaque = this;
         start_ = std::chrono::high_resolution_clock::now();
 
         // open input stream
-        Info("input URL: %s", _url.c_str());
+        Debug("input URL: %s", _url.c_str());
         int nStatus = avformat_open_input(&pAvContext_, _url.c_str(), 0, 0);
         if (nStatus < 0) {
                 static char str[500];
@@ -480,7 +542,7 @@ int AvReceiver::Receive(IN const std::string& _url, IN int _nXspeed, IN PacketHa
         for (unsigned int i = 0; i < pAvContext_->nb_streams; i++) {
                 struct AVStream * pAvStream = pAvContext_->streams[i];
                 streams_.push_back(StreamInfo{pAvStream, -1});
-                Info("stream is found: avstream=%d, avcodec=%d",
+                Debug("stream is found: avstream=%d, avcodec=%d",
                      pAvStream->codecpar->codec_type, pAvStream->codecpar->codec_id);
         }
 
@@ -492,6 +554,9 @@ int AvReceiver::Receive(IN const std::string& _url, IN int _nXspeed, IN PacketHa
                 if (nStatus < 0) {
                         return nStatus;
                 }
+
+                // statistic input bytes
+                pStat_->IncInBytes(avPacket.size);
 
                 if (avPacket.stream_index < 0 ||
                     static_cast<unsigned int>(avPacket.stream_index) >= pAvContext_->nb_streams) {
@@ -560,10 +625,11 @@ bool AvReceiver::EmulateFramerate(IN int64_t _nPts, OUT StreamInfo& _stream, IN 
 
         _stream.nCount++;
 
-        Info("wall_clock=%ld vs play_clock=%ld", nDuration, nPlaytime);
+        Debug("wall_clock=%ld vs play_clock=%ld", nDuration, nPlaytime);
 
         return true;
 }
+
 
 //
 // StreamPumper
@@ -576,6 +642,7 @@ StreamPumper::StreamPumper(IN const std::string& _url, IN int _nXspeed, IN int _
 {
         std::call_once(avformatInit_, [](){
                         avformat_network_init();
+                        av_log_set_level(AV_LOG_WARNING);
                 });
 
         bPumperStopped_.store(false);
@@ -598,11 +665,14 @@ StreamPumper::StreamPumper(IN const std::string& _url, IN int _nXspeed, IN int _
         if (_nBlockSize < 4096) {
                 nBlockSize_ = 4096;
         }
+
+        pStat_->IncCount();
 }
 
 StreamPumper::~StreamPumper()
 {
         StopPumper();
+        pStat_->DecCount();
 }
 
 void StreamPumper::StartPumper()
