@@ -122,7 +122,7 @@ func GetInfoFromFilename(s, sep string) (error, map[string]interface{}) {
 // Return []yyyy/mm/dd, if same day and same hour, return [1]yyyy/mm/dd/hh
 func calculateMark(xl *xlog.Logger, starttime int64, uaid, head string) string {
 	k2 := fmt.Sprintf("%s/%s/%d", head, uaid, starttime/1000-MAX_SEGMENT_TS_TIME_STAMP)
-	xl.Infof("CalculateMark k %s", k2)
+	xl.Infof("CalculateMark %s", k2)
 
 	m := map[string]interface{}{
 		"k": k2,
@@ -155,13 +155,18 @@ func (m *SegmentKodoModel) GetSegmentTsInfo(xl *xlog.Logger, starttime, endtime 
 
 	prefix := "ts/" + uaid + "/"
 	ctx, cancelFunc := context.WithCancel(context.Background())
-	xl.Infof("GetSegmentTsInfo prefix ********* %s \n", prefix)
+	xl.Infof("GetSegmentTsInfo prefix  %s \n", prefix)
 	entries, err := bucketManager.ListBucketContext(ctx, bucket, prefix, delimiter, marker)
 	if err != nil {
-		info := err.(*storage.ErrorInfo)
-		if info.Code == 200 {
-			return r, "", nil
+		info, ok := err.(*storage.ErrorInfo)
+		if ok {
+			if info.Code == 200 {
+				return r, "", nil
+			} else {
+				return r, "", err
+			}
 		} else {
+			xl.Infof("Not ok")
 			return r, "", err
 		}
 	}
@@ -181,7 +186,6 @@ func (m *SegmentKodoModel) GetSegmentTsInfo(xl *xlog.Logger, starttime, endtime 
 			break
 		}
 		if info[SEGMENT_ITEM_END_TIME].(int64) > starttime {
-			xl.Infof("GetTsInfo info[SEGMENT_ITEM_START_TIME] %d \n", info[SEGMENT_ITEM_START_TIME].(int64))
 			r = append(r, info)
 			total++
 		}
@@ -237,8 +241,6 @@ func (m *SegmentKodoModel) GetFragmentTsInfo(xl *xlog.Logger, count int, startti
 			break
 		}
 		if info[SEGMENT_ITEM_END_TIME].(int64) > starttime {
-			xl.Infof("GetFragmentTsInfo info[SEGMENT_ITEM_START_TIME] %d \n", info[SEGMENT_ITEM_START_TIME].(int64))
-			xl.Infof("GetFragmentTsInfo info[SEGMENT_ITEM_END_TIME] %d \n", info[SEGMENT_ITEM_END_TIME].(int64))
 			r = append(r, info)
 			total++
 		}
