@@ -4,21 +4,13 @@ import (
 	//"time"
 	"encoding/json"
 	//"errors"
+	"io/ioutil"
+
 	"github.com/gin-gonic/gin"
 	xlog "github.com/qiniu/xlog.v1"
-	"io/ioutil"
 	"qiniu.com/models"
 	//"strconv"
 )
-
-var (
-	UaMod *models.UaModel
-)
-
-func init() {
-	UaMod = &models.UaModel{}
-	UaMod.Init()
-}
 
 type uabody struct {
 	Uaid      string `json:"uaid"`
@@ -53,9 +45,9 @@ func RegisterUa(c *gin.Context) {
 	}
 	user, err := getUserInfo(xl, c.Request)
 	if err != nil {
-		c.JSON(403, gin.H{
-			"error": "get user info falied",
-		})
+		xl.Errorf("get user Info failed%v", err)
+		c.JSON(500, gin.H{"error": err.Error()})
+		return
 	}
 
 	ua := models.UaInfo{
@@ -66,7 +58,12 @@ func RegisterUa(c *gin.Context) {
 	}
 	model := models.NamespaceModel{}
 	r, err := model.GetNamespaceInfo(xl, getUid(user.uid), params.namespace)
-	if err != nil || len(r) == 0 {
+	if err != nil {
+		xl.Errorf("get namespace error, error =%#v", err)
+		c.JSON(500, gin.H{"error": "Service Internal Error"})
+		return
+	}
+	if len(r) == 0 {
 		xl.Errorf("namespace is not correct")
 		c.JSON(400, gin.H{
 			"error": "namespace is not correct",
@@ -75,6 +72,13 @@ func RegisterUa(c *gin.Context) {
 	}
 
 	info, err := UaMod.GetUaInfo(xl, params.namespace, params.uaid)
+	if err != nil {
+		xl.Errorf("get ua info failed")
+		c.JSON(500, gin.H{
+			"error": "Service Internal Error",
+		})
+		return
+	}
 	if len(info) != 0 {
 		xl.Errorf("ua is exist")
 		c.JSON(400, gin.H{
@@ -86,8 +90,8 @@ func RegisterUa(c *gin.Context) {
 	err = UaMod.Register(xl, ua)
 	if err != nil {
 		xl.Errorf("Register falied error = %#v", err.Error())
-		c.JSON(400, gin.H{
-			"error": err.Error(),
+		c.JSON(500, gin.H{
+			"error": "Service Internal Error",
 		})
 		return
 	} else {
@@ -106,11 +110,28 @@ func DeleteUa(c *gin.Context) {
 		})
 		return
 	}
-	err = UaMod.Delete(xl, params.namespace, params.uaid)
+	cond := map[string]interface{}{
+		models.UA_ITEM_NAMESPACE: params.namespace,
+		models.UA_ITEM_UAID:      params.uaid,
+	}
+	info, err := UaMod.GetUaInfo(xl, params.namespace, params.uaid)
+	if err != nil {
+		xl.Errorf("get use info error, error =%#v", err)
+		c.JSON(500, gin.H{"error": "Service Internal Error"})
+		return
+	}
+	if len(info) == 0 {
+		xl.Errorf("ua is not correct")
+		c.JSON(400, gin.H{
+			"error": "ua is not correct",
+		})
+		return
+	}
+	err = UaMod.Delete(xl, cond)
 	if err != nil {
 		xl.Errorf("Delete falied error = %#v", err.Error())
-		c.JSON(400, gin.H{
-			"error": err.Error(),
+		c.JSON(500, gin.H{
+			"error": "Service Internal Error",
 		})
 		return
 	} else {
@@ -143,9 +164,9 @@ func UpdateUa(c *gin.Context) {
 
 	user, err := getUserInfo(xl, c.Request)
 	if err != nil {
-		c.JSON(403, gin.H{
-			"error": "get user info falied",
-		})
+		xl.Errorf("get user Info failed%v", err)
+		c.JSON(500, gin.H{"error": err.Error()})
+		return
 	}
 
 	ua := models.UaInfo{
@@ -157,7 +178,14 @@ func UpdateUa(c *gin.Context) {
 
 	model := models.NamespaceModel{}
 	r, err := model.GetNamespaceInfo(xl, getUid(user.uid), params.namespace)
-	if err != nil || len(r) == 0 {
+	if err != nil {
+		xl.Errorf("namespace is not correct")
+		c.JSON(500, gin.H{
+			"error": "Service Internal Error",
+		})
+		return
+	}
+	if len(r) == 0 {
 		xl.Errorf("namespace is not correct")
 		c.JSON(400, gin.H{
 			"error": "namespace is not correct",
@@ -174,7 +202,12 @@ func UpdateUa(c *gin.Context) {
 	}
 
 	info, err := UaMod.GetUaInfo(xl, params.namespace, params.uaid)
-	if len(info) == 0 || err != nil {
+	if err != nil {
+		xl.Errorf("get ua info error, error =%#v", err)
+		c.JSON(500, gin.H{"error": "Service Internal Error"})
+		return
+	}
+	if len(info) == 0 {
 		xl.Errorf("ua is not correct")
 		c.JSON(400, gin.H{
 			"error": "ua is not correct",
@@ -186,7 +219,12 @@ func UpdateUa(c *gin.Context) {
 		ua.Password = info[0].Password
 	}
 
-	info, _ = UaMod.GetUaInfo(xl, ua.Namespace, ua.UaId)
+	info, err = UaMod.GetUaInfo(xl, ua.Namespace, ua.UaId)
+	if err != nil {
+		xl.Errorf("get ua info error, error =%#v", err)
+		c.JSON(500, gin.H{"error": "Service Internal Error"})
+		return
+	}
 	if len(info) != 0 {
 		xl.Errorf("ua is exist")
 		c.JSON(400, gin.H{
@@ -197,9 +235,7 @@ func UpdateUa(c *gin.Context) {
 	err = UaMod.UpdateUa(xl, params.namespace, params.uaid, ua)
 	if err != nil {
 		xl.Errorf("Update falied error = %#v", err.Error())
-		c.JSON(400, gin.H{
-			"error": err.Error(),
-		})
+		c.JSON(500, gin.H{"error": "Service Internal Error"})
 		return
 	} else {
 		c.JSON(200, gin.H{"success": true})
@@ -227,8 +263,8 @@ func GetUaInfo(c *gin.Context) {
 	}
 	if err != nil {
 		xl.Errorf("Get falied error = %#v", err.Error())
-		c.JSON(400, gin.H{
-			"error": err.Error(),
+		c.JSON(500, gin.H{
+			"error": "Service Internal Error",
 		})
 		return
 	} else {

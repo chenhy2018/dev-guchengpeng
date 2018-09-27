@@ -54,7 +54,7 @@ typedef struct _FFTsMuxUploader{
         FFTsMuxContext *pTsMuxCtx;
         
         int64_t nLastVideoTimestamp;
-        int64_t nLastUploadVideoTimestamp; //initial to -1
+        int64_t nFirstTimestamp; //initial to -1
         int nKeyFrameCount;
         int nFrameCount;
         AvArg avArg;
@@ -263,18 +263,13 @@ static int push(FFTsMuxUploader *pFFTsMuxUploader, char * _pData, int _nDataLen,
         return ret;
 }
 
-static int PushVideo(TsMuxUploader *_pTsMuxUploader, char * _pData, int _nDataLen, int64_t _nTimestamp, int nIsKeyFrame, int _nIsSegStart)
+static int checkSwitch(TsMuxUploader *_pTsMuxUploader, int64_t _nTimestamp, int nIsKeyFrame, int _isVideo, int _nIsSegStart)
 {
+        int ret;
+        int shouldSwitch = 0;
         FFTsMuxUploader *pFFTsMuxUploader = (FFTsMuxUploader *)_pTsMuxUploader;
-        pthread_mutex_lock(&pFFTsMuxUploader->muxUploaderMutex_);
-        int ret = 0;
-        if (pFFTsMuxUploader->nKeyFrameCount == 0 && !nIsKeyFrame) {
-                logwarn("first video frame not IDR. drop this frame\n");
-                pthread_mutex_unlock(&pFFTsMuxUploader->muxUploaderMutex_);
-                return 0;
-        }
-        if (pFFTsMuxUploader->nLastUploadVideoTimestamp == -1) {
-                pFFTsMuxUploader->nLastUploadVideoTimestamp = _nTimestamp;
+        if (pFFTsMuxUploader->nFirstTimestamp == -1) {
+                pFFTsMuxUploader->nFirstTimestamp = _nTimestamp;
         }
         UploadState ustate = pFFTsMuxUploader->pTsMuxCtx->pTsUploader_->GetUploaderState(pFFTsMuxUploader->pTsMuxCtx->pTsUploader_);
         //if (pFFTsMuxUploader->pTsMuxCtx->pTsUploader_->GetUploaderState(pTsMuxCtx->pTsUploader_) == TK_UPLOAD_FAIL) {
@@ -283,17 +278,18 @@ static int PushVideo(TsMuxUploader *_pTsMuxUploader, char * _pData, int _nDataLe
                         logdebug("upload fail. drop the data");
                 }
                 pFFTsMuxUploader->ffMuxSatte = ustate;
+                shouldSwitch = 1;
         }
         // if start new uploader, start from keyframe
-        if (nIsKeyFrame) {
-                if( (_nTimestamp - pFFTsMuxUploader->nLastUploadVideoTimestamp) > 4980
-                   //at least 2 keyframe and aoubt last 5 second
+        if ((_isVideo && nIsKeyFrame) || shouldSwitch) {
+                if( ((_nTimestamp - pFFTsMuxUploader->nFirstTimestamp) > 4980 && pFFTsMuxUploader->nKeyFrameCount > 0)
+                   //at least 1 keyframe and aoubt last 5 second
                    || (_nIsSegStart && pFFTsMuxUploader->nFrameCount != 0)// new segment is specified
                    ||  pFFTsMuxUploader->ffMuxSatte != TK_UPLOAD_INIT){   // upload finished
                         //printf("next ts:%d %lld\n", pFFTsMuxUploader->nKeyFrameCount, _nTimestamp - pFFTsMuxUploader->nLastUploadVideoTimestamp);
                         pFFTsMuxUploader->nKeyFrameCount = 0;
                         pFFTsMuxUploader->nFrameCount = 0;
-                        pFFTsMuxUploader->nLastUploadVideoTimestamp = _nTimestamp;
+                        pFFTsMuxUploader->nFirstTimestamp = _nTimestamp;
                         pFFTsMuxUploader->ffMuxSatte = TK_UPLOAD_INIT;
                         pushRecycle(pFFTsMuxUploader);
                         if (_nIsSegStart) {
@@ -304,10 +300,27 @@ static int PushVideo(TsMuxUploader *_pTsMuxUploader, char * _pData, int _nDataLe
                                 return ret;
                         }
                 }
-                pFFTsMuxUploader->nKeyFrameCount++;
+                if (_isVideo && nIsKeyFrame) {
+                        pFFTsMuxUploader->nKeyFrameCount++;
+                }
         }
-        
-        pFFTsMuxUploader->nLastVideoTimestamp = _nTimestamp;
+        return 0;
+}
+
+static int PushVideo(TsMuxUploader *_pTsMuxUploader, char * _pData, int _nDataLen, int64_t _nTimestamp, int nIsKeyFrame, int _nIsSegStart)
+{
+        FFTsMuxUploader *pFFTsMuxUploader = (FFTsMuxUploader *)_pTsMuxUploader;
+        pthread_mutex_lock(&pFFTsMuxUploader->muxUploaderMutex_);
+        int ret = 0;
+        if (pFFTsMuxUploader->nKeyFrameCount == 0 && !nIsKeyFrame) {
+                logwarn("first video frame not IDR. drop this frame\n");
+                pthread_mutex_unlock(&pFFTsMuxUploader->muxUploaderMutex_);
+                return 0;
+        }
+        ret = checkSwitch(_pTsMuxUploader, _nTimestamp, nIsKeyFrame, 1, _nIsSegStart);
+        if (ret != 0) {
+                return ret;
+        }
         
         ret = push(pFFTsMuxUploader, _pData, _nDataLen, _nTimestamp, TK_STREAM_TYPE_VIDEO);
         if (ret == 0){
@@ -321,7 +334,11 @@ static int PushAudio(TsMuxUploader *_pTsMuxUploader, char * _pData, int _nDataLe
 {
         FFTsMuxUploader *pFFTsMuxUploader = (FFTsMuxUploader *)_pTsMuxUploader;
         pthread_mutex_lock(&pFFTsMuxUploader->muxUploaderMutex_);
-        int ret = push(pFFTsMuxUploader, _pData, _nDataLen, _nTimestamp, TK_STREAM_TYPE_AUDIO);
+        int ret = checkSwitch(_pTsMuxUploader, _nTimestamp, 0, 0, 0);
+        if (ret != 0) {
+                return ret;
+        }
+        ret = push(pFFTsMuxUploader, _pData, _nDataLen, _nTimestamp, TK_STREAM_TYPE_AUDIO);
         if (ret == 0){
                 pFFTsMuxUploader->nFrameCount++;
         }
@@ -702,7 +719,7 @@ int NewTsMuxUploader(TsMuxUploader **_pTsMuxUploader, AvArg *_pAvArg, char *_pDe
         
         pFFTsMuxUploader->nNewSegmentInterval = 30;
         
-        pFFTsMuxUploader->nLastUploadVideoTimestamp = -1;
+        pFFTsMuxUploader->nFirstTimestamp = -1;
         
         ret = pthread_mutex_init(&pFFTsMuxUploader->muxUploaderMutex_, NULL);
         if (ret != 0){

@@ -3,27 +3,19 @@ package controllers
 import (
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
+	"net/http"
+
 	"github.com/gin-gonic/gin"
 	"github.com/qiniu/api.v7/auth/qbox"
 	xlog "github.com/qiniu/xlog.v1"
-	"io/ioutil"
-	"net/http"
 	"qiniu.com/models"
-)
-
-var (
-	namespaceMod *models.NamespaceModel
 )
 
 const (
 	DOMAIN_URL     = "http://api.qiniu.com/v6/domain/list?tbl="
 	DEFAULT_EXPIRE = 7
 )
-
-func init() {
-	namespaceMod = &models.NamespaceModel{}
-	namespaceMod.Init()
-}
 
 type namespacebody struct {
 	Bucket       string `json:"bucket"`
@@ -53,13 +45,15 @@ func getDomain(xl *xlog.Logger, bucket string, info *userInfo) (string, error) {
 		return "", err
 	}
 
+	defer resp.Body.Close()
 	body, err := ioutil.ReadAll(resp.Body)
+
 	var domain []string
 	err = json.Unmarshal(body, &domain)
 	if err != nil || len(domain) == 0 {
 		return "", err
 	}
-	return domain[0], err
+	return domain[0], nil
 }
 
 func checkbucket(xl *xlog.Logger, bucket string) error {
@@ -116,9 +110,9 @@ func RegisterNamespace(c *gin.Context) {
 
 	info, err := getUserInfo(xl, c.Request)
 	if err != nil {
-		c.JSON(403, gin.H{
-			"error": "get user info falied",
-		})
+		xl.Errorf("get user Info failed%v", err)
+		c.JSON(500, gin.H{"error": err.Error()})
+		return
 	}
 
 	domain, err := getDomain(xl, namespaceData.Bucket, info)
@@ -130,7 +124,14 @@ func RegisterNamespace(c *gin.Context) {
 		return
 	}
 	oldinfo, err := namespaceMod.GetNamespaceInfo(xl, getUid(info.uid), params.namespace)
-	if err != nil || len(oldinfo) != 0 {
+	if err != nil {
+		xl.Errorf("get Namesapce Info error %#v", err)
+		c.JSON(500, gin.H{
+			"error": "Service Internal Error",
+		})
+		return
+	}
+	if len(oldinfo) != 0 {
 		xl.Errorf("namespace is exist")
 		c.JSON(400, gin.H{
 			"error": "namespace is exist",
@@ -153,8 +154,8 @@ func RegisterNamespace(c *gin.Context) {
 	err = namespaceMod.Register(xl, namespace)
 	if err != nil {
 		xl.Errorf("Register falied error = %#v", err.Error())
-		c.JSON(400, gin.H{
-			"error": err.Error(),
+		c.JSON(500, gin.H{
+			"error": "Service Internal Error",
 		})
 		return
 	} else {
@@ -175,43 +176,37 @@ func DeleteNamespace(c *gin.Context) {
 	}
 	info, err := getUserInfo(xl, c.Request)
 	if err != nil {
-		xl.Errorf("get user info falied, erro = %#v", err)
-		c.JSON(403, gin.H{
-			"error": "get user info falied",
+		xl.Errorf("get user Info failed%v", err)
+		c.JSON(500, gin.H{"error": err.Error()})
+		return
+	}
+	oldinfo, err := namespaceMod.GetNamespaceInfo(xl, getUid(info.uid), params.namespace)
+	if err != nil {
+		xl.Errorf("get Namesapce Info error %#v", err)
+		c.JSON(500, gin.H{
+			"error": "Service Internal Error",
 		})
 		return
 	}
-
+	if len(oldinfo) == 0 {
+		xl.Errorf("namespace doesn't exist")
+		c.JSON(400, gin.H{
+			"error": "namespace doesn't exist",
+		})
+		return
+	}
 	err = namespaceMod.Delete(xl, getUid(info.uid), params.namespace)
 	if err != nil {
 		xl.Errorf("Delete falied error = %#v", err.Error())
-		c.JSON(400, gin.H{
-			"error": err.Error(),
+		c.JSON(500, gin.H{
+			"error": "Service Internal Error",
 		})
 		return
-	} else {
-		model := models.UaModel{}
-		mark := ""
-		for {
-			uas, nextmark, err := model.GetUaInfos(xl, 0, mark, params.namespace, models.UA_ITEM_UAID, "")
-			if err != nil {
-				xl.Errorf("Register falied error = %#v", err.Error())
-				c.JSON(400, gin.H{
-					"error": err.Error(),
-				})
-				return
-			}
-			for i := 0; i < len(uas); i++ {
-				model.Delete(xl, uas[i].Namespace, uas[i].UaId)
-			}
-			if nextmark != "" {
-				mark = nextmark
-			} else {
-				break
-			}
-		}
-		c.JSON(200, gin.H{"success": true})
 	}
+	model := models.UaModel{}
+	cond := map[string]interface{}{models.UA_ITEM_NAMESPACE: params.namespace}
+	model.Delete(xl, cond)
+	c.JSON(200, gin.H{"success": true})
 }
 
 //need test.
@@ -311,11 +306,10 @@ func UpdateNamespace(c *gin.Context) {
 
 	info, err := getUserInfo(xl, c.Request)
 	if err != nil {
-		xl.Errorf("get user info falied, erro = %#v", err)
-		c.JSON(403, gin.H{
-			"error": "get user info falied",
-		})
+		xl.Errorf("get user Info failed%v", err)
+		c.JSON(500, gin.H{"error": err.Error()})
 		return
+
 	}
 
 	/*
@@ -337,8 +331,8 @@ func UpdateNamespace(c *gin.Context) {
 	err = updateNamespace(xl, getUid(info.uid), params.namespace, namespaceData.Namespace)
 	if err != nil {
 		xl.Errorf("update namespace failed, err = %#v", err)
-		c.JSON(400, gin.H{
-			"error": "update namespace failed",
+		c.JSON(500, gin.H{
+			"error": "Service Internal Error",
 		})
 		return
 	}
@@ -353,8 +347,8 @@ func UpdateNamespace(c *gin.Context) {
 	err = updateAutoCreateUa(xl, getUid(info.uid), params.namespace, oldinfo[0].AutoCreateUa, namespaceData.AutoCreateUa)
 	if err != nil {
 		xl.Errorf("update auto create ua failed")
-		c.JSON(400, gin.H{
-			"error": "update auto create ca failed",
+		c.JSON(500, gin.H{
+			"error": "Service Internal Error",
 		})
 		return
 	}
@@ -385,10 +379,8 @@ func GetNamespaceInfo(c *gin.Context) {
 
 	info, err := getUserInfo(xl, c.Request)
 	if err != nil {
-		xl.Errorf("get user info falied, erro = %#v", err)
-		c.JSON(403, gin.H{
-			"error": "get user info falied",
-		})
+		xl.Errorf("get user Info failed%v", err)
+		c.JSON(500, gin.H{"error": err.Error()})
 		return
 	}
 
@@ -399,15 +391,15 @@ func GetNamespaceInfo(c *gin.Context) {
 		r, nextMark, err = namespaceMod.GetNamespaceInfos(xl, params.limit, params.marker, getUid(info.uid), models.NAMESPACE_ITEM_ID, params.regex)
 	}
 	if err != nil {
-		xl.Errorf("Update falied error = %#v", err.Error())
-		c.JSON(400, gin.H{
-			"error": err.Error(),
+		xl.Errorf("get namesapce failed, error = %#v", err.Error())
+		c.JSON(500, gin.H{
+			"error": "Service Internal Error",
 		})
 		return
-	} else {
-		c.Header("Content-Type", "application/json")
-		c.Header("Access-Control-Allow-Origin", "*")
-		c.JSON(200, gin.H{"item": r,
-			"marker": nextMark})
 	}
+
+	c.Header("Content-Type", "application/json")
+	c.Header("Access-Control-Allow-Origin", "*")
+	c.JSON(200, gin.H{"item": r,
+		"marker": nextMark})
 }

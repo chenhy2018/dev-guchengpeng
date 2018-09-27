@@ -49,19 +49,19 @@ func GetSegments(c *gin.Context) {
 	user, err := getUserInfo(xl, c.Request)
 	if err != nil {
 		xl.Errorf("get user info error, error = %v", err)
-		c.JSON(500, gin.H{"error": "Service Internal Error"})
+		c.JSON(500, gin.H{"error": err.Error()})
 		return
 	}
 
 	bucket, err := GetBucket(xl, getUid(user.uid), params.namespace)
 	if err != nil {
 		xl.Errorf("get bucket error, error =  %#v", err)
-		c.JSON(500, gin.H{"error": "Service Internal Error"})
+		c.JSON(400, gin.H{"error": "namespace is not correct"})
 		return
 	}
 	mac := qbox.NewMac(user.ak, user.sk)
 	newFrom := getFristTsAfterFrom(xl, params.from, params.to, bucket, params.uaid, mac)
-	ret, marker, err := SegMod.GetFragmentTsInfo(xl, params.limit, newFrom, params.to, bucket, params.uaid, params.marker, mac)
+	ret, marker, err := segMod.GetFragmentTsInfo(xl, params.limit, newFrom, params.to, bucket, params.uaid, params.marker, mac)
 	if err != nil {
 		xl.Errorf("get segments list error, error =%#v", err)
 		c.JSON(500, gin.H{"error": "Service Internal Error"})
@@ -92,7 +92,7 @@ func GetSegments(c *gin.Context) {
 }
 func getFristTsAfterFrom(xl *xlog.Logger, from, to int64, bucket, uaid string, mac *qbox.Mac) int64 {
 
-	segs, _, err := SegMod.GetSegmentTsInfo(xl, from, to, bucket, uaid, 1, "", mac)
+	segs, _, err := segMod.GetSegmentTsInfo(xl, from, to, bucket, uaid, 1, "", mac)
 	if err != nil || segs == nil {
 		return from
 	}

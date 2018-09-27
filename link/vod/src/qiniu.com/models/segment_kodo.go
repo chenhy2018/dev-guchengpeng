@@ -155,7 +155,7 @@ func (m *SegmentKodoModel) GetSegmentTsInfo(xl *xlog.Logger, starttime, endtime 
 
 	prefix := "ts/" + uaid + "/"
 	ctx, cancelFunc := context.WithCancel(context.Background())
-	xl.Infof("GetSegmentTsInfo prefix ********* %s \n", prefix)
+	defer cancelFunc()
 	entries, err := bucketManager.ListBucketContext(ctx, bucket, prefix, delimiter, marker)
 	if err != nil {
 		info := err.(*storage.ErrorInfo)
@@ -170,18 +170,15 @@ func (m *SegmentKodoModel) GetSegmentTsInfo(xl *xlog.Logger, starttime, endtime 
 		err, info := GetInfoFromFilename(listItem1.Item.Key, "/")
 		if err != nil {
 			fmt.Println(err)
-			cancelFunc()
 			break
 		}
 		if len(info) == 0 {
 			continue
 		}
 		if info[SEGMENT_ITEM_START_TIME].(int64)/1000 > endtime/1000 {
-			cancelFunc()
 			break
 		}
 		if info[SEGMENT_ITEM_END_TIME].(int64) > starttime {
-			xl.Infof("GetTsInfo info[SEGMENT_ITEM_START_TIME] %d \n", info[SEGMENT_ITEM_START_TIME].(int64))
 			r = append(r, info)
 			total++
 		}
@@ -214,6 +211,7 @@ func (m *SegmentKodoModel) GetFragmentTsInfo(xl *xlog.Logger, count int, startti
 	prefix := "seg/" + uaid + "/"
 	xl.Infof("GetFragmentTsInfo prefix  %s \n", prefix)
 	ctx, cancelFunc := context.WithCancel(context.Background())
+	defer cancelFunc()
 	entries, err := bucketManager.ListBucketContext(ctx, bucket, prefix, delimiter, marker)
 	if err != nil {
 		xl.Errorf("GetFragmentTsInfo ListBucketContext %#v", err)
@@ -233,12 +231,9 @@ func (m *SegmentKodoModel) GetFragmentTsInfo(xl *xlog.Logger, count int, startti
 		}
 
 		if info[SEGMENT_ITEM_START_TIME].(int64)/1000 > endtime/1000 {
-			cancelFunc()
 			break
 		}
 		if info[SEGMENT_ITEM_END_TIME].(int64) > starttime {
-			xl.Infof("GetFragmentTsInfo info[SEGMENT_ITEM_START_TIME] %d \n", info[SEGMENT_ITEM_START_TIME].(int64))
-			xl.Infof("GetFragmentTsInfo info[SEGMENT_ITEM_END_TIME] %d \n", info[SEGMENT_ITEM_END_TIME].(int64))
 			r = append(r, info)
 			total++
 		}
@@ -265,6 +260,7 @@ func (m *SegmentKodoModel) GetFrameInfo(xl *xlog.Logger, starttime, endtime int6
 	prefix := "frame/" + uaid + "/"
 	xl.Infof("GetFragmentTsInfo prefix  %s \n", prefix)
 	ctx, cancelFunc := context.WithCancel(context.Background())
+	defer cancelFunc()
 	entries, err := bucketManager.ListBucketContext(ctx, bucket, prefix, delimiter, marker)
 	if err != nil {
 		xl.Errorf("GetFrameTsInfo ListBucketContext %#v", err)
@@ -284,7 +280,6 @@ func (m *SegmentKodoModel) GetFrameInfo(xl *xlog.Logger, starttime, endtime int6
 			continue
 		}
 		if info[SEGMENT_ITEM_START_TIME].(int64)/1000 > endtime/1000 {
-			cancelFunc()
 			break
 		}
 		if info[SEGMENT_ITEM_START_TIME].(int64) >= starttime {

@@ -512,8 +512,12 @@ int dev_sdk_start_audio_play(DevSdkAudioType audiotype)
 int dev_sdk_stop_video(int camera, int stream)
 {
         cameras[camera].videoStreams[stream].isStop = 1;
+        pthread_t tid;
+        memset(&tid, 0, sizeof(tid));
+        if(memcmp(&tid, &cameras[camera].audioStreams[stream].tid, sizeof(tid)) != 0) {
+                pthread_join(cameras[camera].videoStreams[stream].tid, NULL);
+        }
         cameras[camera].videoStreams[stream].videoCb = NULL;
-        pthread_join(&cameras[camera].videoStreams[stream].tid, NULL);
         memset(&cameras[camera].videoStreams[stream].tid, 0, sizeof(pthread_t));
         return 0;
 }
@@ -521,8 +525,12 @@ int dev_sdk_stop_video(int camera, int stream)
 int dev_sdk_stop_audio(int camera, int stream)
 {
         cameras[camera].audioStreams[stream].isStop = 1;
+        pthread_t tid;
+        memset(&tid, 0, sizeof(tid));
+        if(memcmp(&tid, &cameras[camera].audioStreams[stream].tid, sizeof(tid)) != 0) {
+                pthread_join(cameras[camera].audioStreams[stream].tid, NULL);
+        }
         cameras[camera].audioStreams[stream].audioCb = NULL;
-        pthread_join(&cameras[camera].audioStreams[stream].tid, NULL);
         memset(&cameras[camera].audioStreams[stream].tid, 0, sizeof(pthread_t));
         return 0;
 }
@@ -548,6 +556,7 @@ int dev_sdk_start_video(int camera, int stream, VIDEO_CALLBACK vcb, void *pconte
         }
         pStream->videoCb = vcb;
         
+        cameras[camera].videoStreams[stream].isStop = 0;
         pthread_create( &pStream->tid, NULL, VideoCaptureTask, (void *)pStream );
         return 0;
 }
@@ -566,6 +575,7 @@ int dev_sdk_start_audio(int camera, int stream, AUDIO_CALLBACK acb, void *pconte
         }
         pStream->audioCb = acb;
         
+        cameras[camera].audioStreams[stream].isStop = 0;
         pthread_create( &pStream->tid, NULL, AudioCaptureTask, (void *)pStream );
         
         return 0;
