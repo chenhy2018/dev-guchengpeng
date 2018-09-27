@@ -321,6 +321,11 @@ static int PushVideo(TsMuxUploader *_pTsMuxUploader, char * _pData, int _nDataLe
         if (ret != 0) {
                 return ret;
         }
+        if (pFFTsMuxUploader->nKeyFrameCount == 0 && !nIsKeyFrame) {
+                logwarn("first video frame not IDR. drop this frame\n");
+                pthread_mutex_unlock(&pFFTsMuxUploader->muxUploaderMutex_);
+                return 0;
+        }
         
         ret = push(pFFTsMuxUploader, _pData, _nDataLen, _nTimestamp, TK_STREAM_TYPE_VIDEO);
         if (ret == 0){
