@@ -30,7 +30,7 @@ static int PushQueue(CircleQueue *_pQueue, char *pData_, int nDataLen)
         
         if (!pQueueImp->nIsAvailableAfterTimeout && pQueueImp->nQState_ == QUEUE_TIMEOUT_STATE) {
                 pQueueImp->statInfo.nDropped += nDataLen;
-                logwarn("queue is is timeout dropped");
+                logwarn("queue is timeout dropped:%p", _pQueue);
                 pthread_mutex_unlock(&pQueueImp->mutex_);
                 return 0;
         }

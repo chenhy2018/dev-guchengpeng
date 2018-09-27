@@ -2,10 +2,11 @@ package models
 
 import (
 	"fmt"
+	"testing"
+
 	"github.com/qiniu/xlog.v1"
 	"github.com/stretchr/testify/assert"
 	"qiniu.com/db"
-	"testing"
 	//"time"
 )
 
@@ -50,7 +51,11 @@ func TestUa(t *testing.T) {
 	assert.Equal(t, size_1, 1, "they should be equal")
 	assert.Equal(t, r_1[0].Namespace, "test", "they should be equal")
 	for count := 0; count < 100; count++ {
-		model.Delete(xl, "test", fmt.Sprintf("daaa%03d", count))
+		cond := map[string]interface{}{
+			UA_ITEM_NAMESPACE: "test",
+			UA_ITEM_UAID:      fmt.Sprintf("daaa%03d", count),
+		}
+		model.Delete(xl, cond)
 	}
 }
 
@@ -93,6 +98,10 @@ func TestWrongPriUrl(t *testing.T) {
 	size := len(r)
 	assert.Equal(t, size, 100, "they should be equal")
 	for count := 0; count < 100; count++ {
-		model.Delete(xl, "test", fmt.Sprintf("daaa%03d", count))
+		cond := map[string]interface{}{
+			UA_ITEM_NAMESPACE: "test",
+			UA_ITEM_UAID:      fmt.Sprintf("daaa%03d", count),
+		}
+		model.Delete(xl, cond)
 	}
 }

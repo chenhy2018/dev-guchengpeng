@@ -46,9 +46,14 @@ func LoadConf(dir, file string) (conf *Configuration, err error) {
 }
 
 func HaveDb() bool {
+	// cause golang runtime will inlined only one
+	// leaf functions, but in test case we need mock those function
+	// so we just disable this inline
+	defer func() {}()
 	return haveDbConf
 }
 
 func HaveQconf() bool {
+	defer func() {}()
 	return haveQconf
 }

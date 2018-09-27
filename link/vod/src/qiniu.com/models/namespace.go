@@ -2,12 +2,13 @@ package models
 
 import (
 	"fmt"
+	"strconv"
+	"time"
+
 	"github.com/qiniu/xlog.v1"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 	"qiniu.com/db"
-	"strconv"
-	"time"
 )
 
 type NamespaceModel struct {
