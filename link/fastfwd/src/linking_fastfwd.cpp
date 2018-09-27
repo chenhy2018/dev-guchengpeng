@@ -24,22 +24,22 @@ extern char *optarg;
 unsigned int fastfwd::global::nLogLevel = 4;
 
 // Logic and data behind the server's behavior.
-class GreeterServiceImpl final : public FastForward::Service {
+class FastForwardServiceImpl final : public FastForward::Service {
         Status GetTsStream(ServerContext* context, const FastForwardInfo* request,
                         ServerWriter<FastForwardStream>* writer) override {
 
                 FastForwardStream ffs;
-                long cSize;
-                char * cBuffer;
-                std::string url = request->url();
-                int x = reinterpret_cast<int>(request->speed());
+                std::string szUrl = request->url();
+                int nSpeed = reinterpret_cast<int>(request->speed());
 
-                auto pPumper = std::make_unique<fastfwd::StreamPumper>(url, x, 4096);
+                auto pPumper = std::make_unique<fastfwd::StreamPumper>(szUrl, nSpeed, 4096);
 
-                std::vector<char> buffer;
-                while (pPumper->Pump(buffer, 5 * 1000) == 0) {
-                        ffs.set_stream(buffer.data(), buffer.size());
-                        writer->Write(ffs);
+                std::vector<char> chBuffer;
+                while (pPumper->Pump(chBuffer, 5 * 1000) == 0) {
+                        ffs.set_stream(chBuffer.data(), chBuffer.size());
+                        if(!writer->Write(ffs)) {
+                                return Status::CANCELLED;
+                        }
                 }
                 return Status::OK;
         }
@@ -47,10 +47,9 @@ class GreeterServiceImpl final : public FastForward::Service {
 
 void RunServer(const std::string port) {
         std::string server_address = "0.0.0.0";
-        server_address.append(":");
-        server_address.append(port);
+        server_address.append(":").append(port);
         std::cout << server_address << std::endl;
-        GreeterServiceImpl service;
+        FastForwardServiceImpl service;
 
         ServerBuilder builder;
         // Listen on the given address without any authentication mechanism.

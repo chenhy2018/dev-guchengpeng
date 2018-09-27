@@ -87,6 +87,8 @@ extern "C"
         } while(0)
 
 
+#define FASTFWD_TIME_BASE 90000
+
 namespace fastfwd {
 
         namespace global
@@ -274,8 +276,11 @@ namespace fastfwd {
 
                 std::string path_ = "";
                 size_t nCount_ = 0;
-                long long nLastPtsOri_ = -1;
-                long long nLastPtsMod_ = -1;
+
+                bool bIsFirstPkt_ = true;
+                long long nMinGOP_ = FASTFWD_TIME_BASE * 8;
+                long long nLastPtsOriginal_ = 0;
+                long long nLastPtsFitted_ = 0;
 
                 AVIOContext* pAvIoContext_ = nullptr;
                 uint8_t* pMemBuffer_ = nullptr;

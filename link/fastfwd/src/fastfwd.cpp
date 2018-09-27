@@ -257,7 +257,6 @@ int FileSink::Write(IN const std::shared_ptr<MediaPacket>& _pPacket)
 
 bool FileSink::WritePackets(IN int _nXspeed)
 {
-        long long nTimeDelta = 0;
         // handle packet queue
         do {
                 // get from queue
@@ -273,19 +272,30 @@ bool FileSink::WritePackets(IN int _nXspeed)
                         continue;
                 }
 
-                // pts control
-                if (nLastPtsOri_ < 0) {
-                        nLastPtsOri_ = pAvPkt->pts;
+                /* Frame rate control principle:
+                 * 1. We assume that the GOP of one stream is constant and the maximum of GOP is 8 second.
+                 * 2. nCurrentGOP is interval of current frame's PTS and last frame's PTS. nMinGOP_ is the
+                 * minimum GOP of a stream. if nCurrentGOP is larger than two time of nMinGOP_, we assume
+                 * that the frame is not in the same time slot as the last frame and fitted the PTS as
+                 * last frame's PTS + nMinGOP_ / _nXspeed.
+                */
+                if (bIsFirstPkt_) {
+                        bIsFirstPkt_ = false;
+                        nLastPtsOriginal_ = pAvPkt->pts;
                         pAvPkt->pts = 0;
-                        nLastPtsMod_ = pAvPkt->pts;
                 } else {
-                        nTimeDelta = pAvPkt->pts - nLastPtsOri_;
-                        nLastPtsOri_ = pAvPkt->pts;
-                        pAvPkt->pts = nLastPtsMod_ + nTimeDelta / _nXspeed;
-                        nLastPtsMod_ = pAvPkt->pts;
+                        long long nCurrentGOP = pAvPkt->pts - nLastPtsOriginal_;
+                        nLastPtsOriginal_ = pAvPkt->pts;
+                        if (nCurrentGOP > nMinGOP_ * 2) {
+                                pAvPkt->pts = nLastPtsFitted_ + nMinGOP_ / _nXspeed;
+                        } else {
+                                nMinGOP_ = (nCurrentGOP < nMinGOP_) ? nCurrentGOP : nMinGOP_;
+                                pAvPkt->pts = nLastPtsFitted_ + nCurrentGOP / _nXspeed;
+                        }
+                        nLastPtsFitted_ = pAvPkt->pts;
                 }
                 pAvPkt->dts = pAvPkt->pts;
-                //Info("pts ===> %ld, nCount_ = %u", pAvPkt->pts, static_cast<unsigned int>(nCount_));
+                Debug("count: %ld, pts: %ld", nCount_, pAvPkt->pts);
 
                 // handle stream index
                 pAvPkt->stream_index = streams_[static_cast<int>(pPkt->Stream())];
@@ -499,8 +509,8 @@ int AvReceiver::Receive(IN const std::string& _url, IN int _nXspeed, IN PacketHa
 
                 // if avformat detects another stream during transport, we have to ignore the packets of the stream
                 if (static_cast<size_t>(avPacket.stream_index) < streams_.size()) {
-                        // we need all PTS/DTS use 90000, sometimes they are macroseconds such as TS streams
-                        AVRational tb = AVRational{1, 90000};
+                        // we need all PTS/DTS use milliseconds, sometimes they are macroseconds such as TS streams
+                        AVRational tb = AVRational{1, FASTFWD_TIME_BASE};
                         AVRounding r = static_cast<AVRounding>(AV_ROUND_NEAR_INF|AV_ROUND_PASS_MINMAX);
                         avPacket.dts = av_rescale_q_rnd(avPacket.dts, streams_[avPacket.stream_index].pAvStream->time_base, tb, r);
                         avPacket.pts = av_rescale_q_rnd(avPacket.pts, streams_[avPacket.stream_index].pAvStream->time_base, tb, r);
@@ -544,7 +554,7 @@ bool AvReceiver::EmulateFramerate(IN int64_t _nPts, OUT StreamInfo& _stream, IN 
                 if (delay > 10000) {
                         Warn("receiver: fps emulation: delay > 10s (delay=%ld), skip", delay);
                 } else {
-                        usleep(delay * 1000);
+                        std::this_thread::sleep_for(std::chrono::milliseconds(1000));
                 }
         }
 
