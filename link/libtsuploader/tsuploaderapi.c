@@ -121,6 +121,7 @@ void LinkSetNewSegmentInterval(LinkTsMuxUploader *_pTsMuxUploader, int _nInterva
                 LinkLogError("wrong arg.%p %d", _pTsMuxUploader, _nIntervalSecond);
                 return;
         }
+        _pTsMuxUploader->SetNewSegmentInterval(_pTsMuxUploader, _nIntervalSecond);
 }
 
 void LinkDestroyAVUploader(LinkTsMuxUploader **pTsMuxUploader)
