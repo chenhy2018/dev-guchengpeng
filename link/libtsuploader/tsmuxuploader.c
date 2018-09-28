@@ -343,6 +343,11 @@ static int PushAudio(TsMuxUploader *_pTsMuxUploader, char * _pData, int _nDataLe
         if (ret != 0) {
                 return ret;
         }
+        if (pFFTsMuxUploader->nKeyFrameCount == 0) {
+                pthread_mutex_unlock(&pFFTsMuxUploader->muxUploaderMutex_);
+                logdebug("no keyframe. drop audio frame");
+                return 0;
+        }
         ret = push(pFFTsMuxUploader, _pData, _nDataLen, _nTimestamp, TK_STREAM_TYPE_AUDIO);
         if (ret == 0){
                 pFFTsMuxUploader->nFrameCount++;
