@@ -90,7 +90,6 @@ extern "C"
 #define FASTFWD_TIME_BASE 90000
 
 namespace fastfwd {
-
         namespace global
         {
                 extern unsigned int nLogLevel;
@@ -223,6 +222,31 @@ namespace fastfwd {
                 int nSampleRate_ = -1, nChannels_ = -1;
         };
 
+        // Statistic
+        extern int nStatPeriod;
+        class Statistic
+        {
+        public:
+                Statistic();
+                ~Statistic();
+
+                void IncInBytes(IN int nBytes);
+                void IncOutBytes(IN int nBytes);
+                void IncCount();
+                void DecCount();
+                void GetStat(OUT int& nInBytes, OUT int& nOutBytes, OUT int& nCounts);
+
+        private:
+                std::atomic<int> nCounts_;
+                std::atomic<int> nInBytes_;
+                std::atomic<int> nOutBytes_;
+
+                std::atomic<bool> bThreadExit_;
+                std::mutex startLck_;
+                std::thread stat_;
+
+        };
+
         // AvReceiver
         typedef const std::function<int(const std::shared_ptr<MediaPacket>)> PacketHandlerType;
         class AvReceiver
@@ -246,6 +270,7 @@ namespace fastfwd {
                         std::chrono::high_resolution_clock::time_point start;
                 };
                 std::vector<StreamInfo> streams_;
+                Statistic* pStat_ = Singular<Statistic>::Instance();
         };
 
         class FileSink
@@ -317,6 +342,7 @@ namespace fastfwd {
                 // util
                 std::unique_ptr<AvReceiver> pReceiver_ = nullptr;
                 std::unique_ptr<FileSink> pSink_ = nullptr;
+                Statistic* pStat_ = Singular<Statistic>::Instance();
         };
 }
 

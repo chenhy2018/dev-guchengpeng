@@ -20,8 +20,9 @@ using fastforward::FastForwardInfo;
 using fastforward::FastForwardStream;
 
 extern char *optarg;
-
+std::string version = "201809281044";
 unsigned int fastfwd::global::nLogLevel = 4;
+int fastfwd::nStatPeriod = 10;
 
 // Logic and data behind the server's behavior.
 class FastForwardServiceImpl final : public FastForward::Service {
@@ -31,15 +32,17 @@ class FastForwardServiceImpl final : public FastForward::Service {
                 FastForwardStream ffs;
                 std::string szUrl = request->url();
                 int nSpeed = reinterpret_cast<int>(request->speed());
-
-                auto pPumper = std::make_unique<fastfwd::StreamPumper>(szUrl, nSpeed, 4096);
+                auto pStat = Singular<fastfwd::Statistic>::Instance();
+                auto pPumper = std::make_unique<fastfwd::StreamPumper>(szUrl, nSpeed, 16384);
 
                 std::vector<char> chBuffer;
-                while (pPumper->Pump(chBuffer, 5 * 1000) == 0) {
+                while (pPumper->Pump(chBuffer, 16384) == 0) {
                         ffs.set_stream(chBuffer.data(), chBuffer.size());
                         if(!writer->Write(ffs)) {
                                 return Status::CANCELLED;
                         }
+                        // statistic output bytes
+                        pStat->IncOutBytes(chBuffer.size());
                 }
                 return Status::OK;
         }
@@ -48,7 +51,6 @@ class FastForwardServiceImpl final : public FastForward::Service {
 void RunServer(const std::string port) {
         std::string server_address = "0.0.0.0";
         server_address.append(":").append(port);
-        std::cout << server_address << std::endl;
         FastForwardServiceImpl service;
 
         ServerBuilder builder;
@@ -59,7 +61,7 @@ void RunServer(const std::string port) {
         builder.RegisterService(&service);
         // Finally assemble the server.
         std::unique_ptr<Server> server(builder.BuildAndStart());
-        std::cout << "Server listening on " << server_address << std::endl;
+        Info("Server listening on %s", server_address.c_str());
 
         // Wait for the server to shutdown. Note that some other thread must be
         // responsible for shutting down the server for this call to ever return.
@@ -88,7 +90,6 @@ int main(int argc, char** argv) {
                         exit(1);
                 }
         }
-        Info("linking_fastfwd arguments: port=%s ", sPort.c_str());
 
         // port
         int nPort;
@@ -101,7 +102,9 @@ int main(int argc, char** argv) {
                 std::cout << "port number out of range" << std::endl;
                 exit(1);
         }
+        Info("linking_fastfwd started, version=%s, arguments: port=%s ", version.c_str(), sPort.c_str());;
 
+        auto pStat = Singular<fastfwd::Statistic>::Instance();
         RunServer(sPort);
 
         return 0;
