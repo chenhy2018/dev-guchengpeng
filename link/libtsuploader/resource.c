@@ -3,7 +3,7 @@
 
 typedef struct _ResourceMgr
 {
-        CircleQueue * pQueue_;
+        LinkCircleQueue * pQueue_;
         pthread_t mgrThreadId_;
         int nQuit_;
         int nIsStarted_;
@@ -13,23 +13,23 @@ static ResourceMgr manager;
 
 static void * recycle(void *_pOpaque)
 {
-        UploaderStatInfo info = {0};
+        LinkUploaderStatInfo info = {0};
         manager.pQueue_->GetStatInfo(manager.pQueue_, &info);
         while(!manager.nQuit_ && info.nLen_ == 0) {
-                AsyncInterface *pAsync = NULL;
-                int ret = manager.pQueue_->PopWithTimeout(manager.pQueue_, (char *)(&pAsync), sizeof(AsyncInterface *), 24 * 60 * 60 * 1000000);
-                UploaderStatInfo info;
+                LinkAsyncInterface *pAsync = NULL;
+                int ret = manager.pQueue_->PopWithTimeout(manager.pQueue_, (char *)(&pAsync), sizeof(LinkAsyncInterface *), 24 * 60 * 60 * 1000000);
+                LinkUploaderStatInfo info;
                 manager.pQueue_->GetStatInfo(manager.pQueue_, &info);
-                logdebug("thread queue:%d", info.nLen_);
-                if (ret == TK_TIMEOUT) {
+                LinkLogDebug("thread queue:%d", info.nLen_);
+                if (ret == LINK_TIMEOUT) {
                         continue;
                 }
-                if (ret == sizeof(TsUploader *)) {
-                        loginfo("pop from mgr:%p\n", pAsync);
+                if (ret == sizeof(LinkTsUploader *)) {
+                        LinkLogInfo("pop from mgr:%p\n", pAsync);
                         if (pAsync == NULL) {
-                                logwarn("NULL function");
+                                LinkLogWarn("NULL function");
                         } else {
-                                AsynFunction func = pAsync->function;
+                                LinkAsynFunction func = pAsync->function;
                                 func(pAsync);
                         }
                 }
@@ -37,21 +37,21 @@ static void * recycle(void *_pOpaque)
         }
 }
 
-int PushFunction(void *_pAsyncInterface)
+int LinkPushFunction(void *_pAsyncInterface)
 {
         if (!manager.nIsStarted_) {
                 return -1;
         }
-        return manager.pQueue_->Push(manager.pQueue_, (char *)(&_pAsyncInterface), sizeof(AsyncInterface *));
+        return manager.pQueue_->Push(manager.pQueue_, (char *)(&_pAsyncInterface), sizeof(LinkAsyncInterface *));
 }
 
-int StartMgr()
+int LinkStartMgr()
 {
         if (manager.nIsStarted_) {
                 return 0;
         }
         
-        int ret = NewCircleQueue(&manager.pQueue_, 1, TSQ_FIX_LENGTH, sizeof(void *), 100);
+        int ret = LinkNewCircleQueue(&manager.pQueue_, 1, TSQ_FIX_LENGTH, sizeof(void *), 100);
         if (ret != 0){
                 return ret;
         }
@@ -59,22 +59,22 @@ int StartMgr()
         ret = pthread_create(&manager.mgrThreadId_, NULL, recycle, NULL);
         if (ret != 0) {
                 manager.nIsStarted_ = 0;
-                return TK_THREAD_ERROR;
+                return LINK_THREAD_ERROR;
         }
         manager.nIsStarted_ = 1;
         
         return 0;
 }
 
-void StopMgr()
+void LinkStopMgr()
 {
         manager.nQuit_ = 1;
         if (manager.nIsStarted_) {
-                PushFunction(NULL);
+                LinkPushFunction(NULL);
                 pthread_join(manager.mgrThreadId_, NULL);
                 manager.nIsStarted_ = 0;
                 if (manager.pQueue_) {
-                        DestroyQueue(&manager.pQueue_);
+                        LinkDestroyQueue(&manager.pQueue_);
                 }
         }
         return;

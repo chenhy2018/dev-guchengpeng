@@ -11,7 +11,7 @@
 
 static int volatile nProcStatus = 0;
 
-int InitUploader()
+int LinkInitUploader()
 {
         if (nProcStatus) {
                 return 0;
@@ -26,38 +26,38 @@ int InitUploader()
         Qiniu_Global_Init(-1);
 
         int ret = 0;
-        ret = InitTime();
+        ret = LinkInitTime();
         if (ret != 0) {
-                logerror("InitUploader gettime from server fail:%d", ret);
-                return TK_HTTP_TIME;
+                LinkLogError("InitUploader gettime from server fail:%d", ret);
+                return LINK_HTTP_TIME;
         }
         
-        ret = StartMgr();
+        ret = LinkStartMgr();
         if (ret != 0) {
-                logerror("StartMgr fail");
+                LinkLogError("StartMgr fail");
                 return ret;
         }
         nProcStatus = 1;
-        logdebug("main thread id:%ld", (long)pthread_self());
+        LinkLogDebug("main thread id:%ld", (long)pthread_self());
         
         return 0;
 
 }
 
-int CreateAndStartAVUploader(TsMuxUploader **_pTsMuxUploader, AvArg *_pAvArg, UserUploadArg *_pUserUploadArg)
+int LinkCreateAndStartAVUploader(LinkTsMuxUploader **_pTsMuxUploader, LinkMediaArg *_pAvArg, LinkUserUploadArg *_pUserUploadArg)
 {
         if (_pUserUploadArg->pToken_ == NULL || _pUserUploadArg->nTokenLen_ == 0 ||
             _pUserUploadArg->pDeviceId_ == NULL || _pUserUploadArg->nDeviceIdLen_ == 0 ||
             _pTsMuxUploader == NULL || _pAvArg == NULL || _pUserUploadArg == NULL) {
-                logerror("token or deviceid or argument is null");
-                return TK_ARG_ERROR;
+                LinkLogError("token or deviceid or argument is null");
+                return LINK_ARG_ERROR;
         }
 
-        TsMuxUploader *pTsMuxUploader;
-        int ret = NewTsMuxUploader(&pTsMuxUploader, _pAvArg, _pUserUploadArg->pDeviceId_,
+        LinkTsMuxUploader *pTsMuxUploader;
+        int ret = LinkNewTsMuxUploader(&pTsMuxUploader, _pAvArg, _pUserUploadArg->pDeviceId_,
                                    _pUserUploadArg->nDeviceIdLen_, _pUserUploadArg->pToken_, _pUserUploadArg->nTokenLen_);
         if (ret != 0) {
-                logerror("NewTsMuxUploader fail");
+                LinkLogError("NewTsMuxUploader fail");
                 return ret;
         }
         if (_pUserUploadArg->nUploaderBufferSize != 0) {
@@ -67,10 +67,10 @@ int CreateAndStartAVUploader(TsMuxUploader **_pTsMuxUploader, AvArg *_pAvArg, Us
                 pTsMuxUploader->SetNewSegmentInterval(pTsMuxUploader, _pUserUploadArg->nNewSegmentInterval);
         }
         
-        ret = TsMuxUploaderStart(pTsMuxUploader);
+        ret = LinkTsMuxUploaderStart(pTsMuxUploader);
         if (ret != 0){
-                DestroyTsMuxUploader(&pTsMuxUploader);
-                logerror("UploadStart fail:%d", ret);
+                LinkDestroyTsMuxUploader(&pTsMuxUploader);
+                LinkLogError("UploadStart fail:%d", ret);
                 return ret;
         }
         *_pTsMuxUploader = pTsMuxUploader;
@@ -78,57 +78,57 @@ int CreateAndStartAVUploader(TsMuxUploader **_pTsMuxUploader, AvArg *_pAvArg, Us
         return 0;
 }
 
-int PushVideo(TsMuxUploader *_pTsMuxUploader, char * _pData, int _nDataLen, int64_t _nTimestamp, int _nIsKeyFrame, int _nIsSegStart)
+int LinkPushVideo(LinkTsMuxUploader *_pTsMuxUploader, char * _pData, int _nDataLen, int64_t _nTimestamp, int _nIsKeyFrame, int _nIsSegStart)
 {
         if (_pTsMuxUploader == NULL || _pData == NULL || _nDataLen == 0) {
-                return TK_ARG_ERROR;
+                return LINK_ARG_ERROR;
         }
         int ret = 0;
         ret = _pTsMuxUploader->PushVideo(_pTsMuxUploader, _pData, _nDataLen, _nTimestamp, _nIsKeyFrame, _nIsSegStart);
         return ret;
 }
 
-int PushAudio(TsMuxUploader *_pTsMuxUploader, char * _pData, int _nDataLen, int64_t _nTimestamp)
+int LinkPushAudio(LinkTsMuxUploader *_pTsMuxUploader, char * _pData, int _nDataLen, int64_t _nTimestamp)
 {
         if (_pTsMuxUploader == NULL || _pData == NULL || _nDataLen == 0) {
-                return TK_ARG_ERROR;
+                return LINK_ARG_ERROR;
         }
         int ret = 0;
         ret = _pTsMuxUploader->PushAudio(_pTsMuxUploader, _pData, _nDataLen, _nTimestamp);
         return ret;
 }
 
-int UpdateToken(TsMuxUploader *_pTsMuxUploader, char * _pToken, int _nTokenLen)
+int LinkUpdateToken(LinkTsMuxUploader *_pTsMuxUploader, char * _pToken, int _nTokenLen)
 {
         if (_pTsMuxUploader == NULL || _pToken == NULL || _nTokenLen == 0) {
-                return TK_ARG_ERROR;
+                return LINK_ARG_ERROR;
         }
         return _pTsMuxUploader->SetToken(_pTsMuxUploader, _pToken, _nTokenLen);
 }
 
-void SetUploadBufferSize(TsMuxUploader *_pTsMuxUploader, int _nSize)
+void LinkSetUploadBufferSize(LinkTsMuxUploader *_pTsMuxUploader, int _nSize)
 {
         if (_pTsMuxUploader == NULL || _nSize < 0) {
-                logerror("wrong arg.%p %d", _pTsMuxUploader, _nSize);
+                LinkLogError("wrong arg.%p %d", _pTsMuxUploader, _nSize);
                 return;
         }
         _pTsMuxUploader->SetUploaderBufferSize(_pTsMuxUploader, _nSize);
 }
 
-void SetNewSegmentInterval(TsMuxUploader *_pTsMuxUploader, int _nIntervalSecond)
+void LinkSetNewSegmentInterval(LinkTsMuxUploader *_pTsMuxUploader, int _nIntervalSecond)
 {
         if (_pTsMuxUploader == NULL || _nIntervalSecond < 0) {
-                logerror("wrong arg.%p %d", _pTsMuxUploader, _nIntervalSecond);
+                LinkLogError("wrong arg.%p %d", _pTsMuxUploader, _nIntervalSecond);
                 return;
         }
 }
 
-void DestroyAVUploader(TsMuxUploader **pTsMuxUploader)
+void LinkDestroyAVUploader(LinkTsMuxUploader **pTsMuxUploader)
 {
-        DestroyTsMuxUploader(pTsMuxUploader);
+        LinkDestroyTsMuxUploader(pTsMuxUploader);
 }
 
-int IsProcStatusQuit()
+int LinkIsProcStatusQuit()
 {
         if (nProcStatus == 2) {
                 return 1;
@@ -136,12 +136,12 @@ int IsProcStatusQuit()
         return 0;
 }
 
-void UninitUploader()
+void LinkUninitUploader()
 {
         if (nProcStatus != 1)
                 return;
         nProcStatus = 2;
-        StopMgr();
+        LinkStopMgr();
         Qiniu_Global_Cleanup();
         
         return;
@@ -154,7 +154,7 @@ static char gSk[65] = {0};
 static char gBucket[128] = {0};
 static char gCallbackUrl[256] = {0};
 static int nDeleteAfterDays = -1;
-void SetBucketName(char *_pName)
+void LinkSetBucketName(char *_pName)
 {
         int nLen = strlen(_pName);
         assert(nLen < sizeof(gBucket));
@@ -164,7 +164,7 @@ void SetBucketName(char *_pName)
         return;
 }
 
-void SetAk(char *_pAk)
+void LinkSetAk(char *_pAk)
 {
         int nLen = strlen(_pAk);
         assert(nLen < sizeof(gAk));
@@ -174,7 +174,7 @@ void SetAk(char *_pAk)
         return;
 }
 
-void SetSk(char *_pSk)
+void LinkSetSk(char *_pSk)
 {
         int nLen = strlen(_pSk);
         assert(nLen < sizeof(gSk));
@@ -184,7 +184,7 @@ void SetSk(char *_pSk)
         return;
 }
 
-void SetCallbackUrl(char *pUrl)
+void LinkSetCallbackUrl(char *pUrl)
 {
         int nLen = strlen(pUrl);
         assert(nLen < sizeof(gCallbackUrl));
@@ -193,7 +193,7 @@ void SetCallbackUrl(char *pUrl)
         return;
 }
 
-void SetDeleteAfterDays(int nDays)
+void LinkSetDeleteAfterDays(int nDays)
 {
         nDeleteAfterDays = nDays;
 }
@@ -212,7 +212,7 @@ size_t writeData(void *pTokenStr, size_t size,  size_t nmemb,  void *pUserData) 
         }
         char *pTokenStart = strstr(pTokenStr, "\"token\"");
         if (pTokenStart == NULL) {
-                pToken->nCurlRet = TK_JSON_FORMAT;
+                pToken->nCurlRet = LINK_JSON_FORMAT;
                 return 0;
         }
         pTokenStart += strlen("\"token\"");
@@ -221,17 +221,17 @@ size_t writeData(void *pTokenStr, size_t size,  size_t nmemb,  void *pUserData) 
         
         char *pTokenEnd = strchr(pTokenStart, '\"');
         if (pTokenEnd == NULL) {
-                pToken->nCurlRet = TK_JSON_FORMAT;
+                pToken->nCurlRet = LINK_JSON_FORMAT;
                 return 0;
         }
         if (pTokenEnd - pTokenStart >= pToken->nDataLen) {
-                pToken->nCurlRet = TK_BUFFER_IS_SMALL;
+                pToken->nCurlRet = LINK_BUFFER_IS_SMALL;
         }
         memcpy(pToken->pData, pTokenStart, pTokenEnd - pTokenStart);
         return size * nmemb;
 }
 
-int GetUploadToken(char *pBuf, int nBufLen, char *pUrl)
+int LinkGetUploadToken(char *pBuf, int nBufLen, char *pUrl)
 {
 #ifdef DISABLE_OPENSSL
         memset(pBuf, 0, nBufLen);

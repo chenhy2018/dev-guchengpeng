@@ -1,7 +1,7 @@
-#ifndef __TS_TIME_H__
-#define __TS_TIME_H__
+#ifndef __LINK_TS_TIME_H__
+#define __LINK_TS_TIME_H__
 
-int64_t GetCurrentNanosecond();
-int InitTime();
+int64_t LinkGetCurrentNanosecond();
+int LinkInitTime();
 
 #endif

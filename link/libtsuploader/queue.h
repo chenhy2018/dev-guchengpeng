@@ -1,23 +1,23 @@
-#ifndef __CIRCLE_QUEUE_H__
-#define __CIRCLE_QUEUE_H__
+#ifndef __LINK_CIRCLE_QUEUE_H__
+#define __LINK_CIRCLE_QUEUE_H__
 
 #include <pthread.h>
 #ifndef __APPLE__
 #include <stdint.h>
 #endif
 
-typedef enum CircleQueuePolicy{
+enum CircleQueuePolicy{
         TSQ_FIX_LENGTH,
         TSQ_VAR_LENGTH
 };
 
-typedef struct _CircleQueue CircleQueue;
+typedef struct _LinkCircleQueue LinkCircleQueue;
 
 
-typedef int(*CircleQueuePush)(CircleQueue *pQueue, char * pData, int nDataLen);
-typedef int(*CircleQueuePopWithTimeoutNoOverwrite)(CircleQueue *pQueue, char * pBuf, int nBufLen, int64_t nUsec);
-typedef int(*CircleQueuePopWithNoOverwrite)(CircleQueue *pQueue, char * pBuf, int nBufLen);
-typedef void(*CircleQueueStopPush)(CircleQueue *pQueue);
+typedef int(*LinkCircleQueuePush)(LinkCircleQueue *pQueue, char * pData, int nDataLen);
+typedef int(*LinkCircleQueuePopWithTimeoutNoOverwrite)(LinkCircleQueue *pQueue, char * pBuf, int nBufLen, int64_t nUsec);
+typedef int(*LinkCircleQueuePopWithNoOverwrite)(LinkCircleQueue *pQueue, char * pBuf, int nBufLen);
+typedef void(*LinkCircleQueueStopPush)(LinkCircleQueue *pQueue);
 
 typedef struct _UploaderStatInfo {
         int nPushDataBytes_;
@@ -26,17 +26,17 @@ typedef struct _UploaderStatInfo {
         int nOverwriteCnt;
         int nIsReadOnly;
 	int nDropped;
-}UploaderStatInfo;
+}LinkUploaderStatInfo;
 
-typedef struct _CircleQueue{
-        CircleQueuePush Push;
-        CircleQueuePopWithTimeoutNoOverwrite PopWithTimeout;
-        CircleQueuePopWithNoOverwrite PopWithNoOverwrite;
-        CircleQueueStopPush StopPush;
-        void (*GetStatInfo)(CircleQueue *pQueue, UploaderStatInfo *pStatInfo);
-}CircleQueue;
+typedef struct _LinkCircleQueue{
+        LinkCircleQueuePush Push;
+        LinkCircleQueuePopWithTimeoutNoOverwrite PopWithTimeout;
+        LinkCircleQueuePopWithNoOverwrite PopWithNoOverwrite;
+        LinkCircleQueueStopPush StopPush;
+        void (*GetStatInfo)(LinkCircleQueue *pQueue, LinkUploaderStatInfo *pStatInfo);
+}LinkCircleQueue;
 
-int NewCircleQueue(CircleQueue **pQueue, int nIsAvailableAfterTimeout,  enum CircleQueuePolicy policy, int nMaxItemLen, int nInitItemCount);
-void DestroyQueue(CircleQueue **_pQueue);
+int LinkNewCircleQueue(LinkCircleQueue **pQueue, int nIsAvailableAfterTimeout,  enum CircleQueuePolicy policy, int nMaxItemLen, int nInitItemCount);
+void LinkDestroyQueue(LinkCircleQueue **_pQueue);
 
 #endif

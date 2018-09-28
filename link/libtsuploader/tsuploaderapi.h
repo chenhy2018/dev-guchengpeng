@@ -5,8 +5,6 @@
 #include "log.h"
 #include "base.h"
 
-#define DEBUG_MODE
-
 typedef struct {
         char  *pToken_;
         int   nTokenLen_;
@@ -14,27 +12,18 @@ typedef struct {
         int   nDeviceIdLen_;
         int   nUploaderBufferSize;
         int   nNewSegmentInterval;
-}UserUploadArg;
+}LinkUserUploadArg;
 
-int InitUploader();
+int LinkInitUploader();
 
-int CreateAndStartAVUploader(TsMuxUploader **pTsMuxUploader, AvArg *pAvArg, UserUploadArg *pUserUploadArg);
-int UpdateToken(TsMuxUploader *pTsMuxUploader, char * pToken, int nTokenLen);
-void SetUploadBufferSize(TsMuxUploader *pTsMuxUploader, int nSize);
-void SetNewSegmentInterval(TsMuxUploader *pTsMuxUploader, int nIntervalSecond);
-int PushVideo(TsMuxUploader *pTsMuxUploader, char * pData, int nDataLen, int64_t nTimestamp, int nIsKeyFrame, int nIsSegStart);
-int PushAudio(TsMuxUploader *pTsMuxUploader, char * pData, int nDataLen, int64_t nTimestamp);
-void DestroyAVUploader(TsMuxUploader **pTsMuxUploader);
-void UninitUploader();
-
-
-//for test
-int GetUploadToken(char *pBuf, int nBufLen, char *pUrl);
-void SetAk(char *pAk);
-void SetSk(char *pSk);
-void SetBucketName(char *_pName);
-void SetCallbackUrl(char *pUrl);
-void SetDeleteAfterDays(int days);
+int LinkCreateAndStartAVUploader(OUT LinkTsMuxUploader **pTsMuxUploader, IN LinkMediaArg *pAvArg, IN LinkUserUploadArg *pUserUploadArg);
+int LinkUpdateToken(IN LinkTsMuxUploader *pTsMuxUploader, IN char * pToken, IN int nTokenLen);
+void LinkSetUploadBufferSize(IN LinkTsMuxUploader *pTsMuxUploader, IN int nSize);
+void LinkSetNewSegmentInterval(IN LinkTsMuxUploader *pTsMuxUploader, IN int nIntervalSecond);
+int LinkPushVideo(IN LinkTsMuxUploader *pTsMuxUploader, IN char * pData, IN int nDataLen, IN int64_t nTimestamp, IN int nIsKeyFrame, IN int nIsSegStart);
+int LinkPushAudio(IN LinkTsMuxUploader *pTsMuxUploader, IN char * pData, IN int nDataLen, IN int64_t nTimestamp);
+void LinkDestroyAVUploader(IN OUT LinkTsMuxUploader **pTsMuxUploader);
+void LinkUninitUploader();
 
 
 #endif

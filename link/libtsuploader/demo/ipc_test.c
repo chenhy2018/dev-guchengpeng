@@ -6,6 +6,7 @@
 #include <stdlib.h>
 
 #include "tsuploaderapi.h"
+#include "localkey.h"
 #include "devsdk.h"
 #include "ipc_test.h"
 #include "log2file.h"
@@ -24,8 +25,8 @@ static char gTestToken[1024] = { 0 };
 static char gSubToken[1024] = { 0 };
 static Config gIpcConfig;
 static unsigned char gMovingDetect = 0;
-static TsMuxUploader *pMainUploader;
-static TsMuxUploader *pSubUploader;
+static LinkTsMuxUploader *pMainUploader;
+static LinkTsMuxUploader *pSubUploader;
 static struct cfg_struct *cfg;
 static char gMainStreamDeviceId[128] = { 0 };
 static char gSubStreamDeviceId[128] = { 0 };
@@ -223,7 +224,7 @@ void ReportKodoInitError( char *stream, char *reason )
     }
 }
 
-int CacheHandle( Queue *pQueue, TsMuxUploader *pUploader,
+int CacheHandle( Queue *pQueue, LinkTsMuxUploader *pUploader,
                  int _nStreamType, char *_pFrame,
                  int _nLen, int _nIskey, double _dTimeStamp
   )
@@ -257,16 +258,16 @@ int CacheHandle( Queue *pQueue, TsMuxUploader *pUploader,
         if (  gMovingDetect == ALARM_CODE_MOTION_DETECT  ) {
             count = STREAM_CACHE_SIZE;
             if ( _nStreamType == TYPE_VIDEO ) {
-                PushVideo( pUploader, frame.data, frame.len, (int64_t)frame.timeStamp, frame.isKey, 0 );
+                LinkPushVideo( pUploader, frame.data, frame.len, (int64_t)frame.timeStamp, frame.isKey, 0 );
             } else {
-                PushAudio( pUploader, frame.data, frame.len, (int64_t)frame.timeStamp );
+                LinkPushAudio( pUploader, frame.data, frame.len, (int64_t)frame.timeStamp );
             }
         } else if ( gMovingDetect == ALARM_CODE_MOTION_DETECT_DISAPPEAR ) {
             if ( count-- > 0 ) {
                 if ( _nStreamType == TYPE_VIDEO ) {
-                    PushVideo( pUploader, frame.data, frame.len, (int64_t)frame.timeStamp, frame.isKey, 0 );
+                    LinkPushVideo( pUploader, frame.data, frame.len, (int64_t)frame.timeStamp, frame.isKey, 0 );
                 } else {
-                    PushAudio( pUploader, frame.data, frame.len, (int64_t)frame.timeStamp );
+                    LinkPushAudio( pUploader, frame.data, frame.len, (int64_t)frame.timeStamp );
                 }
             } else {
                 ReportKodoInitError( "main stream", "use cache, not detect moving" );
@@ -310,7 +311,7 @@ int VideoGetFrameCb( int streamno, char *_pFrame,
             /* do nothing */
         }
     } else {
-        PushVideo(pMainUploader, _pFrame, _nLen, (int64_t)_dTimeStamp, _nIskey, 0 );
+        LinkPushVideo(pMainUploader, _pFrame, _nLen, (int64_t)_dTimeStamp, _nIskey, 0 );
     }
 
     return 0;
@@ -337,14 +338,14 @@ int SubStreamVideoGetFrameCb( int streamno, char *_pFrame,
         if ( gIpcConfig.openCache && pVideoSubStreamCache ) {
             CacheHandle( pVideoSubStreamCache, pSubUploader, TYPE_VIDEO, _pFrame, _nLen, _nIskey,  _dTimeStamp );
         } else if ( gMovingDetect == ALARM_CODE_MOTION_DETECT ) {
-            PushVideo(pSubUploader, _pFrame, _nLen, (int64_t)_dTimeStamp, _nIskey, 0 );
+            LinkPushVideo(pSubUploader, _pFrame, _nLen, (int64_t)_dTimeStamp, _nIskey, 0 );
         } else if (gMovingDetect == ALARM_CODE_MOTION_DETECT_DISAPPEAR )  {
             ReportKodoInitError( "sub stream", "not detect moving" );
         } else {
             /* do nothing */
         }
     } else {
-        PushVideo(pSubUploader, _pFrame, _nLen, (int64_t)_dTimeStamp, _nIskey, 0 );
+        LinkPushVideo(pSubUploader, _pFrame, _nLen, (int64_t)_dTimeStamp, _nIskey, 0 );
     }
 
     return 0;
@@ -392,7 +393,7 @@ int AudioGetFrameCb( char *_pFrame, int _nLen, double _dTimeStamp,
         if ( gIpcConfig.openCache && pAudioMainStreamCache ) {
             CacheHandle( pAudioMainStreamCache, pMainUploader, TYPE_AUDIO, _pFrame, _nLen, 0,  _dTimeStamp );
         } else if ( gMovingDetect == ALARM_CODE_MOTION_DETECT ) {
-            ret = PushAudio( pMainUploader, _pFrame, _nLen, (int64_t)timeStamp );
+            ret = LinkPushAudio( pMainUploader, _pFrame, _nLen, (int64_t)timeStamp );
             if ( ret != 0 ) {
                 DBG_ERROR("ret = %d\n", ret );
             }
@@ -402,7 +403,7 @@ int AudioGetFrameCb( char *_pFrame, int _nLen, double _dTimeStamp,
             /* do nothing */
         }
     } else {
-        ret = PushAudio( pMainUploader, _pFrame, _nLen, (int64_t)timeStamp );
+        ret = LinkPushAudio( pMainUploader, _pFrame, _nLen, (int64_t)timeStamp );
         if ( ret != 0 ) {
             DBG_ERROR("ret = %d\n", ret );
         }
@@ -458,7 +459,7 @@ int SubStreamAudioGetFrameCb( char *_pFrame, int _nLen, double _dTimeStamp,
         if ( gIpcConfig.openCache && pAudioSubStreamCache ) {
             CacheHandle( pAudioSubStreamCache, pSubUploader, TYPE_AUDIO, _pFrame, _nLen, 0,  _dTimeStamp );
         } else if ( gMovingDetect == ALARM_CODE_MOTION_DETECT ) {
-            ret = PushAudio( pSubUploader, _pFrame, _nLen, (int64_t)timeStamp );
+            ret = LinkPushAudio( pSubUploader, _pFrame, _nLen, (int64_t)timeStamp );
             if ( ret != 0 ) {
                 DBG_ERROR("ret = %d\n", ret );
             }
@@ -468,7 +469,7 @@ int SubStreamAudioGetFrameCb( char *_pFrame, int _nLen, double _dTimeStamp,
             /* do nothing */
         }
     } else {
-        ret = PushAudio( pSubUploader, _pFrame, _nLen, (int64_t)timeStamp );
+        ret = LinkPushAudio( pSubUploader, _pFrame, _nLen, (int64_t)timeStamp );
         if ( ret != 0 ) {
             DBG_ERROR("ret = %d\n", ret );
         }
@@ -528,34 +529,34 @@ static int DeInitIPC()
 int InitKodo()
 {
     int ret = 0, i=0;
-    AvArg avArg;
+    LinkMediaArg mediaArg;
     char url[1024] = "http://47.105.118.51:8086/qiniu/upload/token/"; 
 
     DBG_LOG("start to init kodo\n");
     if ( gAudioType == AUDIO_TYPE_AAC ) {
-        avArg.nAudioFormat = TK_AUDIO_AAC;
-        avArg.nChannels = 1;
-        avArg.nSamplerate = 16000;
+        mediaArg.nAudioFormat = LINK_AUDIO_AAC;
+        mediaArg.nChannels = 1;
+        mediaArg.nSamplerate = 16000;
     } else {
-        avArg.nAudioFormat = TK_AUDIO_PCMU;
-        avArg.nChannels = 1;
-        avArg.nSamplerate = 8000;
+        mediaArg.nAudioFormat = LINK_AUDIO_PCMU;
+        mediaArg.nChannels = 1;
+        mediaArg.nSamplerate = 8000;
     }
-    avArg.nVideoFormat = TK_VIDEO_H264;
+    mediaArg.nVideoFormat = LINK_VIDEO_H264;
 
-    SetLogLevelToDebug();
-    SetAk( gIpcConfig.ak );
-    SetSk( gIpcConfig.sk );
+    LinkSetLogLevel(LINK_LOG_LEVEL_DEBUG);
+    LinkSetAk( gIpcConfig.ak );
+    LinkSetSk( gIpcConfig.sk );
 
     //计算token需要，所以需要先设置
-    SetBucketName( gIpcConfig.bucketName );
+    LinkSetBucketName( gIpcConfig.bucketName );
 
     strncat( url, gAjMediaStreamConfig.rtmpConfig.server, strlen(gAjMediaStreamConfig.rtmpConfig.server) );
     strncat( url, "a", 1 );
     DBG_LOG("url = %s\n", url );
 
     for ( i=0; i<gIpcConfig.tokenRetryCount; i++ ) {
-        ret = GetUploadToken( gTestToken, sizeof(gTestToken), url );
+        ret = LinkGetUploadToken( gTestToken, sizeof(gTestToken), url );
         if ( ret != 0 ) {
             DBG_ERROR("GetUploadToken error, ret = %d, retry = %d\n", ret, i );
             continue;
@@ -571,7 +572,7 @@ int InitKodo()
     DBG_LOG("gAjMediaStreamConfig.rtmpConfig.streamid = %s\n", gAjMediaStreamConfig.rtmpConfig.streamid);
     DBG_LOG("gAjMediaStreamConfig.rtmpConfig.server = %s\n", gAjMediaStreamConfig.rtmpConfig.server );
 
-    ret = InitUploader();
+    ret = LinkInitUploader();
     if (ret != 0) {
         DBG_LOG("InitUploader error, ret = %d\n", ret );
         return ret;
@@ -580,7 +581,7 @@ int InitKodo()
     sprintf( gMainStreamDeviceId, "%s%s", gAjMediaStreamConfig.rtmpConfig.server, "a" );
     sprintf( gSubStreamDeviceId, "%s%s", gAjMediaStreamConfig.rtmpConfig.server, "b" );
 
-    UserUploadArg userUploadArg;
+    LinkUserUploadArg userUploadArg;
     memset(&userUploadArg, 0, sizeof(userUploadArg));
     userUploadArg.pToken_ = gTestToken;
     userUploadArg.nTokenLen_ = strlen(gTestToken);
@@ -588,7 +589,7 @@ int InitKodo()
     userUploadArg.nDeviceIdLen_ = strlen(gMainStreamDeviceId);
     userUploadArg.nUploaderBufferSize = 512;
 
-    ret = CreateAndStartAVUploader(&pMainUploader, &avArg, &userUploadArg);
+    ret = LinkCreateAndStartAVUploader(&pMainUploader, &mediaArg, &userUploadArg);
     if (ret != 0) {
         DBG_LOG("CreateAndStartAVUploader error, ret = %d\n", ret );
         return ret;
@@ -597,7 +598,7 @@ int InitKodo()
     /* sub stream */
     if ( gIpcConfig.multiChannel ) {
         userUploadArg.pDeviceId_ = gSubStreamDeviceId;
-        ret = CreateAndStartAVUploader(&pSubUploader, &avArg, &userUploadArg);
+        ret = LinkCreateAndStartAVUploader(&pSubUploader, &mediaArg, &userUploadArg);
         if (ret != 0) {
             DBG_LOG("CreateAndStartAVUploader error, ret = %d\n", ret );
             return ret;
@@ -622,13 +623,13 @@ static void * upadateToken() {
     while( 1 ) {
         sleep( gIpcConfig.tokenUploadInterval );// 59 minutes
         memset(gTestToken, 0, sizeof(gTestToken));
-        ret = GetUploadToken(gTestToken, sizeof(gTestToken), url );
+        ret = LinkGetUploadToken(gTestToken, sizeof(gTestToken), url );
         if ( ret != 0 ) {
             DBG_ERROR("GetUploadToken error, ret = %d\n", ret );
             return NULL;
         }
         DBG_LOG("token:%s\n", gTestToken);
-        ret = UpdateToken(pMainUploader, gTestToken, strlen(gTestToken));
+        ret = LinkUpdateToken(pMainUploader, gTestToken, strlen(gTestToken));
         if (ret != 0) {
             DBG_ERROR("UpdateToken error, ret = %d\n", ret );
             return NULL;
@@ -636,13 +637,13 @@ static void * upadateToken() {
 
         if ( gIpcConfig.multiChannel ) {
             memset( gSubToken, 0, sizeof(gSubToken));
-            ret = GetUploadToken( gSubToken, sizeof(gSubToken), url );
+            ret = LinkGetUploadToken( gSubToken, sizeof(gSubToken), url );
             if ( ret != 0 ) {
                 DBG_ERROR("GetUploadToken error, ret = %d\n", ret );
                 return NULL;
             }
             DBG_LOG("token:%s\n", gSubToken);
-            ret = UpdateToken(pSubUploader, gSubToken, strlen(gSubToken));
+            ret = LinkUpdateToken(pSubUploader, gSubToken, strlen(gSubToken));
             if (ret != 0) {
                 DBG_ERROR("UpdateToken error, ret = %d\n", ret );
                 return NULL;
@@ -675,7 +676,7 @@ int WaitForNetworkOk()
     int i = 0, ret = 0;
 
     for ( i=0; i<gIpcConfig.tokenRetryCount; i++ ) {
-        ret = GetUploadToken(  gTestToken, sizeof(gTestToken), NULL );
+        ret = LinkGetUploadToken(  gTestToken, sizeof(gTestToken), NULL );
         if ( ret != 0 ) {
             DBG_ERROR("GetUploadToken error, ret = %d, retry = %d\n", ret, i );
             continue;
@@ -692,7 +693,7 @@ int WaitForNetworkOk()
     return 0;
 }
 
-void SdkLogCallback( char *log )
+void SdkLogCallback(int nLogLevel, char *log )
 {
     DBG_LOG( log );
 }
@@ -737,7 +738,7 @@ int main()
     printf("gIpcConfig.logFile = %s\n", gIpcConfig.logFile );
     LoggerInit( gIpcConfig.logPrintTime, gIpcConfig.logOutput, gIpcConfig.logFile, gIpcConfig.logVerbose );
     /* sdk log callback */
-    SetLogCallback( SdkLogCallback );
+    LinkSetLogCallback( SdkLogCallback );
 
     DBG_LOG("compile tile : %s %s \n", __DATE__, __TIME__ );
 
@@ -772,9 +773,9 @@ int main()
     }
 
     DeInitIPC();
-    DestroyAVUploader(&pMainUploader);
-    DestroyAVUploader(&pSubUploader);
-    UninitUploader();
+    LinkDestroyAVUploader(&pMainUploader);
+    LinkDestroyAVUploader(&pSubUploader);
+    LinkUninitUploader();
 
     return 0;
 }

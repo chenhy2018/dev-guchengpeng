@@ -63,6 +63,7 @@ add_library(tsuploader STATIC
         tsmux.c
         mpegts.c
         mpegts.h
+        localkey.h
 )
 
 if ( $ENV{ARCH} STREQUAL x86 )

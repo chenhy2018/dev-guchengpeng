@@ -1,38 +1,36 @@
 #ifndef __TS_UPLOADER_H__
 #define __TS_UPLOADER_H__
 
-#include <qiniu/io.h>
-#include <qiniu/rs.h>
 #include <pthread.h>
 #include <errno.h>
 #include "queue.h"
 #include "base.h"
 
-typedef void (*UploadArgUpadater)(void *pOpaque, void* pUploadArg, int64_t nNow);
+typedef void (*LinkUploadArgUpadater)(void *pOpaque, void* pUploadArg, int64_t nNow);
 typedef struct _UploadArg {
         char    *pToken_;
         char    *pDeviceId_;
         void    *pUploadArgKeeper_;
         int64_t nSegmentId_;
         int64_t nLastUploadTsTime_;
-        UploadArgUpadater UploadArgUpadate;
-}UploadArg;
+        LinkUploadArgUpadater UploadArgUpadate;
+}LinkUploadArg;
 
-typedef struct _TsUploader TsUploader;
-typedef int (*StreamUploadStart)(TsUploader* pUploader);
-typedef void (*StreamUploadStop)(TsUploader*);
+typedef struct _LinkTsUploader LinkTsUploader;
+typedef int (*StreamUploadStart)(LinkTsUploader* pUploader);
+typedef void (*StreamUploadStop)(LinkTsUploader*);
 
-typedef struct _TsUploader{
+typedef struct _LinkTsUploader{
         StreamUploadStart UploadStart;
         StreamUploadStop UploadStop;
-        UploadState (*GetUploaderState)(TsUploader *pTsUploader);
-        int(*Push)(TsUploader *pTsUploader, char * pData, int nDataLen);
-        void (*GetStatInfo)(TsUploader *pTsUploader, UploaderStatInfo *pStatInfo);
-        void (*RecordTimestamp)(TsUploader *pTsUploader, int64_t nTimestamp);
-}TsUploader;
+        LinkUploadState (*GetUploaderState)(LinkTsUploader *pTsUploader);
+        int(*Push)(LinkTsUploader *pTsUploader, char * pData, int nDataLen);
+        void (*GetStatInfo)(LinkTsUploader *pTsUploader, LinkUploaderStatInfo *pStatInfo);
+        void (*RecordTimestamp)(LinkTsUploader *pTsUploader, int64_t nTimestamp);
+}LinkTsUploader;
 
 
-int NewUploader(TsUploader ** _pUploader, UploadArg *pArg, enum CircleQueuePolicy _policy, int _nMaxItemLen, int _nInitItemCount);
-void DestroyUploader(TsUploader ** _pUploader);
+int LinkNewUploader(LinkTsUploader ** _pUploader, LinkUploadArg *pArg, enum CircleQueuePolicy _policy, int _nMaxItemLen, int _nInitItemCount);
+void LinkDestroyUploader(LinkTsUploader ** _pUploader);
 
 #endif

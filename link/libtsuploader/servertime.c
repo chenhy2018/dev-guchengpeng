@@ -97,13 +97,13 @@ static int getTimeFromServer(int64_t *pStime) {
         return ret;
 }
 
-int64_t GetCurrentNanosecond()
+int64_t LinkGetCurrentNanosecond()
 {
         int64_t nUptime = getUptime();
         return (nUptime - nLocalupTimestamp)+nServerTimestamp;
 }
 
-int InitTime() {
+int LinkInitTime() {
 #ifdef USE_CLOCK
         clock_getres(CLOCK_MONOTONIC, &tmResolution);
 #endif

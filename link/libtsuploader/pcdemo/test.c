@@ -7,6 +7,7 @@
 #include <unistd.h>
 #include <signal.h>
 #include "tsuploaderapi.h"
+#include "localkey.h"
 #include "adts.h"
 #include "flag.h"
 
@@ -45,9 +46,9 @@ typedef struct {
 }CmdArg;
 
 typedef struct {
-        UserUploadArg userUploadArg;
-        AvArg avArg;
-        TsMuxUploader *pTsMuxUploader;
+        LinkUserUploadArg userUploadArg;
+        LinkMediaArg avArg;
+        LinkTsMuxUploader *pTsMuxUploader;
         int64_t firstTimeStamp ;
         int segStartCount;
         int nByteCount;
@@ -72,8 +73,8 @@ char gtestToken[1024] = {0};
 // start aac
 static int aacfreq[13] = {96000, 88200,64000,48000,44100,32000,24000, 22050 , 16000 ,12000,11025,8000,7350};
 typedef struct ADTS{
-        ADTSFixheader fix;
-        ADTSVariableHeader var;
+        LinkADTSFixheader fix;
+        LinkADTSVariableHeader var;
 }ADTS;
 //end aac
 
@@ -376,9 +377,9 @@ int start_file_test(char * _pAudioFile, char * _pVideoFile, DataCallback callbac
                         if (isAAC) {
                                 ADTS adts;
                                 if(audioOffset+7 <= nAudioDataLen) {
-                                        ParseAdtsfixedHeader((unsigned char *)(pAudioData + audioOffset), &adts.fix);
+                                        LinkParseAdtsfixedHeader((unsigned char *)(pAudioData + audioOffset), &adts.fix);
                                         int hlen = adts.fix.protection_absent == 1 ? 7 : 9;
-                                        ParseAdtsVariableHeader((unsigned char *)(pAudioData + audioOffset), &adts.var);
+                                        LinkParseAdtsVariableHeader((unsigned char *)(pAudioData + audioOffset), &adts.var);
                                         if (audioOffset+hlen+adts.var.aac_frame_length <= nAudioDataLen) {
 
                                                 if (cmdArg.IsTestAACWithoutAdts)
@@ -429,7 +430,7 @@ int start_file_test(char * _pAudioFile, char * _pVideoFile, DataCallback callbac
                 if (nSleepTime != 0) {
                         //printf("sleeptime:%lld\n", nSleepTime);
                         if (nSleepTime > 40 * 1000) {
-			        logwarn("abnormal time diff:%lld", nSleepTime);
+			        LinkLogWarn("abnormal time diff:%lld", nSleepTime);
 			}
                         usleep(nSleepTime);
                 }
@@ -562,7 +563,7 @@ static int dataCallback(void *opaque, void *pData, int nDataLen, int nFlag, int6
         pAvuploader->nByteCount += nDataLen;
         if (nFlag == THIS_IS_AUDIO){
                 //fprintf(stderr, "push audio ts:%lld\n", timestamp);
-                ret = PushAudio(pAvuploader->pTsMuxUploader, pData, nDataLen, timestamp + cmdArg.nBaseAudioTime);
+                ret = LinkPushAudio(pAvuploader->pTsMuxUploader, pData, nDataLen, timestamp + cmdArg.nBaseAudioTime);
         } else {
                 if (pAvuploader->firstTimeStamp == -1){
                         pAvuploader->firstTimeStamp = timestamp;
@@ -586,7 +587,7 @@ static int dataCallback(void *opaque, void *pData, int nDataLen, int nFlag, int6
                         cmdArg.nKeyFrameCount++;
                 }
                 
-                ret = PushVideo(pAvuploader->pTsMuxUploader, pData, nDataLen, timestamp + cmdArg.nBaseVideoTime, nIsKeyFrame, nNewSegMent);
+                ret = LinkPushVideo(pAvuploader->pTsMuxUploader, pData, nDataLen, timestamp + cmdArg.nBaseVideoTime, nIsKeyFrame, nNewSegMent);
         }
         return ret;
 }
@@ -596,13 +597,13 @@ static void * updateToken(void * opaque) {
         while(1) {
                 sleep(cmdArg.nUptokenInterval);
                 memset(gtestToken, 0, sizeof(gtestToken));
-                ret = GetUploadToken(gtestToken, sizeof(gtestToken), cmdArg.pTokenUrl);
+                ret = LinkGetUploadToken(gtestToken, sizeof(gtestToken), cmdArg.pTokenUrl);
                 if (ret != 0) {
                         printf("update token file<<<<<<<<<<<<<\n");
                         return NULL;
                 }
                 printf("token:%s\n", gtestToken);
-                ret = UpdateToken(opaque, gtestToken, strlen(gtestToken));
+                ret = LinkUpdateToken(opaque, gtestToken, strlen(gtestToken));
                 if (ret != 0) {
                         printf("update token file<<<<<<<<<<<<<\n");
                         return NULL;
@@ -616,7 +617,7 @@ void signalHander(int s){
         cmdArg.IsQuit = true;
 }
 
-void logCb(char * pLog)
+void logCb(int _nLevel, char * pLog)
 {
         fprintf(stderr, "-%s", pLog);
 }
@@ -633,30 +634,30 @@ static void checkCmdArg(const char * name)
         }
 #ifndef TEST_WITH_FFMPEG
         if (cmdArg.IsInputFromFFmpeg) {
-                logerror("not enable TEST_WITH_FFMPEG");
+                LinkLogError("not enable TEST_WITH_FFMPEG");
                 exit(2);
         }
 #endif
 #ifndef DISABLE_OPENSSL
         if (cmdArg.IsLocalToken) {
-                logerror("cannot from calc token from local. not enable OPENSSL");
+                LinkLogError("cannot from calc token from local. not enable OPENSSL");
                 exit(3);
         }
 #endif
         if (cmdArg.IsInputFromFFmpeg) {
                 cmdArg.IsTestAAC = true;
                 cmdArg.IsTestAACWithoutAdts = false;
-                logerror("input from ffmpeg");
+                LinkLogError("input from ffmpeg");
         }
         if (cmdArg.IsTestTimestampRollover) {
                 cmdArg.nRolloverTestBase = 95437000;
 	}
         if (cmdArg.nSleeptime != 0 && cmdArg.nSleeptime < 1000) {
-                logerror("sleep time is milliseond. should great than 1000");
+                LinkLogError("sleep time is milliseond. should great than 1000");
                 exit(4);
 	}
         if (cmdArg.IsNoAudio && cmdArg.IsNoVideo) {
-                logerror("no audio and video");
+                LinkLogError("no audio and video");
                 exit(5);
         }
         if (cmdArg.nUptokenInterval == 0) {
@@ -664,7 +665,7 @@ static void checkCmdArg(const char * name)
         }
         if (cmdArg.IsTwoUpload || cmdArg.IsTwoFileUpload) {
                 if (cmdArg.pUa1 == NULL || cmdArg.pUa2 == NULL) {
-                        logerror("ua1 or ua2 is NULL");
+                        LinkLogError("ua1 or ua2 is NULL");
                         exit(6);
                 }
         } else {
@@ -679,10 +680,10 @@ static void * second_test(void * opaque) {
         AVuploader avuploader;
         memset(&avuploader, 0, sizeof(avuploader));
         
-        avuploader.avArg.nAudioFormat = TK_AUDIO_AAC;
+        avuploader.avArg.nAudioFormat = LINK_AUDIO_AAC;
         avuploader.avArg.nSamplerate = 16000;
         avuploader.avArg.nChannels = 1;
-        avuploader.avArg.nVideoFormat = TK_VIDEO_H264;
+        avuploader.avArg.nVideoFormat = LINK_VIDEO_H264;
 
         avuploader.userUploadArg.pToken_ = gtestToken;
         avuploader.userUploadArg.nTokenLen_ = strlen(gtestToken);
@@ -691,7 +692,7 @@ static void * second_test(void * opaque) {
         avuploader.userUploadArg.nUploaderBufferSize = cmdArg.nQbufSize;
         avuploader.userUploadArg.nNewSegmentInterval = cmdArg.nNewSetIntval;
         
-        int ret = CreateAndStartAVUploader(&avuploader.pTsMuxUploader, &avuploader.avArg, &avuploader.userUploadArg);
+        int ret = LinkCreateAndStartAVUploader(&avuploader.pTsMuxUploader, &avuploader.avArg, &avuploader.userUploadArg);
         if (ret != 0) {
                 fprintf(stderr, "CreateAndStartAVUploader err:%d\n", ret);
                 return NULL;
@@ -699,7 +700,7 @@ static void * second_test(void * opaque) {
         
         start_ffmpeg_test("rtmp://localhost:1935/live/movie", dataCallback, &avuploader);
         sleep(1);
-        DestroyAVUploader(&avuploader.pTsMuxUploader);
+        LinkDestroyAVUploader(&avuploader.pTsMuxUploader);
         return NULL;
 }
 
@@ -723,7 +724,7 @@ static void * second_file_test(void * opaque) {
         avuploader.userUploadArg.pDeviceId_ = cmdArg.pUa2;
         avuploader.userUploadArg.nDeviceIdLen_ = strlen(cmdArg.pUa2);
         
-        int ret = CreateAndStartAVUploader(&avuploader.pTsMuxUploader, &avuploader.avArg, &avuploader.userUploadArg);
+        int ret = LinkCreateAndStartAVUploader(&avuploader.pTsMuxUploader, &avuploader.avArg, &avuploader.userUploadArg);
         if (ret != 0) {
                 fprintf(stderr, "CreateAndStartAVUploader err:%d\n", ret);
                 return NULL;
@@ -731,7 +732,7 @@ static void * second_file_test(void * opaque) {
         
         do_start_file_test(&avuploader);
         sleep(1);
-        DestroyAVUploader(&avuploader.pTsMuxUploader);
+        LinkDestroyAVUploader(&avuploader.pTsMuxUploader);
         return NULL;
 }
 
@@ -846,8 +847,8 @@ int main(int argc, const char** argv)
  	        printf("avformat_network_init\n");
 	}
 #endif
-        SetLogLevelToDebug();
-        SetLogCallback(logCb);
+        LinkSetLogLevel(LINK_LOG_LEVEL_DEBUG);
+        LinkSetLogCallback(logCb);
         signal(SIGINT, signalHander);
         
 #ifndef DISABLE_OPENSSL
@@ -861,7 +862,7 @@ int main(int argc, const char** argv)
         
         AVuploader avuploader;
         if (!cmdArg.IsNoNet) {
-                ret = GetUploadToken(gtestToken, sizeof(gtestToken), cmdArg.pTokenUrl);
+                ret = LinkGetUploadToken(gtestToken, sizeof(gtestToken), cmdArg.pTokenUrl);
                 if (ret != 0)
                         return ret;
                 printf("token:%s\n", gtestToken);
@@ -884,18 +885,18 @@ int main(int argc, const char** argv)
         avuploader.avArg.nChannels = 1;
         if (!cmdArg.IsNoAudio) {
                 if(cmdArg.IsTestAAC) {
-                        avuploader.avArg.nAudioFormat = TK_AUDIO_AAC;
+                        avuploader.avArg.nAudioFormat = LINK_AUDIO_AAC;
                         avuploader.avArg.nSamplerate = 16000;
                 } else {
-                        avuploader.avArg.nAudioFormat = TK_AUDIO_PCMU;
+                        avuploader.avArg.nAudioFormat = LINK_AUDIO_PCMU;
                         avuploader.avArg.nSamplerate = 8000;
                 }
         }
         if (!cmdArg.IsNoVideo) {
                 if(cmdArg.IsTestH265) {
-                        avuploader.avArg.nVideoFormat = TK_VIDEO_H265;
+                        avuploader.avArg.nVideoFormat = LINK_VIDEO_H265;
                 } else {
-                        avuploader.avArg.nVideoFormat = TK_VIDEO_H264;
+                        avuploader.avArg.nVideoFormat = LINK_VIDEO_H264;
                 }
         }
          
@@ -906,7 +907,7 @@ int main(int argc, const char** argv)
         //end test
         */
         //gtestToken[100]='1'; //wrong token
-        ret = InitUploader();
+        ret = LinkInitUploader();
         if (ret != 0) {
                 fprintf(stderr, "InitUploader err:%d\n", ret);
                 return ret;
@@ -919,7 +920,7 @@ int main(int argc, const char** argv)
         avuploader.userUploadArg.nUploaderBufferSize = cmdArg.nQbufSize;
         avuploader.userUploadArg.nNewSegmentInterval = cmdArg.nNewSetIntval;
         
-        ret = CreateAndStartAVUploader(&avuploader.pTsMuxUploader, &avuploader.avArg, &avuploader.userUploadArg);
+        ret = LinkCreateAndStartAVUploader(&avuploader.pTsMuxUploader, &avuploader.avArg, &avuploader.userUploadArg);
         if (ret != 0) {
                 fprintf(stderr, "CreateAndStartAVUploader err:%d\n", ret);
                 return ret;
@@ -957,12 +958,12 @@ int main(int argc, const char** argv)
         }
         
         sleep(1);
-        DestroyAVUploader(&avuploader.pTsMuxUploader);
+        LinkDestroyAVUploader(&avuploader.pTsMuxUploader);
         if (cmdArg.IsTwoUpload || cmdArg.IsTwoFileUpload) {
                 pthread_join(secondUploadThread, NULL);
         }
-        UninitUploader();
-        loginfo("should total:%d\n", avuploader.nByteCount);
+        LinkUninitUploader();
+        LinkLogInfo("should total:%d\n", avuploader.nByteCount);
 
         return 0;
 }

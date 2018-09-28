@@ -6,7 +6,7 @@
 #define QUEUE_TIMEOUT_STATE 2
 
 typedef struct _CircleQueueImp{
-        CircleQueue circleQueue;
+        LinkCircleQueue circleQueue;
         char *pData_;
         int nCap_;
         int nLen_;
@@ -17,11 +17,11 @@ typedef struct _CircleQueueImp{
         pthread_mutex_t mutex_;
         pthread_cond_t condition_;
         enum CircleQueuePolicy policy;
-        UploaderStatInfo statInfo;
+        LinkUploaderStatInfo statInfo;
 	int nIsAvailableAfterTimeout;
 }CircleQueueImp;
 
-static int PushQueue(CircleQueue *_pQueue, char *pData_, int nDataLen)
+static int PushQueue(LinkCircleQueue *_pQueue, char *pData_, int nDataLen)
 {
         CircleQueueImp *pQueueImp = (CircleQueueImp *)_pQueue;
         assert(pQueueImp->nItemLen_ - sizeof(int) >= nDataLen);
@@ -30,15 +30,15 @@ static int PushQueue(CircleQueue *_pQueue, char *pData_, int nDataLen)
         
         if (!pQueueImp->nIsAvailableAfterTimeout && pQueueImp->nQState_ == QUEUE_TIMEOUT_STATE) {
                 pQueueImp->statInfo.nDropped += nDataLen;
-                logwarn("queue is timeout dropped:%p", _pQueue);
+                LinkLogWarn("queue is timeout dropped:%p", _pQueue);
                 pthread_mutex_unlock(&pQueueImp->mutex_);
                 return 0;
         }
         if (pQueueImp->nQState_ == QUEUE_READ_ONLY_STATE) {
                 pQueueImp->statInfo.nDropped += nDataLen;
-                logwarn("queue is only readable now");
+                LinkLogWarn("queue is only readable now");
                 pthread_mutex_unlock(&pQueueImp->mutex_);
-                return TK_NO_PUSH;
+                return LINK_NO_PUSH;
         }
         
         int nPos = pQueueImp->nEnd_;
@@ -73,7 +73,7 @@ static int PushQueue(CircleQueue *_pQueue, char *pData_, int nDataLen)
 
                         pQueueImp->statInfo.nPushDataBytes_ += nDataLen;
                         pQueueImp->statInfo.nOverwriteCnt++;
-                        return TK_Q_OVERWRIT;
+                        return LINK_Q_OVERWRIT;
                 } else{
                         char *pTmp = (char *)malloc(pQueueImp->nItemLen_ * pQueueImp->nCap_ * 2);
                         int nOriginCap = pQueueImp->nCap_;
@@ -112,14 +112,14 @@ static int PushQueue(CircleQueue *_pQueue, char *pData_, int nDataLen)
         return -1;
 }
 
-static int PopQueueWithTimeout(CircleQueue *_pQueue, char *pBuf_, int nBufLen, int64_t nUSec)
+static int PopQueueWithTimeout(LinkCircleQueue *_pQueue, char *pBuf_, int nBufLen, int64_t nUSec)
 {
         CircleQueueImp *pQueueImp = (CircleQueueImp *)_pQueue;
         
         pthread_mutex_lock(&pQueueImp->mutex_);
         if (!pQueueImp->nIsAvailableAfterTimeout && pQueueImp->nQState_ == QUEUE_TIMEOUT_STATE) {
                 pthread_mutex_unlock(&pQueueImp->mutex_);
-                return TK_TIMEOUT;
+                return LINK_TIMEOUT;
         }
         if (pQueueImp->nQState_ == QUEUE_READ_ONLY_STATE && pQueueImp->nLen_ == 0) {
                 pthread_mutex_unlock(&pQueueImp->mutex_);
@@ -138,7 +138,7 @@ static int PopQueueWithTimeout(CircleQueue *_pQueue, char *pBuf_, int nBufLen, i
                 if (ret == ETIMEDOUT) {
                         pthread_mutex_unlock(&pQueueImp->mutex_);
                         pQueueImp->nQState_ = QUEUE_TIMEOUT_STATE;
-                        return TK_TIMEOUT;
+                        return LINK_TIMEOUT;
                 }
                 if (pQueueImp->nLen_ == 0) {
                         pthread_mutex_unlock(&pQueueImp->mutex_);
@@ -149,7 +149,7 @@ static int PopQueueWithTimeout(CircleQueue *_pQueue, char *pBuf_, int nBufLen, i
         int nDataLen = 0;
         memcpy(&nDataLen, pQueueImp->pData_ + pQueueImp->nStart_ * pQueueImp->nItemLen_, sizeof(int));
         int nRemain = nDataLen - nBufLen;
-        logtrace("pop remain:%d pop:%d buflen:%d len:%d", nRemain, nDataLen, nBufLen, pQueueImp->nLen_);
+        LinkLogTrace("pop remain:%d pop:%d buflen:%d len:%d", nRemain, nDataLen, nBufLen, pQueueImp->nLen_);
         if (nRemain > 0) {
                 memcpy(pBuf_, pQueueImp->pData_ + pQueueImp->nStart_ * pQueueImp->nItemLen_ + sizeof(int), nBufLen);
                 memcpy(pQueueImp->pData_ + pQueueImp->nStart_ * pQueueImp->nItemLen_, &nRemain, sizeof(int));
@@ -173,21 +173,21 @@ static int PopQueueWithTimeout(CircleQueue *_pQueue, char *pBuf_, int nBufLen, i
 }
 
 
-static int PopQueue(CircleQueue *_pQueue, char *pBuf_, int nBufLen, int64_t nUSec)
+static int PopQueue(LinkCircleQueue *_pQueue, char *pBuf_, int nBufLen, int64_t nUSec)
 {
         int64_t usec = 1000000;
         CircleQueueImp *pQueueImp = (CircleQueueImp *)_pQueue;
         if (pQueueImp->statInfo.nOverwriteCnt > 0) {
-                return TK_Q_OVERWRIT;
+                return LINK_Q_OVERWRIT;
         }
         return PopQueueWithTimeout(_pQueue, pBuf_, nBufLen, usec * 60 * 60 * 24 * 365);
 }
 
-static int PopQueueWithNoOverwrite(CircleQueue *_pQueue, char *pBuf_, int nBufLen)
+static int PopQueueWithNoOverwrite(LinkCircleQueue *_pQueue, char *pBuf_, int nBufLen)
 {
         CircleQueueImp *pQueueImp = (CircleQueueImp *)_pQueue;
         if (pQueueImp->statInfo.nOverwriteCnt > 0) {
-                return TK_Q_OVERWRIT;
+                return LINK_Q_OVERWRIT;
         }
         int64_t usec = 1000000;
         if (pQueueImp->statInfo.nPushDataBytes_> 0) {
@@ -197,7 +197,7 @@ static int PopQueueWithNoOverwrite(CircleQueue *_pQueue, char *pBuf_, int nBufLe
         }
 }
 
-static void StopPush(CircleQueue *_pQueue)
+static void StopPush(LinkCircleQueue *_pQueue)
 {
         CircleQueueImp *pQueueImp = (CircleQueueImp *)_pQueue;
         
@@ -209,7 +209,7 @@ static void StopPush(CircleQueue *_pQueue)
         return;
 }
 
-static void getStatInfo(CircleQueue *_pQueue, UploaderStatInfo *_pStatInfo)
+static void getStatInfo(LinkCircleQueue *_pQueue, LinkUploaderStatInfo *_pStatInfo)
 {
         CircleQueueImp *pQueueImp = (CircleQueueImp *)_pQueue;
         
@@ -221,24 +221,24 @@ static void getStatInfo(CircleQueue *_pQueue, UploaderStatInfo *_pStatInfo)
         return;
 }
 
-int NewCircleQueue(CircleQueue **_pQueue, int nIsAvailableAfterTimeout, enum CircleQueuePolicy _policy, int _nMaxItemLen, int _nInitItemCount)
+int LinkNewCircleQueue(LinkCircleQueue **_pQueue, int nIsAvailableAfterTimeout, enum CircleQueuePolicy _policy, int _nMaxItemLen, int _nInitItemCount)
 {
         int ret;
         CircleQueueImp *pQueueImp = (CircleQueueImp *)malloc(sizeof(CircleQueueImp) +
                                                              (_nMaxItemLen + sizeof(int)) * _nInitItemCount);
         if (pQueueImp == NULL) {
-                return TK_NO_MEMORY;
+                return LINK_NO_MEMORY;
         }
         memset(pQueueImp, 0, sizeof(CircleQueueImp));
 
         ret = pthread_mutex_init(&pQueueImp->mutex_, NULL);
         if (ret != 0){
-                return TK_MUTEX_ERROR;
+                return LINK_MUTEX_ERROR;
         }
         ret = pthread_cond_init(&pQueueImp->condition_, NULL);
         if (ret != 0){
                 pthread_mutex_destroy(&pQueueImp->mutex_);
-                return TK_COND_ERROR;
+                return LINK_COND_ERROR;
         }
         
         pQueueImp->policy = _policy;
@@ -252,11 +252,11 @@ int NewCircleQueue(CircleQueue **_pQueue, int nIsAvailableAfterTimeout, enum Cir
         pQueueImp->circleQueue.GetStatInfo = getStatInfo;
         pQueueImp->nIsAvailableAfterTimeout = nIsAvailableAfterTimeout;
         
-        *_pQueue = (CircleQueue*)pQueueImp;
+        *_pQueue = (LinkCircleQueue*)pQueueImp;
         return 0;
 }
 
-void DestroyQueue(CircleQueue **_pQueue)
+void LinkDestroyQueue(LinkCircleQueue **_pQueue)
 {
         CircleQueueImp *pQueueImp = (CircleQueueImp *)(*_pQueue);
 

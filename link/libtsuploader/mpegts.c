@@ -60,9 +60,9 @@ uint32_t crc32 (uint8_t *data, int len)
         return crc;
 }
 
-static void initPes(PES *_pPes, uint8_t *_pData, int _nDataLen, int64_t _nPts)
+static void initPes(LinkPES *_pPes, uint8_t *_pData, int _nDataLen, int64_t _nPts)
 {
-        memset(_pPes, 0, sizeof(PES));
+        memset(_pPes, 0, sizeof(LinkPES));
         _pPes->nPts = _nPts * 90; //90000hz, 这里传入的单位是毫秒
         _pPes->pESData = _pData;
         _pPes->nESDataLen = _nDataLen;
@@ -70,7 +70,7 @@ static void initPes(PES *_pPes, uint8_t *_pData, int _nDataLen, int64_t _nPts)
         return;
 }
 
-void InitVideoPES(PES *_pPes, TkVideoFormat _fmt, uint8_t *_pData, int _nDataLen, int64_t _nPts)
+void LinkInitVideoPES(LinkPES *_pPes, LinkVideoFormat _fmt, uint8_t *_pData, int _nDataLen, int64_t _nPts)
 {
         initPes(_pPes, _pData, _nDataLen, _nPts);
         _pPes->nStreamId = 0xE0;
@@ -79,21 +79,21 @@ void InitVideoPES(PES *_pPes, TkVideoFormat _fmt, uint8_t *_pData, int _nDataLen
         return;
 }
 
-void InitVideoPESWithPcr(PES *_pPes, TkVideoFormat fmt, uint8_t *_pData, int _nDataLen, int64_t _nPts)
+void LinkInitVideoPESWithPcr(LinkPES *_pPes, LinkVideoFormat fmt, uint8_t *_pData, int _nDataLen, int64_t _nPts)
 {
-        InitVideoPES(_pPes, fmt, _pData, _nDataLen, _nPts);
+        LinkInitVideoPES(_pPes, fmt, _pData, _nDataLen, _nPts);
         _pPes->nWithPcr = 1;
         return;
 }
 
-void InitAudioPES(PES *_pPes, uint8_t *_pData, int _nDataLen, int64_t _nPts)
+void LinkInitAudioPES(LinkPES *_pPes, uint8_t *_pData, int _nDataLen, int64_t _nPts)
 {
         initPes(_pPes, _pData, _nDataLen, _nPts);
         _pPes->nStreamId = 0xC0;
         return;
 }
 
-void InitPrivateTypePES(PES *_pPes, uint8_t *_pData, int _nDataLen, int64_t _nPts)
+void LinkInitPrivateTypePES(LinkPES *_pPes, uint8_t *_pData, int _nDataLen, int64_t _nPts)
 {
         initPes(_pPes, _pData, _nDataLen, _nPts);
         _pPes->nStreamId = 0xBD;
@@ -101,7 +101,7 @@ void InitPrivateTypePES(PES *_pPes, uint8_t *_pData, int _nDataLen, int64_t _nPt
         return;
 }
 
-void NewVideoPES(PES *_pPes, uint8_t *_pData, int _nDataLen, int64_t _nPts)
+void NewVideoPES(LinkPES *_pPes, uint8_t *_pData, int _nDataLen, int64_t _nPts)
 {
         initPes(_pPes, _pData, _nDataLen, _nPts);
         _pPes->nStreamId = 0xE0;
@@ -166,18 +166,18 @@ static void printPts(uint8_t *buf){
         printf("pes pts:%lld\n", pts/90);
 }
 
-static int getPESHeaderJustWithPtsLen(PES *_pPes)
+static int getPESHeaderJustWithPtsLen(LinkPES *_pPes)
 {
         int nLen = 14;
-        if (_pPes->videoFormat == TK_VIDEO_H264) {
+        if (_pPes->videoFormat == LINK_VIDEO_H264) {
                 nLen += sizeof(h264Aud);
-        } else if (_pPes->videoFormat == TK_VIDEO_H265) {
+        } else if (_pPes->videoFormat == LINK_VIDEO_H265) {
                 nLen += sizeof(h265Aud);
         }
         return nLen;
 }
 
-static int writePESHeaderJustWithPts(PES *_pPes, uint8_t *pData)
+static int writePESHeaderJustWithPts(LinkPES *_pPes, uint8_t *pData)
 {
         uint8_t * pPts = NULL;
         int nRetLen = 0;
@@ -188,9 +188,9 @@ static int writePESHeaderJustWithPts(PES *_pPes, uint8_t *pData)
         pData[3] = _pPes->nStreamId; //stream_id 8bit
         
         int nLen = _pPes->nESDataLen + 8; //PES_packet_length 16bit header[6-13]长度为8
-        if (_pPes->videoFormat == TK_VIDEO_H264) {
+        if (_pPes->videoFormat == LINK_VIDEO_H264) {
                 nLen += sizeof(h264Aud);
-        } else if (_pPes->videoFormat == TK_VIDEO_H265) {
+        } else if (_pPes->videoFormat == LINK_VIDEO_H265) {
                 nLen += sizeof(h265Aud);
         }
         if (nLen > 65535) {
@@ -227,23 +227,23 @@ static int writePESHeaderJustWithPts(PES *_pPes, uint8_t *pData)
         pData[13] = 0x01 | ((nPts << 1 ) & 0xFE);
         nRetLen += 14;
         
-        if (_pPes->videoFormat == TK_VIDEO_H264) {
+        if (_pPes->videoFormat == LINK_VIDEO_H264) {
                 memcpy(&pData[nRetLen], h264Aud, sizeof(h264Aud));
                 nRetLen += sizeof(h264Aud);
-        } else if (_pPes->videoFormat == TK_VIDEO_H265) {
+        } else if (_pPes->videoFormat == LINK_VIDEO_H265) {
                 memcpy(&pData[nRetLen], h265Aud, sizeof(h265Aud));
                 nRetLen += sizeof(h265Aud);
         }
         
         pPts=pData+9; //for debug
         
-        //if (pPts != NULL && (_pPes->videoFormat == TK_VIDEO_H264 || _pPes->videoFormat == TK_VIDEO_H265))
+        //if (pPts != NULL && (_pPes->videoFormat == LINK_VIDEO_H264 || _pPes->videoFormat == LINK_VIDEO_H265))
         //        printPts(pPts);
         
         return nRetLen;
 }
 
-int GetPESData(PES *_pPes, int _nCounter, int _nPid, uint8_t *_pData, int _nLen)
+int LinkGetPESData(LinkPES *_pPes, int _nCounter, int _nPid, uint8_t *_pData, int _nLen)
 {
         if (_pPes->nPos == _pPes->nESDataLen)
                 return 0;
@@ -255,12 +255,12 @@ int GetPESData(PES *_pPes, int _nCounter, int _nPid, uint8_t *_pData, int _nLen)
         int isPaddingBeforePesHdr = 0;
         int nPesHdrLen = 0;
         if (_pPes->nPos == 0) {
-                nRetLen = WriteTsHeader(pData, 1, _nCounter, _nPid, ADAPTATION_JUST_PAYLOAD);
+                nRetLen = LinkWriteTsHeader(pData, 1, _nCounter, _nPid, LINK_ADAPTATION_JUST_PAYLOAD);
                 //https://en.wikipedia.org/wiki/Packetized_elementary_stream
                 pData += nRetLen;
                 
                 if (_pPes->nWithPcr == 1) { //关键帧不可能小于188
-                        SetAdaptationFieldFlag(_pData, ADAPTATION_BOTH);
+                        LinkSetAdaptationFieldFlag(_pData, LINK_ADAPTATION_BOTH);
                         int nAdaLen = writeAdaptationFieldJustWithPCR(pData, _pPes->nPts);
                         nRetLen += nAdaLen;
                         pData += nAdaLen;
@@ -281,7 +281,7 @@ int GetPESData(PES *_pPes, int _nCounter, int _nPid, uint8_t *_pData, int _nLen)
                 }
                 
         }  else {
-                nRetLen = WriteTsHeader(pData, 0, _nCounter, _nPid, ADAPTATION_JUST_PAYLOAD);
+                nRetLen = LinkWriteTsHeader(pData, 0, _nCounter, _nPid, LINK_ADAPTATION_JUST_PAYLOAD);
         }
         
         int nAdapLen = 0;
@@ -298,7 +298,7 @@ int GetPESData(PES *_pPes, int _nCounter, int _nPid, uint8_t *_pData, int _nLen)
                 
                 _pData[nRetLen-2] = nAdapLen + 1; //adaptation_field_lenght不算，但是后面的一个字节算
                 _pData[nRetLen-1] = 0x00;
-                SetAdaptationFieldFlag(_pData, ADAPTATION_BOTH); //前面填充ff,然后才是数据
+                LinkSetAdaptationFieldFlag(_pData, LINK_ADAPTATION_BOTH); //前面填充ff,然后才是数据
                 
                 memset(_pData + nRetLen, 0xff, nAdapLen);
                 
@@ -315,18 +315,18 @@ int GetPESData(PES *_pPes, int _nCounter, int _nPid, uint8_t *_pData, int _nLen)
         return 188;
 }
 
-void SetAdaptationFieldFlag(uint8_t *_pBuf, int _nAdaptationField)
+void LinkSetAdaptationFieldFlag(uint8_t *_pBuf, int _nAdaptationField)
 {
         _pBuf[3] |= (_nAdaptationField << 4);
         return;
 }
 
-void WriteContinuityCounter(uint8_t *_pBuf, int _nCounter)
+void LinkWriteContinuityCounter(uint8_t *_pBuf, int _nCounter)
 {
         _pBuf[3] |= _nCounter;
 }
 
-int WriteTsHeader(uint8_t *_pBuf, int _nUinitStartIndicator, int _nCount, int _nPid, int _nAdaptationField)
+int LinkWriteTsHeader(uint8_t *_pBuf, int _nUinitStartIndicator, int _nCount, int _nPid, int _nAdaptationField)
 {
         _pBuf[0] = 0x47;
         memset(_pBuf+1, 0, 3);
@@ -338,16 +338,16 @@ int WriteTsHeader(uint8_t *_pBuf, int _nUinitStartIndicator, int _nCount, int _n
         _pBuf[1] |= nHighPid;
         _pBuf[2] = nLowPid;
         
-        SetAdaptationFieldFlag(_pBuf, _nAdaptationField);
+        LinkSetAdaptationFieldFlag(_pBuf, _nAdaptationField);
         _pBuf[3] |= _nCount;
         
         return 4;
 }
 
-int WriteSDT(uint8_t *_pBuf, int _nUinitStartIndicator, int _nCount, int _nAdaptationField)
+int LinkWriteSDT(uint8_t *_pBuf, int _nUinitStartIndicator, int _nCount, int _nAdaptationField)
 {
         int nRetLen = 4;
-        WriteTsHeader(_pBuf, _nUinitStartIndicator, _nCount, SDT_PID, _nAdaptationField);
+        LinkWriteTsHeader(_pBuf, _nUinitStartIndicator, _nCount, LINK_SDT_PID, _nAdaptationField);
         _pBuf += 4;
         if (_nUinitStartIndicator) {
                 _pBuf[0] = 0;
@@ -400,10 +400,10 @@ int WriteSDT(uint8_t *_pBuf, int _nUinitStartIndicator, int _nCount, int _nAdapt
         return 39+nRetLen;
 }
 
-int WritePAT(uint8_t *_pBuf, int _nUinitStartIndicator, int _nCount, int _nAdaptationField)
+int LinkWritePAT(uint8_t *_pBuf, int _nUinitStartIndicator, int _nCount, int _nAdaptationField)
 {
         int nRetLen = 4;
-        WriteTsHeader(_pBuf, _nUinitStartIndicator, _nCount, PAT_PID, _nAdaptationField);
+        LinkWriteTsHeader(_pBuf, _nUinitStartIndicator, _nCount, LINK_PAT_PID, _nAdaptationField);
         _pBuf += 4;
         if (_nUinitStartIndicator) {
                 _pBuf[0] = 0;
@@ -440,12 +440,12 @@ int WritePAT(uint8_t *_pBuf, int _nUinitStartIndicator, int _nCount, int _nAdapt
 }
 
 
-int WritePMT(uint8_t *_pBuf, int _nUinitStartIndicator, int _nCount, int _nAdaptationField, int _nVStreamType, int _nAStreamType)
+int LinkWritePMT(uint8_t *_pBuf, int _nUinitStartIndicator, int _nCount, int _nAdaptationField, int _nVStreamType, int _nAStreamType)
 {
         assert(_nVStreamType ||  _nAStreamType);
         int nRetLen = 4;
         int noAOrV = 0;
-        WriteTsHeader(_pBuf, _nUinitStartIndicator, _nCount, PMT_PID, _nAdaptationField);
+        LinkWriteTsHeader(_pBuf, _nUinitStartIndicator, _nCount, LINK_PMT_PID, _nAdaptationField);
         _pBuf += 4;
         if (_nUinitStartIndicator) {
                 _pBuf[0] = 0;
