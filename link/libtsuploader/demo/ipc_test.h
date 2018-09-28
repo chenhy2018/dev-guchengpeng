@@ -1,4 +1,4 @@
-// Last Update:2018-09-21 16:49:39
+// Last Update:2018-09-25 16:46:11
 /**
  * @file ipc_test.h
  * @brief 
@@ -52,5 +52,9 @@ extern Config *GetConfig();
 extern int GetKodoInitSts();
 extern int GetMovingDetectSts();
 extern int GetAudioType();
+extern void SetOutputType( int output );
+extern int GetOutputType();
+extern void SetMovingDetection( int enable );
+extern int GetMovingDetection();
 
 #endif  /*IPC_TEST_H*/
