@@ -248,7 +248,7 @@ static void * streamUpload(void *_pOpaque)
 #ifdef DISABLE_OPENSSL
         Qiniu_Use_Zone_Huadong(Qiniu_False);
 #else
-        Qiniu_Use_Zone_Huadong(Qiniu_True);
+        Qiniu_Use_Zone_Huadong(Qiniu_False);
 #endif
         //Qiniu_Use_Zone_Huanan(Qiniu_True);
         

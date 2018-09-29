@@ -8,6 +8,10 @@
 #ifndef USE_OWN_TSMUX
 #include <libavformat/avformat.h>
 #endif
+#ifndef DISABLE_OPENSSL
+#include <qiniu/io.h>
+#include <qiniu/rs.h>
+#endif
 
 static int volatile nProcStatus = 0;
 
@@ -149,7 +153,7 @@ void LinkUninitUploader()
 }
 
 //---------test
-#define CALLBACK_URL "http://39.107.247.14:8088/qiniu/upload/callback"
+#define CALLBACK_URL "http://47.105.118.51:8088/qiniu/upload/callback"
 static char gAk[65] = {0};
 static char gSk[65] = {0};
 static char gBucket[128] = {0};
@@ -277,6 +281,7 @@ int LinkGetUploadToken(char *pBuf, int nBufLen, char *pUrl)
         char *uptoken;
         uptoken = Qiniu_RS_PutPolicy_Token(&putPolicy, &mac);
         assert(nBufLen > strlen(uptoken));
+        fprintf(stderr,"token from local:\n");
         strcpy(pBuf, uptoken);
         Qiniu_Free(uptoken);
         return 0;

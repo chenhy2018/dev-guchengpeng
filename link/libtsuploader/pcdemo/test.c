@@ -638,7 +638,7 @@ static void checkCmdArg(const char * name)
                 exit(2);
         }
 #endif
-#ifndef DISABLE_OPENSSL
+#ifdef DISABLE_OPENSSL
         if (cmdArg.IsLocalToken) {
                 LinkLogError("cannot from calc token from local. not enable OPENSSL");
                 exit(3);
@@ -853,10 +853,10 @@ int main(int argc, const char** argv)
         
 #ifndef DISABLE_OPENSSL
         if (cmdArg.IsLocalToken) {
-                SetAk("JAwTPb8dmrbiwt89Eaxa4VsL4_xSIYJoJh4rQfOQ");
-                SetSk("G5mtjT3QzG4Lf7jpCAN5PZHrGeoSH9jRdC96ecYS");
+                LinkSetAk("JAwTPb8dmrbiwt89Eaxa4VsL4_xSIYJoJh4rQfOQ");
+                LinkSetSk("G5mtjT3QzG4Lf7jpCAN5PZHrGeoSH9jRdC96ecYS");
                 //计算token需要，所以需要先设置
-                SetBucketName("ipcamera");
+                LinkSetBucketName("ipcamera");
         }
 #endif
         
