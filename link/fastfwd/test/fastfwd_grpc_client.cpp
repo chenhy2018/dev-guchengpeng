@@ -23,21 +23,21 @@ public:
                         stub_(FastForward::NewStub(channel)) {
         }
 
-        int ReceiveStream(const std::string& url, const int speed) {
+        int ReceiveStream(const std::string& _url, const int _speed) {
                 // Data we are sending to the server.
                 FastForwardStream ffs;
                 ClientContext context;
                 FastForwardInfo request;
-                request.set_url(url);
-                request.set_speed(speed);
+                request.set_url(_url);
+                request.set_speed(_speed);
 
                 std::unique_ptr<ClientReader<FastForwardStream> > reader(
                                 stub_->GetTsStream(&context, request));
 
                 std::ofstream outfile("grpc_test.mp4",std::ofstream::binary);
 
-                // XXX if not sleep, the client will blocking.
-                std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+                // before read stream, need to wait grpc channel ready
+                reader->WaitForInitialMetadata();
 
                 while (reader->Read(&ffs)) {
 

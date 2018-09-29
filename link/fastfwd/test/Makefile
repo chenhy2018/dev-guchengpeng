@@ -14,7 +14,7 @@ LDFLAGS2 = -L$(LIBP_GRPC) -lprotobuf -lgrpc++ -lgrpc -lgrpc++_reflection
 LDFLAGS3 = -L$(LIBP_GLIBC) $(LIBP_GLIBC)/libm-2.27.a -Wl,--whole-archive $(LIBP_GLIBC)/libpthread.a -Wl,--no-whole-archive $(LIBP_GLIBC)/libc.a $(LIBP_GLIBC)/libdl.a
 LDFLAGS4 = -static -static-libstdc++
 
-TARGETS = fastfwd_file_test fastfwd_grpc_client
+TARGETS = fastfwd_file_test fastfwd_grpc_client fastfwd_load_test
 test: $(TARGETS)
 
 fastfwd_file_test: fastfwd_file_test.o
@@ -22,6 +22,10 @@ fastfwd_file_test: fastfwd_file_test.o
 	$(CXX) ${SRC_PATH}/fastfwd.o $^ $(LDFLAGS1) $(LDFLAGS3) $(LDFLAGS4) -o $@
 
 fastfwd_grpc_client: fastfwd_grpc_client.o
+	make -C ${SRC_PATH} build
+	$(CXX) ${SRC_PATH}/fast_forward.pb.o  ${SRC_PATH}/fast_forward.grpc.pb.o $^ $(LDFLAGS2) $(LDFLAGS3) $(LDFLAGS4) -o $@
+
+fastfwd_load_test: fastfwd_load_test.o
 	make -C ${SRC_PATH} build
 	$(CXX) ${SRC_PATH}/fast_forward.pb.o  ${SRC_PATH}/fast_forward.grpc.pb.o $^ $(LDFLAGS2) $(LDFLAGS3) $(LDFLAGS4) -o $@
 

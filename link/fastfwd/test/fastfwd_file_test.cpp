@@ -1,6 +1,7 @@
 #include "fastfwd.hpp"
 
 unsigned int fastfwd::global::nLogLevel = 4;
+int fastfwd::nStatPeriod = 10;
 
 int main(int _nArgc, char** _pArgv)
 {
@@ -46,7 +47,7 @@ int main(int _nArgc, char** _pArgv)
                                 Info("error on connection");
                         }
                         i++;
-                        Info("count=%d", i);
+                        Debug("count=%d", i);
                         if (i > 1500) {
                                 break;
                         }
