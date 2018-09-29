@@ -30,8 +30,8 @@ typedef int (*DataCallback)(void *opaque, void *pData, int nDataLen, int nFlag, 
 // start aac
 static int aacfreq[13] = {96000, 88200,64000,48000,44100,32000,24000, 22050 , 16000 ,12000,11025,8000,7350};
 typedef struct ADTS{
-        ADTSFixheader fix;
-        ADTSVariableHeader var;
+        LinkADTSFixheader fix;
+        LinkADTSVariableHeader var;
 }ADTS;
 //end aac
 
@@ -323,7 +323,7 @@ int start_video_file_test(void *opaque)
                  if (nSleepTime > 0) {
                          //printf("sleeptime:%lld\n", nSleepTime);
                          if (nSleepTime > 40 * 1000) {
-                                 logwarn("abnormal time diff:%lld", nSleepTime);
+                                 LinkLogWarn("abnormal time diff:%lld", nSleepTime);
                          }
                          usleep(nSleepTime);
                  }
@@ -371,9 +371,9 @@ int start_audio_file_test(void *opaque)
                 if (isAAC) {
                         ADTS adts;
                         if(audioOffset+7 <= nAudioDataLen) {
-                                ParseAdtsfixedHeader((unsigned char *)(pAudioData + audioOffset), &adts.fix);
+                                LinkParseAdtsfixedHeader((unsigned char *)(pAudioData + audioOffset), &adts.fix);
                                 int hlen = adts.fix.protection_absent == 1 ? 7 : 9;
-                                ParseAdtsVariableHeader((unsigned char *)(pAudioData + audioOffset), &adts.var);
+                                LinkParseAdtsVariableHeader((unsigned char *)(pAudioData + audioOffset), &adts.var);
                                 if (audioOffset+hlen+adts.var.aac_frame_length <= nAudioDataLen) {
                                         
                                         if (pStream->IsTestAACWithoutAdts)
@@ -421,7 +421,7 @@ int start_audio_file_test(void *opaque)
                 if (nSleepTime > 0) {
                         //printf("sleeptime:%lld\n", nSleepTime);
                         if (nSleepTime > duration * 1000) {
-                                logwarn("abnormal time diff:%lld", nSleepTime);
+                                LinkLogWarn("abnormal time diff:%lld", nSleepTime);
                         }
                         usleep(nSleepTime);
                 }

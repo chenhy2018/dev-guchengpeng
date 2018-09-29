@@ -1,3 +1,5 @@
+#include <qiniu/io.h>
+#include <qiniu/rs.h>
 #include "uploader.h"
 #include <string.h>
 #include <stdlib.h>
@@ -23,9 +25,9 @@ enum WaitFirstFlag {
 };
 
 typedef struct _KodoUploader{
-        TsUploader uploader;
-#ifdef TK_STREAM_UPLOAD
-        CircleQueue * pQueue_;
+        LinkTsUploader uploader;
+#ifdef LINK_STREAM_UPLOAD
+        LinkCircleQueue * pQueue_;
 #else
         char *pTsData;
         int nTsDataCap;
@@ -34,11 +36,11 @@ typedef struct _KodoUploader{
         pthread_t workerId_;
         int isThreadStarted_;
         
-        UploadArg uploadArg;
+        LinkUploadArg uploadArg;
         
         int64_t nFirstFrameTimestamp;
         int64_t nLastFrameTimestamp;
-        UploadState state;
+        LinkUploadState state;
         
         int64_t getDataBytes;
         curl_off_t nLastUlnow;
@@ -78,19 +80,19 @@ int timeoutCallback(void *clientp, curl_off_t dltotal, curl_off_t dlnow, curl_of
                 if ((ulnow - pUploader->nLastUlnow) / nDiff < 1024) { //} && !pUploader->isTimeoutWithData) {
                         pUploader->nLowSpeedCnt += nDiff;
                         if (pUploader->nLowSpeedCnt > 3) {
-                                logerror("accumulate upload timeout:%d %d", pUploader->nLowSpeedCnt, nDiff);
+                                LinkLogError("accumulate upload timeout:%d %d", pUploader->nLowSpeedCnt, nDiff);
                                 return -1;
                         }
                 }
                 if (nDiff >= 10) {
-                        logerror("upload timeout directly:%d", nDiff); 
+                        LinkLogError("upload timeout directly:%d", nDiff); 
                         return -1;
                 } else if (nDiff >= 5) {
                         if (pUploader->nLowSpeedCnt > 1) {
-                                logerror("half accumulate upload timeout:%d %d", pUploader->nLowSpeedCnt, nDiff);
+                                LinkLogError("half accumulate upload timeout:%d %d", pUploader->nLowSpeedCnt, nDiff);
                                 return -1;
                         }
-                        logwarn("accumulate2 upload timeout:%d %d", pUploader->nLowSpeedCnt, nDiff);
+                        LinkLogWarn("accumulate2 upload timeout:%d %d", pUploader->nLowSpeedCnt, nDiff);
                         pUploader->nLowSpeedCnt = 2;
                         
                 }
@@ -179,12 +181,12 @@ static int getExpireDays(char * pToken)
 {
         char * pPolicy = strchr(pToken, ':');
         if (pPolicy == NULL) {
-                return TK_ARG_ERROR;
+                return LINK_ARG_ERROR;
         }
         pPolicy++;
         pPolicy = strchr(pPolicy, ':');
         if (pPolicy == NULL) {
-                return TK_ARG_ERROR;
+                return LINK_ARG_ERROR;
         }
         
         pPolicy++; //jump :
@@ -264,7 +266,7 @@ static void * streamUpload(void *_pOpaque)
                 goto END;
         }
         
-        int64_t curTime = GetCurrentNanosecond();
+        int64_t curTime = LinkGetCurrentNanosecond();
         // ts/uid/ua_id/yyyy/mm/dd/hh/mm/ss/mmm/fragment_start_ts/expiry.ts
         
         if (pUploader->uploadArg.nSegmentId_ == 0) {
@@ -281,8 +283,8 @@ static void * streamUpload(void *_pOpaque)
         //ts/uaid/startts/fragment_start_ts/expiry.ts
         sprintf(key, "ts/%s/%lld/%lld/%d.ts", pUploader->uploadArg.pDeviceId_,
                 curTime / 1000000, nSegmentId / 1000000, nDeleteAfterDays_);
-        logdebug("upload start:%s q:%p", key, pUploader->pQueue_);
-#ifdef TK_STREAM_UPLOAD
+        LinkLogDebug("upload start:%s q:%p", key, pUploader->pQueue_);
+#ifdef LINK_STREAM_UPLOAD
         client.xferinfoData = _pOpaque;
         client.xferinfoCb = timeoutCallback;
         Qiniu_Error error = Qiniu_Io_PutStream(&client, &putRet, uptoken, key, pUploader, -1, getDataCallback, &putExtra);
@@ -295,31 +297,31 @@ static void * streamUpload(void *_pOpaque)
         report_status( error.code, key );// add by liyq to record ts upload status
 #endif
         if (error.code != 200) {
-                pUploader->state = TK_UPLOAD_FAIL;
+                pUploader->state = LINK_UPLOAD_FAIL;
                 if (error.code == 401) {
-                        logerror("upload file :%s expsize:%d httpcode=%d errmsg=%s", key, pUploader->getDataBytes, error.code, Qiniu_Buffer_CStr(&client.b));
+                        LinkLogError("upload file :%s expsize:%d httpcode=%d errmsg=%s", key, pUploader->getDataBytes, error.code, Qiniu_Buffer_CStr(&client.b));
                 } else if (error.code >= 500) {
                         const char * pFullErrMsg = Qiniu_Buffer_CStr(&client.b);
                         char errMsg[256];
                         char *pMsg = getErrorMsg(pFullErrMsg, errMsg, sizeof(errMsg));
                         if (pMsg) {
-                                logerror("upload file :%s httpcode=%d errmsg={\"error\":\"%s\"}", key, error.code, pMsg);
+                                LinkLogError("upload file :%s httpcode=%d errmsg={\"error\":\"%s\"}", key, error.code, pMsg);
                         }else {
-                                logerror("upload file :%s httpcode=%d errmsg=%s", key, error.code,
+                                LinkLogError("upload file :%s httpcode=%d errmsg=%s", key, error.code,
                                          pFullErrMsg);
                         }
                 } else {
                         const char *pCurlErrMsg = curl_easy_strerror(error.code);
                         if (pCurlErrMsg != NULL) {
-                                logerror("upload file :%s expsize:%d errorcode=%d errmsg={\"error\":\"%s\"}", key, pUploader->getDataBytes, error.code, pCurlErrMsg);
+                                LinkLogError("upload file :%s expsize:%d errorcode=%d errmsg={\"error\":\"%s\"}", key, pUploader->getDataBytes, error.code, pCurlErrMsg);
                         } else {
-                                logerror("upload file :%s expsize:%d errorcode=%d errmsg={\"error\":\"unknown error\"}", key, pUploader->getDataBytes, error.code);
+                                LinkLogError("upload file :%s expsize:%d errorcode=%d errmsg={\"error\":\"unknown error\"}", key, pUploader->getDataBytes, error.code);
                         }
                 }
                 //debug_log(&client, error);
         } else {
-                pUploader->state = TK_UPLOAD_OK;
-                logdebug("upload file size:(exp:%lld real:%lld) key:%s success",
+                pUploader->state = LINK_UPLOAD_OK;
+                LinkLogDebug("upload file size:(exp:%lld real:%lld) key:%s success",
                          pUploader->getDataBytes, pUploader->nLastUlnow, key);
         }
 END:
@@ -331,28 +333,28 @@ END:
         return 0;
 }
 
-#ifdef TK_STREAM_UPLOAD
+#ifdef LINK_STREAM_UPLOAD
 size_t getDataCallback(void* buffer, size_t size, size_t n, void* rptr)
 {
         KodoUploader * pUploader = (KodoUploader *) rptr;
         int nPopLen = 0;
         if (pUploader->isTimeoutWithData != 0) {
                 pUploader->isTimeoutWithData++;
-                loginfo("isTimeoutWithData:%d\n", pUploader->isTimeoutWithData);;
+                LinkLogInfo("isTimeoutWithData:%d\n", pUploader->isTimeoutWithData);;
                 return 0;
         }
         nPopLen = pUploader->pQueue_->PopWithNoOverwrite(pUploader->pQueue_, buffer, size * n);
         if (nPopLen < 0) {
-                if (nPopLen == TK_TIMEOUT) {
+                if (nPopLen == LINK_TIMEOUT) {
                         if (pUploader->nLastFrameTimestamp >= 0 &&  pUploader->nFirstFrameTimestamp >= 0) {
                                 return 0;
                         }
-                        logerror("first pop from queue timeout:%d %lld %lld", nPopLen, pUploader->nLastFrameTimestamp, pUploader->nFirstFrameTimestamp);
+                        LinkLogError("first pop from queue timeout:%d %lld %lld", nPopLen, pUploader->nLastFrameTimestamp, pUploader->nFirstFrameTimestamp);
                 }
                 return CURL_READFUNC_ABORT;
         }
         if (nPopLen == 0) {
-                if (IsProcStatusQuit()) {
+                if (LinkIsProcStatusQuit()) {
                         return CURL_READFUNC_ABORT;
                 }
                 return 0;
@@ -365,25 +367,25 @@ size_t getDataCallback(void* buffer, size_t size, size_t n, void* rptr)
                 if (nTmp == 0)
                         break;
                 if (nTmp < 0) {
-                        if (nTmp == TK_TIMEOUT) {
+                        if (nTmp == LINK_TIMEOUT) {
                                 if (pUploader->nLastFrameTimestamp >= 0 &&  pUploader->nFirstFrameTimestamp >= 0) {
                                         pUploader->isTimeoutWithData = 1;
                                         goto RET;
                                 }
-                                logerror("next pop from queue timeout:%d %lld %lld", nTmp, pUploader->nLastFrameTimestamp, pUploader->nFirstFrameTimestamp);
+                                LinkLogError("next pop from queue timeout:%d %lld %lld", nTmp, pUploader->nLastFrameTimestamp, pUploader->nFirstFrameTimestamp);
                         }
                         return CURL_READFUNC_ABORT;
                 }
                 nPopLen += nTmp;
         }
-        UploaderStatInfo info;
+        LinkUploaderStatInfo info;
         pUploader->pQueue_->GetStatInfo(rptr, &info);
 RET:
         pUploader->getDataBytes += nPopLen;
         return nPopLen;
 }
 
-static int streamUploadStart(TsUploader * _pUploader)
+static int streamUploadStart(LinkTsUploader * _pUploader)
 {
         KodoUploader * pKodoUploader = (KodoUploader *)_pUploader;
         int ret = pthread_create(&pKodoUploader->workerId_, NULL, streamUpload, _pUploader);
@@ -391,12 +393,12 @@ static int streamUploadStart(TsUploader * _pUploader)
                 pKodoUploader->isThreadStarted_ = 1;
                 return 0;
         } else {
-                logerror("start upload thread fail:%d", ret);
-                return TK_THREAD_ERROR;
+                LinkLogError("start upload thread fail:%d", ret);
+                return LINK_THREAD_ERROR;
         }
 }
 
-static void streamUploadStop(TsUploader * _pUploader)
+static void streamUploadStop(LinkTsUploader * _pUploader)
 {
         KodoUploader * pKodoUploader = (KodoUploader *)_pUploader;
         if(pKodoUploader->nWaitFirstMutexLocked_ == WF_LOCKED) {
@@ -415,7 +417,7 @@ static void streamUploadStop(TsUploader * _pUploader)
         return;
 }
 
-static int streamPushData(TsUploader *pTsUploader, char * pData, int nDataLen)
+static int streamPushData(LinkTsUploader *pTsUploader, char * pData, int nDataLen)
 {
         KodoUploader * pKodoUploader = (KodoUploader *)pTsUploader;
         
@@ -462,10 +464,10 @@ static int memPushData(TsUploader *pTsUploader, char * pData, int nDataLen)
 }
 #endif
 
-static void getStatInfo(TsUploader *pTsUploader, UploaderStatInfo *_pStatInfo)
+static void getStatInfo(LinkTsUploader *pTsUploader, LinkUploaderStatInfo *_pStatInfo)
 {
         KodoUploader * pKodoUploader = (KodoUploader *)pTsUploader;
-#ifdef TK_STREAM_UPLOAD
+#ifdef LINK_STREAM_UPLOAD
         pKodoUploader->pQueue_->GetStatInfo(pKodoUploader->pQueue_, _pStatInfo);
 #else
         _pStatInfo->nLen_ = 0;
@@ -475,7 +477,7 @@ static void getStatInfo(TsUploader *pTsUploader, UploaderStatInfo *_pStatInfo)
         return;
 }
 
-void recordTimestamp(TsUploader *_pTsUploader, int64_t _nTimestamp)
+void recordTimestamp(LinkTsUploader *_pTsUploader, int64_t _nTimestamp)
 {
         KodoUploader * pKodoUploader = (KodoUploader *)_pTsUploader;
         if (pKodoUploader->nFirstFrameTimestamp == -1) {
@@ -486,17 +488,17 @@ void recordTimestamp(TsUploader *_pTsUploader, int64_t _nTimestamp)
         return;
 }
 
-UploadState getUploaderState(TsUploader *_pTsUploader)
+LinkUploadState getUploaderState(LinkTsUploader *_pTsUploader)
 {
         KodoUploader * pKodoUploader = (KodoUploader *)_pTsUploader;
         return pKodoUploader->state;
 }
 
-int NewUploader(TsUploader ** _pUploader, UploadArg *_pArg, enum CircleQueuePolicy _policy, int _nMaxItemLen, int _nInitItemCount)
+int LinkNewUploader(LinkTsUploader ** _pUploader, LinkUploadArg *_pArg, enum CircleQueuePolicy _policy, int _nMaxItemLen, int _nInitItemCount)
 {
         KodoUploader * pKodoUploader = (KodoUploader *) malloc(sizeof(KodoUploader));
         if (pKodoUploader == NULL) {
-                return TK_NO_MEMORY;
+                return LINK_NO_MEMORY;
         }
         
         memset(pKodoUploader, 0, sizeof(KodoUploader));
@@ -504,12 +506,12 @@ int NewUploader(TsUploader ** _pUploader, UploadArg *_pArg, enum CircleQueuePoli
         int ret = pthread_mutex_init(&pKodoUploader->waitFirstMutex_, NULL);
         if (ret != 0){
                 free(pKodoUploader);
-                return TK_MUTEX_ERROR;
+                return LINK_MUTEX_ERROR;
         }
         pthread_mutex_lock(&pKodoUploader->waitFirstMutex_);
         pKodoUploader->nWaitFirstMutexLocked_ = WF_LOCKED;
-#ifdef TK_STREAM_UPLOAD
-        ret = NewCircleQueue(&pKodoUploader->pQueue_, 0, _policy, _nMaxItemLen, _nInitItemCount);
+#ifdef LINK_STREAM_UPLOAD
+        ret = LinkNewCircleQueue(&pKodoUploader->pQueue_, 0, _policy, _nMaxItemLen, _nInitItemCount);
         if (ret != 0) {
                 free(pKodoUploader);
                 return ret;
@@ -520,7 +522,7 @@ int NewUploader(TsUploader ** _pUploader, UploadArg *_pArg, enum CircleQueuePoli
         pKodoUploader->nFirstFrameTimestamp = -1;
         pKodoUploader->nLastFrameTimestamp = -1;
         pKodoUploader->uploadArg = *_pArg;
-#ifdef TK_STREAM_UPLOAD
+#ifdef LINK_STREAM_UPLOAD
         pKodoUploader->uploader.UploadStart = streamUploadStart;
         pKodoUploader->uploader.UploadStop = streamUploadStop;
         pKodoUploader->uploader.Push = streamPushData;
@@ -533,21 +535,21 @@ int NewUploader(TsUploader ** _pUploader, UploadArg *_pArg, enum CircleQueuePoli
         pKodoUploader->uploader.RecordTimestamp = recordTimestamp;
         pKodoUploader->uploader.GetUploaderState = getUploaderState;
         
-        *_pUploader = (TsUploader*)pKodoUploader;
+        *_pUploader = (LinkTsUploader*)pKodoUploader;
         
         return 0;
 }
 
-void DestroyUploader(TsUploader ** _pUploader)
+void LinkDestroyUploader(LinkTsUploader ** _pUploader)
 {
         KodoUploader * pKodoUploader = (KodoUploader *)(*_pUploader);
         
         pthread_mutex_destroy(&pKodoUploader->waitFirstMutex_);
-#ifdef TK_STREAM_UPLOAD
+#ifdef LINK_STREAM_UPLOAD
         if (pKodoUploader->isThreadStarted_) {
                 pthread_join(pKodoUploader->workerId_, NULL);
         }
-        DestroyQueue(&pKodoUploader->pQueue_);
+        LinkDestroyQueue(&pKodoUploader->pQueue_);
 #else
         free(pKodoUploader->pTsData);
 #endif

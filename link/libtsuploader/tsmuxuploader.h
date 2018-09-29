@@ -4,24 +4,24 @@
 #include "resource.h"
 #include "base.h"
 
-typedef struct _TsMuxUploader TsMuxUploader;
+typedef struct _LinkTsMuxUploader LinkTsMuxUploader;
 
-#define TK_AUDIO_FORMAT_G711A 1
-#define TK_AUDIO_FORMAT_G711U 2
-#define TK_VIDEO_FORMAT_H264 1
-#define TK_VIDEO_FORMAT_H265 2
+#define LINK_AUDIO_FORMAT_G711A 1
+#define LINK_AUDIO_FORMAT_G711U 2
+#define LINK_VIDEO_FORMAT_H264 1
+#define LINK_VIDEO_FORMAT_H265 2
 
 
-typedef struct _TsMuxUploader{
-        int(*PushVideo)(TsMuxUploader *pTsMuxUploader, char * pData, int nDataLen, int64_t nTimestamp, int nIsKeyFrame, int nIsSegStart);
-        int(*PushAudio)(TsMuxUploader *pTsMuxUploader, char * pData, int nDataLen, int64_t nTimestamp);
-        int (*SetToken)(TsMuxUploader*, char *, int);
-        void (*SetUploaderBufferSize)(TsMuxUploader*, int);
-        void (*SetNewSegmentInterval)(TsMuxUploader*, int);
-}TsMuxUploader;
+typedef struct _LinkTsMuxUploader{
+        int(*PushVideo)(LinkTsMuxUploader *pTsMuxUploader, char * pData, int nDataLen, int64_t nTimestamp, int nIsKeyFrame, int nIsSegStart);
+        int(*PushAudio)(LinkTsMuxUploader *pTsMuxUploader, char * pData, int nDataLen, int64_t nTimestamp);
+        int (*SetToken)(LinkTsMuxUploader*, char *, int);
+        void (*SetUploaderBufferSize)(LinkTsMuxUploader*, int);
+        void (*SetNewSegmentInterval)(LinkTsMuxUploader*, int);
+}LinkTsMuxUploader;
 
-int NewTsMuxUploader(TsMuxUploader **pTsMuxUploader, AvArg *pAvArg, char *pDeviceId, int nDeviceIdLen,
+int LinkNewTsMuxUploader(LinkTsMuxUploader **pTsMuxUploader, LinkMediaArg *pAvArg, char *pDeviceId, int nDeviceIdLen,
                      char *pToken, int nTokenLen);
-int TsMuxUploaderStart(TsMuxUploader *pTsMuxUploader);
-void DestroyTsMuxUploader(TsMuxUploader **pTsMuxUploader);
+int LinkTsMuxUploaderStart(LinkTsMuxUploader *pTsMuxUploader);
+void LinkDestroyTsMuxUploader(LinkTsMuxUploader **pTsMuxUploader);
 #endif

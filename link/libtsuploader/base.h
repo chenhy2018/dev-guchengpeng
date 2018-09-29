@@ -1,5 +1,5 @@
-#ifndef __BASE_H__
-#define __BASE_H__
+#ifndef __LINK_BASE_H__
+#define __LINK_BASE_H__
 
 #include <string.h>
 #include <stdlib.h>
@@ -11,48 +11,55 @@
 #include <stdint.h>
 #endif
 
-typedef enum {
-        TK_VIDEO_H264 = 1,
-        TK_VIDEO_H265 = 2
-}TkVideoFormat;
-typedef enum {
-        TK_AUDIO_PCMU = 1,
-        TK_AUDIO_PCMA = 2,
-        TK_AUDIO_AAC = 3
-}TkAudioFormat;
+#ifndef OUT
+#define OUT
+#endif
+#ifndef IN
+#define IN
+#endif
 
 typedef enum {
-        TK_UPLOAD_INIT,
-        TK_UPLOAD_FAIL,
-        TK_UPLOAD_OK
-}UploadState;
+        LINK_VIDEO_H264 = 1,
+        LINK_VIDEO_H265 = 2
+}LinkVideoFormat;
+typedef enum {
+        LINK_AUDIO_PCMU = 1,
+        LINK_AUDIO_PCMA = 2,
+        LINK_AUDIO_AAC = 3
+}LinkAudioFormat;
 
-typedef struct _AvArg{
-        TkAudioFormat nAudioFormat;
+typedef enum {
+        LINK_UPLOAD_INIT,
+        LINK_UPLOAD_FAIL,
+        LINK_UPLOAD_OK
+}LinkUploadState;
+
+typedef struct _LinkMediaArg{
+        LinkAudioFormat nAudioFormat;
         int nChannels;
         int nSamplerate;
-        TkVideoFormat nVideoFormat;
-} AvArg;
+        LinkVideoFormat nVideoFormat;
+} LinkMediaArg;
 
-#define TK_STREAM_UPLOAD 1
+#define LINK_STREAM_UPLOAD 1
 
-#define TK_NO_MEMORY       -1000
-#define TK_MUTEX_ERROR     -1100
-#define TK_COND_ERROR      -1101
-#define TK_THREAD_ERROR    -1102
-#define TK_TIMEOUT         -2000
-#define TK_NO_PUSH         -2001
-#define TK_BUFFER_IS_SMALL -2003
-#define TK_ARG_TOO_LONG    -2004
-#define TK_ARG_ERROR       -2100
-#define TK_JSON_FORMAT     -2200
-#define TK_HTTP_TIME       -2300
-#define TK_OPEN_TS_ERR     -2400
-#define TK_WRITE_TS_ERR    -2401
-#define TK_Q_OVERWRIT      -5001
-#define TK_Q_WRONGSTATE    -5002
+#define LINK_NO_MEMORY       -1000
+#define LINK_MUTEX_ERROR     -1100
+#define LINK_COND_ERROR      -1101
+#define LINK_THREAD_ERROR    -1102
+#define LINK_TIMEOUT         -2000
+#define LINK_NO_PUSH         -2001
+#define LINK_BUFFER_IS_SMALL -2003
+#define LINK_ARG_TOO_LONG    -2004
+#define LINK_ARG_ERROR       -2100
+#define LINK_JSON_FORMAT     -2200
+#define LINK_HTTP_TIME       -2300
+#define LINK_OPEN_TS_ERR     -2400
+#define LINK_WRITE_TS_ERR    -2401
+#define LINK_Q_OVERWRIT      -5001
+#define LINK_Q_WRONGSTATE    -5002
 
 
-int IsProcStatusQuit();
+int LinkIsProcStatusQuit();
 
 #endif

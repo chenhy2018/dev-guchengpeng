@@ -1,40 +1,21 @@
 #include "log.h"
 
-int nLogLevel = LOG_LEVEL_INFO;
-LogFunc logFunc = NULL;
+int nLogLevel = LINK_LOG_LEVEL_INFO;
+LinkLogFunc logFunc = NULL;
 
-void SetLogLevelToTrace()
-{
-        nLogLevel = LOG_LEVEL_TRACE;
-}
-
-void SetLogLevelToDebug()
-{
-        nLogLevel = LOG_LEVEL_DEBUG;
-}
-
-void SetLogLevelToInfo()
-{
-        nLogLevel = LOG_LEVEL_INFO;
-}
-
-void SetLogLevelToWarn()
-{
-        nLogLevel = LOG_LEVEL_WARN;
-}
-
-void SetLogLevelToError()
-{
-        nLogLevel = LOG_LEVEL_ERROR;
-}
-
-void SetLogCallback(LogFunc f)
+void LinkSetLogCallback(LinkLogFunc f)
 {
         logFunc = f;
 }
 
+void LinkSetLogLevel(int level)
+{
+        if (level >= LINK_LOG_LEVEL_TRACE && level <= LINK_LOG_LEVEL_ERROR)
+                nLogLevel = level;
+}
 
-void Log(int nLevel, char * pFmt, ...)
+
+void LinkLog(int nLevel, char * pFmt, ...)
 {
         if (nLevel >= nLogLevel){
                 va_list ap;
@@ -44,7 +25,7 @@ void Log(int nLevel, char * pFmt, ...)
                 } else {
                         char logStr[257] = {0};
                         vsnprintf(logStr, sizeof(logStr), pFmt, ap);
-                        logFunc(logStr);
+                        logFunc(nLevel, logStr);
                 }
                 va_end(ap);
         }
