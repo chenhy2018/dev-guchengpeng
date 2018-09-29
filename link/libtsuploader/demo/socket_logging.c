@@ -1,4 +1,4 @@
-// Last Update:2018-09-25 19:46:57
+// Last Update:2018-09-27 14:40:52
 /**
  * @file socket_logging.c
  * @brief 
@@ -34,6 +34,9 @@ void CmdHnadleLogStop( char *param );
 void CmdHnadleLogStart( char *param );
 void CmdHnadleOutput( char *param );
 void CmdHandleMovingDetection( char *param );
+void CmdHnadleUpdateFrom( char *param );
+void CmdHnadleHelp( char *param );
+void CmdHnadleCache( char *param );
 
 char *host = "47.105.118.51";
 int port = 8090;
@@ -44,7 +47,11 @@ static DemoCmd gCmds[] =
     { "logstop", CmdHnadleLogStop },
     { "logstart", CmdHnadleLogStart },
     { "output", CmdHnadleOutput },
-    { "moving", CmdHandleMovingDetection }
+    { "moving", CmdHandleMovingDetection },
+    { "updatefrom", CmdHnadleUpdateFrom },
+    { "cache", CmdHnadleCache },
+    { "remotehelp", CmdHnadleHelp }
+
 };
 
 int socket_init()
@@ -374,6 +381,55 @@ void CmdHandleMovingDetection( char *param )
             SetMovingDetection( 0 );
             DBG_LOG("set moving detection disalbe\n");
         }
+    }
+}
+
+void CmdHnadleUpdateFrom( char *param )
+{
+    char *p = NULL;
+
+    p = strchr( (char *)param, ' ');
+    if ( !p ) {
+        printf("error, p is NULL\n");
+        return;
+    }
+
+    p++;
+    if ( strcmp( p, "socket") == 0 ) {
+        SetUpdateFrom( UPDATE_FROM_SOCKET );
+    } else {
+        SetUpdateFrom( UPDATE_FROM_FILE );
+    }
+}
+
+void CmdHnadleHelp( char *param )
+{
+    DBG_LOG("command list :\n"
+            " dump       - dump the global variable\n"
+            " logstop    - stop the log\n"
+            " logstart   - stat the log\n"
+            " output     - set the output type (socket/file/mqtt/console)\n"
+            " moving     - moving detection open or close (0/1)\n"
+            " updatefrom - gIpcConfig update from socket or file (socket/file)\n"
+            " cache      - set open the cache (0/1)\n"
+            " remotehelp - this help\n");
+}
+
+void CmdHnadleCache( char *param )
+{
+    char *p = NULL;
+
+    p = strchr( (char *)param, ' ');
+    if ( !p ) {
+        printf("error, p is NULL\n");
+        return;
+    }
+
+    p++;
+    if ( strcmp( p, "1") == 0 ) {
+        SetCache( 1 );
+    } else {
+        SetCache( 0 );
     }
 }
 
