@@ -7,8 +7,10 @@
 #include "base.h"
 
 typedef void (*LinkUploadArgUpadater)(void *pOpaque, void* pUploadArg, int64_t nNow);
+
 typedef struct _UploadArg {
         char    *pToken_;
+        LinkUploadZone uploadZone;
         char    *pDeviceId_;
         void    *pUploadArgKeeper_;
         int64_t nSegmentId_;

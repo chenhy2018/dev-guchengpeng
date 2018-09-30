@@ -18,10 +18,29 @@
 #define IN
 #endif
 
+typedef enum _LinkUploadZone{
+        LINK_ZONE_HUADONG = 1,
+        LINK_ZONE_HUABEI = 2,
+        LINK_ZONE_HUANAN = 3,
+        LINK_ZONE_BEIMEI = 4,
+        LINK_ZONE_DONGNANYA = 5,
+}LinkUploadZone;
+
+typedef struct _LinkUserUploadArg{
+        char  *pToken_;
+        int   nTokenLen_;
+        LinkUploadZone uploadZone_;
+        char  *pDeviceId_;
+        int   nDeviceIdLen_;
+        int   nUploaderBufferSize;
+        int   nNewSegmentInterval;
+}LinkUserUploadArg;
+
 typedef enum {
         LINK_VIDEO_H264 = 1,
         LINK_VIDEO_H265 = 2
 }LinkVideoFormat;
+
 typedef enum {
         LINK_AUDIO_PCMU = 1,
         LINK_AUDIO_PCMA = 2,
@@ -58,6 +77,7 @@ typedef struct _LinkMediaArg{
 #define LINK_WRITE_TS_ERR    -2401
 #define LINK_Q_OVERWRIT      -5001
 #define LINK_Q_WRONGSTATE    -5002
+#define LINK_SUCCESS         0
 
 
 int LinkIsProcStatusQuit();

@@ -8,13 +8,17 @@
 #ifndef USE_OWN_TSMUX
 #include <libavformat/avformat.h>
 #endif
+#ifndef DISABLE_OPENSSL
+#include <qiniu/io.h>
+#include <qiniu/rs.h>
+#endif
 
 static int volatile nProcStatus = 0;
 
 int LinkInitUploader()
 {
         if (nProcStatus) {
-                return 0;
+                return LINK_SUCCESS;
         }
 #ifndef USE_OWN_TSMUX
     #if LIBAVFORMAT_VERSION_MAJOR < 58
@@ -40,7 +44,7 @@ int LinkInitUploader()
         nProcStatus = 1;
         LinkLogDebug("main thread id:%ld", (long)pthread_self());
         
-        return 0;
+        return LINK_SUCCESS;
 
 }
 
@@ -54,8 +58,7 @@ int LinkCreateAndStartAVUploader(LinkTsMuxUploader **_pTsMuxUploader, LinkMediaA
         }
 
         LinkTsMuxUploader *pTsMuxUploader;
-        int ret = LinkNewTsMuxUploader(&pTsMuxUploader, _pAvArg, _pUserUploadArg->pDeviceId_,
-                                   _pUserUploadArg->nDeviceIdLen_, _pUserUploadArg->pToken_, _pUserUploadArg->nTokenLen_);
+        int ret = LinkNewTsMuxUploader(&pTsMuxUploader, _pAvArg, _pUserUploadArg);
         if (ret != 0) {
                 LinkLogError("NewTsMuxUploader fail");
                 return ret;
@@ -75,7 +78,7 @@ int LinkCreateAndStartAVUploader(LinkTsMuxUploader **_pTsMuxUploader, LinkMediaA
         }
         *_pTsMuxUploader = pTsMuxUploader;
 
-        return 0;
+        return LINK_SUCCESS;
 }
 
 int LinkPushVideo(LinkTsMuxUploader *_pTsMuxUploader, char * _pData, int _nDataLen, int64_t _nTimestamp, int _nIsKeyFrame, int _nIsSegStart)
@@ -115,6 +118,11 @@ void LinkSetUploadBufferSize(LinkTsMuxUploader *_pTsMuxUploader, int _nSize)
         _pTsMuxUploader->SetUploaderBufferSize(_pTsMuxUploader, _nSize);
 }
 
+int LinkGetUploadBufferUsedSize(LinkTsMuxUploader *_pTsMuxUploader)
+{
+        return _pTsMuxUploader->GetUploaderBufferUsedSize(_pTsMuxUploader);
+}
+
 void LinkSetNewSegmentInterval(LinkTsMuxUploader *_pTsMuxUploader, int _nIntervalSecond)
 {
         if (_pTsMuxUploader == NULL || _nIntervalSecond < 0) {
@@ -149,7 +157,7 @@ void LinkUninitUploader()
 }
 
 //---------test
-#define CALLBACK_URL "http://39.107.247.14:8088/qiniu/upload/callback"
+#define CALLBACK_URL "http://47.105.118.51:8088/qiniu/upload/callback"
 static char gAk[65] = {0};
 static char gSk[65] = {0};
 static char gBucket[128] = {0};
@@ -277,8 +285,9 @@ int LinkGetUploadToken(char *pBuf, int nBufLen, char *pUrl)
         char *uptoken;
         uptoken = Qiniu_RS_PutPolicy_Token(&putPolicy, &mac);
         assert(nBufLen > strlen(uptoken));
+        fprintf(stderr,"token from local:\n");
         strcpy(pBuf, uptoken);
         Qiniu_Free(uptoken);
-        return 0;
+        return LINK_SUCCESS;
 #endif
 }

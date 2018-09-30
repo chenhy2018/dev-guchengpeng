@@ -32,8 +32,11 @@ typedef struct {
         char *pAFilePath;
         char *pVFilePath;
         char *pTokenUrl;
+        const char *pToken;
         char *pUa1;
         char *pUa2;
+        const char *pZone;
+        LinkUploadZone zone;
         bool IsFileLoop;
         int  nLoopSleeptime;
         int nRoundCount;
@@ -638,7 +641,7 @@ static void checkCmdArg(const char * name)
                 exit(2);
         }
 #endif
-#ifndef DISABLE_OPENSSL
+#ifdef DISABLE_OPENSSL
         if (cmdArg.IsLocalToken) {
                 LinkLogError("cannot from calc token from local. not enable OPENSSL");
                 exit(3);
@@ -673,6 +676,25 @@ static void checkCmdArg(const char * name)
                         cmdArg.pUa1 = "ipcxxa";
                 }
         }
+        if (cmdArg.pZone) {
+                if (strcmp(cmdArg.pZone, "huabei") == 0) {
+                        cmdArg.zone = LINK_ZONE_HUABEI;
+                } else if(strcmp(cmdArg.pZone, "huanan") == 0) {
+                        cmdArg.zone = LINK_ZONE_HUANAN;
+                } else if(strcmp(cmdArg.pZone, "beimei") == 0) {
+                        cmdArg.zone = LINK_ZONE_BEIMEI;
+                } else if(strcmp(cmdArg.pZone, "dongnanya") == 0) {
+                        cmdArg.zone = LINK_ZONE_DONGNANYA;
+                }
+        }
+        if (cmdArg.zone == 0) {
+                cmdArg.zone = LINK_ZONE_HUADONG;
+        }
+        if (cmdArg.pToken != NULL) {
+                if (strlen(cmdArg.pToken) > sizeof(gtestToken) - 1) {
+                        exit(6);
+                }
+        }
         return;
 }
 
@@ -691,6 +713,7 @@ static void * second_test(void * opaque) {
         avuploader.userUploadArg.nDeviceIdLen_ = strlen(cmdArg.pUa2);
         avuploader.userUploadArg.nUploaderBufferSize = cmdArg.nQbufSize;
         avuploader.userUploadArg.nNewSegmentInterval = cmdArg.nNewSetIntval;
+        avuploader.userUploadArg.uploadZone_ = cmdArg.zone;
         
         int ret = LinkCreateAndStartAVUploader(&avuploader.pTsMuxUploader, &avuploader.avArg, &avuploader.userUploadArg);
         if (ret != 0) {
@@ -723,6 +746,7 @@ static void * second_file_test(void * opaque) {
         AVuploader avuploader = *pAuploader;
         avuploader.userUploadArg.pDeviceId_ = cmdArg.pUa2;
         avuploader.userUploadArg.nDeviceIdLen_ = strlen(cmdArg.pUa2);
+        avuploader.userUploadArg.uploadZone_ = cmdArg.zone;
         
         int ret = LinkCreateAndStartAVUploader(&avuploader.pTsMuxUploader, &avuploader.avArg, &avuploader.userUploadArg);
         if (ret != 0) {
@@ -759,8 +783,10 @@ int main(int argc, const char** argv)
         flag_str(&cmdArg.pAFilePath, "afpath", "set audio file path.like /root/a.aac");
         flag_str(&cmdArg.pVFilePath, "vfpath", "set video file path.like /root/a.h264");
         flag_str(&cmdArg.pTokenUrl, "tokenurl", "url where to send token request");
+        flag_str(&cmdArg.pToken, "token", "upload token");
         flag_str(&cmdArg.pUa1, "ua1", "ua(deviceid) name. default value is ipcxxa");
         flag_str(&cmdArg.pUa2, "ua2", "ua(deviceid) name");
+        flag_str(&cmdArg.pZone, "zone", "upload zone(huadong huabei huanan beimei dongnanya). default huadong");
         flag_bool(&cmdArg.IsFileLoop, "fileloop", "in file mode and only one upload, will loop to push file");
         flag_int(&cmdArg.nLoopSleeptime, "csleeptime", "next round sleeptime");
         flag_bool(&cmdArg.IsNoNet, "nonet", "no network");
@@ -786,6 +812,7 @@ int main(int argc, const char** argv)
         printf("cmdArg.pTokenUrl=%s\n", cmdArg.pTokenUrl);
         printf("cmdArg.IsFileLoop=%d\n", cmdArg.IsFileLoop);
         printf("cmdArg.nLoopSleeptime=%d\n", cmdArg.nLoopSleeptime);
+        printf("cmdArg.zone=%s %d\n", cmdArg.pZone, cmdArg.zone);
 	if (cmdArg.pTokenUrl) {
                 printf("cmdArg.pTokenUrl:%s\n", cmdArg.pTokenUrl);
         }
@@ -853,18 +880,22 @@ int main(int argc, const char** argv)
         
 #ifndef DISABLE_OPENSSL
         if (cmdArg.IsLocalToken) {
-                SetAk("JAwTPb8dmrbiwt89Eaxa4VsL4_xSIYJoJh4rQfOQ");
-                SetSk("G5mtjT3QzG4Lf7jpCAN5PZHrGeoSH9jRdC96ecYS");
+                LinkSetAk("JAwTPb8dmrbiwt89Eaxa4VsL4_xSIYJoJh4rQfOQ");
+                LinkSetSk("G5mtjT3QzG4Lf7jpCAN5PZHrGeoSH9jRdC96ecYS");
                 //计算token需要，所以需要先设置
-                SetBucketName("ipcamera");
+                LinkSetBucketName("ipcamera");
         }
 #endif
         
         AVuploader avuploader;
         if (!cmdArg.IsNoNet) {
-                ret = LinkGetUploadToken(gtestToken, sizeof(gtestToken), cmdArg.pTokenUrl);
-                if (ret != 0)
-                        return ret;
+                if (cmdArg.pToken == NULL) {
+                        ret = LinkGetUploadToken(gtestToken, sizeof(gtestToken), cmdArg.pTokenUrl);
+                        if (ret != 0)
+                                return ret;
+                } else {
+                        strcpy(gtestToken, cmdArg.pToken);
+                }
                 printf("token:%s\n", gtestToken);
 
                 pthread_t updateTokenThread;
@@ -919,6 +950,7 @@ int main(int argc, const char** argv)
         avuploader.userUploadArg.nDeviceIdLen_ = strlen(cmdArg.pUa1);
         avuploader.userUploadArg.nUploaderBufferSize = cmdArg.nQbufSize;
         avuploader.userUploadArg.nNewSegmentInterval = cmdArg.nNewSetIntval;
+        avuploader.userUploadArg.uploadZone_ = cmdArg.zone;
         
         ret = LinkCreateAndStartAVUploader(&avuploader.pTsMuxUploader, &avuploader.avArg, &avuploader.userUploadArg);
         if (ret != 0) {

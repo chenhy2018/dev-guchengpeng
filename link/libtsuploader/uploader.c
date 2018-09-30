@@ -242,15 +242,43 @@ static void * streamUpload(void *_pOpaque)
         Qiniu_Io_PutExtra putExtra;
         Qiniu_Zero(putExtra);
         //设置机房域名
-        //Qiniu_Use_Zone_Beimei(Qiniu_False);
-        //Qiniu_Use_Zone_Huabei(Qiniu_True);
-        //Qiniu_Use_Zone_Huadong(Qiniu_True);
 #ifdef DISABLE_OPENSSL
-        Qiniu_Use_Zone_Huadong(Qiniu_False);
+        switch(pUploader->uploadArg.uploadZone) {
+        case LINK_ZONE_HUABEI:
+                Qiniu_Use_Zone_Huabei(Qiniu_False);
+                break;
+        case LINK_ZONE_HUANAN:
+                Qiniu_Use_Zone_Huanan(Qiniu_False);
+                break;
+        case LINK_ZONE_BEIMEI:
+                Qiniu_Use_Zone_Beimei(Qiniu_False);
+                break;
+        case LINK_ZONE_DONGNANYA:
+                Qiniu_Use_Zone_Dongnanya(Qiniu_False);
+                break;
+        default:
+                Qiniu_Use_Zone_Huadong(Qiniu_False);
+                break;
+        }
 #else
-        Qiniu_Use_Zone_Huadong(Qiniu_True);
+        switch(pUploader->uploadArg.uploadZone) {
+        case LINK_ZONE_HUABEI:
+                Qiniu_Use_Zone_Huabei(Qiniu_True);
+                break;
+        case LINK_ZONE_HUANAN:
+                Qiniu_Use_Zone_Huanan(Qiniu_True);
+                break;
+        case LINK_ZONE_BEIMEI:
+                Qiniu_Use_Zone_Beimei(Qiniu_True);
+                break;
+        case LINK_ZONE_DONGNANYA:
+                Qiniu_Use_Zone_Dongnanya(Qiniu_True);
+                break;
+        default:
+                Qiniu_Use_Zone_Huadong(Qiniu_True);
+                break;
+        }
 #endif
-        //Qiniu_Use_Zone_Huanan(Qiniu_True);
         
         //put extra
         //putExtra.upHost="http://nbxs-gate-up.qiniu.com";
@@ -330,7 +358,7 @@ END:
         }
         Qiniu_Client_Cleanup(&client);
         
-        return 0;
+        return NULL;
 }
 
 #ifdef LINK_STREAM_UPLOAD
@@ -391,7 +419,7 @@ static int streamUploadStart(LinkTsUploader * _pUploader)
         int ret = pthread_create(&pKodoUploader->workerId_, NULL, streamUpload, _pUploader);
         if (ret == 0) {
                 pKodoUploader->isThreadStarted_ = 1;
-                return 0;
+                return LINK_SUCCESS;
         } else {
                 LinkLogError("start upload thread fail:%d", ret);
                 return LINK_THREAD_ERROR;
@@ -433,7 +461,7 @@ static int streamPushData(LinkTsUploader *pTsUploader, char * pData, int nDataLe
 
 static int memUploadStart(TsUploader * _pUploader)
 {
-        return 0;
+        return LINK_SUCCESS;
 }
 
 static void memUploadStop(TsUploader * _pUploader)
@@ -537,7 +565,7 @@ int LinkNewUploader(LinkTsUploader ** _pUploader, LinkUploadArg *_pArg, enum Cir
         
         *_pUploader = (LinkTsUploader*)pKodoUploader;
         
-        return 0;
+        return LINK_SUCCESS;
 }
 
 void LinkDestroyUploader(LinkTsUploader ** _pUploader)

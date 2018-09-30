@@ -253,7 +253,7 @@ int LinkNewCircleQueue(LinkCircleQueue **_pQueue, int nIsAvailableAfterTimeout, 
         pQueueImp->nIsAvailableAfterTimeout = nIsAvailableAfterTimeout;
         
         *_pQueue = (LinkCircleQueue*)pQueueImp;
-        return 0;
+        return LINK_SUCCESS;
 }
 
 void LinkDestroyQueue(LinkCircleQueue **_pQueue)
