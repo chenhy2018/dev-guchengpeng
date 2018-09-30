@@ -701,8 +701,7 @@ static void setNewSegmentInterval(LinkTsMuxUploader* _pTsMuxUploader, int nInter
         pFFTsMuxUploader->nNewSegmentInterval = nInterval;
 }
 
-int LinkNewTsMuxUploader(LinkTsMuxUploader **_pTsMuxUploader, LinkMediaArg *_pAvArg, char *_pDeviceId, int _nDeviceIdLen,
-                     char *_pToken, int _nTokenLen)
+int LinkNewTsMuxUploader(LinkTsMuxUploader **_pTsMuxUploader, LinkMediaArg *_pAvArg, LinkUserUploadArg *_pUserUploadArg)
 {
         FFTsMuxUploader *pFFTsMuxUploader = (FFTsMuxUploader*)malloc(sizeof(FFTsMuxUploader));
         if (pFFTsMuxUploader == NULL) {
@@ -711,21 +710,22 @@ int LinkNewTsMuxUploader(LinkTsMuxUploader **_pTsMuxUploader, LinkMediaArg *_pAv
         memset(pFFTsMuxUploader, 0, sizeof(FFTsMuxUploader));
         
         int ret = 0;
-        ret = setToken((LinkTsMuxUploader *)pFFTsMuxUploader, _pToken, _nTokenLen);
+        ret = setToken((LinkTsMuxUploader *)pFFTsMuxUploader, _pUserUploadArg->pToken_, _pUserUploadArg->nTokenLen_);
         if (ret != 0) {
                 return ret;
         }
         
-        if (_nDeviceIdLen >= sizeof(pFFTsMuxUploader->deviceId_)) {
+        if (_pUserUploadArg->nDeviceIdLen_ >= sizeof(pFFTsMuxUploader->deviceId_)) {
                 free(pFFTsMuxUploader);
                 LinkLogError("device max support lenght is 64");
                 return LINK_ARG_TOO_LONG;
         }
-        memcpy(pFFTsMuxUploader->deviceId_, _pDeviceId, _nDeviceIdLen);
+        memcpy(pFFTsMuxUploader->deviceId_, _pUserUploadArg->pDeviceId_, _pUserUploadArg->nDeviceIdLen_);
         pFFTsMuxUploader->uploadArg.pDeviceId_ = pFFTsMuxUploader->deviceId_;
         
         pFFTsMuxUploader->uploadArg.pUploadArgKeeper_ = pFFTsMuxUploader;
         pFFTsMuxUploader->uploadArg.UploadArgUpadate = upadateUploadArg;
+        pFFTsMuxUploader->uploadArg.uploadZone = _pUserUploadArg->uploadZone_;
         
         pFFTsMuxUploader->nNewSegmentInterval = 30;
         

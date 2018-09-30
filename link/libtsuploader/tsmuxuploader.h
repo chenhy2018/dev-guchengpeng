@@ -1,8 +1,8 @@
 #ifndef __TS_MUX_UPLOADER_H__
 #define __TS_MUX_UPLOADER_H__
+#include "base.h"
 #include "uploader.h"
 #include "resource.h"
-#include "base.h"
 
 typedef struct _LinkTsMuxUploader LinkTsMuxUploader;
 
@@ -20,8 +20,7 @@ typedef struct _LinkTsMuxUploader{
         void (*SetNewSegmentInterval)(LinkTsMuxUploader*, int);
 }LinkTsMuxUploader;
 
-int LinkNewTsMuxUploader(LinkTsMuxUploader **pTsMuxUploader, LinkMediaArg *pAvArg, char *pDeviceId, int nDeviceIdLen,
-                     char *pToken, int nTokenLen);
+int LinkNewTsMuxUploader(LinkTsMuxUploader **pTsMuxUploader, LinkMediaArg *pAvArg, LinkUserUploadArg *pUserUploadArg);
 int LinkTsMuxUploaderStart(LinkTsMuxUploader *pTsMuxUploader);
 void LinkDestroyTsMuxUploader(LinkTsMuxUploader **pTsMuxUploader);
 #endif

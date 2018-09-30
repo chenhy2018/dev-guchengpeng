@@ -242,15 +242,43 @@ static void * streamUpload(void *_pOpaque)
         Qiniu_Io_PutExtra putExtra;
         Qiniu_Zero(putExtra);
         //设置机房域名
-        //Qiniu_Use_Zone_Beimei(Qiniu_False);
-        //Qiniu_Use_Zone_Huabei(Qiniu_True);
-        //Qiniu_Use_Zone_Huadong(Qiniu_True);
 #ifdef DISABLE_OPENSSL
-        Qiniu_Use_Zone_Huadong(Qiniu_False);
+        switch(pUploader->uploadArg.uploadZone) {
+        case LINK_ZONE_HUABEI:
+                Qiniu_Use_Zone_Huabei(Qiniu_False);
+                break;
+        case LINK_ZONE_HUANAN:
+                Qiniu_Use_Zone_Huanan(Qiniu_False);
+                break;
+        case LINK_ZONE_BEIMEI:
+                Qiniu_Use_Zone_Beimei(Qiniu_False);
+                break;
+        case LINK_ZONE_DONGNANYA:
+                Qiniu_Use_Zone_Dongnanya(Qiniu_False);
+                break;
+        default:
+                Qiniu_Use_Zone_Huadong(Qiniu_False);
+                break;
+        }
 #else
-        Qiniu_Use_Zone_Huadong(Qiniu_False);
+        switch(pUploader->uploadArg.uploadZone) {
+        case LINK_ZONE_HUABEI:
+                Qiniu_Use_Zone_Huabei(Qiniu_True);
+                break;
+        case LINK_ZONE_HUANAN:
+                Qiniu_Use_Zone_Huanan(Qiniu_True);
+                break;
+        case LINK_ZONE_BEIMEI:
+                Qiniu_Use_Zone_Beimei(Qiniu_True);
+                break;
+        case LINK_ZONE_DONGNANYA:
+                Qiniu_Use_Zone_Dongnanya(Qiniu_True);
+                break;
+        default:
+                Qiniu_Use_Zone_Huadong(Qiniu_True);
+                break;
+        }
 #endif
-        //Qiniu_Use_Zone_Huanan(Qiniu_True);
         
         //put extra
         //putExtra.upHost="http://nbxs-gate-up.qiniu.com";

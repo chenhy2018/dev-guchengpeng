@@ -5,15 +5,6 @@
 #include "log.h"
 #include "base.h"
 
-typedef struct {
-        char  *pToken_;
-        int   nTokenLen_;
-        char  *pDeviceId_;
-        int   nDeviceIdLen_;
-        int   nUploaderBufferSize;
-        int   nNewSegmentInterval;
-}LinkUserUploadArg;
-
 int LinkInitUploader();
 
 int LinkCreateAndStartAVUploader(OUT LinkTsMuxUploader **pTsMuxUploader, IN LinkMediaArg *pAvArg, IN LinkUserUploadArg *pUserUploadArg);
