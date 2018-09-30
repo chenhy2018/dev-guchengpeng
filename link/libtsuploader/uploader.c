@@ -358,7 +358,7 @@ END:
         }
         Qiniu_Client_Cleanup(&client);
         
-        return 0;
+        return NULL;
 }
 
 #ifdef LINK_STREAM_UPLOAD
@@ -419,7 +419,7 @@ static int streamUploadStart(LinkTsUploader * _pUploader)
         int ret = pthread_create(&pKodoUploader->workerId_, NULL, streamUpload, _pUploader);
         if (ret == 0) {
                 pKodoUploader->isThreadStarted_ = 1;
-                return 0;
+                return LINK_SUCCESS;
         } else {
                 LinkLogError("start upload thread fail:%d", ret);
                 return LINK_THREAD_ERROR;
@@ -461,7 +461,7 @@ static int streamPushData(LinkTsUploader *pTsUploader, char * pData, int nDataLe
 
 static int memUploadStart(TsUploader * _pUploader)
 {
-        return 0;
+        return LINK_SUCCESS;
 }
 
 static void memUploadStop(TsUploader * _pUploader)
@@ -565,7 +565,7 @@ int LinkNewUploader(LinkTsUploader ** _pUploader, LinkUploadArg *_pArg, enum Cir
         
         *_pUploader = (LinkTsUploader*)pKodoUploader;
         
-        return 0;
+        return LINK_SUCCESS;
 }
 
 void LinkDestroyUploader(LinkTsUploader ** _pUploader)

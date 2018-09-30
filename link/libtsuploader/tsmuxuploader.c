@@ -405,7 +405,7 @@ static int waitToCompleUploadAndDestroyTsMuxContext(void *_pOpaque)
                 free(pTsMuxCtx);
         }
         
-        return 0;
+        return LINK_SUCCESS;
 }
 
 #define getFFmpegErrorMsg(errcode) char msg[128];\
@@ -508,7 +508,7 @@ static int newTsMuxContext(FFTsMuxContext ** _pTsMuxCtx, LinkMediaArg *_pAvArg, 
         
         pTsMuxCtx->asyncWait.function = waitToCompleUploadAndDestroyTsMuxContext;
         * _pTsMuxCtx = pTsMuxCtx;
-        return 0;
+        return LINK_SUCCESS;
 }
 #else
 {
@@ -616,7 +616,7 @@ static int newTsMuxContext(FFTsMuxContext ** _pTsMuxCtx, LinkMediaArg *_pAvArg, 
         
         pTsMuxCtx->asyncWait.function = waitToCompleUploadAndDestroyTsMuxContext;
         *_pTsMuxCtx = pTsMuxCtx;
-        return 0;
+        return LINK_SUCCESS;
 end:
         if (pOutBuffer) {
                 av_free(pOutBuffer);
@@ -660,7 +660,7 @@ static int setToken(LinkTsMuxUploader* _PTsMuxUploader, char *_pToken, int _nTok
         pFFTsMuxUploader->token_.pToken_[_nTokenLen] = 0;
         
         pFFTsMuxUploader->uploadArg.pToken_ = _pToken;
-        return 0;
+        return LINK_SUCCESS;
 }
 
 static void upadateUploadArg(void *_pOpaque, void* pArg, int64_t nNow)
@@ -747,7 +747,7 @@ int LinkNewTsMuxUploader(LinkTsMuxUploader **_pTsMuxUploader, LinkMediaArg *_pAv
         
         *_pTsMuxUploader = (LinkTsMuxUploader *)pFFTsMuxUploader;
         
-        return 0;
+        return LINK_SUCCESS;
 }
 
 int LinkTsMuxUploaderStart(LinkTsMuxUploader *_pTsMuxUploader)
@@ -764,7 +764,7 @@ int LinkTsMuxUploaderStart(LinkTsMuxUploader *_pTsMuxUploader)
         }
         
         pFFTsMuxUploader->pTsMuxCtx->pTsUploader_->UploadStart(pFFTsMuxUploader->pTsMuxCtx->pTsUploader_);
-        return 0;
+        return LINK_SUCCESS;
 }
 
 void LinkDestroyTsMuxUploader(LinkTsMuxUploader **_pTsMuxUploader)

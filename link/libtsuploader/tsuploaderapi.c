@@ -18,7 +18,7 @@ static int volatile nProcStatus = 0;
 int LinkInitUploader()
 {
         if (nProcStatus) {
-                return 0;
+                return LINK_SUCCESS;
         }
 #ifndef USE_OWN_TSMUX
     #if LIBAVFORMAT_VERSION_MAJOR < 58
@@ -44,7 +44,7 @@ int LinkInitUploader()
         nProcStatus = 1;
         LinkLogDebug("main thread id:%ld", (long)pthread_self());
         
-        return 0;
+        return LINK_SUCCESS;
 
 }
 
@@ -78,7 +78,7 @@ int LinkCreateAndStartAVUploader(LinkTsMuxUploader **_pTsMuxUploader, LinkMediaA
         }
         *_pTsMuxUploader = pTsMuxUploader;
 
-        return 0;
+        return LINK_SUCCESS;
 }
 
 int LinkPushVideo(LinkTsMuxUploader *_pTsMuxUploader, char * _pData, int _nDataLen, int64_t _nTimestamp, int _nIsKeyFrame, int _nIsSegStart)
@@ -283,6 +283,6 @@ int LinkGetUploadToken(char *pBuf, int nBufLen, char *pUrl)
         fprintf(stderr,"token from local:\n");
         strcpy(pBuf, uptoken);
         Qiniu_Free(uptoken);
-        return 0;
+        return LINK_SUCCESS;
 #endif
 }

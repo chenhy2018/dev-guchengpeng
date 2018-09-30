@@ -48,7 +48,7 @@ int LinkPushFunction(void *_pAsyncInterface)
 int LinkStartMgr()
 {
         if (manager.nIsStarted_) {
-                return 0;
+                return LINK_SUCCESS;
         }
         
         int ret = LinkNewCircleQueue(&manager.pQueue_, 1, TSQ_FIX_LENGTH, sizeof(void *), 100);
@@ -63,7 +63,7 @@ int LinkStartMgr()
         }
         manager.nIsStarted_ = 1;
         
-        return 0;
+        return LINK_SUCCESS;
 }
 
 void LinkStopMgr()
