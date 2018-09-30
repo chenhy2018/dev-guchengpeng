@@ -102,10 +102,10 @@ void InitConfig()
     gIpcConfig.bucketName = "ipcamera";
     gIpcConfig.ak = "JAwTPb8dmrbiwt89Eaxa4VsL4_xSIYJoJh4rQfOQ";
     gIpcConfig.sk = "G5mtjT3QzG4Lf7jpCAN5PZHrGeoSH9jRdC96ecYS";
-    gIpcConfig.movingDetection = 0;
+    gIpcConfig.movingDetection = 1;
     gIpcConfig.configUpdateInterval = 10;
-    gIpcConfig.multiChannel = 0;
-    gIpcConfig.openCache = 0;
+    gIpcConfig.multiChannel = 1;
+    gIpcConfig.openCache = 1;
     gIpcConfig.cacheSize = STREAM_CACHE_SIZE;
     gIpcConfig.updateFrom = UPDATE_FROM_SOCKET;
 }
@@ -325,7 +325,7 @@ int VideoGetFrameCb( int streamno, char *_pFrame,
         if ( gIpcConfig.openCache && pVideoMainStreamCache ) {
             CacheHandle( pVideoMainStreamCache, pMainUploader, TYPE_VIDEO, _pFrame, _nLen, _nIskey,  _dTimeStamp );
         } else if ( gMovingDetect == ALARM_CODE_MOTION_DETECT ) {
-            PushVideo(pMainUploader, _pFrame, _nLen, (int64_t)_dTimeStamp, _nIskey, 0 );
+            LinkPushVideo(pMainUploader, _pFrame, _nLen, (int64_t)_dTimeStamp, _nIskey, 0 );
         } else if (gMovingDetect == ALARM_CODE_MOTION_DETECT_DISAPPEAR )  {
             ReportKodoInitError( "main stream video", "not detect moving" );
         } else {

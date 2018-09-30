@@ -1,4 +1,4 @@
-// Last Update:2018-09-27 14:54:36
+// Last Update:2018-09-30 11:13:48
 /**
  * @file mock_anjia.c
  * @brief 
@@ -585,6 +585,7 @@ int dev_sdk_start_audio(int camera, int stream, AUDIO_CALLBACK acb, void *pconte
 void *AlarmTask( void *arg )
 {
     int interval = 0;
+    ALARM_ENTRY alam;
     ALARM_CALLBACK alarmcb = (ALARM_CALLBACK)arg;
 
     (void)arg;
@@ -593,20 +594,22 @@ void *AlarmTask( void *arg )
         srand( time(0) );
         interval = rand()%15;
         sleep( interval );
-        alarmcb( ALARM_CODE_MOTION_DETECT, NULL );
+        alam.code = ALARM_CODE_MOTION_DETECT;
+        alarmcb( alam, NULL );
         srand( time(0) );
         interval = rand()%15;
         sleep( interval );
-        alarmcb( ALARM_CODE_MOTION_DETECT_DISAPPEAR, NULL );
+        alam.code = ALARM_CODE_MOTION_DETECT_DISAPPEAR;
+        alarmcb( alam, NULL );
     }
     return NULL;
 }
 
 int dev_sdk_register_callback(ALARM_CALLBACK alarmcb, CONTROL_RESPONSE crespcb, DEBUG_CALLBACK debugcb, void *pcontext)
 {
-        thread_t thread = 0;
+        pthread_t thread = 0;
         
-        pthread( &thread, NULL, AlarmTask, (void *)alarmcb );
+        pthread_create( &thread, NULL, AlarmTask, (void *)alarmcb );
         return 0;
 }
 
