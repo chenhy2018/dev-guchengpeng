@@ -77,6 +77,18 @@ int GetMovingDetection()
     return gIpcConfig.movingDetection;
 }
 
+void SetUpdateFrom( int updateFrom )
+{
+    gIpcConfig.updateFrom = updateFrom;
+}
+
+void SetCache( int enable )
+{
+    if ( gIpcConfig.openCache != enable ) {
+        gIpcConfig.openCache = enable;
+    }
+}
+
 void InitConfig()
 {
     gIpcConfig.logOutput = OUTPUT_CONSOLE;
@@ -95,6 +107,7 @@ void InitConfig()
     gIpcConfig.multiChannel = 1;
     gIpcConfig.openCache = 1;
     gIpcConfig.cacheSize = STREAM_CACHE_SIZE;
+    gIpcConfig.updateFrom = UPDATE_FROM_SOCKET;
 }
 
 void LoadConfig()
@@ -121,16 +134,18 @@ void UpdateConfig()
     }
     //cfg_dump( cfg );
     logOutput = cfg_get( cfg, "LOG_OUTPUT" );
-    if ( strcmp( logOutput, "socket") == 0 ) {
-        gIpcConfig.logOutput = OUTPUT_SOCKET;
-    } else if ( strcmp(logOutput, "console" ) == 0 ) {
-        gIpcConfig.logOutput = OUTPUT_CONSOLE;
-    } else if ( strcmp( logOutput, "mqtt") == 0  ) {
-        gIpcConfig.logOutput = OUTPUT_MQTT;
-    } else if ( strcmp ( logOutput, "file") == 0 ) {
-        gIpcConfig.logOutput = OUTPUT_FILE;
-    } else {
-        gIpcConfig.logOutput = OUTPUT_SOCKET;
+    if ( logOutput ) {
+        if ( strcmp( logOutput, "socket") == 0 ) {
+            gIpcConfig.logOutput = OUTPUT_SOCKET;
+        } else if ( strcmp(logOutput, "console" ) == 0 ) {
+            gIpcConfig.logOutput = OUTPUT_CONSOLE;
+        } else if ( strcmp( logOutput, "mqtt") == 0  ) {
+            gIpcConfig.logOutput = OUTPUT_MQTT;
+        } else if ( strcmp ( logOutput, "file") == 0 ) {
+            gIpcConfig.logOutput = OUTPUT_FILE;
+        } else {
+            gIpcConfig.logOutput = OUTPUT_SOCKET;
+        }
     }
 
     if ( last ) {
@@ -145,19 +160,25 @@ void UpdateConfig()
     }
 
     logFile = cfg_get( cfg, "LOG_FILE" );
-    strcpy( gLogFile, logFile );
-    gIpcConfig.logFile = gLogFile;
+    if ( logFile ) {
+        strcpy( gLogFile, logFile );
+        gIpcConfig.logFile = gLogFile;
+    }
 
     movingDetect = cfg_get( cfg, "MOUTION_DETECTION" );
-    if ( strcmp( movingDetect, "1" ) == 0 ) {
-        if ( gIpcConfig.movingDetection != 1 ) {
-            gIpcConfig.movingDetection = 1;
-            printf("%s %s %d open moving detection\n", __FILE__, __FUNCTION__, __LINE__ );
-        }
-    } else {
-        if ( gIpcConfig.movingDetection != 0 ) {
-            gIpcConfig.movingDetection = 0;
-            printf("%s %s %d close moving detection\n", __FILE__, __FUNCTION__, __LINE__ );
+    if ( movingDetect ) {
+        if ( strcmp( movingDetect, "1" ) == 0 ) {
+            if ( gIpcConfig.movingDetection != 1 ) {
+                gIpcConfig.movingDetection = 1;
+                printf("%s %s %d open moving detection\n", __FILE__, __FUNCTION__, __LINE__ );
+                DBG_LOG("open moving detection\n");
+            }
+        } else {
+            if ( gIpcConfig.movingDetection != 0 ) {
+                gIpcConfig.movingDetection = 0;
+                printf("%s %s %d close moving detection\n", __FILE__, __FUNCTION__, __LINE__ );
+                DBG_LOG("close moving detection\n");
+            }
         }
     }
     cache = cfg_get( cfg, "OPEN_CACHE");
@@ -304,9 +325,9 @@ int VideoGetFrameCb( int streamno, char *_pFrame,
         if ( gIpcConfig.openCache && pVideoMainStreamCache ) {
             CacheHandle( pVideoMainStreamCache, pMainUploader, TYPE_VIDEO, _pFrame, _nLen, _nIskey,  _dTimeStamp );
         } else if ( gMovingDetect == ALARM_CODE_MOTION_DETECT ) {
-            PushVideo(pMainUploader, _pFrame, _nLen, (int64_t)_dTimeStamp, _nIskey, 0 );
+            LinkPushVideo(pMainUploader, _pFrame, _nLen, (int64_t)_dTimeStamp, _nIskey, 0 );
         } else if (gMovingDetect == ALARM_CODE_MOTION_DETECT_DISAPPEAR )  {
-            ReportKodoInitError( "main stream", "not detect moving" );
+            ReportKodoInitError( "main stream video", "not detect moving" );
         } else {
             /* do nothing */
         }
@@ -340,7 +361,7 @@ int SubStreamVideoGetFrameCb( int streamno, char *_pFrame,
         } else if ( gMovingDetect == ALARM_CODE_MOTION_DETECT ) {
             LinkPushVideo(pSubUploader, _pFrame, _nLen, (int64_t)_dTimeStamp, _nIskey, 0 );
         } else if (gMovingDetect == ALARM_CODE_MOTION_DETECT_DISAPPEAR )  {
-            ReportKodoInitError( "sub stream", "not detect moving" );
+            ReportKodoInitError( "sub stream video", "not detect moving" );
         } else {
             /* do nothing */
         }
@@ -365,7 +386,7 @@ int AudioGetFrameCb( char *_pFrame, int _nLen, double _dTimeStamp,
     }
 
     if ( !gKodoInitOk ) {
-        ReportKodoInitError("main stream", "gKodoInitOk");
+        ReportKodoInitError("main stream audio", "gKodoInitOk");
         return 0;
     }
 
@@ -398,7 +419,7 @@ int AudioGetFrameCb( char *_pFrame, int _nLen, double _dTimeStamp,
                 DBG_ERROR("ret = %d\n", ret );
             }
         } else if (gMovingDetect == ALARM_CODE_MOTION_DETECT_DISAPPEAR )  {
-            ReportKodoInitError( "main stream", "not detect moving" );
+            ReportKodoInitError( "main stream audio", "not detect moving" );
         } else {
             /* do nothing */
         }
@@ -716,8 +737,10 @@ int AlarmCallback(ALARM_ENTRY alarm, void *pcontext)
 void *ConfigUpdateTask( void *param )
 {
     for (;;) {
-        UpdateConfig();
-        sleep( gIpcConfig.configUpdateInterval );
+        if ( gIpcConfig.updateFrom == UPDATE_FROM_FILE ) {
+            UpdateConfig();
+            sleep( gIpcConfig.configUpdateInterval );
+        }
     }
 }
 
@@ -739,8 +762,6 @@ int main()
     LoggerInit( gIpcConfig.logPrintTime, gIpcConfig.logOutput, gIpcConfig.logFile, gIpcConfig.logVerbose );
     /* sdk log callback */
     LinkSetLogCallback( SdkLogCallback );
-
-    DBG_LOG("compile tile : %s %s \n", __DATE__, __TIME__ );
 
     StartTokenUpdateTask();
     StartConfigUpdateTask();
@@ -767,6 +788,7 @@ int main()
         DBG_ERROR("ret is 0\n");
     }
 
+    DBG_LOG("compile time : %s %s \n", __DATE__, __TIME__ );
     for (;; ) {
         sleep( gIpcConfig.heartBeatInterval );
         DBG_LOG("[ %s ] [ HEART BEAT] main thread is running\n", gAjMediaStreamConfig.rtmpConfig.server );

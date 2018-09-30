@@ -8,5 +8,7 @@ if ($ENV{WITH_P2P} STREQUAL "ON")
         add_definitions("-DWITH_P2P")
 endif()
 
-add_subdirectory(third_party)
+if ($ENV{ARCH} STREQUAL "x86")
+    add_subdirectory(third_party)
+endif()
 add_subdirectory(link)

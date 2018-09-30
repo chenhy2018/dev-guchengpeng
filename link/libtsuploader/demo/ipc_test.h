@@ -1,4 +1,4 @@
-// Last Update:2018-09-25 16:46:11
+// Last Update:2018-09-27 11:19:57
 /**
  * @file ipc_test.h
  * @brief 
@@ -22,6 +22,11 @@ typedef enum {
     TYPE_AUDIO,
 } StreamType;
 
+typedef enum {
+    UPDATE_FROM_SOCKET,
+    UPDATE_FROM_FILE,
+};
+
 typedef struct {
     unsigned char logOutput;
     unsigned char logVerbose;
@@ -39,6 +44,7 @@ typedef struct {
     unsigned char multiChannel;
     unsigned char openCache;
     int cacheSize;
+    unsigned char updateFrom;
 } Config;
 
 typedef struct {
@@ -56,5 +62,7 @@ extern void SetOutputType( int output );
 extern int GetOutputType();
 extern void SetMovingDetection( int enable );
 extern int GetMovingDetection();
+extern void SetUpdateFrom( int updateFrom );
+extern void SetCache( int enable );
 
 #endif  /*IPC_TEST_H*/
