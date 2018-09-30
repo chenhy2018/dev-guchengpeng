@@ -65,6 +65,7 @@ ExternalProject_Add(curl-7.61.0
 #        BUILD_IN_SOURCE 1
 #)
 
+if ($ENV{ARCH} STREQUAL "x86")
 SET(FASTFWD_RELEASE_PATH  "${CMAKE_CURRENT_SOURCE_DIR}/../release/fastfwd")
 include(ExternalProject)
 ExternalProject_Add(ffmpeg
@@ -74,6 +75,7 @@ ExternalProject_Add(ffmpeg
         INSTALL_COMMAND make install
         BUILD_IN_SOURCE 1
 )
+endif()
 
 #include(ExternalProject)
 #ExternalProject_Add(librtmp
