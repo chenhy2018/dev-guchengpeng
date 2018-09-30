@@ -118,6 +118,11 @@ void LinkSetUploadBufferSize(LinkTsMuxUploader *_pTsMuxUploader, int _nSize)
         _pTsMuxUploader->SetUploaderBufferSize(_pTsMuxUploader, _nSize);
 }
 
+int LinkGetUploadBufferUsedSize(LinkTsMuxUploader *_pTsMuxUploader)
+{
+        return _pTsMuxUploader->GetUploaderBufferUsedSize(_pTsMuxUploader);
+}
+
 void LinkSetNewSegmentInterval(LinkTsMuxUploader *_pTsMuxUploader, int _nIntervalSecond)
 {
         if (_pTsMuxUploader == NULL || _nIntervalSecond < 0) {

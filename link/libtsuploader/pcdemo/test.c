@@ -32,6 +32,7 @@ typedef struct {
         char *pAFilePath;
         char *pVFilePath;
         char *pTokenUrl;
+        const char *pToken;
         char *pUa1;
         char *pUa2;
         const char *pZone;
@@ -689,6 +690,11 @@ static void checkCmdArg(const char * name)
         if (cmdArg.zone == 0) {
                 cmdArg.zone = LINK_ZONE_HUADONG;
         }
+        if (cmdArg.pToken != NULL) {
+                if (strlen(cmdArg.pToken) > sizeof(gtestToken) - 1) {
+                        exit(6);
+                }
+        }
         return;
 }
 
@@ -777,6 +783,7 @@ int main(int argc, const char** argv)
         flag_str(&cmdArg.pAFilePath, "afpath", "set audio file path.like /root/a.aac");
         flag_str(&cmdArg.pVFilePath, "vfpath", "set video file path.like /root/a.h264");
         flag_str(&cmdArg.pTokenUrl, "tokenurl", "url where to send token request");
+        flag_str(&cmdArg.pToken, "token", "upload token");
         flag_str(&cmdArg.pUa1, "ua1", "ua(deviceid) name. default value is ipcxxa");
         flag_str(&cmdArg.pUa2, "ua2", "ua(deviceid) name");
         flag_str(&cmdArg.pZone, "zone", "upload zone(huadong huabei huanan beimei dongnanya). default huadong");
@@ -882,9 +889,13 @@ int main(int argc, const char** argv)
         
         AVuploader avuploader;
         if (!cmdArg.IsNoNet) {
-                ret = LinkGetUploadToken(gtestToken, sizeof(gtestToken), cmdArg.pTokenUrl);
-                if (ret != 0)
-                        return ret;
+                if (cmdArg.pToken == NULL) {
+                        ret = LinkGetUploadToken(gtestToken, sizeof(gtestToken), cmdArg.pTokenUrl);
+                        if (ret != 0)
+                                return ret;
+                } else {
+                        strcpy(gtestToken, cmdArg.pToken);
+                }
                 printf("token:%s\n", gtestToken);
 
                 pthread_t updateTokenThread;

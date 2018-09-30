@@ -691,6 +691,22 @@ static void setUploaderBufferSize(LinkTsMuxUploader* _pTsMuxUploader, int nBuffe
         pFFTsMuxUploader->nUploadBufferSize = nBufferSize * 1024;
 }
 
+static int getUploaderBufferUsedSize(LinkTsMuxUploader* _pTsMuxUploader)
+{
+        FFTsMuxUploader *pFFTsMuxUploader = (FFTsMuxUploader*)_pTsMuxUploader;
+        LinkUploaderStatInfo info;
+        pthread_mutex_lock(&pFFTsMuxUploader->muxUploaderMutex_);
+        int nUsed = 0;
+        if (pFFTsMuxUploader->pTsMuxCtx) {
+                pFFTsMuxUploader->pTsMuxCtx->pTsUploader_->GetStatInfo(pFFTsMuxUploader->pTsMuxCtx->pTsUploader_, &info);
+                nUsed = info.nPushDataBytes_ - info.nPopDataBytes_;
+        } else {
+                return 0;
+        }
+        pthread_mutex_unlock(&pFFTsMuxUploader->muxUploaderMutex_);
+        return nUsed + (nUsed/188) * 4;
+}
+
 static void setNewSegmentInterval(LinkTsMuxUploader* _pTsMuxUploader, int nInterval)
 {
         if (nInterval < 15) {
@@ -741,6 +757,7 @@ int LinkNewTsMuxUploader(LinkTsMuxUploader **_pTsMuxUploader, LinkMediaArg *_pAv
         pFFTsMuxUploader->tsMuxUploader_.PushAudio = PushAudio;
         pFFTsMuxUploader->tsMuxUploader_.PushVideo = PushVideo;
         pFFTsMuxUploader->tsMuxUploader_.SetUploaderBufferSize = setUploaderBufferSize;
+        pFFTsMuxUploader->tsMuxUploader_.GetUploaderBufferUsedSize = getUploaderBufferUsedSize;
         pFFTsMuxUploader->tsMuxUploader_.SetNewSegmentInterval = setNewSegmentInterval;
         
         pFFTsMuxUploader->avArg = *_pAvArg;
