@@ -2,17 +2,20 @@ cmake_minimum_required (VERSION 2.8)
 
 project(tsuploader)
 
-add_definitions("-Wall -g")
+#add_definitions("-Wall -g")
 include_directories("${CMAKE_CURRENT_SOURCE_DIR}/../../third_party/curl-7.61.0/include")
 include_directories("${CMAKE_CURRENT_SOURCE_DIR}/c-sdk")
 
 include_directories("${CMAKE_CURRENT_SOURCE_DIR}/demo/include")
 include_directories("${CMAKE_CURRENT_SOURCE_DIR}/")
 
-
 link_directories("${CMAKE_CURRENT_SOURCE_DIR}/../../third_party/curl-7.61.0/lib/.libs")
 if ( $ENV{ARCH} STREQUAL mstar )
-link_directories("${CMAKE_CURRENT_SOURCE_DIR}/libs")
+link_directories("${CMAKE_CURRENT_SOURCE_DIR}/libs/mstar")
+elseif ( $ENV{ARCH} STREQUAL hi )
+link_directories("${CMAKE_CURRENT_SOURCE_DIR}/libs/hi")
+set( MOCK_ANJIA_API ON)
+add_definitions(-DMOCK_ANJIA )
 else()
 set( MOCK_ANJIA_API ON)
 add_definitions(-DMOCK_ANJIA )
@@ -29,12 +32,7 @@ else()
         message("WITH_OPENSSL")
 endif()
 
-if ( $ENV{ARCH} STREQUAL mstar )
-    set(LIBFFMPEG "")
-else()
-    set(LIBFFMPEG "")
-    #set(LIBFFMPEG avformat avcodec swresample avutil)
-endif()
+set(LIBFFMPEG "")
 
 if ($ENV{WITH_FFMPEG} STREQUAL "OFF")
         message("WITHOUT_FFMPEG")
@@ -86,20 +84,19 @@ add_executable(ipc-testupload
     ./demo/mymalloc.c
     ./demo/mock_anjia.c
 )
+
 if ( $ENV{ARCH} STREQUAL mstar )
     add_definitions(-D__ARM)
 endif()
 
-#if ( $ENV{ARCH} STREQUAL mstar )
-    if(DISABLE_OPENSSL)
-        if(MOCK_ANJIA_API)
-            message("mock an-jia")
-            target_link_libraries(ipc-testupload tsuploader ${LIBFFMPEG} qiniu curl m pthread )
-        else()
-            target_link_libraries(ipc-testupload tsuploader ${LIBFFMPEG} qiniu curl m pthread devsdk tools)
-        endif()
+if(DISABLE_OPENSSL)
+    if(MOCK_ANJIA_API)
+        message("mock an-jia")
+        target_link_libraries(ipc-testupload tsuploader ${LIBFFMPEG} qiniu curl m pthread )
     else()
-        target_link_libraries(ipc-testupload tsuploader ${LIBFFMPEG} qiniu curl crypto m pthread devsdk tools)
+        target_link_libraries(ipc-testupload tsuploader ${LIBFFMPEG} qiniu curl m pthread devsdk tools)
     endif()
-#endif()
+else()
+    target_link_libraries(ipc-testupload tsuploader ${LIBFFMPEG} qiniu curl crypto m pthread devsdk tools)
+endif()
 
