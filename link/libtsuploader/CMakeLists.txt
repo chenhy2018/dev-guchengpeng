@@ -74,8 +74,9 @@ add_library(tsuploader STATIC
 
 if ( $ENV{ARCH} STREQUAL x86 )
         if ($ENV{WITH_FFMPEG} STREQUAL "ON")
-            add_subdirectory(pcdemo)
+            add_definitions(-DTEST_WITH_FFMPEG)
         endif()
+        add_subdirectory(pcdemo)
 endif()
 
 add_executable(ipc-testupload
