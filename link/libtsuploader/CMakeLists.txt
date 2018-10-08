@@ -39,6 +39,7 @@ endif()
 set(LIBFFMPEG "")
 
 if ($ENV{WITH_FFMPEG} STREQUAL "OFF")
+        set(TEST_WITHOUT_FFMPEG ON)
         message("WITHOUT_FFMPEG")
         add_definitions(-DUSE_OWN_TSMUX)
 else()
@@ -72,7 +73,7 @@ add_library(tsuploader STATIC
         localkey.h
 )
 
-if ( $ENV{ARCH} STREQUAL x86 )
+if ( $ENV{ARCH} STREQUAL x86 OR $ENV{ARCH} STREQUAL 80386)
         if ($ENV{WITH_FFMPEG} STREQUAL "ON")
             add_definitions(-DTEST_WITH_FFMPEG)
         endif()
