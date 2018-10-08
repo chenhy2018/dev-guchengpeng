@@ -636,7 +636,7 @@ static void checkCmdArg(const char * name)
                 }
         }
 #ifndef TEST_WITH_FFMPEG
-        if (cmdArg.IsInputFromFFmpeg) {
+        if (cmdArg.IsInputFromFFmpeg || cmdArg.IsTwoUpload) {
                 LinkLogError("not enable TEST_WITH_FFMPEG");
                 exit(2);
         }
@@ -698,6 +698,7 @@ static void checkCmdArg(const char * name)
         return;
 }
 
+#ifdef TEST_WITH_FFMPEG
 static void * second_test(void * opaque) {
         AVuploader avuploader;
         memset(&avuploader, 0, sizeof(avuploader));
@@ -726,6 +727,7 @@ static void * second_test(void * opaque) {
         LinkDestroyAVUploader(&avuploader.pTsMuxUploader);
         return NULL;
 }
+#endif
 
 static void do_start_file_test(AVuploader *pAvuploader){
         printf("%s\n%s\n", pAvuploader->pAFile, pAvuploader->pVFile);
@@ -972,6 +974,7 @@ int main(int argc, const char** argv)
                 }
                 printf("two file upload\n");
                 do_start_file_test(&avuploader);
+#ifdef TEST_WITH_FFMPEG
 	} else if (cmdArg.IsTwoUpload) {
                 ret = pthread_create(&secondUploadThread, NULL, second_test, NULL);
                 if (ret != 0) {
@@ -980,13 +983,18 @@ int main(int argc, const char** argv)
                 }
                 
                 do_start_file_test(&avuploader);
+#endif
         } else {
+#ifdef TEST_WITH_FFMPEG
                 if (cmdArg.IsInputFromFFmpeg) {
                         start_ffmpeg_test("rtmp://localhost:1935/live/movie", dataCallback, &avuploader);
                         //start_ffmpeg_test("rtmp://live.hkstv.hk.lxdns.com/live/hks", dataCallback, NULL);
                 } else {
                         do_start_file_test(&avuploader);
                 }
+#else
+                do_start_file_test(&avuploader);
+#endif
         }
         
         sleep(1);
