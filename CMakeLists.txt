@@ -10,5 +10,7 @@ endif()
 
 if ($ENV{ARCH} STREQUAL "x86")
     add_subdirectory(third_party)
+elseif ($ENV{ARCH} STREQUAL "80386")
+    add_subdirectory(third_party)
 endif()
 add_subdirectory(link)

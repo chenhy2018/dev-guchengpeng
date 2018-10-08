@@ -327,7 +327,7 @@ static void * streamUpload(void *_pOpaque)
         if (error.code != 200) {
                 pUploader->state = LINK_UPLOAD_FAIL;
                 if (error.code == 401) {
-                        LinkLogError("upload file :%s expsize:%d httpcode=%d errmsg=%s", key, pUploader->getDataBytes, error.code, Qiniu_Buffer_CStr(&client.b));
+                        LinkLogError("upload file :%s expsize:%lld httpcode=%d errmsg=%s", key, pUploader->getDataBytes, error.code, Qiniu_Buffer_CStr(&client.b));
                 } else if (error.code >= 500) {
                         const char * pFullErrMsg = Qiniu_Buffer_CStr(&client.b);
                         char errMsg[256];
@@ -341,9 +341,9 @@ static void * streamUpload(void *_pOpaque)
                 } else {
                         const char *pCurlErrMsg = curl_easy_strerror(error.code);
                         if (pCurlErrMsg != NULL) {
-                                LinkLogError("upload file :%s expsize:%d errorcode=%d errmsg={\"error\":\"%s\"}", key, pUploader->getDataBytes, error.code, pCurlErrMsg);
+                                LinkLogError("upload file :%s expsize:%lld errorcode=%d errmsg={\"error\":\"%s\"}", key, pUploader->getDataBytes, error.code, pCurlErrMsg);
                         } else {
-                                LinkLogError("upload file :%s expsize:%d errorcode=%d errmsg={\"error\":\"unknown error\"}", key, pUploader->getDataBytes, error.code);
+                                LinkLogError("upload file :%s expsize:%lld errorcode=%d errmsg={\"error\":\"unknown error\"}", key, pUploader->getDataBytes, error.code);
                         }
                 }
                 //debug_log(&client, error);
