@@ -112,7 +112,6 @@ func GetPlayBackm3u8(c *gin.Context) {
 		return
 	}
 	c.Header("Content-Type", "application/x-mpegURL")
-	c.Header("Access-Control-Allow-Origin", "*")
 	c.String(200, m3u8.Mkm3u8(playlist, xl))
 }
 func getPlaybackList(xl *xlog.Logger, segs []map[string]interface{}, user *userInfo, domain string) ([]map[string]interface{}, error) {
@@ -163,7 +162,6 @@ func getFastForwardStream(xl *xlog.Logger, params *requestParams, c *gin.Context
 		return errors.New("get TsStream error")
 	}
 	c.Header("Content-Type", "video/mp4")
-	c.Header("Access-Control-Allow-Origin", "*")
 	c.Stream(func(w io.Writer) bool {
 		if ret, err := r.Recv(); err == nil {
 			w.Write(ret.Stream)
