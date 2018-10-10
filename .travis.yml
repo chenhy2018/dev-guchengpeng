@@ -1,5 +1,4 @@
 sudo: true
-  - echo $PWD
 language: go
 go:
   - 1.10.1
