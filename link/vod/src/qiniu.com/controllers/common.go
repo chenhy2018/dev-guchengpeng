@@ -120,7 +120,7 @@ func getUserInfo(xl *xlog.Logger, req *http.Request) (*userInfo, error) {
 }
 
 func HandleToken(c *gin.Context) {
-
+	c.Header("Access-Control-Allow-Origin", "*")
 	if system.HaveQconf() {
 		return
 	}

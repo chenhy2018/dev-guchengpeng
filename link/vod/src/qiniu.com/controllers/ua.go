@@ -269,7 +269,6 @@ func GetUaInfo(c *gin.Context) {
 		return
 	} else {
 		c.Header("Content-Type", "application/json")
-		c.Header("Access-Control-Allow-Origin", "*")
 		c.JSON(200, gin.H{"item": r,
 			"marker": nextMark})
 	}
