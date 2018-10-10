@@ -36,6 +36,7 @@ static Queue *pVideoSubStreamCache = NULL;
 static Queue *pAudioSubStreamCache = NULL;
 static Queue *pAudioMainStreamCache = NULL;
 static __thread int count = STREAM_CACHE_SIZE;
+static const char *version = "00.00.01";
 
 int GetKodoInitSts()
 {
@@ -89,6 +90,11 @@ void SetCache( int enable )
     }
 }
 
+char *GetVersion()
+{
+    return version;
+}
+
 void InitConfig()
 {
     gIpcConfig.logOutput = OUTPUT_CONSOLE;
@@ -102,12 +108,12 @@ void InitConfig()
     gIpcConfig.bucketName = "ipcamera";
     gIpcConfig.ak = "JAwTPb8dmrbiwt89Eaxa4VsL4_xSIYJoJh4rQfOQ";
     gIpcConfig.sk = "G5mtjT3QzG4Lf7jpCAN5PZHrGeoSH9jRdC96ecYS";
-    gIpcConfig.movingDetection = 1;
+    gIpcConfig.movingDetection = 0;
     gIpcConfig.configUpdateInterval = 10;
     gIpcConfig.multiChannel = 1;
     gIpcConfig.openCache = 1;
     gIpcConfig.cacheSize = STREAM_CACHE_SIZE;
-    gIpcConfig.updateFrom = UPDATE_FROM_SOCKET;
+    gIpcConfig.updateFrom = UPDATE_FROM_FILE;
 }
 
 void LoadConfig()
@@ -647,13 +653,13 @@ static void * upadateToken() {
         ret = LinkGetUploadToken(gTestToken, sizeof(gTestToken), url );
         if ( ret != 0 ) {
             DBG_ERROR("GetUploadToken error, ret = %d\n", ret );
-            return NULL;
+            continue;
         }
         DBG_LOG("token:%s\n", gTestToken);
         ret = LinkUpdateToken(pMainUploader, gTestToken, strlen(gTestToken));
         if (ret != 0) {
             DBG_ERROR("UpdateToken error, ret = %d\n", ret );
-            return NULL;
+            continue;
         }
 
         if ( gIpcConfig.multiChannel ) {
@@ -661,13 +667,13 @@ static void * upadateToken() {
             ret = LinkGetUploadToken( gSubToken, sizeof(gSubToken), url );
             if ( ret != 0 ) {
                 DBG_ERROR("GetUploadToken error, ret = %d\n", ret );
-                return NULL;
+                continue;
             }
             DBG_LOG("token:%s\n", gSubToken);
             ret = LinkUpdateToken(pSubUploader, gSubToken, strlen(gSubToken));
             if (ret != 0) {
                 DBG_ERROR("UpdateToken error, ret = %d\n", ret );
-                return NULL;
+                continue;
             }
         }
     }
@@ -739,8 +745,8 @@ void *ConfigUpdateTask( void *param )
     for (;;) {
         if ( gIpcConfig.updateFrom == UPDATE_FROM_FILE ) {
             UpdateConfig();
-            sleep( gIpcConfig.configUpdateInterval );
         }
+        sleep( gIpcConfig.configUpdateInterval );
     }
 }
 
@@ -749,6 +755,18 @@ void StartConfigUpdateTask()
     pthread_t thread;
 
     pthread_create( &thread, NULL, ConfigUpdateTask, NULL );
+}
+
+
+void LinkLog2(int nLevel, char * pFmt, ...)
+{
+	va_list ap;
+	va_start(ap, pFmt);
+	char logStr[257] = {0};
+
+	vsnprintf(logStr, sizeof(logStr), pFmt, ap);
+	va_end(ap);
+	printf("%s", logStr );
 }
 
 int main()
@@ -789,6 +807,8 @@ int main()
     }
 
     DBG_LOG("compile time : %s %s \n", __DATE__, __TIME__ );
+    DBG_LOG("version : %s\n", version );
+    //DBG_LOG("commit id : %s\n", GIT_COMMIT_SHA2 );
     for (;; ) {
         sleep( gIpcConfig.heartBeatInterval );
         DBG_LOG("[ %s ] [ HEART BEAT] main thread is running\n", gAjMediaStreamConfig.rtmpConfig.server );

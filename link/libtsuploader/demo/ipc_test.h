@@ -64,5 +64,6 @@ extern void SetMovingDetection( int enable );
 extern int GetMovingDetection();
 extern void SetUpdateFrom( int updateFrom );
 extern void SetCache( int enable );
+extern char *GetVersion();
 
 #endif  /*IPC_TEST_H*/

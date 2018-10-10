@@ -1,4 +1,4 @@
-// Last Update:2018-09-27 14:40:52
+// Last Update:2018-10-10 14:56:43
 /**
  * @file socket_logging.c
  * @brief 
@@ -37,6 +37,7 @@ void CmdHandleMovingDetection( char *param );
 void CmdHnadleUpdateFrom( char *param );
 void CmdHnadleHelp( char *param );
 void CmdHnadleCache( char *param );
+void CmdHandleGetVersion( char *param );
 
 char *host = "47.105.118.51";
 int port = 8090;
@@ -50,7 +51,8 @@ static DemoCmd gCmds[] =
     { "moving", CmdHandleMovingDetection },
     { "updatefrom", CmdHnadleUpdateFrom },
     { "cache", CmdHnadleCache },
-    { "remotehelp", CmdHnadleHelp }
+    { "remotehelp", CmdHnadleHelp },
+    { "get-version", CmdHandleGetVersion }
 
 };
 
@@ -412,6 +414,7 @@ void CmdHnadleHelp( char *param )
             " moving     - moving detection open or close (0/1)\n"
             " updatefrom - gIpcConfig update from socket or file (socket/file)\n"
             " cache      - set open the cache (0/1)\n"
+            " get-version- get version\n"
             " remotehelp - this help\n");
 }
 
@@ -430,6 +433,19 @@ void CmdHnadleCache( char *param )
         SetCache( 1 );
     } else {
         SetCache( 0 );
+    }
+}
+
+void CmdHandleGetVersion( char *param )
+{
+    char buffer[1024] = { 0 };
+    int ret = 0;
+
+//    sprintf( buffer, "version : %s, commit id : %s, compile time : %s %s\n", GetVersion(), GIT_COMMIT_SHA2, __DATE__, __TIME__ );
+    sprintf( buffer, "version : %s, compile time : %s %s\n", GetVersion(),  __DATE__, __TIME__ );
+    ret = send(gsock , buffer , strlen(buffer) , MSG_NOSIGNAL );// MSG_NOSIGNAL ignore SIGPIPE signal
+    if(  ret < 0 ) {
+        printf("Send failed, ret = %d, %s\n", ret, strerror(errno) );
     }
 }
 
