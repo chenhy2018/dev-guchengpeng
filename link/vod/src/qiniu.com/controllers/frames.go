@@ -97,7 +97,7 @@ func GetFrames(c *gin.Context) {
 			c.JSON(500, gin.H{"error": "Service Internal Error"})
 			return
 		}
-		realUrl := GetUrlWithDownLoadToken(xl, domain, filename, 0, user)
+		realUrl := GetUrlWithDownLoadToken(xl, domain, filename, 0, mac)
 		starttime, ok := v[models.SEGMENT_ITEM_START_TIME].(int64)
 		if !ok {
 			xl.Errorf("segment start format error %#v", v)

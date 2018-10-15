@@ -11,7 +11,6 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/qiniu/api.v7/auth/qbox"
-	"github.com/qiniu/api.v7/storage"
 	xlog "github.com/qiniu/xlog.v1"
 	"google.golang.org/grpc"
 	"qiniu.com/auth"
@@ -143,11 +142,11 @@ func getUid(uid uint32) string {
 	return strconv.Itoa(int(uid))
 }
 
-func GetUrlWithDownLoadToken(xl *xlog.Logger, domain, fname string, tsExpire int64, userInfo *userInfo) string {
-	mac := qbox.NewMac(userInfo.ak, userInfo.sk)
+func GetUrlWithDownLoadToken(xl *xlog.Logger, domain, fname string, tsExpire int64, mac *qbox.Mac) string {
 	expireT := time.Now().Add(time.Hour).Unix() + tsExpire
-	realUrl := storage.MakePrivateURL(mac, domain, fname, expireT)
-	return realUrl
+	urlToSign := domain + "/" + fname + "?e=" + strconv.FormatInt(expireT, 10)
+	token := mac.Sign([]byte(urlToSign))
+	return urlToSign + "&token=" + token
 }
 
 func GetBucket(xl *xlog.Logger, uid, namespace string) (string, error) {
