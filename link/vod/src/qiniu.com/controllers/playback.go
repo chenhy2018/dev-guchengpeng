@@ -105,7 +105,7 @@ func GetPlayBackm3u8(c *gin.Context) {
 		return
 	}
 	domain = "http://" + domain
-	playlist, err := getPlaybackList(xl, segs, userInfo, domain)
+	playlist, err := getPlaybackList(xl, segs, mac, domain)
 	if err != nil {
 		xl.Errorf("get playback list error, error = %#v", err.Error())
 		c.JSON(500, gin.H{"error": "Service Internal Error"})
@@ -114,7 +114,7 @@ func GetPlayBackm3u8(c *gin.Context) {
 	c.Header("Content-Type", "application/x-mpegURL")
 	c.String(200, m3u8.Mkm3u8(playlist, xl))
 }
-func getPlaybackList(xl *xlog.Logger, segs []map[string]interface{}, user *userInfo, domain string) ([]map[string]interface{}, error) {
+func getPlaybackList(xl *xlog.Logger, segs []map[string]interface{}, mac *qbox.Mac, domain string) ([]map[string]interface{}, error) {
 	var playlist []map[string]interface{}
 
 	var total int64
@@ -135,7 +135,7 @@ func getPlaybackList(xl *xlog.Logger, segs []map[string]interface{}, user *userI
 			return nil, errors.New("filename format error")
 
 		}
-		realUrl := GetUrlWithDownLoadToken(xl, domain, filename, total, user)
+		realUrl := GetUrlWithDownLoadToken(xl, domain, filename, total, mac)
 
 		m := map[string]interface{}{
 			"duration": duration,
