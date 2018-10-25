@@ -159,6 +159,20 @@ class FastForwardInfo : public ::google::protobuf::Message /* @@protoc_insertion
   ::std::string* release_url();
   void set_allocated_url(::std::string* url);
 
+  // string fmt = 3;
+  void clear_fmt();
+  static const int kFmtFieldNumber = 3;
+  const ::std::string& fmt() const;
+  void set_fmt(const ::std::string& value);
+  #if LANG_CXX11
+  void set_fmt(::std::string&& value);
+  #endif
+  void set_fmt(const char* value);
+  void set_fmt(const char* value, size_t size);
+  ::std::string* mutable_fmt();
+  ::std::string* release_fmt();
+  void set_allocated_fmt(::std::string* fmt);
+
   // int32 speed = 2;
   void clear_speed();
   static const int kSpeedFieldNumber = 2;
@@ -170,6 +184,7 @@ class FastForwardInfo : public ::google::protobuf::Message /* @@protoc_insertion
 
   ::google::protobuf::internal::InternalMetadataWithArena _internal_metadata_;
   ::google::protobuf::internal::ArenaStringPtr url_;
+  ::google::protobuf::internal::ArenaStringPtr fmt_;
   ::google::protobuf::int32 speed_;
   mutable int _cached_size_;
   friend struct ::protobuf_fast_5fforward_2eproto::TableStruct;
@@ -358,6 +373,59 @@ inline void FastForwardInfo::set_speed(::google::protobuf::int32 value) {
   
   speed_ = value;
   // @@protoc_insertion_point(field_set:fastforward.FastForwardInfo.speed)
+}
+
+// string fmt = 3;
+inline void FastForwardInfo::clear_fmt() {
+  fmt_.ClearToEmptyNoArena(&::google::protobuf::internal::GetEmptyStringAlreadyInited());
+}
+inline const ::std::string& FastForwardInfo::fmt() const {
+  // @@protoc_insertion_point(field_get:fastforward.FastForwardInfo.fmt)
+  return fmt_.GetNoArena();
+}
+inline void FastForwardInfo::set_fmt(const ::std::string& value) {
+  
+  fmt_.SetNoArena(&::google::protobuf::internal::GetEmptyStringAlreadyInited(), value);
+  // @@protoc_insertion_point(field_set:fastforward.FastForwardInfo.fmt)
+}
+#if LANG_CXX11
+inline void FastForwardInfo::set_fmt(::std::string&& value) {
+  
+  fmt_.SetNoArena(
+    &::google::protobuf::internal::GetEmptyStringAlreadyInited(), ::std::move(value));
+  // @@protoc_insertion_point(field_set_rvalue:fastforward.FastForwardInfo.fmt)
+}
+#endif
+inline void FastForwardInfo::set_fmt(const char* value) {
+  GOOGLE_DCHECK(value != NULL);
+  
+  fmt_.SetNoArena(&::google::protobuf::internal::GetEmptyStringAlreadyInited(), ::std::string(value));
+  // @@protoc_insertion_point(field_set_char:fastforward.FastForwardInfo.fmt)
+}
+inline void FastForwardInfo::set_fmt(const char* value, size_t size) {
+  
+  fmt_.SetNoArena(&::google::protobuf::internal::GetEmptyStringAlreadyInited(),
+      ::std::string(reinterpret_cast<const char*>(value), size));
+  // @@protoc_insertion_point(field_set_pointer:fastforward.FastForwardInfo.fmt)
+}
+inline ::std::string* FastForwardInfo::mutable_fmt() {
+  
+  // @@protoc_insertion_point(field_mutable:fastforward.FastForwardInfo.fmt)
+  return fmt_.MutableNoArena(&::google::protobuf::internal::GetEmptyStringAlreadyInited());
+}
+inline ::std::string* FastForwardInfo::release_fmt() {
+  // @@protoc_insertion_point(field_release:fastforward.FastForwardInfo.fmt)
+  
+  return fmt_.ReleaseNoArena(&::google::protobuf::internal::GetEmptyStringAlreadyInited());
+}
+inline void FastForwardInfo::set_allocated_fmt(::std::string* fmt) {
+  if (fmt != NULL) {
+    
+  } else {
+    
+  }
+  fmt_.SetAllocatedNoArena(&::google::protobuf::internal::GetEmptyStringAlreadyInited(), fmt);
+  // @@protoc_insertion_point(field_set_allocated:fastforward.FastForwardInfo.fmt)
 }
 
 // -------------------------------------------------------------------

@@ -84,6 +84,7 @@ const ::google::protobuf::uint32 TableStruct::offsets[] GOOGLE_PROTOBUF_ATTRIBUT
   ~0u,  // no _weak_field_map_
   GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(::fastforward::FastForwardInfo, url_),
   GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(::fastforward::FastForwardInfo, speed_),
+  GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(::fastforward::FastForwardInfo, fmt_),
   ~0u,  // no _has_bits_
   GOOGLE_PROTOBUF_GENERATED_MESSAGE_FIELD_OFFSET(::fastforward::FastForwardStream, _internal_metadata_),
   ~0u,  // no _extensions_
@@ -93,7 +94,7 @@ const ::google::protobuf::uint32 TableStruct::offsets[] GOOGLE_PROTOBUF_ATTRIBUT
 };
 static const ::google::protobuf::internal::MigrationSchema schemas[] GOOGLE_PROTOBUF_ATTRIBUTE_SECTION_VARIABLE(protodesc_cold) = {
   { 0, -1, sizeof(::fastforward::FastForwardInfo)},
-  { 7, -1, sizeof(::fastforward::FastForwardStream)},
+  { 8, -1, sizeof(::fastforward::FastForwardStream)},
 };
 
 static ::google::protobuf::Message const * const file_default_instances[] = {
@@ -123,15 +124,15 @@ void protobuf_RegisterTypes(const ::std::string&) {
 void AddDescriptorsImpl() {
   InitDefaults();
   static const char descriptor[] GOOGLE_PROTOBUF_ATTRIBUTE_SECTION_VARIABLE(protodesc_cold) = {
-      "\n\022fast_forward.proto\022\013fastforward\"-\n\017Fas"
+      "\n\022fast_forward.proto\022\013fastforward\":\n\017Fas"
       "tForwardInfo\022\013\n\003url\030\001 \001(\t\022\r\n\005speed\030\002 \001(\005"
-      "\"#\n\021FastForwardStream\022\016\n\006stream\030\001 \001(\0142^\n"
-      "\013FastForward\022O\n\013GetTsStream\022\034.fastforwar"
-      "d.FastForwardInfo\032\036.fastforward.FastForw"
-      "ardStream\"\0000\001b\006proto3"
+      "\022\013\n\003fmt\030\003 \001(\t\"#\n\021FastForwardStream\022\016\n\006st"
+      "ream\030\001 \001(\0142^\n\013FastForward\022O\n\013GetTsStream"
+      "\022\034.fastforward.FastForwardInfo\032\036.fastfor"
+      "ward.FastForwardStream\"\0000\001b\006proto3"
   };
   ::google::protobuf::DescriptorPool::InternalAddGeneratedFile(
-      descriptor, 221);
+      descriptor, 234);
   ::google::protobuf::MessageFactory::InternalRegisterGeneratedFile(
     "fast_forward.proto", &protobuf_RegisterTypes);
 }
@@ -156,6 +157,7 @@ void FastForwardInfo::InitAsDefaultInstance() {
 #if !defined(_MSC_VER) || _MSC_VER >= 1900
 const int FastForwardInfo::kUrlFieldNumber;
 const int FastForwardInfo::kSpeedFieldNumber;
+const int FastForwardInfo::kFmtFieldNumber;
 #endif  // !defined(_MSC_VER) || _MSC_VER >= 1900
 
 FastForwardInfo::FastForwardInfo()
@@ -175,12 +177,17 @@ FastForwardInfo::FastForwardInfo(const FastForwardInfo& from)
   if (from.url().size() > 0) {
     url_.AssignWithDefault(&::google::protobuf::internal::GetEmptyStringAlreadyInited(), from.url_);
   }
+  fmt_.UnsafeSetDefault(&::google::protobuf::internal::GetEmptyStringAlreadyInited());
+  if (from.fmt().size() > 0) {
+    fmt_.AssignWithDefault(&::google::protobuf::internal::GetEmptyStringAlreadyInited(), from.fmt_);
+  }
   speed_ = from.speed_;
   // @@protoc_insertion_point(copy_constructor:fastforward.FastForwardInfo)
 }
 
 void FastForwardInfo::SharedCtor() {
   url_.UnsafeSetDefault(&::google::protobuf::internal::GetEmptyStringAlreadyInited());
+  fmt_.UnsafeSetDefault(&::google::protobuf::internal::GetEmptyStringAlreadyInited());
   speed_ = 0;
   _cached_size_ = 0;
 }
@@ -192,6 +199,7 @@ FastForwardInfo::~FastForwardInfo() {
 
 void FastForwardInfo::SharedDtor() {
   url_.DestroyNoArena(&::google::protobuf::internal::GetEmptyStringAlreadyInited());
+  fmt_.DestroyNoArena(&::google::protobuf::internal::GetEmptyStringAlreadyInited());
 }
 
 void FastForwardInfo::SetCachedSize(int size) const {
@@ -224,6 +232,7 @@ void FastForwardInfo::Clear() {
   (void) cached_has_bits;
 
   url_.ClearToEmptyNoArena(&::google::protobuf::internal::GetEmptyStringAlreadyInited());
+  fmt_.ClearToEmptyNoArena(&::google::protobuf::internal::GetEmptyStringAlreadyInited());
   speed_ = 0;
   _internal_metadata_.Clear();
 }
@@ -262,6 +271,22 @@ bool FastForwardInfo::MergePartialFromCodedStream(
           DO_((::google::protobuf::internal::WireFormatLite::ReadPrimitive<
                    ::google::protobuf::int32, ::google::protobuf::internal::WireFormatLite::TYPE_INT32>(
                  input, &speed_)));
+        } else {
+          goto handle_unusual;
+        }
+        break;
+      }
+
+      // string fmt = 3;
+      case 3: {
+        if (static_cast< ::google::protobuf::uint8>(tag) ==
+            static_cast< ::google::protobuf::uint8>(26u /* 26 & 0xFF */)) {
+          DO_(::google::protobuf::internal::WireFormatLite::ReadString(
+                input, this->mutable_fmt()));
+          DO_(::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
+            this->fmt().data(), static_cast<int>(this->fmt().length()),
+            ::google::protobuf::internal::WireFormatLite::PARSE,
+            "fastforward.FastForwardInfo.fmt"));
         } else {
           goto handle_unusual;
         }
@@ -309,6 +334,16 @@ void FastForwardInfo::SerializeWithCachedSizes(
     ::google::protobuf::internal::WireFormatLite::WriteInt32(2, this->speed(), output);
   }
 
+  // string fmt = 3;
+  if (this->fmt().size() > 0) {
+    ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
+      this->fmt().data(), static_cast<int>(this->fmt().length()),
+      ::google::protobuf::internal::WireFormatLite::SERIALIZE,
+      "fastforward.FastForwardInfo.fmt");
+    ::google::protobuf::internal::WireFormatLite::WriteStringMaybeAliased(
+      3, this->fmt(), output);
+  }
+
   if ((_internal_metadata_.have_unknown_fields() &&  ::google::protobuf::internal::GetProto3PreserveUnknownsDefault())) {
     ::google::protobuf::internal::WireFormat::SerializeUnknownFields(
         (::google::protobuf::internal::GetProto3PreserveUnknownsDefault()   ? _internal_metadata_.unknown_fields()   : _internal_metadata_.default_instance()), output);
@@ -339,6 +374,17 @@ void FastForwardInfo::SerializeWithCachedSizes(
     target = ::google::protobuf::internal::WireFormatLite::WriteInt32ToArray(2, this->speed(), target);
   }
 
+  // string fmt = 3;
+  if (this->fmt().size() > 0) {
+    ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
+      this->fmt().data(), static_cast<int>(this->fmt().length()),
+      ::google::protobuf::internal::WireFormatLite::SERIALIZE,
+      "fastforward.FastForwardInfo.fmt");
+    target =
+      ::google::protobuf::internal::WireFormatLite::WriteStringToArray(
+        3, this->fmt(), target);
+  }
+
   if ((_internal_metadata_.have_unknown_fields() &&  ::google::protobuf::internal::GetProto3PreserveUnknownsDefault())) {
     target = ::google::protobuf::internal::WireFormat::SerializeUnknownFieldsToArray(
         (::google::protobuf::internal::GetProto3PreserveUnknownsDefault()   ? _internal_metadata_.unknown_fields()   : _internal_metadata_.default_instance()), target);
@@ -361,6 +407,13 @@ size_t FastForwardInfo::ByteSizeLong() const {
     total_size += 1 +
       ::google::protobuf::internal::WireFormatLite::StringSize(
         this->url());
+  }
+
+  // string fmt = 3;
+  if (this->fmt().size() > 0) {
+    total_size += 1 +
+      ::google::protobuf::internal::WireFormatLite::StringSize(
+        this->fmt());
   }
 
   // int32 speed = 2;
@@ -403,6 +456,10 @@ void FastForwardInfo::MergeFrom(const FastForwardInfo& from) {
 
     url_.AssignWithDefault(&::google::protobuf::internal::GetEmptyStringAlreadyInited(), from.url_);
   }
+  if (from.fmt().size() > 0) {
+
+    fmt_.AssignWithDefault(&::google::protobuf::internal::GetEmptyStringAlreadyInited(), from.fmt_);
+  }
   if (from.speed() != 0) {
     set_speed(from.speed());
   }
@@ -433,6 +490,7 @@ void FastForwardInfo::Swap(FastForwardInfo* other) {
 void FastForwardInfo::InternalSwap(FastForwardInfo* other) {
   using std::swap;
   url_.Swap(&other->url_);
+  fmt_.Swap(&other->fmt_);
   swap(speed_, other->speed_);
   _internal_metadata_.Swap(&other->_internal_metadata_);
   swap(_cached_size_, other->_cached_size_);
