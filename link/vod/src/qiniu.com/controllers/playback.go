@@ -5,7 +5,6 @@ import (
 	"errors"
 	"io"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -147,13 +146,20 @@ func getPlaybackList(xl *xlog.Logger, segs []map[string]interface{}, mac *qbox.M
 	return playlist, nil
 }
 func getFastForwardStream(xl *xlog.Logger, params *requestParams, c *gin.Context, user *userInfo) error {
-	url := c.Request.URL.String()
-	fullUrl := "http://" + c.Request.Host + url
-
+	// remove speed fmt from url
+	url := c.Request.URL
+	query := url.Query()
+	query.Del("fmt")
+	query.Del("speed")
+	query.Del("token")
+	query.Del("e")
+	url.RawQuery = query.Encode()
+	fullUrl := "http://" + c.Request.Host + url.String()
 	req := new(pb.FastForwardInfo)
 	expire := time.Now().Add(time.Hour).Unix()
 	req.Url = getNewToken(fullUrl, expire, user)
 	req.Speed = params.speed
+	req.Fmt = params.fmt
 	ctx, cancel := context.WithCancel(context.Background())
 	r, err := fastForwardClint.GetTsStream(ctx, req)
 	defer cancel()
@@ -161,7 +167,12 @@ func getFastForwardStream(xl *xlog.Logger, params *requestParams, c *gin.Context
 		xl.Errorf("get TsStream error, errr =%#v", err)
 		return errors.New("get TsStream error")
 	}
-	c.Header("Content-Type", "video/mp4")
+	if params.fmt == "fmp4" {
+		c.Header("Content-Type", "video/mp4")
+	} else {
+		c.Header("Content-Type", "video/flv")
+	}
+	c.Header("Access-Control-Allow-Origin", "*")
 	c.Stream(func(w io.Writer) bool {
 		if ret, err := r.Recv(); err == nil {
 			w.Write(ret.Stream)
@@ -173,8 +184,7 @@ func getFastForwardStream(xl *xlog.Logger, params *requestParams, c *gin.Context
 }
 
 func getNewToken(origin string, expire int64, user *userInfo) string {
-	prefix := strings.Split(origin, "&speed")[0]
-	playbackBaseUrl := prefix + "&e=" + strconv.FormatInt(expire, 10)
+	playbackBaseUrl := origin + "&e=" + strconv.FormatInt(expire, 10)
 	// using uid password as ak/sk
 	mac := qbox.NewMac(user.ak, user.sk)
 	token := mac.Sign([]byte(playbackBaseUrl))
