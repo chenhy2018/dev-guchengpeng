@@ -14,7 +14,7 @@ import (
 type segInfo struct {
 	StartTime int64  `json:"starttime"`
 	EndTime   int64  `json:"endtime"`
-	Snap      string `json:"snap"`
+	Snapshot  string `json:"snapshot"`
 }
 
 func GetSegments(c *gin.Context) {
@@ -150,7 +150,7 @@ func filterSegs(xl *xlog.Logger, ret []map[string]interface{}, params *requestPa
 		seg := segInfo{
 			StartTime: starttime / 1000,
 			EndTime:   endtime / 1000,
-			Snap:      realUrl,
+			Snapshot:  realUrl,
 		}
 		segs = append(segs, seg)
 	}
