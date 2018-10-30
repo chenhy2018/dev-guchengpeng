@@ -20,7 +20,7 @@ using fastforward::FastForwardInfo;
 using fastforward::FastForwardStream;
 
 extern char *optarg;
-std::string version = "201809281044";
+std::string version = "201810291800";
 unsigned int fastfwd::global::nLogLevel = 4;
 int fastfwd::nStatPeriod = 10;
 
@@ -31,9 +31,10 @@ class FastForwardServiceImpl final : public FastForward::Service {
 
                 FastForwardStream ffs;
                 std::string szUrl = request->url();
+                std::string szFmt = request->fmt();
                 int nSpeed = reinterpret_cast<int>(request->speed());
                 auto pStat = Singular<fastfwd::Statistic>::Instance();
-                auto pPumper = std::make_unique<fastfwd::StreamPumper>(szUrl, nSpeed, 16384);
+                auto pPumper = std::make_unique<fastfwd::StreamPumper>(szUrl, nSpeed, szFmt, 16384);
 
                 std::vector<char> chBuffer;
                 while (pPumper->Pump(chBuffer, 16384) == 0) {

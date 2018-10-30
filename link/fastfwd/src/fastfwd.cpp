@@ -244,12 +244,24 @@ void Statistic::GetStat(OUT int& _nInBytes,OUT int& _nOutBytes, OUT int& _nCount
 //
 
 FileSink::FileSink(IN const std::shared_ptr<SharedQueue<std::vector<char>>> _pPool,
-                   IN int _nBlockSize, IN int _nXspeed)
+                   IN int _nBlockSize, IN int _nXspeed, IN std::string _fmt)
         :pPool_(_pPool),
          nBlockSize_(_nBlockSize),
          nXspeed_(_nXspeed),
          probeQ_(100)
 {
+        if (_fmt == "flv") {
+                path_ = "output.flv";
+                nTimeBase_ = FASTFWD_FLV_TIME_BASE;
+
+        } else if (_fmt == "fmp4") {
+                path_ = "output.mp4";
+                nTimeBase_ = FASTFWD_FMP4_TIME_BASE;
+        } else if (_fmt == "ts") {
+                path_ = "output.ts";
+                nTimeBase_ = FASTFWD_TS_TIME_BASE;
+        }
+        nMinGOP_ = nTimeBase_ * 8;
 }
 
 FileSink::~FileSink()
@@ -273,8 +285,6 @@ FileSink::~FileSink()
 
 int FileSink::Write(IN const std::shared_ptr<MediaPacket>& _pPacket)
 {
-        path_ = "output.mp4";
-
         // initialize contexts
         if (Init() == false) {
                 return -1;
@@ -409,7 +419,16 @@ bool FileSink::Init()
                 pMemBuffer_ = (uint8_t*)av_malloc(nBlockSize_);
                 pAvIoContext_ = avio_alloc_context(pMemBuffer_, nBlockSize_, 1, this, nullptr, WriteFunction, nullptr);
                 pOutputContext_->pb = pAvIoContext_;
-                auto pFormat = av_guess_format("mp4", nullptr, nullptr);
+
+                AVOutputFormat* pFormat = nullptr;
+                if (path_ == "output.flv") {
+                        pFormat = av_guess_format("flv", nullptr, nullptr);
+                } else if (path_ == "output.mp4") {
+                        pFormat = av_guess_format("mp4", nullptr, nullptr);
+                } else if (path_ == "output.ts") {
+                        pFormat = av_guess_format("mpegts", nullptr, nullptr);
+                }
+
                 if (pFormat == nullptr) {
                         Error("format not found");
                         return false;
@@ -462,8 +481,9 @@ int FileSink::AddStream(IN const std::shared_ptr<MediaPacket>& _pPacket)
 bool FileSink::WriteHeader()
 {
         AVDictionary *pOption = nullptr;
-        av_dict_set(&pOption, "movflags", "frag_keyframe+empty_moov", 0);
-
+        if (path_ == "output.mp4") {
+                av_dict_set(&pOption, "movflags", "frag_keyframe+empty_moov", 0);
+        }
         // write file header according to the file suffix
         auto nStatus = avformat_write_header(pOutputContext_, &pOption);
         if (nStatus < 0) {
@@ -501,7 +521,7 @@ int AvReceiver::AvInterruptCallback(void* _pContext)
         return 0;
 }
 
-int AvReceiver::Receive(IN const std::string& _url, IN int _nXspeed, IN PacketHandlerType& _callback)
+int AvReceiver::Receive(IN const std::string& _url, IN int _nXspeed, IN std::string _fmt, IN PacketHandlerType& _callback)
 {
         if (pAvContext_ != nullptr) {
                 Warn("internal: reuse of Receiver is not recommended");
@@ -575,7 +595,15 @@ int AvReceiver::Receive(IN const std::string& _url, IN int _nXspeed, IN PacketHa
                 // if avformat detects another stream during transport, we have to ignore the packets of the stream
                 if (static_cast<size_t>(avPacket.stream_index) < streams_.size()) {
                         // we need all PTS/DTS use milliseconds, sometimes they are macroseconds such as TS streams
-                        AVRational tb = AVRational{1, FASTFWD_TIME_BASE};
+                        AVRational tb;
+                        if (_fmt == "flv") {
+                                tb = AVRational{1, FASTFWD_FLV_TIME_BASE};
+                        } else if (_fmt == "fmp4") {
+                                tb = AVRational{1, FASTFWD_FMP4_TIME_BASE};
+                        } else if (_fmt == "ts") {
+                                tb = AVRational{1, FASTFWD_TS_TIME_BASE};
+                        }
+
                         AVRounding r = static_cast<AVRounding>(AV_ROUND_NEAR_INF|AV_ROUND_PASS_MINMAX);
                         avPacket.dts = av_rescale_q_rnd(avPacket.dts, streams_[avPacket.stream_index].pAvStream->time_base, tb, r);
                         avPacket.pts = av_rescale_q_rnd(avPacket.pts, streams_[avPacket.stream_index].pAvStream->time_base, tb, r);
@@ -635,9 +663,10 @@ bool AvReceiver::EmulateFramerate(IN int64_t _nPts, OUT StreamInfo& _stream, IN 
 // StreamPumper
 //
 
-StreamPumper::StreamPumper(IN const std::string& _url, IN int _nXspeed, IN int _nBlockSize)
+StreamPumper::StreamPumper(IN const std::string& _url, IN int _nXspeed, IN const std::string& _fmt, IN int _nBlockSize)
         :url_(_url),
          nXspeed_(_nXspeed),
+         fmt_(_fmt),
          nBlockSize_(_nBlockSize)
 {
         std::call_once(avformatInit_, [](){
@@ -650,8 +679,8 @@ StreamPumper::StreamPumper(IN const std::string& _url, IN int _nXspeed, IN int _
 
         // validate x speed
         auto bFound = false;
-        std::vector<int> validx{2, 4, 8, 16, 32};
-        for (auto& n : validx) {
+        std::vector<int> validSpeed{2, 4, 8, 16, 32};
+        for (auto& n : validSpeed) {
                 if (n == _nXspeed) {
                         bFound = true;
                         break;
@@ -659,6 +688,20 @@ StreamPumper::StreamPumper(IN const std::string& _url, IN int _nXspeed, IN int _
         }
         if (!bFound) {
                 nXspeed_ = fastfwd::x2;                
+        }
+
+        // validate format
+        bFound = false;
+        std::vector<std::string> validFmt{"fmp4", "flv", "ts"};
+        for (auto& s : validFmt) {
+            if (s == _fmt) {
+                bFound = true;
+                break;
+            }
+        }
+
+        if(!bFound) {
+            fmt_ = "flv";
         }
 
         // validate block size
@@ -677,7 +720,7 @@ StreamPumper::~StreamPumper()
 
 void StreamPumper::StartPumper()
 {
-        pSink_ = std::make_unique<FileSink>(pPool_, nBlockSize_, nXspeed_);
+        pSink_ = std::make_unique<FileSink>(pPool_, nBlockSize_, nXspeed_, fmt_);
         pReceiver_ = std::make_unique<AvReceiver>();
 
         auto pumper = [this]() {
@@ -699,7 +742,7 @@ void StreamPumper::StartPumper()
                 };
 
                 while (bPumperStopped_.load() != true) {
-                        auto nStatus = pReceiver_->Receive(url_, nXspeed_, recv);
+                        auto nStatus = pReceiver_->Receive(url_, nXspeed_, fmt_, recv);
                         if (nStatus == AVERROR_EOF) {
                                 nStatus_.store(StreamPumper::eof);
                         } else {
