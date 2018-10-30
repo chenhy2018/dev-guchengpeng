@@ -87,7 +87,9 @@ extern "C"
         } while(0)
 
 
-#define FASTFWD_TIME_BASE 90000
+#define FASTFWD_FMP4_TIME_BASE 90000
+#define FASTFWD_FLV_TIME_BASE 1000
+#define FASTFWD_TS_TIME_BASE 1000
 
 namespace fastfwd {
         namespace global
@@ -214,8 +216,8 @@ namespace fastfwd {
                 AVCodecContext* pAvCodecContext_ = nullptr;
 
                 // save following fields seperately
-                StreamType stream_;
-                CodecType codec_;
+                StreamType stream_ = STREAM_VIDEO;
+                CodecType codec_ = CODEC_H264;
 
                 // video specific
                 int nWidth_ = -1, nHeight_ = -1;
@@ -254,7 +256,7 @@ namespace fastfwd {
         public:
                 AvReceiver();
                 ~AvReceiver();
-                int Receive(IN const std::string& url, IN int nXspeed, IN PacketHandlerType& callback);
+                int Receive(IN const std::string& url, IN int nXspeed, IN std::string fmt, IN PacketHandlerType& callback);
         private:
                 struct StreamInfo;
                 static int AvInterruptCallback(void* pContext);
@@ -276,7 +278,7 @@ namespace fastfwd {
         class FileSink
         {
         public:
-                FileSink(IN const std::shared_ptr<SharedQueue<std::vector<char>>> pPool, IN int nBlockSize, IN int nXspeed);
+                FileSink(IN const std::shared_ptr<SharedQueue<std::vector<char>>> pPool, IN int nBlockSize, IN int nXspeed, IN std::string fmt);
                 ~FileSink();
                 int Write(IN const std::shared_ptr<MediaPacket>& pPacket);
         private:
@@ -289,6 +291,7 @@ namespace fastfwd {
                 std::shared_ptr<SharedQueue<std::vector<char>>> pPool_;
                 int nBlockSize_;
                 int nXspeed_;
+                int nTimeBase_;
 
                 AVFormatContext* pOutputContext_ = nullptr;
                 AVBSFContext *pAacBsf_ = nullptr;
@@ -303,7 +306,7 @@ namespace fastfwd {
                 size_t nCount_ = 0;
 
                 bool bIsFirstPkt_ = true;
-                long long nMinGOP_ = FASTFWD_TIME_BASE * 8;
+                long long nMinGOP_;
                 long long nLastPtsOriginal_ = 0;
                 long long nLastPtsFitted_ = 0;
 
@@ -318,7 +321,7 @@ namespace fastfwd {
                 static const int eof = -5;
                 static const int econn = -10;
         public:
-                StreamPumper(IN const std::string& url, IN int nXspeed = fastfwd::x2, IN int nBlockSize = 1024);
+                StreamPumper(IN const std::string& url, IN int nXspeed = fastfwd::x2, IN const std::string& fmt = "flv", IN int nBlockSize = 1024);
                 ~StreamPumper();
                 int Pump(OUT std::vector<char>& stream, IN int nTimeout);
         private:
@@ -328,6 +331,7 @@ namespace fastfwd {
                 // parameters
                 std::string url_;
                 int nXspeed_;
+                std::string fmt_;
                 int nBlockSize_;
 
                 // pumper thread

@@ -49,6 +49,11 @@ func UploadTs(c *gin.Context) {
 
 	key := kodoData.Key
 	ids := strings.Split(key, "/")
+	if ids[0] != "ts" {
+		c.JSON(200, "")
+		return
+	}
+
 	// key  =  ts/ua_id/start_ts/fragment_start_ts/expiry.ts
 	if len(ids) < 5 {
 		xl.Errorf("bad file name, file name = %s", key)

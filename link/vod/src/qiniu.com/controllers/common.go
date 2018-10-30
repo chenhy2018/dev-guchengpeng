@@ -59,6 +59,7 @@ type requestParams struct {
 	regex       string
 	exact       bool
 	speed       int32
+	fmt         string
 }
 type userInfo struct {
 	uid uint32
@@ -214,6 +215,7 @@ func ParseRequest(c *gin.Context, xl *xlog.Logger) (*requestParams, error) {
 	regex := c.DefaultQuery("regex", "")
 	exact := c.DefaultQuery("exact", "false")
 	speed := c.DefaultQuery("speed", "1")
+	fmt := c.Query("fmt")
 
 	if strings.Contains(uaid, ".m3u8") {
 		uaid = strings.Split(uaid, ".")[0]
@@ -246,7 +248,9 @@ func ParseRequest(c *gin.Context, xl *xlog.Logger) (*requestParams, error) {
 	if err != nil || !isValidSpeed(speedT) {
 		return nil, errors.New("Parse speed failed")
 	}
-
+	if fmt != "fmp4" && fmt != "flv" && fmt != "" {
+		return nil, errors.New("fmt error, it should be flv or fmp4")
+	}
 	params := &requestParams{
 		uaid:        uaid,
 		from:        fromT * 1000,
@@ -260,6 +264,7 @@ func ParseRequest(c *gin.Context, xl *xlog.Logger) (*requestParams, error) {
 		regex:       regex,
 		exact:       exactT,
 		speed:       int32(speedT),
+		fmt:         fmt,
 	}
 
 	return params, nil

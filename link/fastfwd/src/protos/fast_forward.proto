@@ -10,6 +10,7 @@ service FastForward {
 message FastForwardInfo {
         string url = 1;
         int32  speed= 2;
+        string fmt = 3;
 }
 
 message FastForwardStream {

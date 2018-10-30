@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"errors"
+	"strconv"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -11,8 +12,9 @@ import (
 )
 
 type segInfo struct {
-	StartTime int64 `json:"starttime"`
-	EndTime   int64 `json:"endtime"`
+	StartTime int64  `json:"starttime"`
+	EndTime   int64  `json:"endtime"`
+	Snapshot  string `json:"snapshot"`
 }
 
 func GetSegments(c *gin.Context) {
@@ -74,8 +76,22 @@ func GetSegments(c *gin.Context) {
 		})
 		return
 	}
+	domain, err := getDomain(xl, bucket, user)
+	if err != nil {
+		xl.Errorf("getDomain error, error =  %#v", err)
+		c.JSON(500, gin.H{"error": "Service Internal Error"})
+		return
+	}
+	if domain == "" {
+		xl.Errorf("bucket is not correct, err = %#v", err)
+		c.JSON(403, gin.H{
+			"error": "bucket is not correct",
+		})
+		return
+	}
 
-	segs, err := filterSegs(ret, params)
+	domain = "http://" + domain
+	segs, err := filterSegs(xl, ret, params, domain, mac)
 	if err != nil {
 		xl.Error("parse seg start/end failed")
 		c.JSON(500, gin.H{
@@ -103,7 +119,7 @@ func getFristTsAfterFrom(xl *xlog.Logger, from, to int64, bucket, uaid string, m
 	return newFrom
 }
 
-func filterSegs(ret []map[string]interface{}, params *requestParams) (segs []segInfo, err error) {
+func filterSegs(xl *xlog.Logger, ret []map[string]interface{}, params *requestParams, domain string, mac *qbox.Mac) (segs []segInfo, err error) {
 	for _, v := range ret {
 		starttime, ok := v[models.SEGMENT_ITEM_START_TIME].(int64)
 		if !ok {
@@ -129,9 +145,13 @@ func filterSegs(ret []map[string]interface{}, params *requestParams) (segs []seg
 		if (params.to >= starttime) && (params.to <= endtime) {
 			endtime = params.to
 		}
-
-		seg := segInfo{StartTime: starttime / 1000,
-			EndTime: endtime / 1000}
+		filename := "frame" + "/" + params.uaid + "/" + strconv.FormatInt(starttime, 10) + "/" + strconv.FormatInt(starttime, 10) + ".jpeg"
+		realUrl := GetUrlWithDownLoadToken(xl, domain, filename, 0, mac)
+		seg := segInfo{
+			StartTime: starttime / 1000,
+			EndTime:   endtime / 1000,
+			Snapshot:  realUrl,
+		}
 		segs = append(segs, seg)
 	}
 	return
