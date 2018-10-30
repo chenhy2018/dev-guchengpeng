@@ -124,7 +124,7 @@ func TestRegisterNamespace(t *testing.T) {
 	guard2.Unpatch()
 	// get user info failed. return 500
 	guard4 := monkey.Patch(getUserInfo, func(xl *xlog.Logger, req *http.Request) (*userInfo, error) {
-		return &userInfo{}, errors.New("get user  info error")
+		return &userInfo{}, errors.New("get user info error")
 	})
 	body = namespacebody{
 		Bucket:    "ipcamera1",

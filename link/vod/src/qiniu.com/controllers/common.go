@@ -47,17 +47,18 @@ func FFGrpcClientInit(conf *system.GrpcConf) {
 }
 
 type requestParams struct {
-	uaid      string
-	from      int64
-	to        int64
-	expire    int64
-	token     string
-	limit     int
-	marker    string
-	namespace string
-	regex     string
-	exact     bool
-	speed     int32
+	uaid        string
+	from        int64
+	to          int64
+	expire      int64
+	token       string
+	limit       int
+	marker      string
+	namespace   string
+	namespaceUa string
+	regex       string
+	exact       bool
+	speed       int32
 }
 type userInfo struct {
 	uid uint32
@@ -203,6 +204,7 @@ func ParseRequest(c *gin.Context, xl *xlog.Logger) (*requestParams, error) {
 	*/
 	uaid := c.Param("uaid")
 	namespace := c.Param("namespace")
+	namespaceUa := c.DefaultQuery("namespace", "")
 	from := c.DefaultQuery("from", "0")
 	to := c.DefaultQuery("to", "0")
 	expire := c.DefaultQuery("e", "0")
@@ -246,17 +248,18 @@ func ParseRequest(c *gin.Context, xl *xlog.Logger) (*requestParams, error) {
 	}
 
 	params := &requestParams{
-		uaid:      uaid,
-		from:      fromT * 1000,
-		to:        toT * 1000,
-		expire:    expireT * 1000,
-		token:     token,
-		limit:     int(limitT),
-		marker:    marker,
-		namespace: namespace,
-		regex:     regex,
-		exact:     exactT,
-		speed:     int32(speedT),
+		uaid:        uaid,
+		from:        fromT * 1000,
+		to:          toT * 1000,
+		expire:      expireT * 1000,
+		token:       token,
+		limit:       int(limitT),
+		marker:      marker,
+		namespace:   namespace,
+		namespaceUa: namespaceUa,
+		regex:       regex,
+		exact:       exactT,
+		speed:       int32(speedT),
 	}
 
 	return params, nil

@@ -39,7 +39,7 @@ func (m *UaModel) Init() error {
 
 func (m *UaModel) Register(xl *xlog.Logger, req UaInfo) error {
 	/*
-	   db.ua.update( {uaid: id, namespace: space, xxx}, {"$set": {"namespace": space, "password": password}},
+	   db.ua.update( {uaid: id, uid: uid, xxx}, {"$set": {"namespace": space, "password": password}},
 	   { upsert: true })
 	*/
 	err := db.WithCollection(
@@ -47,8 +47,8 @@ func (m *UaModel) Register(xl *xlog.Logger, req UaInfo) error {
 		func(c *mgo.Collection) error {
 			_, err := c.Upsert(
 				bson.M{
-					UA_ITEM_UAID:      req.UaId,
-					UA_ITEM_NAMESPACE: req.Namespace,
+					UA_ITEM_UID:  req.Uid,
+					UA_ITEM_UAID: req.UaId,
 				},
 				bson.M{
 					"$set": bson.M{
@@ -58,6 +58,10 @@ func (m *UaModel) Register(xl *xlog.Logger, req UaInfo) error {
 						ITEM_CREATE_TIME:  time.Now().Unix(),
 						UA_ITEM_NAMESPACE: req.Namespace,
 						ITEM_UPDATA_TIME:  time.Now().Unix(),
+						UA_ITEM_VOD:       req.Vod,
+						UA_ITEM_LIVE:      req.Live,
+						UA_ITEM_ONLINE:    req.Online,
+						UA_ITEM_EXPIRE:    req.Expire,
 					},
 				},
 			)
@@ -72,7 +76,7 @@ func (m *UaModel) Register(xl *xlog.Logger, req UaInfo) error {
 
 func (m *UaModel) Delete(xl *xlog.Logger, cond map[string]interface{}) error {
 	/*
-	   db.ua.remove({space: namespace, uaid: id})
+	   db.ua.remove({"uid": uid, uaid: id})
 	*/
 	return db.WithCollection(
 		UA_COL,
@@ -90,19 +94,32 @@ type UaInfo struct {
 	Password  string `bson:"password"   json:"password"` //options
 	Namespace string `bson:"namespace"  json:"namespace"`
 	CreateAt  int64  `bson:"createdAt"  json:"createdAt"`
-	UpdatedAt int64  `bson:"updateAt"   json:"updateAt"`
+	UpdatedAt int64  `bson:"updatedAt"  json:"updatedAt"`
+	Vod       bool   `bson:"vod"        json:"vod"`
+	Live      bool   `bson:"live"       json:"live"`
+	Online    bool   `bson:"online"     json:"online"`
+	Expire    int    `bson:"expire"     json:"expire"`
 }
 
-func (m *UaModel) GetUaInfos(xl *xlog.Logger, limit int, mark, namespace, category, like string) ([]UaInfo, string, error) {
+func (m *UaModel) GetUaInfos(xl *xlog.Logger, limit int, mark, uid, namespace, category, like string) ([]UaInfo, string, error) {
 
 	/*
-	   db.ua.find({"namespace": namespace, {category: {"$regex": "*like*"}},}
+	   db.ua.find({"uid": uid, {category: {"$regex": "*like*"}},}
 	   ).sort({"date":1}).limit(limit),skip(mark)
 	*/
+	var query = bson.M{}
 	// query by keywords
-	query := bson.M{
-		UA_ITEM_NAMESPACE: namespace,
-		category:          bson.M{"$regex": ".*" + like + ".*"},
+	if namespace != "" {
+		query = bson.M{
+			UA_ITEM_UID:       uid,
+			UA_ITEM_NAMESPACE: namespace,
+			category:          bson.M{"$regex": ".*" + like + ".*"},
+		}
+	} else {
+		query = bson.M{
+			UA_ITEM_UID: uid,
+			category:    bson.M{"$regex": ".*" + like + ".*"},
+		}
 	}
 	// direct to specific page
 	nextMark := ""
@@ -141,14 +158,14 @@ func (m *UaModel) GetUaInfos(xl *xlog.Logger, limit int, mark, namespace, catego
 	return r, nextMark, nil
 }
 
-func (m *UaModel) GetUaInfo(xl *xlog.Logger, namespace, uaid string) ([]UaInfo, error) {
+func (m *UaModel) GetUaInfo(xl *xlog.Logger, uid, uaid string) ([]UaInfo, error) {
 	/*
-	   db.ua.find({namespace: namespace, uaid: id})
+		db.ua.find({uid: uid, uaid: id})
 	*/
 	// query by keywords
 	query := bson.M{
-		UA_ITEM_UAID:      uaid,
-		UA_ITEM_NAMESPACE: namespace,
+		UA_ITEM_UID:  uid,
+		UA_ITEM_UAID: uaid,
 	}
 
 	// query
@@ -169,17 +186,17 @@ func (m *UaModel) GetUaInfo(xl *xlog.Logger, namespace, uaid string) ([]UaInfo, 
 	return r, nil
 }
 
-func (m *UaModel) UpdateUa(xl *xlog.Logger, namespace, uaid string, info UaInfo) error {
+func (m *UaModel) UpdateUa(xl *xlog.Logger, uid, uaid string, info UaInfo) error {
 	/*
-	   db.ua.update({namespace: space, uaid: uaid}, bson.M{"$set":{"namespace": space, "password": password}}),
+	   db.ua.update({uid: uid, uaid: uaid}, bson.M{"$set":{"namespace": space, "password": password}}),
 	*/
 	return db.WithCollection(
 		UA_COL,
 		func(c *mgo.Collection) error {
 			return c.Update(
 				bson.M{
-					UA_ITEM_NAMESPACE: namespace,
-					UA_ITEM_UAID:      uaid,
+					UA_ITEM_UID:  uid,
+					UA_ITEM_UAID: uaid,
 				},
 				bson.M{
 					"$set": bson.M{
@@ -188,6 +205,10 @@ func (m *UaModel) UpdateUa(xl *xlog.Logger, namespace, uaid string, info UaInfo)
 						UA_ITEM_PASSWORD:  info.Password,
 						ITEM_UPDATA_TIME:  time.Now().Unix(),
 						UA_ITEM_NAMESPACE: info.Namespace,
+						UA_ITEM_VOD:       info.Vod,
+						UA_ITEM_LIVE:      info.Live,
+						UA_ITEM_ONLINE:    info.Online,
+						UA_ITEM_EXPIRE:    info.Expire,
 					},
 				},
 			)
@@ -195,7 +216,7 @@ func (m *UaModel) UpdateUa(xl *xlog.Logger, namespace, uaid string, info UaInfo)
 	)
 }
 
-func (m *UaModel) UpdateNamespace(xl *xlog.Logger, namespace, uaid, newNamespace string) error {
+func (m *UaModel) UpdateNamespace(xl *xlog.Logger, uid, namespace, uaid, newNamespace string) error {
 	/*
 	   db.ua.update({namespace: space, uaid: uaid}, bson.M{"$set":{"namespace": space}}),
 	*/
@@ -204,6 +225,7 @@ func (m *UaModel) UpdateNamespace(xl *xlog.Logger, namespace, uaid, newNamespace
 		func(c *mgo.Collection) error {
 			return c.Update(
 				bson.M{
+					UA_ITEM_UID:       uid,
 					UA_ITEM_NAMESPACE: namespace,
 					UA_ITEM_UAID:      uaid,
 				},
@@ -211,6 +233,98 @@ func (m *UaModel) UpdateNamespace(xl *xlog.Logger, namespace, uaid, newNamespace
 					"$set": bson.M{
 						ITEM_UPDATA_TIME:  time.Now().Unix(),
 						UA_ITEM_NAMESPACE: newNamespace,
+					},
+				},
+			)
+		},
+	)
+}
+
+func (m *UaModel) UpdateVod(xl *xlog.Logger, uid, uaid string, IsEnable bool) error {
+	/*
+	   db.ua.update({namespace: space, uaid: uaid}, bson.M{"$set":{"vod": IsEnable}}),
+	*/
+	return db.WithCollection(
+		UA_COL,
+		func(c *mgo.Collection) error {
+			return c.Update(
+				bson.M{
+					UA_ITEM_UID:  uid,
+					UA_ITEM_UAID: uaid,
+				},
+				bson.M{
+					"$set": bson.M{
+						ITEM_UPDATA_TIME: time.Now().Unix(),
+						UA_ITEM_VOD:      IsEnable,
+					},
+				},
+			)
+		},
+	)
+}
+
+func (m *UaModel) UpdateLive(xl *xlog.Logger, uid, uaid string, IsEnable bool) error {
+	/*
+	   db.ua.update({uid: uid, uaid: uaid}, bson.M{"$set":{"vod": IsEnable}}),
+	*/
+	return db.WithCollection(
+		UA_COL,
+		func(c *mgo.Collection) error {
+			return c.Update(
+				bson.M{
+					UA_ITEM_UID:  uid,
+					UA_ITEM_UAID: uaid,
+				},
+				bson.M{
+					"$set": bson.M{
+						ITEM_UPDATA_TIME: time.Now().Unix(),
+						UA_ITEM_LIVE:     IsEnable,
+					},
+				},
+			)
+		},
+	)
+}
+
+func (m *UaModel) UpdateOnline(xl *xlog.Logger, uid, uaid string, IsOnline bool) error {
+	/*
+	   db.ua.update({uid: uid, uaid: uaid}, bson.M{"$set":{"online": IsOnline}}),
+	*/
+	return db.WithCollection(
+		UA_COL,
+		func(c *mgo.Collection) error {
+			return c.Update(
+				bson.M{
+					UA_ITEM_UID:  uid,
+					UA_ITEM_UAID: uaid,
+				},
+				bson.M{
+					"$set": bson.M{
+						ITEM_UPDATA_TIME: time.Now().Unix(),
+						UA_ITEM_ONLINE:   IsOnline,
+					},
+				},
+			)
+		},
+	)
+}
+
+func (m *UaModel) UpdateExpire(xl *xlog.Logger, uid, uaid string, expire int) error {
+	/*
+	   db.ua.update({uid: uid, uaid: uaid}, bson.M{"$set":{"expire": expire}}),
+	*/
+	return db.WithCollection(
+		UA_COL,
+		func(c *mgo.Collection) error {
+			return c.Update(
+				bson.M{
+					UA_ITEM_UID:  uid,
+					UA_ITEM_UAID: uaid,
+				},
+				bson.M{
+					"$set": bson.M{
+						ITEM_UPDATA_TIME: time.Now().Unix(),
+						UA_ITEM_EXPIRE:   expire,
 					},
 				},
 			)

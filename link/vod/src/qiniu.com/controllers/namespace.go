@@ -219,12 +219,12 @@ func updateNamespace(xl *xlog.Logger, uid, space, newSpace string) error {
 		model := models.UaModel{}
 		mark := ""
 		for {
-			uas, nextmark, err := model.GetUaInfos(xl, 0, mark, space, models.UA_ITEM_UAID, "")
+			uas, nextmark, err := model.GetUaInfos(xl, 0, mark, uid, space, models.UA_ITEM_UAID, "")
 			if err != nil {
 				return err
 			}
 			for i := 0; i < len(uas); i++ {
-				model.UpdateNamespace(xl, uas[i].Namespace, uas[i].UaId, newSpace)
+				model.UpdateNamespace(xl, uid, uas[i].Namespace, uas[i].UaId, newSpace)
 			}
 			if nextmark != "" {
 				mark = nextmark

@@ -18,9 +18,13 @@ type uabody struct {
 	CreatedAt int64  `json:"createdAt"`
 	UpdatedAt int64  `json:"updatedAt"`
 	Password  string `json:"password"`
+	Vod       bool   `json:"vod"`
+	Live      bool   `json:"live"`
+	Online    bool   `json:"online"`
+	Expire    int    `json:"expire"`
 }
 
-// sample requset url = /v1/namespaces/<Namespace>/uas
+// sample requset url = /v1/uas
 func RegisterUa(c *gin.Context) {
 	xl := xlog.New(c.Writer, c.Request)
 	params, err := ParseRequest(c, xl)
@@ -53,11 +57,15 @@ func RegisterUa(c *gin.Context) {
 	ua := models.UaInfo{
 		Uid:       getUid(user.uid),
 		UaId:      params.uaid,
-		Namespace: params.namespace,
+		Namespace: uaData.Namespace,
 		Password:  uaData.Password,
+		Vod:       uaData.Vod,
+		Live:      uaData.Live,
+		Online:    uaData.Online,
+		Expire:    uaData.Expire,
 	}
 	model := models.NamespaceModel{}
-	r, err := model.GetNamespaceInfo(xl, getUid(user.uid), params.namespace)
+	r, err := model.GetNamespaceInfo(xl, getUid(user.uid), uaData.Namespace)
 	if err != nil {
 		xl.Errorf("get namespace error, error =%#v", err)
 		c.JSON(500, gin.H{"error": "Service Internal Error"})
@@ -71,7 +79,7 @@ func RegisterUa(c *gin.Context) {
 		return
 	}
 
-	info, err := UaMod.GetUaInfo(xl, params.namespace, params.uaid)
+	info, err := UaMod.GetUaInfo(xl, uaData.Namespace, params.uaid)
 	if err != nil {
 		xl.Errorf("get ua info failed")
 		c.JSON(500, gin.H{
@@ -99,7 +107,7 @@ func RegisterUa(c *gin.Context) {
 	}
 }
 
-// sample requset url = /v1/namespaces/<Namespace>/uas/<Encodedua>
+// sample requset url = /v1/uas/<Encodedua>
 func DeleteUa(c *gin.Context) {
 	xl := xlog.New(c.Writer, c.Request)
 	params, err := ParseRequest(c, xl)
@@ -110,11 +118,17 @@ func DeleteUa(c *gin.Context) {
 		})
 		return
 	}
-	cond := map[string]interface{}{
-		models.UA_ITEM_NAMESPACE: params.namespace,
-		models.UA_ITEM_UAID:      params.uaid,
+	user, err := getUserInfo(xl, c.Request)
+	if err != nil {
+		xl.Errorf("get user Info failed%v", err)
+		c.JSON(500, gin.H{"error": err.Error()})
+		return
 	}
-	info, err := UaMod.GetUaInfo(xl, params.namespace, params.uaid)
+	cond := map[string]interface{}{
+		models.UA_ITEM_UID:  getUid(user.uid),
+		models.UA_ITEM_UAID: params.uaid,
+	}
+	info, err := UaMod.GetUaInfo(xl, getUid(user.uid), params.uaid)
 	if err != nil {
 		xl.Errorf("get use info error, error =%#v", err)
 		c.JSON(500, gin.H{"error": "Service Internal Error"})
@@ -139,7 +153,7 @@ func DeleteUa(c *gin.Context) {
 	}
 }
 
-// sample requset url = /v1/namespaces/<Namespace>/uas/<Encodedua>
+// sample requset url = /v1/uas/<Encodedua>
 func UpdateUa(c *gin.Context) {
 	xl := xlog.New(c.Writer, c.Request)
 	params, err := ParseRequest(c, xl)
@@ -151,8 +165,37 @@ func UpdateUa(c *gin.Context) {
 		return
 	}
 
+	user, err := getUserInfo(xl, c.Request)
+	if err != nil {
+		xl.Errorf("get user Info failed %v", err)
+		c.JSON(500, gin.H{"error": err.Error()})
+		return
+	}
+
+	uaInfo, err := UaMod.GetUaInfo(xl, getUid(user.uid), params.uaid)
+	if err != nil {
+		xl.Errorf("get ua info error, error =  %#v", err)
+		c.JSON(400, gin.H{"error =  %#v": "err"})
+		return
+	}
+	if len(uaInfo) == 0 {
+		xl.Errorf("ua is not correct")
+		c.JSON(400, gin.H{
+			"error": "ua is not correct",
+		})
+		return
+	}
 	body, err := ioutil.ReadAll(c.Request.Body)
-	var uaData uabody
+	uaData := uabody{
+		Uaid:      uaInfo[0].UaId,
+		Namespace: uaInfo[0].Namespace,
+		Password:  uaInfo[0].Password,
+		Vod:       uaInfo[0].Vod,
+		Live:      uaInfo[0].Live,
+		Online:    uaInfo[0].Online,
+		Expire:    uaInfo[0].Expire,
+	}
+
 	err = json.Unmarshal(body, &uaData)
 	if err != nil {
 		xl.Errorf("parse request body failed, body = %#v", body)
@@ -161,23 +204,19 @@ func UpdateUa(c *gin.Context) {
 		})
 		return
 	}
-
-	user, err := getUserInfo(xl, c.Request)
-	if err != nil {
-		xl.Errorf("get user Info failed%v", err)
-		c.JSON(500, gin.H{"error": err.Error()})
-		return
-	}
-
 	ua := models.UaInfo{
 		Uid:       getUid(user.uid),
 		UaId:      uaData.Uaid,
 		Namespace: uaData.Namespace,
 		Password:  uaData.Password,
+		Vod:       uaData.Vod,
+		Live:      uaData.Live,
+		Online:    uaData.Online,
+		Expire:    uaData.Expire,
 	}
 
 	model := models.NamespaceModel{}
-	r, err := model.GetNamespaceInfo(xl, getUid(user.uid), params.namespace)
+	r, err := model.GetNamespaceInfo(xl, getUid(user.uid), uaData.Namespace)
 	if err != nil {
 		xl.Errorf("namespace is not correct")
 		c.JSON(500, gin.H{
@@ -193,46 +232,7 @@ func UpdateUa(c *gin.Context) {
 		return
 	}
 
-	if ua.UaId == "" {
-		ua.UaId = params.uaid
-	}
-
-	if ua.Namespace == "" {
-		ua.Namespace = params.namespace
-	}
-
-	info, err := UaMod.GetUaInfo(xl, params.namespace, params.uaid)
-	if err != nil {
-		xl.Errorf("get ua info error, error =%#v", err)
-		c.JSON(500, gin.H{"error": "Service Internal Error"})
-		return
-	}
-	if len(info) == 0 {
-		xl.Errorf("ua is not correct")
-		c.JSON(400, gin.H{
-			"error": "ua is not correct",
-		})
-		return
-	}
-
-	if ua.Password == "" {
-		ua.Password = info[0].Password
-	}
-
-	info, err = UaMod.GetUaInfo(xl, ua.Namespace, ua.UaId)
-	if err != nil {
-		xl.Errorf("get ua info error, error =%#v", err)
-		c.JSON(500, gin.H{"error": "Service Internal Error"})
-		return
-	}
-	if len(info) != 0 {
-		xl.Errorf("ua is exist")
-		c.JSON(400, gin.H{
-			"error": "ua is exist",
-		})
-		return
-	}
-	err = UaMod.UpdateUa(xl, params.namespace, params.uaid, ua)
+	err = UaMod.UpdateUa(xl, getUid(user.uid), params.uaid, ua)
 	if err != nil {
 		xl.Errorf("Update falied error = %#v", err.Error())
 		c.JSON(500, gin.H{"error": "Service Internal Error"})
@@ -242,7 +242,7 @@ func UpdateUa(c *gin.Context) {
 	}
 }
 
-// sample requset url = /v1/namespaces/<Namespace>/uas?regex=<Regex>&limit=<Limit>&marker=<Marker>&exact=<Exact>
+// sample requset url = /v1/uas?regex=<Regex>&Namespace=<Namespace>&limit=<Limit>&marker=<Marker>&exact=<Exact>
 func GetUaInfo(c *gin.Context) {
 	xl := xlog.New(c.Writer, c.Request)
 	params, err := ParseRequest(c, xl)
@@ -253,13 +253,21 @@ func GetUaInfo(c *gin.Context) {
 		})
 		return
 	}
+
+	user, err := getUserInfo(xl, c.Request)
+	if err != nil {
+		xl.Errorf("get user Info failed %v", err)
+		c.JSON(500, gin.H{"error": err.Error()})
+		return
+	}
+
 	var nextMark = ""
 	var r []models.UaInfo
-	xl.Infof("limit %d, marker %s, regex %s namespace %s", params.limit, params.marker, params.regex, params.namespace)
+	xl.Infof("limit %d, marker %s, regex %s namespace %s", params.limit, params.marker, params.regex, params.namespaceUa)
 	if params.exact {
-		r, err = UaMod.GetUaInfo(xl, params.namespace, params.regex)
+		r, err = UaMod.GetUaInfo(xl, getUid(user.uid), params.regex)
 	} else {
-		r, nextMark, err = UaMod.GetUaInfos(xl, params.limit, params.marker, params.namespace, models.UA_ITEM_UAID, params.regex)
+		r, nextMark, err = UaMod.GetUaInfos(xl, params.limit, params.marker, getUid(user.uid), params.namespaceUa, models.UA_ITEM_UAID, params.regex)
 	}
 	if err != nil {
 		xl.Errorf("Get falied error = %#v", err.Error())
