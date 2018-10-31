@@ -5,7 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"strconv"
 	"strings"
@@ -33,18 +33,22 @@ func UploadTs(c *gin.Context) {
 	xl := xlog.New(c.Writer, c.Request)
 
 	c.Header("Content-Type", "application/json")
-	body, err := ioutil.ReadAll(c.Request.Body)
-	if err != nil {
-		xl.Errorf("parse request body failed, body = %#v", body)
-		c.JSON(500, gin.H{
-			"error": "read callback body failed",
-		})
-		return
+
+	dec := json.NewDecoder(c.Request.Body)
+	var kodoData kodoCallBack
+	for {
+
+		if err := dec.Decode(&kodoData); err == io.EOF {
+			break
+		} else if err != nil {
+			xl.Errorf("parse request body failed, body = %#v", c.Request.Body)
+			c.JSON(400, gin.H{
+				"error": "read callback body failed",
+			})
+			return
+		}
 	}
 
-	xl.Infof("%s", body)
-	var kodoData kodoCallBack
-	err = json.Unmarshal(body, &kodoData)
 	xl.Infof("%#v", kodoData)
 
 	key := kodoData.Key

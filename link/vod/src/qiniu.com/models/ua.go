@@ -216,33 +216,9 @@ func (m *UaModel) UpdateUa(xl *xlog.Logger, uid, uaid string, info UaInfo) error
 	)
 }
 
-func (m *UaModel) UpdateNamespace(xl *xlog.Logger, uid, namespace, uaid, newNamespace string) error {
+func (m *UaModel) UpdateFunction(xl *xlog.Logger, uid, uaid, parameter string, cond map[string]interface{}) error {
 	/*
-	   db.ua.update({namespace: space, uaid: uaid}, bson.M{"$set":{"namespace": space}}),
-	*/
-	return db.WithCollection(
-		UA_COL,
-		func(c *mgo.Collection) error {
-			return c.Update(
-				bson.M{
-					UA_ITEM_UID:       uid,
-					UA_ITEM_NAMESPACE: namespace,
-					UA_ITEM_UAID:      uaid,
-				},
-				bson.M{
-					"$set": bson.M{
-						ITEM_UPDATA_TIME:  time.Now().Unix(),
-						UA_ITEM_NAMESPACE: newNamespace,
-					},
-				},
-			)
-		},
-	)
-}
-
-func (m *UaModel) UpdateVod(xl *xlog.Logger, uid, uaid string, IsEnable bool) error {
-	/*
-	   db.ua.update({namespace: space, uaid: uaid}, bson.M{"$set":{"vod": IsEnable}}),
+	   db.ua.update({uid: uid, uaid: uaid}, bson.M{"$set":{parameter: cond[parameter]}}),
 	*/
 	return db.WithCollection(
 		UA_COL,
@@ -255,76 +231,7 @@ func (m *UaModel) UpdateVod(xl *xlog.Logger, uid, uaid string, IsEnable bool) er
 				bson.M{
 					"$set": bson.M{
 						ITEM_UPDATA_TIME: time.Now().Unix(),
-						UA_ITEM_VOD:      IsEnable,
-					},
-				},
-			)
-		},
-	)
-}
-
-func (m *UaModel) UpdateLive(xl *xlog.Logger, uid, uaid string, IsEnable bool) error {
-	/*
-	   db.ua.update({uid: uid, uaid: uaid}, bson.M{"$set":{"vod": IsEnable}}),
-	*/
-	return db.WithCollection(
-		UA_COL,
-		func(c *mgo.Collection) error {
-			return c.Update(
-				bson.M{
-					UA_ITEM_UID:  uid,
-					UA_ITEM_UAID: uaid,
-				},
-				bson.M{
-					"$set": bson.M{
-						ITEM_UPDATA_TIME: time.Now().Unix(),
-						UA_ITEM_LIVE:     IsEnable,
-					},
-				},
-			)
-		},
-	)
-}
-
-func (m *UaModel) UpdateOnline(xl *xlog.Logger, uid, uaid string, IsOnline bool) error {
-	/*
-	   db.ua.update({uid: uid, uaid: uaid}, bson.M{"$set":{"online": IsOnline}}),
-	*/
-	return db.WithCollection(
-		UA_COL,
-		func(c *mgo.Collection) error {
-			return c.Update(
-				bson.M{
-					UA_ITEM_UID:  uid,
-					UA_ITEM_UAID: uaid,
-				},
-				bson.M{
-					"$set": bson.M{
-						ITEM_UPDATA_TIME: time.Now().Unix(),
-						UA_ITEM_ONLINE:   IsOnline,
-					},
-				},
-			)
-		},
-	)
-}
-
-func (m *UaModel) UpdateExpire(xl *xlog.Logger, uid, uaid string, expire int) error {
-	/*
-	   db.ua.update({uid: uid, uaid: uaid}, bson.M{"$set":{"expire": expire}}),
-	*/
-	return db.WithCollection(
-		UA_COL,
-		func(c *mgo.Collection) error {
-			return c.Update(
-				bson.M{
-					UA_ITEM_UID:  uid,
-					UA_ITEM_UAID: uaid,
-				},
-				bson.M{
-					"$set": bson.M{
-						ITEM_UPDATA_TIME: time.Now().Unix(),
-						UA_ITEM_EXPIRE:   expire,
+						parameter:        cond[parameter],
 					},
 				},
 			)

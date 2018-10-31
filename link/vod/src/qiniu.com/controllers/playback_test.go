@@ -49,6 +49,16 @@ func (suite *PlayBackTestSuite) TestPlayBackWithoutFrom() {
 	monkey.Patch(VerifyToken, func(xl *xlog.Logger, expire int64, realToken string, req *http.Request, user *userInfo) bool {
 		return true
 	})
+	monkey.PatchInstanceMethod(
+		reflect.TypeOf((*models.UaModel)(nil)), "GetUaInfo", func(ss *models.UaModel, xl *xlog.Logger, uid, uaid string) ([]models.UaInfo, error) {
+			info := []models.UaInfo{}
+			item := models.UaInfo{
+				Uid:       "link",
+				Namespace: "ipcamera",
+			}
+			info = append(info, item)
+			return info, nil
+		})
 	monkey.Patch(getUserInfo, func(xl *xlog.Logger, req *http.Request) (*userInfo, error) { return &userinfo, nil })
 	w := PerformRequest(suite.r, req)
 	//suite.Equal(true, testObj.VerifyToken(xlog.NewDummy(), int64(10), "", "", ""), "successxxx")
@@ -107,6 +117,16 @@ func (suite *PlayBackTestSuite) TestPlayBack() {
 			return info, nil
 		})
 	monkey.PatchInstanceMethod(
+		reflect.TypeOf((*models.UaModel)(nil)), "GetUaInfo", func(ss *models.UaModel, xl *xlog.Logger, uid, uaid string) ([]models.UaInfo, error) {
+			info := []models.UaInfo{}
+			item := models.UaInfo{
+				Uid:       "link",
+				Namespace: "ipcamera",
+			}
+			info = append(info, item)
+			return info, nil
+		})
+	monkey.PatchInstanceMethod(
 		reflect.TypeOf((*models.SegmentKodoModel)(nil)), "GetSegmentTsInfo", func(ss *models.SegmentKodoModel,
 			xl *xlog.Logger, starttime, endtime int64, bucketurl, uaid string, limit int, marker string, mac *qbox.Mac) ([]map[string]interface{}, string, error) {
 			return nil, "", nil
@@ -126,7 +146,16 @@ func (suite *PlayBackTestSuite) TestPlayBackWithGetSegmentsInfoError() {
 	monkey.Patch(GetBucket, func(xl *xlog.Logger, uid, namespace string) (string, error) {
 		return "ipcamera", nil
 	})
-
+	monkey.PatchInstanceMethod(
+		reflect.TypeOf((*models.UaModel)(nil)), "GetUaInfo", func(ss *models.UaModel, xl *xlog.Logger, uid, uaid string) ([]models.UaInfo, error) {
+			info := []models.UaInfo{}
+			item := models.UaInfo{
+				Uid:       "link",
+				Namespace: "ipcamera",
+			}
+			info = append(info, item)
+			return info, nil
+		})
 	monkey.Patch(getDomain, func(xl *xlog.Logger, bucket string, info *userInfo) (string, error) {
 		return "wwww.test.com", nil
 	})
@@ -146,6 +175,16 @@ func (suite *PlayBackTestSuite) TestGetFastForwardStreamError() {
 	monkey.Patch(VerifyToken, func(xl *xlog.Logger, expire int64, realToken string, req *http.Request, user *userInfo) bool {
 		return true
 	})
+	monkey.PatchInstanceMethod(
+		reflect.TypeOf((*models.UaModel)(nil)), "GetUaInfo", func(ss *models.UaModel, xl *xlog.Logger, uid, uaid string) ([]models.UaInfo, error) {
+			info := []models.UaInfo{}
+			item := models.UaInfo{
+				Uid:       "link",
+				Namespace: "ipcamera",
+			}
+			info = append(info, item)
+			return info, nil
+		})
 	monkey.Patch(getFastForwardStream, func(xl *xlog.Logger, params *requestParams, c *gin.Context, user *userInfo) error {
 		return errors.New("get Ts Stream Error")
 	})
@@ -181,6 +220,16 @@ func (suite *PlayBackTestSuite) TestPlayBackWithBadNameSpace() {
 		return true
 	})
 	monkey.Patch(getUserInfo, func(xl *xlog.Logger, req *http.Request) (*userInfo, error) { return &userinfo, nil })
+	monkey.PatchInstanceMethod(
+		reflect.TypeOf((*models.UaModel)(nil)), "GetUaInfo", func(ss *models.UaModel, xl *xlog.Logger, uid, uaid string) ([]models.UaInfo, error) {
+			info := []models.UaInfo{}
+			item := models.UaInfo{
+				Uid:       "link",
+				Namespace: "ipcamera",
+			}
+			info = append(info, item)
+			return info, nil
+		})
 	monkey.Patch(GetBucket, func(xl *xlog.Logger, uid, namespace string) (string, error) {
 		return "", errors.New("bucket can't find")
 	})
@@ -196,7 +245,16 @@ func (suite *PlayBackTestSuite) TestPlayBackWithBadDomain() {
 		return true
 	})
 	monkey.Patch(getUserInfo, func(xl *xlog.Logger, req *http.Request) (*userInfo, error) { return &userinfo, nil })
-
+	monkey.PatchInstanceMethod(
+		reflect.TypeOf((*models.UaModel)(nil)), "GetUaInfo", func(ss *models.UaModel, xl *xlog.Logger, uid, uaid string) ([]models.UaInfo, error) {
+			info := []models.UaInfo{}
+			item := models.UaInfo{
+				Uid:       "link",
+				Namespace: "ipcamera",
+			}
+			info = append(info, item)
+			return info, nil
+		})
 	monkey.Patch(GetBucket, func(xl *xlog.Logger, uid, namespace string) (string, error) {
 		return "ipcamera", nil
 	})
@@ -239,7 +297,16 @@ func (suite *PlayBackTestSuite) TestPlayBackWithCorrectDomain() {
 	monkey.Patch(getUserInfo, func(xl *xlog.Logger, req *http.Request) (*userInfo, error) {
 		return &userInfo{ak: "fadsfasfsd", sk: "fadsfasfsadf"}, nil
 	})
-
+	monkey.PatchInstanceMethod(
+		reflect.TypeOf((*models.UaModel)(nil)), "GetUaInfo", func(ss *models.UaModel, xl *xlog.Logger, uid, uaid string) ([]models.UaInfo, error) {
+			info := []models.UaInfo{}
+			item := models.UaInfo{
+				Uid:       "link",
+				Namespace: "ipcamera",
+			}
+			info = append(info, item)
+			return info, nil
+		})
 	monkey.Patch(GetBucket, func(xl *xlog.Logger, uid, namespace string) (string, error) {
 		return "ipcamera", nil
 	})

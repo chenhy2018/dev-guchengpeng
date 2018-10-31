@@ -55,10 +55,25 @@ func TestUa(t *testing.T) {
 	assert.Equal(t, r_1[0].Online, false, "they should be equal")
 	assert.Equal(t, r_1[0].Expire, 0, "they should be equal")
 
-	model.UpdateLive(xl, "UserTest", "daaa099", true)
-	model.UpdateVod(xl, "UserTest", "daaa099", true)
-	model.UpdateOnline(xl, "UserTest", "daaa099", true)
-	model.UpdateExpire(xl, "UserTest", "daaa099", 7)
+	cond := map[string]interface{}{
+		UA_ITEM_VOD: true,
+	}
+	model.UpdateFunction(xl, "UserTest", "daaa099", UA_ITEM_VOD, cond)
+
+	cond = map[string]interface{}{
+		UA_ITEM_LIVE: true,
+	}
+	model.UpdateFunction(xl, "UserTest", "daaa099", UA_ITEM_LIVE, cond)
+
+	cond = map[string]interface{}{
+		UA_ITEM_ONLINE: true,
+	}
+	model.UpdateFunction(xl, "UserTest", "daaa099", UA_ITEM_ONLINE, cond)
+
+	cond = map[string]interface{}{
+		UA_ITEM_EXPIRE: 7,
+	}
+	model.UpdateFunction(xl, "UserTest", "daaa099", UA_ITEM_EXPIRE, cond)
 
 	r_1, _, err_1 = model.GetUaInfos(xl, 0, "", "UserTest", "test", UA_ITEM_UAID, "daaa099")
 

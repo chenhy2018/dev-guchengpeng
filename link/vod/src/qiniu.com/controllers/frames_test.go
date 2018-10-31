@@ -67,7 +67,16 @@ func (suite *FramesTestSuite) TestFrames6() {
 	monkey.Patch(getUserInfo, func(xl *xlog.Logger, req *http.Request) (*userInfo, error) {
 		return &userinfo, nil
 	})
-
+	monkey.PatchInstanceMethod(
+		reflect.TypeOf((*models.UaModel)(nil)), "GetUaInfo", func(ss *models.UaModel, xl *xlog.Logger, uid, uaid string) ([]models.UaInfo, error) {
+			info := []models.UaInfo{}
+			item := models.UaInfo{
+				Uid:       "link",
+				Namespace: "ipcamera",
+			}
+			info = append(info, item)
+			return info, nil
+		})
 	monkey.Patch(GetBucket, func(xl *xlog.Logger, uid, namespace string) (string, error) {
 		return "ipcamera", nil
 	})
@@ -88,14 +97,23 @@ func (suite *FramesTestSuite) TestFrames6() {
 		})
 	w := PerformRequest(suite.r, req)
 	suite.Equal(200, w.Code, "")
-
+	monkey.UnpatchAll()
 }
 func (suite *FramesTestSuite) TestFrames7() {
 	req, _ := http.NewRequest("GET", "/v1/namespaces/ipcamera/uas/testdeviceid8/frames?from=1537872668&to=1537876443", nil)
 	monkey.Patch(getUserInfo, func(xl *xlog.Logger, req *http.Request) (*userInfo, error) {
 		return &userinfo, nil
 	})
-
+	monkey.PatchInstanceMethod(
+		reflect.TypeOf((*models.UaModel)(nil)), "GetUaInfo", func(ss *models.UaModel, xl *xlog.Logger, uid, uaid string) ([]models.UaInfo, error) {
+			info := []models.UaInfo{}
+			item := models.UaInfo{
+				Uid:       "link",
+				Namespace: "ipcamera",
+			}
+			info = append(info, item)
+			return info, nil
+		})
 	monkey.Patch(GetBucket, func(xl *xlog.Logger, uid, namespace string) (string, error) {
 		return "ipcamera", nil
 	})
@@ -105,14 +123,23 @@ func (suite *FramesTestSuite) TestFrames7() {
 		})
 	w := PerformRequest(suite.r, req)
 	suite.Equal(500, w.Code, "")
-
+	monkey.UnpatchAll()
 }
 func (suite *FramesTestSuite) TestFrames8() {
 	req, _ := http.NewRequest("GET", "/v1/namespaces/ipcamera/uas/testdeviceid8/frames?from=1537872668&to=1537876443", nil)
 	monkey.Patch(getUserInfo, func(xl *xlog.Logger, req *http.Request) (*userInfo, error) {
 		return &userinfo, nil
 	})
-
+	monkey.PatchInstanceMethod(
+		reflect.TypeOf((*models.UaModel)(nil)), "GetUaInfo", func(ss *models.UaModel, xl *xlog.Logger, uid, uaid string) ([]models.UaInfo, error) {
+			info := []models.UaInfo{}
+			item := models.UaInfo{
+				Uid:       "link",
+				Namespace: "ipcamera",
+			}
+			info = append(info, item)
+			return info, nil
+		})
 	monkey.Patch(GetBucket, func(xl *xlog.Logger, uid, namespace string) (string, error) {
 		return "ipcamera", nil
 	})
@@ -121,13 +148,23 @@ func (suite *FramesTestSuite) TestFrames8() {
 	})
 	w := PerformRequest(suite.r, req)
 	suite.Equal(403, w.Code, "")
+	monkey.UnpatchAll()
 }
 func (suite *FramesTestSuite) TestFrames9() {
 	req, _ := http.NewRequest("GET", "/v1/namespaces/ipcamera/uas/testdeviceid8/frames?from=1537872668&to=1537876443", nil)
 	monkey.Patch(getUserInfo, func(xl *xlog.Logger, req *http.Request) (*userInfo, error) {
 		return &userinfo, nil
 	})
-
+	monkey.PatchInstanceMethod(
+		reflect.TypeOf((*models.UaModel)(nil)), "GetUaInfo", func(ss *models.UaModel, xl *xlog.Logger, uid, uaid string) ([]models.UaInfo, error) {
+			info := []models.UaInfo{}
+			item := models.UaInfo{
+				Uid:       "link",
+				Namespace: "ipcamera",
+			}
+			info = append(info, item)
+			return info, nil
+		})
 	monkey.Patch(GetBucket, func(xl *xlog.Logger, uid, namespace string) (string, error) {
 		return "ipcamera", nil
 	})
@@ -136,7 +173,7 @@ func (suite *FramesTestSuite) TestFrames9() {
 	})
 	w := PerformRequest(suite.r, req)
 	suite.Equal(500, w.Code, "")
-
+	monkey.UnpatchAll()
 }
 func TestFramesTestSuite(t *testing.T) {
 	suite.Run(t, new(FramesTestSuite))

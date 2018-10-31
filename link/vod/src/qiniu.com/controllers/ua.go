@@ -4,7 +4,7 @@ import (
 	//"time"
 	"encoding/json"
 	//"errors"
-	"io/ioutil"
+	"io"
 
 	"github.com/gin-gonic/gin"
 	xlog "github.com/qiniu/xlog.v1"
@@ -36,16 +36,19 @@ func RegisterUa(c *gin.Context) {
 		return
 	}
 
-	body, err := ioutil.ReadAll(c.Request.Body)
 	var uaData uabody
-	err = json.Unmarshal(body, &uaData)
 
-	if err != nil {
-		xl.Errorf("parse request body failed, body = %#v", body)
-		c.JSON(400, gin.H{
-			"error": "read callback body failed",
-		})
-		return
+	dec := json.NewDecoder(c.Request.Body)
+	for {
+		if err := dec.Decode(&uaData); err == io.EOF {
+			break
+		} else if err != nil {
+			xl.Errorf("parse request body failed, body = %#v", c.Request.Body)
+			c.JSON(400, gin.H{
+				"error": "read callback body failed",
+			})
+			return
+		}
 	}
 	user, err := getUserInfo(xl, c.Request)
 	if err != nil {
@@ -185,7 +188,7 @@ func UpdateUa(c *gin.Context) {
 		})
 		return
 	}
-	body, err := ioutil.ReadAll(c.Request.Body)
+
 	uaData := uabody{
 		Uaid:      uaInfo[0].UaId,
 		Namespace: uaInfo[0].Namespace,
@@ -196,13 +199,17 @@ func UpdateUa(c *gin.Context) {
 		Expire:    uaInfo[0].Expire,
 	}
 
-	err = json.Unmarshal(body, &uaData)
-	if err != nil {
-		xl.Errorf("parse request body failed, body = %#v", body)
-		c.JSON(400, gin.H{
-			"error": "read callback body failed",
-		})
-		return
+	dec := json.NewDecoder(c.Request.Body)
+	for {
+		if err := dec.Decode(&uaData); err == io.EOF {
+			break
+		} else if err != nil {
+			xl.Errorf("parse request body failed, body = %#v", c.Request.Body)
+			c.JSON(400, gin.H{
+				"error": "read callback body failed",
+			})
+			return
+		}
 	}
 	ua := models.UaInfo{
 		Uid:       getUid(user.uid),
@@ -263,11 +270,11 @@ func GetUaInfo(c *gin.Context) {
 
 	var nextMark = ""
 	var r []models.UaInfo
-	xl.Infof("limit %d, marker %s, regex %s namespace %s", params.limit, params.marker, params.regex, params.namespaceUa)
+	xl.Infof("limit %d, marker %s, regex %s namespace %s", params.limit, params.marker, params.regex, params.namespaceInQuery)
 	if params.exact {
 		r, err = UaMod.GetUaInfo(xl, getUid(user.uid), params.regex)
 	} else {
-		r, nextMark, err = UaMod.GetUaInfos(xl, params.limit, params.marker, getUid(user.uid), params.namespaceUa, models.UA_ITEM_UAID, params.regex)
+		r, nextMark, err = UaMod.GetUaInfos(xl, params.limit, params.marker, getUid(user.uid), params.namespaceInQuery, models.UA_ITEM_UAID, params.regex)
 	}
 	if err != nil {
 		xl.Errorf("Get falied error = %#v", err.Error())

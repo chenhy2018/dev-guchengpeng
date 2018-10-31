@@ -42,9 +42,9 @@ func main() {
 	r.PUT("/v1/namespaces/:namespace", controllers.UpdateNamespace)
 	r.GET("/v1/namespaces", controllers.GetNamespaceInfo)
 
-	r.GET("/v1/namespaces/:namespace/uas/:uaid/playback", controllers.GetPlayBackm3u8)
-	r.GET("/v1/namespaces/:namespace/uas/:uaid/segments", controllers.GetSegments)
-	r.GET("/v1/namespaces/:namespace/uas/:uaid/frames", controllers.GetFrames)
+	r.GET("/v1/uas/:uaid/playback", controllers.GetPlayBackm3u8)
+	r.GET("/v1/uas/:uaid/segments", controllers.GetSegments)
+	r.GET("/v1/uas/:uaid/frames", controllers.GetFrames)
 	r.POST("/qiniu/upload/callback", controllers.UploadTs)
 
 	//Priavte api

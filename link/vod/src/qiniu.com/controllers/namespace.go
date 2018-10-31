@@ -3,7 +3,7 @@ package controllers
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -46,12 +46,18 @@ func getDomain(xl *xlog.Logger, bucket string, info *userInfo) (string, error) {
 	}
 
 	defer resp.Body.Close()
-	body, err := ioutil.ReadAll(resp.Body)
 
+	dec := json.NewDecoder(resp.Body)
 	var domain []string
-	err = json.Unmarshal(body, &domain)
-	if err != nil || len(domain) == 0 {
-		return "", err
+	for {
+		if err := dec.Decode(&domain); err == io.EOF {
+			break
+		} else if err != nil {
+			return "", err
+		}
+	}
+	if len(domain) == 0 {
+		return "", nil
 	}
 	return domain[0], nil
 }
@@ -81,23 +87,19 @@ func RegisterNamespace(c *gin.Context) {
 		})
 		return
 	}
-	body, err := ioutil.ReadAll(c.Request.Body)
-	if err != nil {
-		xl.Errorf("parse request body failed, body = %#v", body)
-		c.JSON(400, gin.H{
-			"error": "read callback body failed",
-		})
-		return
-	}
-	var namespaceData namespacebody
-	err = json.Unmarshal(body, &namespaceData)
 
-	if err != nil {
-		xl.Errorf("parse request body failed, body = %#v", body)
-		c.JSON(400, gin.H{
-			"error": "read callback body failed",
-		})
-		return
+	var namespaceData namespacebody
+	dec := json.NewDecoder(c.Request.Body)
+	for {
+		if err := dec.Decode(&namespaceData); err == io.EOF {
+			break
+		} else if err != nil {
+			xl.Errorf("json decode failed %#v", err)
+			c.JSON(400, gin.H{
+				"error": "json decode failed",
+			})
+			return
+		}
 	}
 	err = checkbucket(xl, namespaceData.Bucket)
 	if err != nil {
@@ -223,8 +225,9 @@ func updateNamespace(xl *xlog.Logger, uid, space, newSpace string) error {
 			if err != nil {
 				return err
 			}
+			cond := map[string]interface{}{models.UA_ITEM_NAMESPACE: newSpace}
 			for i := 0; i < len(uas); i++ {
-				model.UpdateNamespace(xl, uid, uas[i].Namespace, uas[i].UaId, newSpace)
+				model.UpdateFunction(xl, uid, uas[i].UaId, models.UA_ITEM_NAMESPACE, cond)
 			}
 			if nextmark != "" {
 				mark = nextmark
@@ -293,15 +296,18 @@ func UpdateNamespace(c *gin.Context) {
 		return
 	}
 
-	body, err := ioutil.ReadAll(c.Request.Body)
 	var namespaceData namespacebody
-	err = json.Unmarshal(body, &namespaceData)
-	if err != nil {
-		xl.Errorf("parse request body failed, body = %#v", body)
-		c.JSON(400, gin.H{
-			"error": "read callback body failed",
-		})
-		return
+	dec := json.NewDecoder(c.Request.Body)
+	for {
+		if err := dec.Decode(&namespaceData); err == io.EOF {
+			break
+		} else if err != nil {
+			xl.Errorf("json decode failed")
+			c.JSON(400, gin.H{
+				"error": "json decode failed",
+			})
+			return
+		}
 	}
 
 	info, err := getUserInfo(xl, c.Request)
