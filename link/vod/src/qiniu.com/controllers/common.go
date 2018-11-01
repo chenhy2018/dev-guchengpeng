@@ -307,7 +307,6 @@ func GetNameSpaceInfo(xl *xlog.Logger, bucket, uaid string) (error, int) {
 	if isAuto == false {
 		model := models.UaModel{}
 		r, err := model.GetUaInfo(xl, info[0].Uid, uaid)
-		xl.Errorf("3333333  r = #%v  ua #%v info #%v", r, uaid, info[0])
 		if err != nil {
 			return err, 0
 		}
