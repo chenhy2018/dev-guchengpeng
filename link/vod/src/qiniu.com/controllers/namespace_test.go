@@ -62,17 +62,25 @@ func TestRegisterNamespace(t *testing.T) {
 	}
 	c.Params = append(c.Params, param)
 	c.Request = req
+	monkey.UnpatchAll()
 	monkey.Patch(getUserInfo, func(xl *xlog.Logger, req *http.Request) (*userInfo, error) { return &user, nil })
 	monkey.Patch(system.HaveDb, func() bool { fmt.Printf("111111"); return true })
 	RegisterNamespace(c)
 
 	// bucket already exit. return 400
 	monkey.Patch(getUserInfo, func(xl *xlog.Logger, req *http.Request) (*userInfo, error) { return &user, nil })
+	body = namespacebody{
+		Bucket:    "ipcamera",
+		Namespace: "test1",
+	}
+	bodyBuffer, _ = json.Marshal(body)
+	bodyT = bytes.NewBuffer(bodyBuffer)
 	req, _ = http.NewRequest("POST", "/v1/namespaces/test1", bodyT)
 	c, _ = gin.CreateTestContext(httptest.NewRecorder())
+	c.Params = append(c.Params, param)
 	c.Request = req
 	RegisterNamespace(c)
-	assert.Equal(t, c.Writer.Status(), 400, "they should be equal")
+	assert.Equal(t, c.Writer.Status(), 403, "they should be equal")
 
 	// bucket is not correct. return 403
 	body = namespacebody{
@@ -124,7 +132,7 @@ func TestRegisterNamespace(t *testing.T) {
 	guard2.Unpatch()
 	// get user info failed. return 500
 	guard4 := monkey.Patch(getUserInfo, func(xl *xlog.Logger, req *http.Request) (*userInfo, error) {
-		return &userInfo{}, errors.New("get user  info error")
+		return &userInfo{}, errors.New("get user info error")
 	})
 	body = namespacebody{
 		Bucket:    "ipcamera1",

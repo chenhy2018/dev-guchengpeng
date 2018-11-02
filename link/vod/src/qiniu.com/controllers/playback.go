@@ -27,13 +27,12 @@ func GetPlayBackm3u8(c *gin.Context) {
 		})
 		return
 	}
-	if params.to <= params.from {
-		xl.Errorf("bad from/to time, from = %v, to = %v", params.from, params.to)
-		c.JSON(400, gin.H{
-			"error": "bad from/to time, from great or equal than to",
-		})
-		return
+
+	err = checkParams(xl, params)
+	if err != nil {
+		c.JSON(400, gin.H{"error": err})
 	}
+
 	userInfo, err := getUserInfo(xl, c.Request)
 	if err != nil {
 		xl.Errorf("get user Info failed%v", err)
@@ -48,15 +47,7 @@ func GetPlayBackm3u8(c *gin.Context) {
 		})
 		return
 	}
-	xl.Infof("uaid = %v, from = %v, to = %v, namespace = %v", params.uaid, params.from, params.to, params.namespace)
-	dayInMilliSec := int64((24 * time.Hour).Seconds() * 1000)
-	if (params.to - params.from) > dayInMilliSec {
-		xl.Errorf("bad from/to time, from = %v, to = %v", params.from, params.to)
-		c.JSON(400, gin.H{
-			"error": "bad from/to time, currently we only support playback in 24 hours",
-		})
-		return
-	}
+	xl.Infof("uaid = %v, from = %v, to = %v", params.uaid, params.from, params.to)
 
 	if params.speed != 1 {
 		if err := getFastForwardStream(xl, params, c, userInfo); err != nil {
@@ -65,8 +56,17 @@ func GetPlayBackm3u8(c *gin.Context) {
 		}
 		return
 	}
-
-	bucket, err := GetBucket(xl, getUid(userInfo.uid), params.namespace)
+	info, err := UaMod.GetUaInfo(xl, getUid(userInfo.uid), params.uaid)
+	if err != nil && len(info) == 0 {
+		xl.Errorf("get ua info failed, error =  %#v", err)
+		c.JSON(400, gin.H{
+			"error": "ua is not correct",
+		})
+		return
+	}
+	xl.Infof("info[0].Namespace %v", info[0].Namespace)
+	namespace := info[0].Namespace
+	bucket, err := GetBucket(xl, getUid(userInfo.uid), namespace)
 	if err != nil {
 		xl.Errorf("get bucket error, error =  %#v", err)
 		c.JSON(400, gin.H{

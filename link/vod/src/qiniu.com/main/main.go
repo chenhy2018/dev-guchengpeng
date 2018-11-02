@@ -32,19 +32,19 @@ func main() {
 	}
 	controllers.Init(&conf.GrpcConf)
 	r.Use(controllers.HandleToken)
-	r.POST("/v1/namespaces/:namespace/uas/:uaid", controllers.RegisterUa)
-	r.DELETE("/v1/namespaces/:namespace/uas/:uaid", controllers.DeleteUa)
-	r.PUT("/v1/namespaces/:namespace/uas/:uaid", controllers.UpdateUa)
-	r.GET("/v1/namespaces/:namespace/uas", controllers.GetUaInfo)
+	r.POST("/v1/uas/:uaid", controllers.RegisterUa)
+	r.DELETE("/v1/uas/:uaid", controllers.DeleteUa)
+	r.PUT("/v1/uas/:uaid", controllers.UpdateUa)
+	r.GET("/v1/uas", controllers.GetUaInfo)
 
 	r.POST("/v1/namespaces/:namespace", controllers.RegisterNamespace)
 	r.DELETE("/v1/namespaces/:namespace", controllers.DeleteNamespace)
 	r.PUT("/v1/namespaces/:namespace", controllers.UpdateNamespace)
 	r.GET("/v1/namespaces", controllers.GetNamespaceInfo)
 
-	r.GET("/v1/namespaces/:namespace/uas/:uaid/playback", controllers.GetPlayBackm3u8)
-	r.GET("/v1/namespaces/:namespace/uas/:uaid/segments", controllers.GetSegments)
-	r.GET("/v1/namespaces/:namespace/uas/:uaid/frames", controllers.GetFrames)
+	r.GET("/v1/uas/:uaid/playback", controllers.GetPlayBackm3u8)
+	r.GET("/v1/uas/:uaid/segments", controllers.GetSegments)
+	r.GET("/v1/uas/:uaid/frames", controllers.GetFrames)
 	r.POST("/qiniu/upload/callback", controllers.UploadTs)
 
 	//Priavte api

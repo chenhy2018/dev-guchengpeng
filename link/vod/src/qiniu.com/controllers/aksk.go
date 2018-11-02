@@ -2,7 +2,7 @@ package controllers
 
 import (
 	"encoding/json"
-	"io/ioutil"
+	"io"
 
 	"github.com/gin-gonic/gin"
 	xlog "github.com/qiniu/xlog.v1"
@@ -23,24 +23,20 @@ func SetPrivateAkSk(c *gin.Context) {
 		})
 		return
 	}
-	body, err := ioutil.ReadAll(c.Request.Body)
-	if err != nil {
-		xl.Errorf("parse request body failed, body = %#v", body)
-		c.JSON(400, gin.H{
-			"error": "read callback body failed",
-		})
-		return
-	}
+	dec := json.NewDecoder(c.Request.Body)
 	var aksk akskInfo
-	err = json.Unmarshal(body, &aksk)
-
-	if err != nil {
-		xl.Errorf("parse request body failed, body = %#v", body)
-		c.JSON(400, gin.H{
-			"error": "read callback body failed",
-		})
-		return
+	for {
+		if err := dec.Decode(&aksk); err == io.EOF {
+			break
+		} else if err != nil {
+			xl.Errorf("json decode failed")
+			c.JSON(400, gin.H{
+				"error": "json decode failed",
+			})
+			return
+		}
 	}
+
 	SetUserInfo(aksk.Ak, aksk.Sk)
 	c.JSON(200, gin.H{"success": "true"})
 }

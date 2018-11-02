@@ -46,7 +46,7 @@ func GetSegments(c *gin.Context) {
 		return
 	}
 
-	xl.Infof("deviceid = %v, from = %v, to = %v, limit = %v, marker = %v, namespace = %v", params.uaid, params.from, params.to, params.limit, params.marker, params.namespace)
+	xl.Infof("deviceid = %v, from = %v, to = %v, limit = %v, marker = %v", params.uaid, params.from, params.to, params.limit, params.marker)
 
 	user, err := getUserInfo(xl, c.Request)
 	if err != nil {
@@ -55,7 +55,18 @@ func GetSegments(c *gin.Context) {
 		return
 	}
 
-	bucket, err := GetBucket(xl, getUid(user.uid), params.namespace)
+	info, err := UaMod.GetUaInfo(xl, getUid(user.uid), params.uaid)
+	if err != nil && len(info) == 0 {
+		xl.Errorf("get ua info failed, error =  %#v", err)
+		c.JSON(400, gin.H{
+			"error": "ua is not correct",
+		})
+		return
+	}
+
+	namespace := info[0].Namespace
+
+	bucket, err := GetBucket(xl, getUid(user.uid), namespace)
 	if err != nil {
 		xl.Errorf("get bucket error, error =  %#v", err)
 		c.JSON(400, gin.H{"error": "namespace is not correct"})

@@ -1,8 +1,6 @@
 package controllers
 
 import (
-	"time"
-
 	"github.com/gin-gonic/gin"
 	"github.com/qiniu/api.v7/auth/qbox"
 	xlog "github.com/qiniu/xlog.v1"
@@ -25,25 +23,12 @@ func GetFrames(c *gin.Context) {
 		})
 		return
 	}
-
-	if params.to <= params.from {
-		xl.Errorf("bad from/to time, from = %v, to = %v", params.from, params.to)
-		c.JSON(400, gin.H{
-			"error": "bad from/to time, from great or equal than to",
-		})
-		return
+	err = checkParams(xl, params)
+	if err != nil {
+		c.JSON(400, gin.H{"error": err})
 	}
 
-	dayInMilliSec := int64((24 * time.Hour).Seconds() * 1000)
-	if (params.to - params.from) > dayInMilliSec {
-		xl.Errorf("bad from/to time, from = %v, to = %v", params.from, params.to)
-		c.JSON(400, gin.H{
-			"error": "bad from/to time, currently we only support playback in 24 hours",
-		})
-		return
-	}
-
-	xl.Infof("uaid = %v, from = %v, to = %v, namespace = %v", params.uaid, params.from, params.to, params.namespace)
+	xl.Infof("uaid = %v, from = %v, to = %v", params.uaid, params.from, params.to)
 
 	user, err := getUserInfo(xl, c.Request)
 	if err != nil {
@@ -52,7 +37,17 @@ func GetFrames(c *gin.Context) {
 		return
 	}
 
-	bucket, err := GetBucket(xl, getUid(user.uid), params.namespace)
+	info, err := UaMod.GetUaInfo(xl, getUid(user.uid), params.uaid)
+	if err != nil && len(info) == 0 {
+		xl.Errorf("get ua info failed, error =  %#v", err)
+		c.JSON(400, gin.H{
+			"error": "ua is not correct",
+		})
+		return
+	}
+	namespace := info[0].Namespace
+
+	bucket, err := GetBucket(xl, getUid(user.uid), namespace)
 	if err != nil {
 		xl.Errorf("get bucket error, error =  %#v", err)
 		c.JSON(400, gin.H{
@@ -112,5 +107,4 @@ func GetFrames(c *gin.Context) {
 	c.JSON(200, gin.H{
 		"frames": framesWithToken,
 	})
-
 }

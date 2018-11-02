@@ -42,6 +42,16 @@ func (suite *SegmentsTestSuite) TestFromEndInTwoSeg1() {
 		return &userInfo{}, nil
 	})
 	monkey.PatchInstanceMethod(
+		reflect.TypeOf((*models.UaModel)(nil)), "GetUaInfo", func(ss *models.UaModel, xl *xlog.Logger, uid, uaid string) ([]models.UaInfo, error) {
+			info := []models.UaInfo{}
+			item := models.UaInfo{
+				Uid:       "link",
+				Namespace: "ipcamera",
+			}
+			info = append(info, item)
+			return info, nil
+		})
+	monkey.PatchInstanceMethod(
 		reflect.TypeOf((*models.NamespaceModel)(nil)), "GetNamespaceInfo", func(ss *models.NamespaceModel, xl *xlog.Logger, uid, namespace string) ([]models.NamespaceInfo, error) {
 			info := []models.NamespaceInfo{}
 			item := models.NamespaceInfo{
@@ -70,7 +80,6 @@ func (suite *SegmentsTestSuite) TestFromEndInTwoSeg1() {
 	json.Unmarshal(body, &segInfos)
 	suite.Equal(200, w.Code, "200 ok for request")
 	suite.Equal(0, len(segInfos.Segs), "empty frames")
-
 }
 
 //seg           A1----------A2  B1------B2  C1--------C2
@@ -95,6 +104,16 @@ func (suite *SegmentsTestSuite) TestFromEndInTwoSeg2() {
 	monkey.Patch(getUserInfo, func(xl *xlog.Logger, req *http.Request) (*userInfo, error) {
 		return &userInfo{}, nil
 	})
+	monkey.PatchInstanceMethod(
+		reflect.TypeOf((*models.UaModel)(nil)), "GetUaInfo", func(ss *models.UaModel, xl *xlog.Logger, uid, uaid string) ([]models.UaInfo, error) {
+			info := []models.UaInfo{}
+			item := models.UaInfo{
+				Uid:       "link",
+				Namespace: "ipcamera",
+			}
+			info = append(info, item)
+			return info, nil
+		})
 	monkey.Patch(GetBucket, func(xl *xlog.Logger, uid, namespace string) (string, error) {
 		return "ipcamera", nil
 	})
@@ -180,6 +199,18 @@ func (suite *SegmentsTestSuite) TestFromEndInTwoSeg3() {
 			info = append(info, item)
 			return info, nil
 		})
+
+	monkey.PatchInstanceMethod(
+		reflect.TypeOf((*models.UaModel)(nil)), "GetUaInfo", func(ss *models.UaModel, xl *xlog.Logger, uid, uaid string) ([]models.UaInfo, error) {
+			info := []models.UaInfo{}
+			item := models.UaInfo{
+				Uid:       "link",
+				Namespace: "ipcamera",
+			}
+			info = append(info, item)
+			return info, nil
+		})
+
 	monkey.PatchInstanceMethod(
 		reflect.TypeOf((*models.SegmentKodoModel)(nil)), "GetSegmentTsInfo", func(ss *models.SegmentKodoModel,
 			xl *xlog.Logger, starttime, endtime int64, bucketurl, uaid string, limit int, marker string, mac *qbox.Mac) ([]map[string]interface{}, string, error) {
@@ -205,7 +236,6 @@ func (suite *SegmentsTestSuite) TestFromEndInTwoSeg3() {
 
 	suite.Equal(int64(1532499339), segInfos.Segs[2].StartTime, "should be 1532499339")
 	suite.Equal(int64(1532499341), segInfos.Segs[2].EndTime, "should be 1532499341")
-
 }
 
 //seg           A1----------A2  B1------B2
@@ -229,7 +259,16 @@ func (suite *SegmentsTestSuite) TestFromEndInTwoSeg4() {
 
 			return rets, "", nil
 		})
-
+	monkey.PatchInstanceMethod(
+		reflect.TypeOf((*models.UaModel)(nil)), "GetUaInfo", func(ss *models.UaModel, xl *xlog.Logger, uid, uaid string) ([]models.UaInfo, error) {
+			info := []models.UaInfo{}
+			item := models.UaInfo{
+				Uid:       "link",
+				Namespace: "ipcamera",
+			}
+			info = append(info, item)
+			return info, nil
+		})
 	monkey.PatchInstanceMethod(
 		reflect.TypeOf((*models.SegmentKodoModel)(nil)), "GetSegmentTsInfo", func(ss *models.SegmentKodoModel,
 			xl *xlog.Logger, starttime, endtime int64, bucketurl, uaid string, limit int, marker string, mac *qbox.Mac) ([]map[string]interface{}, string, error) {
@@ -293,7 +332,16 @@ func (suite *SegmentsTestSuite) TestFromEndInTwoSeg5() {
 			rets = append(rets, item)
 			return rets, "", nil
 		})
-
+	monkey.PatchInstanceMethod(
+		reflect.TypeOf((*models.UaModel)(nil)), "GetUaInfo", func(ss *models.UaModel, xl *xlog.Logger, uid, uaid string) ([]models.UaInfo, error) {
+			info := []models.UaInfo{}
+			item := models.UaInfo{
+				Uid:       "link",
+				Namespace: "ipcamera",
+			}
+			info = append(info, item)
+			return info, nil
+		})
 	monkey.PatchInstanceMethod(
 		reflect.TypeOf((*models.SegmentKodoModel)(nil)), "GetSegmentTsInfo", func(ss *models.SegmentKodoModel,
 			xl *xlog.Logger, starttime, endtime int64, bucketurl, uaid string, limit int, marker string, mac *qbox.Mac) ([]map[string]interface{}, string, error) {
@@ -361,7 +409,16 @@ func (suite *SegmentsTestSuite) TestFromEndInTwoSeg6() {
 	monkey.Patch(getUserInfo, func(xl *xlog.Logger, req *http.Request) (*userInfo, error) {
 		return &userInfo{}, nil
 	})
-
+	monkey.PatchInstanceMethod(
+		reflect.TypeOf((*models.UaModel)(nil)), "GetUaInfo", func(ss *models.UaModel, xl *xlog.Logger, uid, uaid string) ([]models.UaInfo, error) {
+			info := []models.UaInfo{}
+			item := models.UaInfo{
+				Uid:       "link",
+				Namespace: "ipcamera",
+			}
+			info = append(info, item)
+			return info, nil
+		})
 	monkey.PatchInstanceMethod(
 		reflect.TypeOf((*models.SegmentKodoModel)(nil)), "GetSegmentTsInfo", func(ss *models.SegmentKodoModel,
 			xl *xlog.Logger, starttime, endtime int64, bucketurl, uaid string, limit int, marker string, mac *qbox.Mac) ([]map[string]interface{}, string, error) {
@@ -424,7 +481,16 @@ func (suite *SegmentsTestSuite) TestFromEndInTwoSeg7() {
 	monkey.Patch(getUserInfo, func(xl *xlog.Logger, req *http.Request) (*userInfo, error) {
 		return &userInfo{}, nil
 	})
-
+	monkey.PatchInstanceMethod(
+		reflect.TypeOf((*models.UaModel)(nil)), "GetUaInfo", func(ss *models.UaModel, xl *xlog.Logger, uid, uaid string) ([]models.UaInfo, error) {
+			info := []models.UaInfo{}
+			item := models.UaInfo{
+				Uid:       "link",
+				Namespace: "ipcamera",
+			}
+			info = append(info, item)
+			return info, nil
+		})
 	monkey.PatchInstanceMethod(
 		reflect.TypeOf((*models.SegmentKodoModel)(nil)), "GetSegmentTsInfo", func(ss *models.SegmentKodoModel,
 			xl *xlog.Logger, starttime, endtime int64, bucketurl, uaid string, limit int, marker string, mac *qbox.Mac) ([]map[string]interface{}, string, error) {
@@ -513,6 +579,17 @@ func (suite *SegmentsTestSuite) TestFromEndInTwoSeg8() {
 	monkey.Patch(getUserInfo, func(xl *xlog.Logger, req *http.Request) (*userInfo, error) {
 		return &userInfo{}, nil
 	})
+
+	monkey.PatchInstanceMethod(
+		reflect.TypeOf((*models.UaModel)(nil)), "GetUaInfo", func(ss *models.UaModel, xl *xlog.Logger, uid, uaid string) ([]models.UaInfo, error) {
+			info := []models.UaInfo{}
+			item := models.UaInfo{
+				Uid:       "link",
+				Namespace: "ipcamera",
+			}
+			info = append(info, item)
+			return info, nil
+		})
 	monkey.Patch(GetBucket, func(xl *xlog.Logger, uid, namespace string) (string, error) {
 		return "ipcamera", nil
 	})
@@ -565,20 +642,41 @@ func (suite *SegmentsTestSuite) TestFromEndInTwoSeg12() {
 
 }
 func (suite *SegmentsTestSuite) TestFromEndInTwoSeg13() {
+	defer monkey.UnpatchAll()
 	req, _ := http.NewRequest("GET", "/v1/namespaces/ipcamera/uas/testdeviceid8/segments?from=1537872668&to=1537876443", nil)
 	monkey.Patch(getUserInfo, func(xl *xlog.Logger, req *http.Request) (*userInfo, error) {
 		return &userinfo, nil
 	})
+	monkey.PatchInstanceMethod(
+		reflect.TypeOf((*models.UaModel)(nil)), "GetUaInfo", func(ss *models.UaModel, xl *xlog.Logger, uid, uaid string) ([]models.UaInfo, error) {
+			info := []models.UaInfo{}
+			item := models.UaInfo{
+				Uid:       "link",
+				Namespace: "ipcamera",
+			}
+			info = append(info, item)
+			return info, nil
+		})
 	w := PerformRequest(suite.r, req)
 	suite.Equal(400, w.Code, "400 for can't find namesapce")
 }
 
 func (suite *SegmentsTestSuite) TestFromEndInTwoSeg14() {
+	defer monkey.UnpatchAll()
 	req, _ := http.NewRequest("GET", "/v1/namespaces/ipcamera/uas/testdeviceid8/segments?from=1537872668&to=1537876443", nil)
 	monkey.Patch(getUserInfo, func(xl *xlog.Logger, req *http.Request) (*userInfo, error) {
 		return &userinfo, nil
 	})
-
+	monkey.PatchInstanceMethod(
+		reflect.TypeOf((*models.UaModel)(nil)), "GetUaInfo", func(ss *models.UaModel, xl *xlog.Logger, uid, uaid string) ([]models.UaInfo, error) {
+			info := []models.UaInfo{}
+			item := models.UaInfo{
+				Uid:       "link",
+				Namespace: "ipcamera",
+			}
+			info = append(info, item)
+			return info, nil
+		})
 	monkey.Patch(GetBucket, func(xl *xlog.Logger, uid, namespace string) (string, error) {
 		return "ipcamera", nil
 	})
@@ -587,11 +685,21 @@ func (suite *SegmentsTestSuite) TestFromEndInTwoSeg14() {
 
 }
 func (suite *SegmentsTestSuite) TestFromEndInTwoSeg15() {
+	defer monkey.UnpatchAll()
 	req, _ := http.NewRequest("GET", "/v1/namespaces/ipcamera/uas/testdeviceid8/segments?from=1537872668&to=1537876443", nil)
 	monkey.Patch(getUserInfo, func(xl *xlog.Logger, req *http.Request) (*userInfo, error) {
 		return &userinfo, nil
 	})
-
+	monkey.PatchInstanceMethod(
+		reflect.TypeOf((*models.UaModel)(nil)), "GetUaInfo", func(ss *models.UaModel, xl *xlog.Logger, uid, uaid string) ([]models.UaInfo, error) {
+			info := []models.UaInfo{}
+			item := models.UaInfo{
+				Uid:       "link",
+				Namespace: "ipcamera",
+			}
+			info = append(info, item)
+			return info, nil
+		})
 	monkey.Patch(GetBucket, func(xl *xlog.Logger, uid, namespace string) (string, error) {
 		return "ipcamera", nil
 	})

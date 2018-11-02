@@ -47,18 +47,19 @@ func FFGrpcClientInit(conf *system.GrpcConf) {
 }
 
 type requestParams struct {
-	uaid      string
-	from      int64
-	to        int64
-	expire    int64
-	token     string
-	limit     int
-	marker    string
-	namespace string
-	regex     string
-	exact     bool
-	speed     int32
-	fmt       string
+	uaid             string
+	from             int64
+	to               int64
+	expire           int64
+	token            string
+	limit            int
+	marker           string
+	namespace        string
+	namespaceInQuery string
+	regex            string
+	exact            bool
+	speed            int32
+	fmt              string
 }
 type userInfo struct {
 	uid uint32
@@ -76,6 +77,20 @@ func SetUserInfo(ak, sk string) {
 	localInfo.uid = 0
 	localInfo.ak = ak
 	localInfo.sk = sk
+}
+
+func checkParams(xl *xlog.Logger, params *requestParams) error {
+	if params.to <= params.from {
+		xl.Errorf("bad from/to time, from = %v, to = %v", params.from, params.to)
+		return fmt.Errorf("bad from/to time, from great or equal than to")
+	}
+
+	dayInMilliSec := int64((24 * time.Hour).Seconds() * 1000)
+	if (params.to - params.from) > dayInMilliSec {
+		xl.Errorf("bad from/to time, from = %v, to = %v", params.from, params.to)
+		return fmt.Errorf("bad from/to time, currently we only support playback in 24 hours")
+	}
+	return nil
 }
 
 func getUserInfo(xl *xlog.Logger, req *http.Request) (*userInfo, error) {
@@ -204,6 +219,7 @@ func ParseRequest(c *gin.Context, xl *xlog.Logger) (*requestParams, error) {
 	*/
 	uaid := c.Param("uaid")
 	namespace := c.Param("namespace")
+	namespaceInQuery := c.DefaultQuery("namespace", "")
 	from := c.DefaultQuery("from", "0")
 	to := c.DefaultQuery("to", "0")
 	expire := c.DefaultQuery("e", "0")
@@ -250,18 +266,19 @@ func ParseRequest(c *gin.Context, xl *xlog.Logger) (*requestParams, error) {
 		return nil, errors.New("fmt error, it should be flv or fmp4")
 	}
 	params := &requestParams{
-		uaid:      uaid,
-		from:      fromT * 1000,
-		to:        toT * 1000,
-		expire:    expireT * 1000,
-		token:     token,
-		limit:     int(limitT),
-		marker:    marker,
-		namespace: namespace,
-		regex:     regex,
-		exact:     exactT,
-		speed:     int32(speedT),
-		fmt:       fmt,
+		uaid:             uaid,
+		from:             fromT * 1000,
+		to:               toT * 1000,
+		expire:           expireT * 1000,
+		token:            token,
+		limit:            int(limitT),
+		marker:           marker,
+		namespace:        namespace,
+		namespaceInQuery: namespaceInQuery,
+		regex:            regex,
+		exact:            exactT,
+		speed:            int32(speedT),
+		fmt:              fmt,
 	}
 
 	return params, nil
@@ -289,7 +306,8 @@ func GetNameSpaceInfo(xl *xlog.Logger, bucket, uaid string) (error, int) {
 
 	if isAuto == false {
 		model := models.UaModel{}
-		r, err := model.GetUaInfo(xl, info[0].Space, uaid)
+		r, err := model.GetUaInfo(xl, info[0].Uid, uaid)
+		xl.Errorf("3333333  r = #%v  ua #%v info #%v", r, uaid, info[0])
 		if err != nil {
 			return err, 0
 		}
