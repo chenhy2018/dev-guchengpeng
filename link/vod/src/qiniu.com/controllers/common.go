@@ -56,7 +56,7 @@ type requestParams struct {
 	marker           string
 	namespace        string
 	namespaceInQuery string
-	regex            string
+	prefix           string
 	exact            bool
 	speed            int32
 	fmt              string
@@ -226,7 +226,7 @@ func ParseRequest(c *gin.Context, xl *xlog.Logger) (*requestParams, error) {
 	token := c.Query("token")
 	limit := c.DefaultQuery("limit", "1000")
 	marker := c.DefaultQuery("marker", "")
-	regex := c.DefaultQuery("regex", "")
+	prefix := c.DefaultQuery("prefix", "")
 	exact := c.DefaultQuery("exact", "false")
 	speed := c.DefaultQuery("speed", "1")
 	fmt := c.Query("fmt")
@@ -275,7 +275,7 @@ func ParseRequest(c *gin.Context, xl *xlog.Logger) (*requestParams, error) {
 		marker:           marker,
 		namespace:        namespace,
 		namespaceInQuery: namespaceInQuery,
-		regex:            regex,
+		prefix:           prefix,
 		exact:            exactT,
 		speed:            int32(speedT),
 		fmt:              fmt,

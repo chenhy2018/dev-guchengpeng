@@ -221,7 +221,7 @@ func updateNamespace(xl *xlog.Logger, uid, space, newSpace string) error {
 		model := models.UaModel{}
 		mark := ""
 		for {
-			uas, nextmark, err := model.GetUaInfos(xl, 0, mark, uid, space, models.UA_ITEM_UAID, "")
+			uas, nextmark, err := model.GetUaInfos(xl, 0, mark, uid, space, "")
 			if err != nil {
 				return err
 			}
@@ -369,7 +369,7 @@ func UpdateNamespace(c *gin.Context) {
 	c.JSON(200, gin.H{"success": true})
 }
 
-// sample requset url = /v1/namespaces?regex=<Regex>&limit=<Limit>&marker=<Marker>&exact=<Exact>
+// sample requset url = /v1/namespaces?prefix=<Prefix>&limit=<Limit>&marker=<Marker>&exact=<Exact>
 func GetNamespaceInfo(c *gin.Context) {
 	xl := xlog.New(c.Writer, c.Request)
 	params, err := ParseRequest(c, xl)
@@ -390,11 +390,11 @@ func GetNamespaceInfo(c *gin.Context) {
 		return
 	}
 
-	xl.Infof("limit %d, marker %s, regex %s uid %s", params.limit, params.marker, params.regex, getUid(info.uid))
+	xl.Infof("limit %d, marker %s, regex %s uid %s", params.limit, params.marker, params.prefix, getUid(info.uid))
 	if params.exact {
-		r, err = namespaceMod.GetNamespaceInfo(xl, getUid(info.uid), params.regex)
+		r, err = namespaceMod.GetNamespaceInfo(xl, getUid(info.uid), params.prefix)
 	} else {
-		r, nextMark, err = namespaceMod.GetNamespaceInfos(xl, params.limit, params.marker, getUid(info.uid), models.NAMESPACE_ITEM_ID, params.regex)
+		r, nextMark, err = namespaceMod.GetNamespaceInfos(xl, params.limit, params.marker, getUid(info.uid), params.prefix)
 	}
 	if err != nil {
 		xl.Errorf("get namesapce failed, error = %#v", err.Error())

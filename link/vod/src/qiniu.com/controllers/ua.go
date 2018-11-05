@@ -128,7 +128,7 @@ func DeleteUa(c *gin.Context) {
 		return
 	}
 	cond := map[string]interface{}{
-		models.UA_ITEM_UID:  getUid(user.uid),
+		models.ITEM_ID:      getUid(user.uid) + "." + params.uaid,
 		models.UA_ITEM_UAID: params.uaid,
 	}
 	info, err := UaMod.GetUaInfo(xl, getUid(user.uid), params.uaid)
@@ -270,11 +270,11 @@ func GetUaInfo(c *gin.Context) {
 
 	var nextMark = ""
 	var r []models.UaInfo
-	xl.Infof("limit %d, marker %s, regex %s namespace %s", params.limit, params.marker, params.regex, params.namespaceInQuery)
+	xl.Infof("limit %d, marker %s, prefix %s namespace %s", params.limit, params.marker, params.prefix, params.namespaceInQuery)
 	if params.exact {
-		r, err = UaMod.GetUaInfo(xl, getUid(user.uid), params.regex)
+		r, err = UaMod.GetUaInfo(xl, getUid(user.uid), params.prefix)
 	} else {
-		r, nextMark, err = UaMod.GetUaInfos(xl, params.limit, params.marker, getUid(user.uid), params.namespaceInQuery, models.UA_ITEM_UAID, params.regex)
+		r, nextMark, err = UaMod.GetUaInfos(xl, params.limit, params.marker, getUid(user.uid), params.namespaceInQuery, params.prefix)
 	}
 	if err != nil {
 		xl.Errorf("Get falied error = %#v", err.Error())

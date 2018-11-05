@@ -2,7 +2,6 @@ package models
 
 import (
 	"fmt"
-	"strconv"
 	"time"
 
 	"github.com/qiniu/xlog.v1"
@@ -32,11 +31,11 @@ func (m *NamespaceModel) Register(xl *xlog.Logger, req NamespaceInfo) error {
 		func(c *mgo.Collection) error {
 			_, err := c.Upsert(
 				bson.M{
-					NAMESPACE_ITEM_ID:  req.Space,
-					NAMESPACE_ITEM_UID: req.Uid,
+					ITEM_ID: req.Uid + "." + req.Space,
 				},
 				bson.M{
 					"$set": bson.M{
+						ITEM_ID:                       req.Uid + "." + req.Space,
 						NAMESPACE_ITEM_ID:             req.Space,
 						ITEM_CREATE_TIME:              time.Now().Unix(),
 						NAMESPACE_ITEM_BUCKET:         req.Bucket,
@@ -59,15 +58,14 @@ func (m *NamespaceModel) Register(xl *xlog.Logger, req NamespaceInfo) error {
 
 func (m *NamespaceModel) Delete(xl *xlog.Logger, uid, id string) error {
 	/*
-	   db.namespace.remove({"uid": uid,  "namespace": id})
+	   db.namespace.remove({"_id": uid + "." + id})
 	*/
 	return db.WithCollection(
 		NAMESPACE_COL,
 		func(c *mgo.Collection) error {
 			return c.Remove(
 				bson.M{
-					NAMESPACE_ITEM_ID:  id,
-					NAMESPACE_ITEM_UID: uid,
+					ITEM_ID: uid + "." + id,
 				},
 			)
 		},
@@ -75,6 +73,7 @@ func (m *NamespaceModel) Delete(xl *xlog.Logger, uid, id string) error {
 }
 
 type NamespaceInfo struct {
+	id           string `bson:"_id"  json:"_id"`
 	Space        string `bson:"namespace"  json:"namespace"`
 	Regtime      int64  `bson:"createdAt"  json:"createdAt"`
 	UpdateTime   int64  `bson:"updatedAt"  json:"updatedAt"`
@@ -95,8 +94,7 @@ func (m *NamespaceModel) GetNamespaceInfo(xl *xlog.Logger, uid, namespace string
 		func(c *mgo.Collection) error {
 			return c.Find(
 				bson.M{
-					NAMESPACE_ITEM_ID:  namespace,
-					NAMESPACE_ITEM_UID: uid,
+					ITEM_ID: uid + "." + namespace,
 				},
 			).All(&r)
 		},
@@ -122,23 +120,22 @@ func (m *NamespaceModel) GetNamespaceByBucket(xl *xlog.Logger, bucket string) ([
 	return r, err
 }
 
-func (m *NamespaceModel) GetNamespaceInfos(xl *xlog.Logger, limit int, mark, uid, category, like string) ([]NamespaceInfo, string, error) {
+func (m *NamespaceModel) GetNamespaceInfos(xl *xlog.Logger, limit int, mark, uid, prefix string) ([]NamespaceInfo, string, error) {
 
 	/*
-	   db.namespace.find({"uid" : uid, { category: {"$regex": "*like*"}}},
-	   ).sort({"namespace":1}).limit(limit),skip(mark)
+		db.namespace.find({"_id": "$gte": newPrefix, "$lte": uid + "/"},
+		   ).sort({"namespace":1}).limit(limit),skip(mark)
 	*/
+
+	newPrefix := uid + "." + prefix
+	if mark != "" {
+		newPrefix = mark
+	}
 	// query by keywords
 	query := bson.M{
-		NAMESPACE_ITEM_UID: uid,
-		category:           bson.M{"$regex": ".*" + like + ".*"},
+		ITEM_ID: bson.M{"$gte": newPrefix, "$lte": uid + "/"},
 	}
 	nextMark := ""
-	// direct to specific page
-	skip, err := strconv.ParseInt(mark, 10, 32)
-	if err != nil {
-		skip = 0
-	}
 
 	if limit == 0 {
 		limit = 65535
@@ -147,11 +144,11 @@ func (m *NamespaceModel) GetNamespaceInfos(xl *xlog.Logger, limit int, mark, uid
 	// query
 	r := []NamespaceInfo{}
 	count := 0
-	err = db.WithCollection(
+	err := db.WithCollection(
 		NAMESPACE_COL,
 		func(c *mgo.Collection) error {
 			var err error
-			if err = c.Find(query).Sort(NAMESPACE_ITEM_ID).Skip(int(skip)).Limit(limit).All(&r); err != nil {
+			if err = c.Find(query).Sort(ITEM_ID).Limit(limit).All(&r); err != nil {
 				return fmt.Errorf("query failed")
 			}
 			if count, err = c.Find(query).Count(); err != nil {
@@ -164,7 +161,7 @@ func (m *NamespaceModel) GetNamespaceInfos(xl *xlog.Logger, limit int, mark, uid
 		return []NamespaceInfo{}, "", err
 	}
 	if count > limit {
-		nextMark = fmt.Sprintf("%d", limit)
+		nextMark = r[limit-1].Uid + "." + r[limit-1].Space + "."
 	}
 	return r, nextMark, nil
 }
@@ -178,37 +175,14 @@ func (m *NamespaceModel) UpdateBucket(xl *xlog.Logger, uid, space, bucket, domai
 		func(c *mgo.Collection) error {
 			return c.Update(
 				bson.M{
-					NAMESPACE_ITEM_ID:  space,
-					NAMESPACE_ITEM_UID: uid,
+					NAMESPACE_ITEM_ID: space,
+					ITEM_ID:           uid + "." + space,
 				},
 				bson.M{
 					"$set": bson.M{
 						NAMESPACE_ITEM_BUCKET: bucket,
 						ITEM_UPDATA_TIME:      time.Now().Unix(),
 						NAMESPACE_ITEM_DOMAIN: domain,
-					},
-				},
-			)
-		},
-	)
-}
-
-func (m *NamespaceModel) UpdateNamespace(xl *xlog.Logger, uid, space, newSpace string) error {
-	/*
-	   db.namespace.update({"uid": uid, "namespace": space}, bson.M{"$set":{"namespace": newSpace}}),
-	*/
-	return db.WithCollection(
-		NAMESPACE_COL,
-		func(c *mgo.Collection) error {
-			return c.Update(
-				bson.M{
-					NAMESPACE_ITEM_ID:  space,
-					NAMESPACE_ITEM_UID: uid,
-				},
-				bson.M{
-					"$set": bson.M{
-						NAMESPACE_ITEM_ID: newSpace,
-						ITEM_UPDATA_TIME:  time.Now().Unix(),
 					},
 				},
 			)
@@ -225,8 +199,8 @@ func (m *NamespaceModel) UpdateAutoCreateUa(xl *xlog.Logger, uid, space string, 
 		func(c *mgo.Collection) error {
 			return c.Update(
 				bson.M{
-					NAMESPACE_ITEM_ID:  space,
-					NAMESPACE_ITEM_UID: uid,
+					NAMESPACE_ITEM_ID: space,
+					ITEM_ID:           uid + "." + space,
 				},
 				bson.M{
 					"$set": bson.M{
@@ -248,8 +222,8 @@ func (m *NamespaceModel) UpdateExpire(xl *xlog.Logger, uid, space string, expire
 		func(c *mgo.Collection) error {
 			return c.Update(
 				bson.M{
-					NAMESPACE_ITEM_ID:  space,
-					NAMESPACE_ITEM_UID: uid,
+					NAMESPACE_ITEM_ID: space,
+					ITEM_ID:           uid + "." + space,
 				},
 				bson.M{
 					"$set": bson.M{
@@ -259,4 +233,69 @@ func (m *NamespaceModel) UpdateExpire(xl *xlog.Logger, uid, space string, expire
 			)
 		},
 	)
+}
+
+func (m *NamespaceModel) UpdateNamespace(xl *xlog.Logger, uid, space, newSpace string) error {
+	/*
+	   db.namespace.update({"uid": uid, "namespace": space}, bson.M{"$set":{"namespace": newSpace}}),
+	*/
+	r := []NamespaceInfo{}
+	err := db.WithCollection(
+		NAMESPACE_COL,
+		func(c *mgo.Collection) error {
+			return c.Find(
+				bson.M{
+					ITEM_ID: uid + "." + space,
+				},
+			).All(&r)
+		},
+	)
+	if err != nil {
+		return err
+	}
+	err = db.WithCollection(
+		NAMESPACE_COL,
+		func(c *mgo.Collection) error {
+			return c.Remove(
+				bson.M{
+					ITEM_ID: uid + "." + space,
+				},
+			)
+		},
+	)
+	if err != nil {
+		return err
+	}
+	if len(r) == 0 {
+		return fmt.Errorf("Can't find old namespace")
+	}
+	err = db.WithCollection(
+		NAMESPACE_COL,
+		func(c *mgo.Collection) error {
+			_, err := c.Upsert(
+				bson.M{
+					ITEM_ID: uid + "." + newSpace,
+				},
+				bson.M{
+					"$set": bson.M{
+						ITEM_ID:                       uid + "." + newSpace,
+						ITEM_CREATE_TIME:              r[0].Regtime,
+						NAMESPACE_ITEM_ID:             newSpace,
+						NAMESPACE_ITEM_BUCKET:         r[0].Bucket,
+						ITEM_UPDATA_TIME:              time.Now().Unix(),
+						NAMESPACE_ITEM_UID:            r[0].Uid,
+						NAMESPACE_ITEM_DOMAIN:         r[0].Domain,
+						NAMESPACE_ITEM_AUTO_CREATE_UA: r[0].AutoCreateUa,
+						NAMESPACE_ITEM_EXPIRE:         r[0].Expire,
+					},
+				},
+			)
+			return err
+		},
+	)
+	if err != nil {
+		return err
+	}
+	return nil
+
 }
