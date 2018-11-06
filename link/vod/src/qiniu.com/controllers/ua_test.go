@@ -59,6 +59,7 @@ func TestRegisterUa(t *testing.T) {
 	RegisterUa(c)
 
 	// namespace is not correct. return 400
+	fmt.Println(bodyT)
 	req, _ = http.NewRequest("POST", "/v1/uas/ipcamera1", bodyT)
 	c, _ = gin.CreateTestContext(httptest.NewRecorder())
 	c.Request = req

@@ -60,6 +60,7 @@ type requestParams struct {
 	exact            bool
 	speed            int32
 	fmt              string
+	m3u8FileName     string
 }
 type userInfo struct {
 	uid uint32
@@ -211,12 +212,6 @@ func VerifyToken(xl *xlog.Logger, expire int64, realToken string, req *http.Requ
 }
 
 func ParseRequest(c *gin.Context, xl *xlog.Logger) (*requestParams, error) {
-	/* uaidT, err := base64.StdEncoding.DecodeString(c.Param("uaid"))
-	   if err != nil {
-	           return nil, errors.New("decode uaid error")
-	   }
-	   uaid := string(uaidT)
-	*/
 	uaid := c.Param("uaid")
 	namespace := c.Param("namespace")
 	namespaceInQuery := c.DefaultQuery("namespace", "")
@@ -229,6 +224,7 @@ func ParseRequest(c *gin.Context, xl *xlog.Logger) (*requestParams, error) {
 	regex := c.DefaultQuery("regex", "")
 	exact := c.DefaultQuery("exact", "false")
 	speed := c.DefaultQuery("speed", "1")
+	m3u8Name := c.DefaultQuery("m3u8Name", "")
 	fmt := c.Query("fmt")
 
 	if strings.Contains(uaid, ".m3u8") {
@@ -279,6 +275,7 @@ func ParseRequest(c *gin.Context, xl *xlog.Logger) (*requestParams, error) {
 		exact:            exactT,
 		speed:            int32(speedT),
 		fmt:              fmt,
+		m3u8FileName:     m3u8Name,
 	}
 
 	return params, nil

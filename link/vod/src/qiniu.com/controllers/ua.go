@@ -3,6 +3,7 @@ package controllers
 import (
 	//"time"
 	"encoding/json"
+	"fmt"
 	//"errors"
 	"io"
 
@@ -68,6 +69,8 @@ func RegisterUa(c *gin.Context) {
 		Expire:    uaData.Expire,
 	}
 	model := models.NamespaceModel{}
+	fmt.Println(uaData.Namespace)
+
 	r, err := model.GetNamespaceInfo(xl, getUid(user.uid), uaData.Namespace)
 	if err != nil {
 		xl.Errorf("get namespace error, error =%#v", err)
@@ -81,7 +84,6 @@ func RegisterUa(c *gin.Context) {
 		})
 		return
 	}
-
 	info, err := UaMod.GetUaInfo(xl, uaData.Namespace, params.uaid)
 	if err != nil {
 		xl.Errorf("get ua info failed")

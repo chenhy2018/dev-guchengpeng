@@ -49,6 +49,7 @@ func GetPlayBackm3u8(c *gin.Context) {
 	}
 	xl.Infof("uaid = %v, from = %v, to = %v", params.uaid, params.from, params.to)
 
+	// fast forward case
 	if params.speed != 1 {
 		if err := getFastForwardStream(xl, params, c, userInfo); err != nil {
 			xl.Errorf("get fastforward stream error , error = %v", err.Error())
@@ -77,73 +78,78 @@ func GetPlayBackm3u8(c *gin.Context) {
 
 	mac := qbox.NewMac(userInfo.ak, userInfo.sk)
 
+	// get ts list from kodo
+	playlist, err, code := getPlaybackList(xl, mac, params, bucket)
+	if err != nil {
+		xl.Errorf("get playback list error, error = %#v", err.Error())
+		c.JSON(code, gin.H{"error": err.Error()})
+		return
+	}
+
+	// make m3u8 file name with "uaid + from + end.m3u8" if user not given
+	fileName := params.m3u8FileName
+	if fileName == "" {
+		from := strconv.FormatInt(params.from, 10)
+		end := strconv.FormatInt(params.from, 10)
+		fileName = params.uaid + from + end + ".m3u8"
+	}
+
+	// upload new m3u8 file to kodo bucket
+	m3u8File := m3u8.Mkm3u8(playlist, xl)
+	err = uploadNewFile(fileName, bucket, []byte(m3u8File), mac)
+	if err != nil {
+		if err.Error() != "file exists" {
+			xl.Errorf("uplaod New m3u8 file failed, error = %#v", err.Error())
+			c.JSON(500, gin.H{"error": "Service Internal Error"})
+			return
+		}
+	}
+	c.Header("Access-Control-Allow-Origin", "*")
+
+	c.JSON(200, gin.H{
+		"key":    fileName,
+		"bucket": bucket,
+	})
+}
+
+func getPlaybackList(xl *xlog.Logger, mac *qbox.Mac, params *requestParams, bucket string) ([]map[string]interface{}, error, int) {
 	segs, _, err := segMod.GetSegmentTsInfo(xl, params.from, params.to, bucket, params.uaid, 0, "", mac)
 	if err != nil {
 		xl.Errorf("getTsInfo error, error =  %#v", err)
-		c.JSON(500, gin.H{"error": "Service Internal Error"})
-		return
+		return nil, errors.New("Service Internal Error"), 500
 	}
-
 	if len(segs) == 0 {
 		xl.Errorf("getTsInfo error, error =  %#v", err)
-		c.JSON(404, gin.H{"error": "can't find stream in this period"})
-		return
+		return nil, errors.New("can't find stream in this period"), 404
 	}
-
-	domain, err := getDomain(xl, bucket, userInfo)
-	if err != nil {
-		xl.Errorf("getDomain error, error =  %#v", err)
-		c.JSON(500, gin.H{"error": "Service Internal Error"})
-		return
-	}
-	if domain == "" {
-		xl.Errorf("bucket is not correct, err = %#v", err)
-		c.JSON(403, gin.H{
-			"error": "bucket is not correct",
-		})
-		return
-	}
-	domain = "http://" + domain
-	playlist, err := getPlaybackList(xl, segs, mac, domain)
-	if err != nil {
-		xl.Errorf("get playback list error, error = %#v", err.Error())
-		c.JSON(500, gin.H{"error": "Service Internal Error"})
-		return
-	}
-	c.Header("Content-Type", "application/x-mpegURL")
-	c.String(200, m3u8.Mkm3u8(playlist, xl))
-}
-func getPlaybackList(xl *xlog.Logger, segs []map[string]interface{}, mac *qbox.Mac, domain string) ([]map[string]interface{}, error) {
 	var playlist []map[string]interface{}
 
 	var total int64
 	for _, v := range segs {
 		start, ok := v[models.SEGMENT_ITEM_START_TIME].(int64)
 		if !ok {
-			return nil, errors.New("start time format error")
+			return nil, errors.New("start time format error"), 500
 		}
 		end, ok := v[models.SEGMENT_ITEM_END_TIME].(int64)
 		if !ok {
-			return nil, errors.New("end time format error")
+			return nil, errors.New("end time format error"), 500
 		}
 		duration := float64(end-start) / 1000
 		total += int64(duration)
 		filename, ok := v[models.SEGMENT_ITEM_FILE_NAME].(string)
 
 		if !ok {
-			return nil, errors.New("filename format error")
+			return nil, errors.New("filename format error"), 500
 
 		}
-		realUrl := GetUrlWithDownLoadToken(xl, domain, filename, total, mac)
-
 		m := map[string]interface{}{
 			"duration": duration,
-			"url":      realUrl,
+			"url":      "/" + filename,
 		}
 		playlist = append(playlist, m)
 
 	}
-	return playlist, nil
+	return playlist, nil, 200
 }
 func getFastForwardStream(xl *xlog.Logger, params *requestParams, c *gin.Context, user *userInfo) error {
 	// remove speed fmt from url

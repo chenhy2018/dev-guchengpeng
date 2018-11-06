@@ -92,11 +92,11 @@ func (p *MediaPlaylist) AppendSegment(uri string, duration float64, title string
 
 	eles := strings.Split(uri, "/")
 
-	startTime, err := strconv.ParseInt(eles[5], 10, 64)
+	startTime, err := strconv.ParseInt(eles[3], 10, 64)
 	if err != nil {
 		return err
 	}
-	endTime, err := strconv.ParseInt(eles[6], 10, 64)
+	endTime, err := strconv.ParseInt(eles[4], 10, 64)
 	if err != nil {
 		return err
 	}
@@ -134,7 +134,7 @@ func (p *MediaPlaylist) addVersion() {
 }
 
 func (p *MediaPlaylist) addCacheInfo() {
-	p.buf.WriteString("#EXT-X-ALLOW-CACHE:NO")
+	p.buf.WriteString("#EXT-X-ALLOW-CACHE:YES")
 	p.buf.WriteRune('\n')
 }
 

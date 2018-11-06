@@ -73,8 +73,8 @@ func GetSegments(c *gin.Context) {
 		return
 	}
 	mac := qbox.NewMac(user.ak, user.sk)
-	newFrom := getFristTsAfterFrom(xl, params.from, params.to, bucket, params.uaid, mac)
-	ret, marker, err := segMod.GetFragmentTsInfo(xl, params.limit, newFrom, params.to, bucket, params.uaid, params.marker, mac)
+	newSegFrom, tsStart := getFristTsAfterFrom(xl, params.from, params.to, bucket, params.uaid, mac)
+	ret, marker, err := segMod.GetFragmentTsInfo(xl, params.limit, newSegFrom, params.to, bucket, params.uaid, params.marker, mac)
 	if err != nil {
 		xl.Errorf("get segments list error, error =%#v", err)
 		c.JSON(500, gin.H{"error": "Service Internal Error"})
@@ -87,22 +87,7 @@ func GetSegments(c *gin.Context) {
 		})
 		return
 	}
-	domain, err := getDomain(xl, bucket, user)
-	if err != nil {
-		xl.Errorf("getDomain error, error =  %#v", err)
-		c.JSON(500, gin.H{"error": "Service Internal Error"})
-		return
-	}
-	if domain == "" {
-		xl.Errorf("bucket is not correct, err = %#v", err)
-		c.JSON(403, gin.H{
-			"error": "bucket is not correct",
-		})
-		return
-	}
-
-	domain = "http://" + domain
-	segs, err := filterSegs(xl, ret, params, domain, mac)
+	segs, err := filterSegs(xl, ret, params, tsStart)
 	if err != nil {
 		xl.Error("parse seg start/end failed")
 		c.JSON(500, gin.H{
@@ -117,28 +102,35 @@ func GetSegments(c *gin.Context) {
 	})
 
 }
-func getFristTsAfterFrom(xl *xlog.Logger, from, to int64, bucket, uaid string, mac *qbox.Mac) int64 {
+func getFristTsAfterFrom(xl *xlog.Logger, from, to int64, bucket, uaid string, mac *qbox.Mac) (int64, int64) {
 
 	segs, _, err := segMod.GetSegmentTsInfo(xl, from, to, bucket, uaid, 1, "", mac)
 	if err != nil || segs == nil {
-		return from
+		return from, from
 	}
-	newFrom, ok := segs[0][models.SEGMENT_ITEM_FRAGMENT_START_TIME].(int64)
+	newSegFrom, ok := segs[0][models.SEGMENT_ITEM_FRAGMENT_START_TIME].(int64)
 	if !ok {
-		return from
+		return from, from
 	}
-	return newFrom
+
+	newTsStart, ok := segs[0][models.SEGMENT_ITEM_START_TIME].(int64)
+	if !ok {
+		return from, from
+	}
+	return newSegFrom, newTsStart
 }
 
-func filterSegs(xl *xlog.Logger, ret []map[string]interface{}, params *requestParams, domain string, mac *qbox.Mac) (segs []segInfo, err error) {
+func filterSegs(xl *xlog.Logger, ret []map[string]interface{}, params *requestParams, tsStart int64) (segs []segInfo, err error) {
 	for _, v := range ret {
 		starttime, ok := v[models.SEGMENT_ITEM_START_TIME].(int64)
 		if !ok {
 			return []segInfo{}, errors.New("parse starttime error")
+
 		}
 		endtime, ok := v[models.SEGMENT_ITEM_END_TIME].(int64)
 		if !ok {
 			return []segInfo{}, errors.New("parse starttime error")
+
 		}
 
 		// if from to in the middle seg case
@@ -149,21 +141,32 @@ func filterSegs(xl *xlog.Logger, ret []map[string]interface{}, params *requestPa
 		if params.from > endtime {
 			continue
 		}
+		frameStart := starttime
+
+		// if seg starttime is great than url.from then using first frame after
+		// url.from as snapshot
+		if params.from > frameStart {
+			frameStart = tsStart
+		}
+		filename := "frame" + "/" + params.uaid + "/" + strconv.FormatInt(frameStart, 10) + "/" + strconv.FormatInt(starttime, 10) + ".jpeg"
 		if (params.from >= starttime) && (params.from <= endtime) {
 			starttime = params.from
+
 		}
 
 		if (params.to >= starttime) && (params.to <= endtime) {
 			endtime = params.to
+
 		}
-		filename := "frame" + "/" + params.uaid + "/" + strconv.FormatInt(starttime, 10) + "/" + strconv.FormatInt(starttime, 10) + ".jpeg"
-		realUrl := GetUrlWithDownLoadToken(xl, domain, filename, 0, mac)
+
 		seg := segInfo{
 			StartTime: starttime / 1000,
 			EndTime:   endtime / 1000,
-			Snapshot:  realUrl,
+			Snapshot:  filename,
 		}
 		segs = append(segs, seg)
+
 	}
 	return
+
 }
