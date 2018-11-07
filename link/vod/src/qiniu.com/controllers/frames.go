@@ -1,15 +1,17 @@
 package controllers
 
 import (
+	"errors"
+
 	"github.com/gin-gonic/gin"
 	"github.com/qiniu/api.v7/auth/qbox"
 	xlog "github.com/qiniu/xlog.v1"
 	"qiniu.com/models"
 )
 
-type FrameInfo struct {
-	DownloadUr string `json:"download_url"`
-	Timestamp  int64  `json:"timestamp"`
+type frameInfo struct {
+	Key       string `json:"key"`
+	Timestamp int64  `json:"timestamp"`
 }
 
 func GetFrames(c *gin.Context) {
@@ -55,21 +57,7 @@ func GetFrames(c *gin.Context) {
 		})
 		return
 	}
-	domain, err := getDomain(xl, bucket, user)
-	if err != nil {
-		xl.Errorf("getDomain error, error =  %#v", err)
-		c.JSON(500, gin.H{"error": "Service Internal Error"})
-		return
-	}
-	if domain == "" {
-		xl.Errorf("bucket is not correct, err = %#v", err)
-		c.JSON(403, gin.H{
-			"error": "bucket is not correct",
-		})
-		return
-	}
 
-	domain = "http://" + domain
 	mac := qbox.NewMac(user.ak, user.sk)
 	frames, err := segMod.GetFrameInfo(xl, params.from, params.to, bucket, params.uaid, mac)
 	if err != nil {
@@ -77,34 +65,44 @@ func GetFrames(c *gin.Context) {
 		c.JSON(500, gin.H{"error": "Service Internal Error"})
 		return
 	}
+
 	if frames == nil {
-		c.JSON(200, gin.H{
-			"frames": []string{},
-		})
+		c.JSON(200, gin.H{"frames": []string{}})
 		return
 	}
+	formatedFrames, err := formatFramesData(xl, frames)
+	if err != nil {
+		xl.Errorf("Parse kodo file name failed, error = %#v", err)
+		c.JSON(500, gin.H{"error": "Service Internal Error"})
+		return
+	}
+	c.JSON(200, gin.H{"frames": formatedFrames})
+}
 
-	framesWithToken := make([]FrameInfo, 0, len(frames))
+func formatFramesData(xl *xlog.Logger, frames []map[string]interface{}) ([]frameInfo, error) {
+
+	newFrames := make([]frameInfo, 0, len(frames))
 	for _, v := range frames {
-		filename, ok := v[models.SEGMENT_ITEM_FILE_NAME].(string)
+		fileName, ok := v[models.SEGMENT_ITEM_FILE_NAME].(string)
 		if !ok {
 			xl.Errorf("filename format error %#v", v)
-			c.JSON(500, gin.H{"error": "Service Internal Error"})
-			return
+			return []frameInfo{}, errors.New("filename format error")
+
 		}
-		realUrl := GetUrlWithDownLoadToken(xl, domain, filename, 0, mac)
 		starttime, ok := v[models.SEGMENT_ITEM_START_TIME].(int64)
 		if !ok {
 			xl.Errorf("segment start format error %#v", v)
-			c.JSON(500, gin.H{"error": "Service Internal Error"})
-			return
+			return []frameInfo{}, errors.New("segment start format error")
+
 		}
-		frame := FrameInfo{DownloadUr: realUrl,
-			Timestamp: starttime / 1000}
-		framesWithToken = append(framesWithToken, frame)
+		frame := frameInfo{
+			Key:       fileName,
+			Timestamp: starttime / 1000,
+		}
+
+		newFrames = append(newFrames, frame)
+
 	}
 
-	c.JSON(200, gin.H{
-		"frames": framesWithToken,
-	})
+	return newFrames, nil
 }

@@ -117,9 +117,7 @@ func (suite *SegmentsTestSuite) TestFromEndInTwoSeg2() {
 	monkey.Patch(GetBucket, func(xl *xlog.Logger, uid, namespace string) (string, error) {
 		return "ipcamera", nil
 	})
-	monkey.Patch(getDomain, func(xl *xlog.Logger, bucket string, info *userInfo) (string, error) {
-		return "www.baidu.com", nil
-	})
+
 	monkey.PatchInstanceMethod(
 		reflect.TypeOf((*models.NamespaceModel)(nil)), "GetNamespaceInfo", func(ss *models.NamespaceModel, xl *xlog.Logger, uid, namespace string) ([]models.NamespaceInfo, error) {
 			info := []models.NamespaceInfo{}
@@ -181,9 +179,7 @@ func (suite *SegmentsTestSuite) TestFromEndInTwoSeg3() {
 	monkey.Patch(GetBucket, func(xl *xlog.Logger, uid, namespace string) (string, error) {
 		return "ipcamera", nil
 	})
-	monkey.Patch(getDomain, func(xl *xlog.Logger, bucket string, info *userInfo) (string, error) {
-		return "www.baidu.com", nil
-	})
+
 	monkey.PatchInstanceMethod(
 		reflect.TypeOf((*models.NamespaceModel)(nil)), "GetNamespaceInfo", func(ss *models.NamespaceModel, xl *xlog.Logger, uid, namespace string) ([]models.NamespaceInfo, error) {
 			info := []models.NamespaceInfo{}
@@ -295,9 +291,7 @@ func (suite *SegmentsTestSuite) TestFromEndInTwoSeg4() {
 	monkey.Patch(GetBucket, func(xl *xlog.Logger, uid, namespace string) (string, error) {
 		return "ipcamera", nil
 	})
-	monkey.Patch(getDomain, func(xl *xlog.Logger, bucket string, info *userInfo) (string, error) {
-		return "www.baidu.com", nil
-	})
+
 	w := PerformRequest(suite.r, req)
 
 	body, _ := ioutil.ReadAll(w.Body)
@@ -371,9 +365,7 @@ func (suite *SegmentsTestSuite) TestFromEndInTwoSeg5() {
 	monkey.Patch(GetBucket, func(xl *xlog.Logger, uid, namespace string) (string, error) {
 		return "ipcamera", nil
 	})
-	monkey.Patch(getDomain, func(xl *xlog.Logger, bucket string, info *userInfo) (string, error) {
-		return "www.baidu.com", nil
-	})
+
 	w := PerformRequest(suite.r, req)
 
 	body, _ := ioutil.ReadAll(w.Body)
@@ -445,9 +437,7 @@ func (suite *SegmentsTestSuite) TestFromEndInTwoSeg6() {
 	monkey.Patch(GetBucket, func(xl *xlog.Logger, uid, namespace string) (string, error) {
 		return "ipcamera", nil
 	})
-	monkey.Patch(getDomain, func(xl *xlog.Logger, bucket string, info *userInfo) (string, error) {
-		return "www.baidu.com", nil
-	})
+
 	w := PerformRequest(suite.r, req)
 
 	body, _ := ioutil.ReadAll(w.Body)
@@ -517,9 +507,7 @@ func (suite *SegmentsTestSuite) TestFromEndInTwoSeg7() {
 	monkey.Patch(GetBucket, func(xl *xlog.Logger, uid, namespace string) (string, error) {
 		return "ipcamera", nil
 	})
-	monkey.Patch(getDomain, func(xl *xlog.Logger, bucket string, info *userInfo) (string, error) {
-		return "www.baidu.com", nil
-	})
+
 	w := PerformRequest(suite.r, req)
 
 	body, _ := ioutil.ReadAll(w.Body)
@@ -593,9 +581,7 @@ func (suite *SegmentsTestSuite) TestFromEndInTwoSeg8() {
 	monkey.Patch(GetBucket, func(xl *xlog.Logger, uid, namespace string) (string, error) {
 		return "ipcamera", nil
 	})
-	monkey.Patch(getDomain, func(xl *xlog.Logger, bucket string, info *userInfo) (string, error) {
-		return "www.baidu.com", nil
-	})
+
 	w := PerformRequest(suite.r, req)
 	body, _ := ioutil.ReadAll(w.Body)
 	var segInfos segInfos

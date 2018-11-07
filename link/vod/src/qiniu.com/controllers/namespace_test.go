@@ -82,20 +82,6 @@ func TestRegisterNamespace(t *testing.T) {
 	RegisterNamespace(c)
 	assert.Equal(t, c.Writer.Status(), 403, "they should be equal")
 
-	// bucket is not correct. return 403
-	body = namespacebody{
-		Bucket:    "ipcamera1",
-		Namespace: "aabb",
-	}
-	bodyBuffer, _ = json.Marshal(body)
-	bodyT = bytes.NewBuffer(bodyBuffer)
-	req, _ = http.NewRequest("POST", "/v1/namespaces/test1", bodyT)
-	c, _ = gin.CreateTestContext(httptest.NewRecorder())
-	c.Request = req
-
-	RegisterNamespace(c)
-	assert.Equal(t, c.Writer.Status(), 403, "they should be equal")
-
 	// get namespace  info error
 	body = namespacebody{
 		Bucket:    "doman",
@@ -135,7 +121,7 @@ func TestRegisterNamespace(t *testing.T) {
 		return &userInfo{}, errors.New("get user info error")
 	})
 	body = namespacebody{
-		Bucket:    "ipcamera1",
+		Bucket:    "ipcamera10",
 		Namespace: "aabb",
 	}
 	bodyBuffer, _ = json.Marshal(body)
@@ -152,15 +138,15 @@ func TestRegisterNamespace(t *testing.T) {
 	   }
 	*/
 	// namesapce already exist
-	body = namespacebody{
-		Bucket:    "doman",
-		Namespace: "aabbccc",
-	}
 	guard3 := monkey.PatchInstanceMethod(
 		reflect.TypeOf((*models.NamespaceModel)(nil)), "Register", func(ss *models.NamespaceModel, xl *xlog.Logger, namespace models.NamespaceInfo) error {
 			return errors.New("register namesapce failed")
 		})
 	monkey.Patch(getUserInfo, func(xl *xlog.Logger, req *http.Request) (*userInfo, error) { return &user, nil })
+	body = namespacebody{
+		Bucket:    "doman",
+		Namespace: "aabbccc",
+	}
 	bodyBuffer, _ = json.Marshal(body)
 	bodyT = bytes.NewBuffer(bodyBuffer)
 	req, _ = http.NewRequest("POST", "/v1/namespaces/test1", bodyT)

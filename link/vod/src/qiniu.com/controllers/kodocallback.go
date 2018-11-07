@@ -157,7 +157,7 @@ func updateTsName(xl *xlog.Logger, srcTsKey, destTsKey, bucket, segPrefix string
 	newSegName := segPrefix + "/" + strconv.FormatInt(endTime, 10)
 	if len(entries) == 0 {
 		// create new seg file if doesn't exist
-		if err := createNewsegFile(newSegName, bucket, mac); err != nil {
+		if err := uploadNewFile(newSegName, bucket, []byte{}, mac); err != nil {
 			xl.Errorf("create seg file error, err = %#v", err)
 		}
 		xl.Info("create new seg file file name =%#v", newSegName)
@@ -200,7 +200,7 @@ func updateTsName(xl *xlog.Logger, srcTsKey, destTsKey, bucket, segPrefix string
 	return
 }
 
-func createNewsegFile(filename, bucket string, mac *qbox.Mac) error {
+func uploadNewFile(filename, bucket string, data []byte, mac *qbox.Mac) error {
 
 	putPolicy := storage.PutPolicy{
 		Scope: bucket,
@@ -220,8 +220,7 @@ func createNewsegFile(filename, bucket string, mac *qbox.Mac) error {
 	ret := storage.PutRet{}
 	putExtra := storage.PutExtra{}
 
-	data := []byte{}
-	return formUploader.Put(context.Background(), &ret, upToken, filename, bytes.NewReader(data), 0, &putExtra)
+	return formUploader.Put(context.Background(), &ret, upToken, filename, bytes.NewReader(data), int64(len(data)), &putExtra)
 }
 
 func fop(filename, bucket, jpegName string, mac *qbox.Mac) error {

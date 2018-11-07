@@ -19,7 +19,6 @@ const (
 
 type namespacebody struct {
 	Bucket       string `json:"bucket"`
-	Domain       string `json:"domain"`
 	Namespace    string `json:"namespace"`
 	CreatedAt    int64  `json:"createdAt"`
 	UpdatedAt    int64  `json:"updatedAt"`
@@ -46,18 +45,21 @@ func getDomain(xl *xlog.Logger, bucket string, info *userInfo) (string, error) {
 	}
 
 	defer resp.Body.Close()
-
 	dec := json.NewDecoder(resp.Body)
 	var domain []string
 	for {
 		if err := dec.Decode(&domain); err == io.EOF {
 			break
+
 		} else if err != nil {
 			return "", err
+
 		}
+
 	}
 	if len(domain) == 0 {
 		return "", nil
+
 	}
 	return domain[0], nil
 }
@@ -117,14 +119,6 @@ func RegisterNamespace(c *gin.Context) {
 		return
 	}
 
-	domain, err := getDomain(xl, namespaceData.Bucket, info)
-	if err != nil || domain == "" {
-		xl.Errorf("bucket is not correct, err = %#v", err)
-		c.JSON(403, gin.H{
-			"error": "bucket is not correct",
-		})
-		return
-	}
 	oldinfo, err := namespaceMod.GetNamespaceInfo(xl, getUid(info.uid), params.namespace)
 	if err != nil {
 		xl.Errorf("get Namesapce Info error %#v", err)
@@ -148,7 +142,6 @@ func RegisterNamespace(c *gin.Context) {
 		Uid:          getUid(info.uid),
 		Space:        params.namespace,
 		Bucket:       namespaceData.Bucket,
-		Domain:       domain,
 		AutoCreateUa: namespaceData.AutoCreateUa,
 		Expire:       expire,
 	}
@@ -250,12 +243,15 @@ func updateBucket(xl *xlog.Logger, uid, space, bucket, newBucket string, info *u
 		if err != nil || domain == "" {
 			xl.Errorf("bucket is not correct")
 			return fmt.Errorf("bucket is not correct")
+
 		}
 		err = namespaceMod.UpdateBucket(xl, uid, space, newBucket, domain)
 		if err != nil {
 			xl.Errorf("Update falied error = %#v", err.Error())
 			return err
+
 		}
+
 	}
 	return nil
 }

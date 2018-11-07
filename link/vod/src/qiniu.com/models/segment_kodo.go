@@ -105,14 +105,9 @@ func GetInfoFromFilename(s, sep string) (error, map[string]interface{}) {
 		if len(r) != 2 {
 			return fmt.Errorf("the filename is error [%s]", sub[3]), info
 		}
-		fragmentStartTime, err2 := strconv.ParseInt(r[0], 10, 64)
-		if err2 != nil {
-			return err2, info
-		}
 		info = map[string]interface{}{
-			SEGMENT_ITEM_FRAGMENT_START_TIME: fragmentStartTime,
-			SEGMENT_ITEM_START_TIME:          starttime,
-			SEGMENT_ITEM_FILE_NAME:           s,
+			SEGMENT_ITEM_START_TIME: starttime,
+			SEGMENT_ITEM_FILE_NAME:  s,
 		}
 	}
 	return nil, info

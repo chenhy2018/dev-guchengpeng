@@ -156,9 +156,6 @@ func (suite *PlayBackTestSuite) TestPlayBackWithGetSegmentsInfoError() {
 			info = append(info, item)
 			return info, nil
 		})
-	monkey.Patch(getDomain, func(xl *xlog.Logger, bucket string, info *userInfo) (string, error) {
-		return "wwww.test.com", nil
-	})
 	monkey.PatchInstanceMethod(
 		reflect.TypeOf((*models.SegmentKodoModel)(nil)), "GetSegmentTsInfo", func(ss *models.SegmentKodoModel,
 			xl *xlog.Logger, starttime, endtime int64, bucketurl, uaid string, limit int, marker string, mac *qbox.Mac) ([]map[string]interface{}, string, error) {
@@ -238,56 +235,6 @@ func (suite *PlayBackTestSuite) TestPlayBackWithBadNameSpace() {
 	suite.Equal(400, w.Code, "bucket can't find")
 }
 
-func (suite *PlayBackTestSuite) TestPlayBackWithBadDomain() {
-	req, _ := http.NewRequest("GET", "/v1/namespaces/ipcamera/uas/testdeviceid8/playback?to=1532499345&from=1532499045&e=1532499345&token=xxxxxx", nil)
-	defer monkey.UnpatchAll()
-	monkey.Patch(VerifyToken, func(xl *xlog.Logger, expire int64, realToken string, req *http.Request, user *userInfo) bool {
-		return true
-	})
-	monkey.Patch(getUserInfo, func(xl *xlog.Logger, req *http.Request) (*userInfo, error) { return &userinfo, nil })
-	monkey.PatchInstanceMethod(
-		reflect.TypeOf((*models.UaModel)(nil)), "GetUaInfo", func(ss *models.UaModel, xl *xlog.Logger, uid, uaid string) ([]models.UaInfo, error) {
-			info := []models.UaInfo{}
-			item := models.UaInfo{
-				Uid:       "link",
-				Namespace: "ipcamera",
-			}
-			info = append(info, item)
-			return info, nil
-		})
-	monkey.Patch(GetBucket, func(xl *xlog.Logger, uid, namespace string) (string, error) {
-		return "ipcamera", nil
-	})
-
-	monkey.Patch(getDomain, func(xl *xlog.Logger, bucket string, info *userInfo) (string, error) {
-		return "", nil
-	})
-	monkey.PatchInstanceMethod(
-		reflect.TypeOf((*models.SegmentKodoModel)(nil)), "GetSegmentTsInfo", func(ss *models.SegmentKodoModel,
-			xl *xlog.Logger, starttime, endtime int64, bucketurl, uaid string, limit int, marker string, mac *qbox.Mac) ([]map[string]interface{}, string, error) {
-			info := []map[string]interface{}{
-				map[string]interface{}{
-					models.SEGMENT_ITEM_START_TIME: 1532499345000,
-					models.SEGMENT_ITEM_END_TIME:   1532499345000,
-					models.SEGMENT_ITEM_FILE_NAME:  "xxxxxxxx",
-				},
-				map[string]interface{}{
-					models.SEGMENT_ITEM_START_TIME: 1532499345001,
-					models.SEGMENT_ITEM_END_TIME:   1532499345002,
-					models.SEGMENT_ITEM_FILE_NAME:  "xxxxxxxxb",
-				}}
-			return info, "", nil
-		})
-	w := PerformRequest(suite.r, req)
-	suite.Equal(403, w.Code, "bucket can't find")
-
-	monkey.Patch(getDomain, func(xl *xlog.Logger, bucket string, info *userInfo) (string, error) {
-		return "", errors.New("get bucket error")
-	})
-	w = PerformRequest(suite.r, req)
-	suite.Equal(500, w.Code, "get domain failed")
-}
-
 func (suite *PlayBackTestSuite) TestPlayBackWithCorrectDomain() {
 	req, _ := http.NewRequest("GET", "/v1/namespaces/ipcamera/uas/testdeviceid8/playback?to=1536143287&from=1536142906&e=1532499345&token=xxxxxx", nil)
 	defer monkey.UnpatchAll()
@@ -311,8 +258,8 @@ func (suite *PlayBackTestSuite) TestPlayBackWithCorrectDomain() {
 		return "ipcamera", nil
 	})
 
-	monkey.Patch(getDomain, func(xl *xlog.Logger, bucket string, info *userInfo) (string, error) {
-		return "wwww.test.com", nil
+	monkey.Patch(uploadNewFile, func(filename, bucket string, data []byte, mac *qbox.Mac) error {
+		return nil
 	})
 	monkey.PatchInstanceMethod(
 		reflect.TypeOf((*models.SegmentKodoModel)(nil)), "GetSegmentTsInfo", func(ss *models.SegmentKodoModel,
