@@ -23,7 +23,7 @@ func (m *UaModel) Init() error {
 
 func (m *UaModel) Register(xl *xlog.Logger, req UaInfo) error {
 	/*
-	   db.ua.update( {id: "req.Uid + "." + req.UaId"}, {"$set": {"namespace": space, "password": password}},
+	   db.ua.update( {id: "uid" + "namespace + "." + req.UaId"}, {"$set": {"namespace": space, "password": password}},
 	   { upsert: true })
 	*/
 	err := db.WithCollection(
@@ -31,11 +31,11 @@ func (m *UaModel) Register(xl *xlog.Logger, req UaInfo) error {
 		func(c *mgo.Collection) error {
 			_, err := c.Upsert(
 				bson.M{
-					ITEM_ID: req.Uid + "." + req.UaId,
+					ITEM_ID: req.Uid + "." + req.Namespace + "." + req.UaId,
 				},
 				bson.M{
 					"$set": bson.M{
-						ITEM_ID:           req.Uid + "." + req.UaId,
+						ITEM_ID:           req.Uid + "." + req.Namespace + "." + req.UaId,
 						UA_ITEM_UID:       req.Uid,
 						UA_ITEM_UAID:      req.UaId,
 						UA_ITEM_PASSWORD:  req.Password,
@@ -60,7 +60,7 @@ func (m *UaModel) Register(xl *xlog.Logger, req UaInfo) error {
 
 func (m *UaModel) Delete(xl *xlog.Logger, cond map[string]interface{}) error {
 	/*
-	   db.ua.remove({id: "uid + "." + id", uaid: id})
+	   db.ua.remove({id: "uid + "." + "namespace" + "." + id", uaid: id})
 	*/
 	return db.WithCollection(
 		UA_COL,
@@ -79,7 +79,7 @@ type UaInfo struct {
 	Password  string `bson:"password"   json:"password"` //options
 	Namespace string `bson:"namespace"  json:"namespace"`
 	CreateAt  int64  `bson:"createdAt"  json:"createdAt"`
-	UpdatedAt int64  `bson:"updatedAt"  json:"updatedAt"`
+	UpdatedAt int64  `bson:"updateAt"   json:"updateAt"`
 	Vod       bool   `bson:"vod"        json:"vod"`
 	Live      bool   `bson:"live"       json:"live"`
 	Online    bool   `bson:"online"     json:"online"`
@@ -89,26 +89,21 @@ type UaInfo struct {
 func (m *UaModel) GetUaInfos(xl *xlog.Logger, limit int, mark, uid, namespace, prefix string) ([]UaInfo, string, error) {
 
 	/*
-	   db.ua.find({"uid": uid, {"_id": "$gte": newPrefix, "$lte": uid + "/"},}
+	   db.ua.find({"uid": uid, {"_id": "$gte": newPrefix, "$lte": uid + "." + namespace + "/"},}
 	   ).sort({"date":1}).limit(limit)
 	*/
 
-	newPrefix := uid + "." + prefix
+	newPrefix := uid + "." + namespace + "." + prefix
 	if mark != "" {
 		newPrefix = mark
 	}
 	var query = bson.M{}
 	// query by keywords
-	if namespace != "" {
-		query = bson.M{
-			ITEM_ID:           bson.M{"$gte": newPrefix, "$lte": uid + "/"},
-			UA_ITEM_NAMESPACE: namespace,
-		}
-	} else {
-		query = bson.M{
-			ITEM_ID: bson.M{"$gte": newPrefix, "$lte": uid + "/"},
-		}
+	query = bson.M{
+		ITEM_ID:           bson.M{"$gte": newPrefix, "$lte": uid + "/"},
+		UA_ITEM_NAMESPACE: namespace,
 	}
+
 	// direct to specific page
 	nextMark := ""
 
@@ -135,18 +130,18 @@ func (m *UaModel) GetUaInfos(xl *xlog.Logger, limit int, mark, uid, namespace, p
 		return []UaInfo{}, "", err
 	}
 	if count > limit {
-		nextMark = r[limit-1].Uid + "." + r[limit-1].UaId + "."
+		nextMark = r[limit-1].Uid + "." + r[limit-1].Namespace + "." + r[limit-1].UaId + "."
 	}
 	return r, nextMark, nil
 }
 
-func (m *UaModel) GetUaInfo(xl *xlog.Logger, uid, uaid string) ([]UaInfo, error) {
+func (m *UaModel) GetUaInfo(xl *xlog.Logger, uid, namespace, uaid string) ([]UaInfo, error) {
 	/*
-		db.ua.find({uid: uid, uaid: id})
+	   db.ua.find({namespace: namespace, uaid: id})
 	*/
 	// query by keywords
 	query := bson.M{
-		ITEM_ID:      uid + "." + uaid,
+		ITEM_ID:      uid + "." + namespace + "." + uaid,
 		UA_ITEM_UAID: uaid,
 	}
 
@@ -168,16 +163,16 @@ func (m *UaModel) GetUaInfo(xl *xlog.Logger, uid, uaid string) ([]UaInfo, error)
 	return r, nil
 }
 
-func (m *UaModel) UpdateUa(xl *xlog.Logger, uid, uaid string, info UaInfo) error {
+func (m *UaModel) UpdateUa(xl *xlog.Logger, uid, namespace, uaid string, info UaInfo) error {
 	/*
-	   db.ua.update({uid: uid, uaid: uaid}, bson.M{"$set":{"namespace": space, "password": password}}),
+	   db.ua.update({namespace: space, uaid: uaid}, bson.M{"$set":{"namespace": space, "password": password}}),
 	*/
 	return db.WithCollection(
 		UA_COL,
 		func(c *mgo.Collection) error {
 			return c.Update(
 				bson.M{
-					ITEM_ID:      uid + "." + uaid,
+					ITEM_ID:      uid + "." + namespace + "." + uaid,
 					UA_ITEM_UAID: uaid,
 				},
 				bson.M{
@@ -185,10 +180,6 @@ func (m *UaModel) UpdateUa(xl *xlog.Logger, uid, uaid string, info UaInfo) error
 						UA_ITEM_PASSWORD:  info.Password,
 						ITEM_UPDATA_TIME:  time.Now().Unix(),
 						UA_ITEM_NAMESPACE: info.Namespace,
-						UA_ITEM_VOD:       info.Vod,
-						UA_ITEM_LIVE:      info.Live,
-						UA_ITEM_ONLINE:    info.Online,
-						UA_ITEM_EXPIRE:    info.Expire,
 					},
 				},
 			)
@@ -196,16 +187,16 @@ func (m *UaModel) UpdateUa(xl *xlog.Logger, uid, uaid string, info UaInfo) error
 	)
 }
 
-func (m *UaModel) UpdateFunction(xl *xlog.Logger, uid, uaid, parameter string, cond map[string]interface{}) error {
+func (m *UaModel) UpdateFunction(xl *xlog.Logger, uid, namespace, uaid, parameter string, cond map[string]interface{}) error {
 	/*
-	   db.ua.update({uid: uid, uaid: uaid}, bson.M{"$set":{parameter: cond[parameter]}}),
+	   db.ua.update({_id: id, uaid: uaid}, bson.M{"$set":{parameter: cond[parameter]}}),
 	*/
 	return db.WithCollection(
 		UA_COL,
 		func(c *mgo.Collection) error {
 			return c.Update(
 				bson.M{
-					ITEM_ID:      uid + "." + uaid,
+					ITEM_ID:      uid + "." + namespace + "." + uaid,
 					UA_ITEM_UAID: uaid,
 				},
 				bson.M{

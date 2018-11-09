@@ -47,20 +47,19 @@ func FFGrpcClientInit(conf *system.GrpcConf) {
 }
 
 type requestParams struct {
-	uaid             string
-	from             int64
-	to               int64
-	expire           int64
-	token            string
-	limit            int
-	marker           string
-	namespace        string
-	namespaceInQuery string
-	prefix           string
-	exact            bool
-	speed            int32
-	fmt              string
-	m3u8FileName     string
+	uaid         string
+	from         int64
+	to           int64
+	expire       int64
+	token        string
+	limit        int
+	marker       string
+	namespace    string
+	prefix       string
+	exact        bool
+	speed        int32
+	fmt          string
+	m3u8FileName string
 }
 type userInfo struct {
 	uid uint32
@@ -214,7 +213,6 @@ func VerifyToken(xl *xlog.Logger, expire int64, realToken string, req *http.Requ
 func ParseRequest(c *gin.Context, xl *xlog.Logger) (*requestParams, error) {
 	uaid := c.Param("uaid")
 	namespace := c.Param("namespace")
-	namespaceInQuery := c.DefaultQuery("namespace", "")
 	from := c.DefaultQuery("from", "0")
 	to := c.DefaultQuery("to", "0")
 	expire := c.DefaultQuery("e", "0")
@@ -262,20 +260,19 @@ func ParseRequest(c *gin.Context, xl *xlog.Logger) (*requestParams, error) {
 		return nil, errors.New("fmt error, it should be flv or fmp4")
 	}
 	params := &requestParams{
-		uaid:             uaid,
-		from:             fromT * 1000,
-		to:               toT * 1000,
-		expire:           expireT * 1000,
-		token:            token,
-		limit:            int(limitT),
-		marker:           marker,
-		namespace:        namespace,
-		namespaceInQuery: namespaceInQuery,
-		prefix:           prefix,
-		exact:            exactT,
-		speed:            int32(speedT),
-		fmt:              fmt,
-		m3u8FileName:     m3u8Name,
+		uaid:         uaid,
+		from:         fromT * 1000,
+		to:           toT * 1000,
+		expire:       expireT * 1000,
+		token:        token,
+		limit:        int(limitT),
+		marker:       marker,
+		namespace:    namespace,
+		prefix:       prefix,
+		exact:        exactT,
+		speed:        int32(speedT),
+		fmt:          fmt,
+		m3u8FileName: m3u8Name,
 	}
 
 	return params, nil
@@ -303,7 +300,7 @@ func GetNameSpaceInfo(xl *xlog.Logger, bucket, uaid string) (error, int) {
 
 	if isAuto == false {
 		model := models.UaModel{}
-		r, err := model.GetUaInfo(xl, info[0].Uid, uaid)
+		r, err := model.GetUaInfo(xl, info[0].Uid, info[0].Space, uaid)
 		if err != nil {
 			return err, 0
 		}

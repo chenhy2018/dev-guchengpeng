@@ -19,7 +19,6 @@ const (
 
 type namespacebody struct {
 	Bucket       string `json:"bucket"`
-	Namespace    string `json:"namespace"`
 	CreatedAt    int64  `json:"createdAt"`
 	UpdatedAt    int64  `json:"updatedAt"`
 	AutoCreateUa bool   `json:"auto"`
@@ -53,13 +52,10 @@ func getDomain(xl *xlog.Logger, bucket string, info *userInfo) (string, error) {
 
 		} else if err != nil {
 			return "", err
-
 		}
-
 	}
 	if len(domain) == 0 {
 		return "", nil
-
 	}
 	return domain[0], nil
 }
@@ -207,27 +203,8 @@ func DeleteNamespace(c *gin.Context) {
 //need test.
 func updateNamespace(xl *xlog.Logger, uid, space, newSpace string) error {
 	if space != newSpace && newSpace != "" {
-		err := namespaceMod.UpdateNamespace(xl, uid, space, newSpace)
-		if err != nil {
-			return err
-		}
-		model := models.UaModel{}
-		mark := ""
-		for {
-			uas, nextmark, err := model.GetUaInfos(xl, 0, mark, uid, space, "")
-			if err != nil {
-				return err
-			}
-			cond := map[string]interface{}{models.UA_ITEM_NAMESPACE: newSpace}
-			for i := 0; i < len(uas); i++ {
-				model.UpdateFunction(xl, uid, uas[i].UaId, models.UA_ITEM_NAMESPACE, cond)
-			}
-			if nextmark != "" {
-				mark = nextmark
-			} else {
-				break
-			}
-		}
+		xl.Errorf("Can't support modify namespace")
+		return fmt.Errorf("Can't support modify namespace")
 	}
 	return nil
 }
@@ -327,14 +304,6 @@ func UpdateNamespace(c *gin.Context) {
 		xl.Errorf("Can't find namespace")
 		c.JSON(400, gin.H{
 			"error": "Can't find namespace info",
-		})
-		return
-	}
-	err = updateNamespace(xl, getUid(info.uid), params.namespace, namespaceData.Namespace)
-	if err != nil {
-		xl.Errorf("update namespace failed, err = %#v", err)
-		c.JSON(500, gin.H{
-			"error": "Service Internal Error",
 		})
 		return
 	}
