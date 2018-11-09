@@ -1,12 +1,12 @@
 package models
 
 import (
+	"encoding/base64"
 	"fmt"
-	"testing"
-
 	"github.com/qiniu/xlog.v1"
 	"github.com/stretchr/testify/assert"
 	"qiniu.com/db"
+	"testing"
 	//"time"
 )
 
@@ -50,7 +50,8 @@ func TestUa(t *testing.T) {
 	size = len(r)
 	assert.Equal(t, size, 2, "they should be equal")
 	assert.Equal(t, r[0].UaId, "daaa090", "they should be equal")
-	assert.Equal(t, next, "UserTest.test.daaa091.", "they should be equal")
+	newMark, err := base64.StdEncoding.DecodeString(next)
+	assert.Equal(t, string(newMark), "UserTest.test.daaa092", "they should be equal")
 
 	r, _, err = model.GetUaInfos(xl, 100, next, "UserTest", "test", "daaa09")
 	assert.Equal(t, err, nil, "they should be equal")

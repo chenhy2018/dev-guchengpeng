@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"time"
 
+	"encoding/base64"
 	"github.com/qiniu/xlog.v1"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
@@ -95,7 +96,12 @@ func (m *UaModel) GetUaInfos(xl *xlog.Logger, limit int, mark, uid, namespace, p
 
 	newPrefix := uid + "." + namespace + "." + prefix
 	if mark != "" {
-		newPrefix = mark
+		newMark, err := base64.StdEncoding.DecodeString(mark)
+		if err == nil {
+			newPrefix = string(newMark)
+		} else {
+			newPrefix = newPrefix
+		}
 	}
 	var query = bson.M{}
 	// query by keywords
@@ -108,20 +114,16 @@ func (m *UaModel) GetUaInfos(xl *xlog.Logger, limit int, mark, uid, namespace, p
 	nextMark := ""
 
 	if limit == 0 {
-		limit = 65535
+		limit = 1000
 	}
 	// query
 	r := []UaInfo{}
-	count := 0
 	err := db.WithCollection(
 		UA_COL,
 		func(c *mgo.Collection) error {
 			var err error
-			if err = c.Find(query).Sort(ITEM_ID).Limit(limit).All(&r); err != nil {
+			if err = c.Find(query).Sort(ITEM_ID).Limit(limit + 1).All(&r); err != nil {
 				return fmt.Errorf("query failed")
-			}
-			if count, err = c.Find(query).Count(); err != nil {
-				return fmt.Errorf("query count failed")
 			}
 			return nil
 		},
@@ -129,10 +131,14 @@ func (m *UaModel) GetUaInfos(xl *xlog.Logger, limit int, mark, uid, namespace, p
 	if err != nil {
 		return []UaInfo{}, "", err
 	}
-	if count > limit {
-		nextMark = r[limit-1].Uid + "." + r[limit-1].Namespace + "." + r[limit-1].UaId + "."
+	var encoded string
+	count := len(r)
+	if len(r) > limit {
+		nextMark = r[limit].Uid + "." + r[limit].Namespace + "." + r[limit].UaId
+		encoded = base64.StdEncoding.EncodeToString([]byte(nextMark))
+		count = len(r) - 1
 	}
-	return r, nextMark, nil
+	return r[0:count], encoded, nil
 }
 
 func (m *UaModel) GetUaInfo(xl *xlog.Logger, uid, namespace, uaid string) ([]UaInfo, error) {

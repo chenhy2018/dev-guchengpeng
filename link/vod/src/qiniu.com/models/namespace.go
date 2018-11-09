@@ -1,13 +1,13 @@
 package models
 
 import (
+	"encoding/base64"
 	"fmt"
-	"time"
-
 	"github.com/qiniu/xlog.v1"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 	"qiniu.com/db"
+	"time"
 )
 
 type NamespaceModel struct {
@@ -127,7 +127,10 @@ func (m *NamespaceModel) GetNamespaceInfos(xl *xlog.Logger, limit int, mark, uid
 
 	newPrefix := uid + "." + prefix
 	if mark != "" {
-		newPrefix = mark
+		newMark, err := base64.StdEncoding.DecodeString(mark)
+		if err == nil {
+			newPrefix = string(newMark)
+		}
 	}
 	// query by keywords
 	query := bson.M{
@@ -136,21 +139,17 @@ func (m *NamespaceModel) GetNamespaceInfos(xl *xlog.Logger, limit int, mark, uid
 	nextMark := ""
 
 	if limit == 0 {
-		limit = 65535
+		limit = 1000
 	}
 
 	// query
 	r := []NamespaceInfo{}
-	count := 0
 	err := db.WithCollection(
 		NAMESPACE_COL,
 		func(c *mgo.Collection) error {
 			var err error
-			if err = c.Find(query).Sort(ITEM_ID).Limit(limit).All(&r); err != nil {
+			if err = c.Find(query).Sort(ITEM_ID).Limit(limit + 1).All(&r); err != nil {
 				return fmt.Errorf("query failed")
-			}
-			if count, err = c.Find(query).Count(); err != nil {
-				return fmt.Errorf("query count failed")
 			}
 			return nil
 		},
@@ -158,10 +157,16 @@ func (m *NamespaceModel) GetNamespaceInfos(xl *xlog.Logger, limit int, mark, uid
 	if err != nil {
 		return []NamespaceInfo{}, "", err
 	}
-	if count > limit {
-		nextMark = r[limit-1].Uid + "." + r[limit-1].Space + "."
+
+	var encoded string
+	count := len(r)
+	if len(r) > limit {
+		nextMark = r[limit].Uid + "." + r[limit].Space
+		encoded = base64.StdEncoding.EncodeToString([]byte(nextMark))
+		count = len(r) - 1
 	}
-	return r, nextMark, nil
+	return r[0:count], encoded, nil
+
 }
 
 func (m *NamespaceModel) UpdateBucket(xl *xlog.Logger, uid, space, bucket, domain string) error {
