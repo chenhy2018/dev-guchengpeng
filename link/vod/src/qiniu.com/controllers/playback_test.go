@@ -110,7 +110,6 @@ func (suite *PlayBackTestSuite) TestPlayBack() {
 				UpdateTime:   3333333,
 				Bucket:       "ipcamera",
 				Uid:          "link",
-				Domain:       "www.baidu.com",
 				AutoCreateUa: true,
 			}
 			info = append(info, item)

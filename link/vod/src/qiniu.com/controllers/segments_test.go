@@ -60,7 +60,6 @@ func (suite *SegmentsTestSuite) TestFromEndInTwoSeg1() {
 				UpdateTime:   3333333,
 				Bucket:       "ipcamera",
 				Uid:          "link",
-				Domain:       "www.baidu.com",
 				AutoCreateUa: true,
 			}
 			info = append(info, item)
@@ -127,7 +126,6 @@ func (suite *SegmentsTestSuite) TestFromEndInTwoSeg2() {
 				UpdateTime:   3333333,
 				Bucket:       "ipcamera",
 				Uid:          "link",
-				Domain:       "www.baidu.com",
 				AutoCreateUa: true,
 			}
 			info = append(info, item)
@@ -189,7 +187,6 @@ func (suite *SegmentsTestSuite) TestFromEndInTwoSeg3() {
 				UpdateTime:   3333333,
 				Bucket:       "ipcamera",
 				Uid:          "link",
-				Domain:       "www.baidu.com",
 				AutoCreateUa: true,
 			}
 			info = append(info, item)
@@ -282,7 +279,6 @@ func (suite *SegmentsTestSuite) TestFromEndInTwoSeg4() {
 				UpdateTime:   3333333,
 				Bucket:       "ipcamera",
 				Uid:          "link",
-				Domain:       "www.baidu.com",
 				AutoCreateUa: true,
 			}
 			info = append(info, item)
@@ -353,7 +349,6 @@ func (suite *SegmentsTestSuite) TestFromEndInTwoSeg5() {
 				UpdateTime:   3333333,
 				Bucket:       "ipcamera",
 				Uid:          "link",
-				Domain:       "www.baidu.com",
 				AutoCreateUa: true,
 			}
 			info = append(info, item)
@@ -428,7 +423,6 @@ func (suite *SegmentsTestSuite) TestFromEndInTwoSeg6() {
 				UpdateTime:   3333333,
 				Bucket:       "ipcamera",
 				Uid:          "link",
-				Domain:       "www.baidu.com",
 				AutoCreateUa: true,
 			}
 			info = append(info, item)
@@ -498,7 +492,6 @@ func (suite *SegmentsTestSuite) TestFromEndInTwoSeg7() {
 				UpdateTime:   3333333,
 				Bucket:       "ipcamera",
 				Uid:          "link",
-				Domain:       "www.baidu.com",
 				AutoCreateUa: true,
 			}
 			info = append(info, item)
@@ -558,7 +551,6 @@ func (suite *SegmentsTestSuite) TestFromEndInTwoSeg8() {
 				UpdateTime:   3333333,
 				Bucket:       "ipcamera",
 				Uid:          "link",
-				Domain:       "www.baidu.com",
 				AutoCreateUa: true,
 			}
 			info = append(info, item)
