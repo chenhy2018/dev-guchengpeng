@@ -360,9 +360,6 @@ func TestUpdateNamespace(t *testing.T) {
 	guard2 := monkey.Patch(getUserInfo, func(xl *xlog.Logger, req *http.Request) (*userInfo, error) {
 		return &user, nil
 	})
-	guard3 := monkey.Patch(updateNamespace, func(xl *xlog.Logger, uid, space, newSpace string) error {
-		return errors.New("update namespace failed")
-	})
 	body = namespacebody{
 		Bucket: "ipcamera",
 	}
@@ -382,14 +379,10 @@ func TestUpdateNamespace(t *testing.T) {
 	UpdateNamespace(c)
 	assert.Equal(t, c.Writer.Status(), 400, "400 not support update namesapce")
 	guard2.Unpatch()
-	guard3.Unpatch()
 
 	// get user info failed if get update autocraeteUa error
 	guard4 := monkey.Patch(getUserInfo, func(xl *xlog.Logger, req *http.Request) (*userInfo, error) {
 		return &user, nil
-	})
-	guard5 := monkey.Patch(updateNamespace, func(xl *xlog.Logger, uid, space, newSpace string) error {
-		return nil
 	})
 
 	guard6 := monkey.Patch(updateAutoCreateUa, func(xl *xlog.Logger, uid, space string, auto, newauto bool) error {
@@ -417,7 +410,6 @@ func TestUpdateNamespace(t *testing.T) {
 	UpdateNamespace(c)
 	assert.Equal(t, c.Writer.Status(), 500, "500 internal error if get namesapce info error")
 	guard4.Unpatch()
-	guard5.Unpatch()
 	guard6.Unpatch()
 
 	monkey.UnpatchAll()

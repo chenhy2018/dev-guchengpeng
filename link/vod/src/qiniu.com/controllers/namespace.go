@@ -200,15 +200,6 @@ func DeleteNamespace(c *gin.Context) {
 	c.JSON(200, gin.H{"success": true})
 }
 
-//need test.
-func updateNamespace(xl *xlog.Logger, uid, space, newSpace string) error {
-	if space != newSpace && newSpace != "" {
-		xl.Errorf("Can't support modify namespace")
-		return fmt.Errorf("Can't support modify namespace")
-	}
-	return nil
-}
-
 func updateBucket(xl *xlog.Logger, uid, space, bucket, newBucket string, info *userInfo) error {
 	if bucket != newBucket && newBucket != "" {
 		err := checkbucket(xl, newBucket)
