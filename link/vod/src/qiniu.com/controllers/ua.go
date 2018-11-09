@@ -18,7 +18,7 @@ type uabody struct {
 	UpdatedAt int64  `json:"updatedAt"`
 	Password  string `json:"password"`
 	Vod       bool   `json:"vod"`
-	Live      bool   `json:"live"`
+	Live      int    `json:"live"`
 	Online    bool   `json:"online"`
 	Expire    int    `json:"expire"`
 }
@@ -61,6 +61,10 @@ func RegisterUa(c *gin.Context) {
 		UaId:      params.uaid,
 		Namespace: params.namespace,
 		Password:  uaData.Password,
+		Vod:       uaData.Vod,
+		Live:      uaData.Live,
+		Online:    uaData.Online,
+		Expire:    uaData.Expire,
 	}
 	model := models.NamespaceModel{}
 

@@ -296,7 +296,6 @@ func UpdateNamespace(c *gin.Context) {
 	           Uid  : info.Uid,
 	           Space : namespaceData.Namespace,
 	           Bucket  : namespaceData.Bucket,
-	           Domain : domain,
 	   }
 	*/
 	oldinfo, err := namespaceMod.GetNamespaceInfo(xl, getUid(info.uid), params.namespace)

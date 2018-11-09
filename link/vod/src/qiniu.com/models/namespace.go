@@ -41,7 +41,6 @@ func (m *NamespaceModel) Register(xl *xlog.Logger, req NamespaceInfo) error {
 						NAMESPACE_ITEM_BUCKET:         req.Bucket,
 						ITEM_UPDATA_TIME:              time.Now().Unix(),
 						NAMESPACE_ITEM_UID:            req.Uid,
-						NAMESPACE_ITEM_DOMAIN:         req.Domain,
 						NAMESPACE_ITEM_AUTO_CREATE_UA: req.AutoCreateUa,
 						NAMESPACE_ITEM_EXPIRE:         req.Expire,
 					},
@@ -79,7 +78,6 @@ type NamespaceInfo struct {
 	UpdateTime   int64  `bson:"updatedAt"  json:"updatedAt"`
 	Bucket       string `bson:"bucket"     json:"bucket"`
 	Uid          string `bson:"uid"        json:"uid"`
-	Domain       string `bson:"domain"     json:"domain"`
 	AutoCreateUa bool   `bson:"auto"       json:"auto"`
 	Expire       int    `bson:"expire"     json:"expire"`
 }
@@ -182,7 +180,6 @@ func (m *NamespaceModel) UpdateBucket(xl *xlog.Logger, uid, space, bucket, domai
 					"$set": bson.M{
 						NAMESPACE_ITEM_BUCKET: bucket,
 						ITEM_UPDATA_TIME:      time.Now().Unix(),
-						NAMESPACE_ITEM_DOMAIN: domain,
 					},
 				},
 			)
@@ -284,7 +281,6 @@ func (m *NamespaceModel) UpdateNamespace(xl *xlog.Logger, uid, space, newSpace s
 						NAMESPACE_ITEM_BUCKET:         r[0].Bucket,
 						ITEM_UPDATA_TIME:              time.Now().Unix(),
 						NAMESPACE_ITEM_UID:            r[0].Uid,
-						NAMESPACE_ITEM_DOMAIN:         r[0].Domain,
 						NAMESPACE_ITEM_AUTO_CREATE_UA: r[0].AutoCreateUa,
 						NAMESPACE_ITEM_EXPIRE:         r[0].Expire,
 					},

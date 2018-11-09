@@ -79,9 +79,9 @@ type UaInfo struct {
 	Password  string `bson:"password"   json:"password"` //options
 	Namespace string `bson:"namespace"  json:"namespace"`
 	CreateAt  int64  `bson:"createdAt"  json:"createdAt"`
-	UpdatedAt int64  `bson:"updateAt"   json:"updateAt"`
+	UpdatedAt int64  `bson:"updatedAt"   json:"updatedAt"`
 	Vod       bool   `bson:"vod"        json:"vod"`
-	Live      bool   `bson:"live"       json:"live"`
+	Live      int    `bson:"live"       json:"live"`
 	Online    bool   `bson:"online"     json:"online"`
 	Expire    int    `bson:"expire"     json:"expire"`
 }
@@ -180,6 +180,10 @@ func (m *UaModel) UpdateUa(xl *xlog.Logger, uid, namespace, uaid string, info Ua
 						UA_ITEM_PASSWORD:  info.Password,
 						ITEM_UPDATA_TIME:  time.Now().Unix(),
 						UA_ITEM_NAMESPACE: info.Namespace,
+						UA_ITEM_VOD:       info.Vod,
+						UA_ITEM_LIVE:      info.Live,
+						UA_ITEM_ONLINE:    info.Online,
+						UA_ITEM_EXPIRE:    info.Expire,
 					},
 				},
 			)

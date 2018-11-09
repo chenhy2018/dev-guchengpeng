@@ -64,7 +64,7 @@ func TestUa(t *testing.T) {
 	assert.Equal(t, size_1, 1, "they should be equal")
 	assert.Equal(t, r_1[0].Namespace, "test", "they should be equal")
 	assert.Equal(t, r_1[0].Vod, false, "they should be equal")
-	assert.Equal(t, r_1[0].Live, false, "they should be equal")
+	assert.Equal(t, r_1[0].Live, 0, "they should be equal")
 	assert.Equal(t, r_1[0].Online, false, "they should be equal")
 	assert.Equal(t, r_1[0].Expire, 0, "they should be equal")
 
@@ -91,7 +91,7 @@ func TestUa(t *testing.T) {
 	r_1, _, err_1 = model.GetUaInfos(xl, 0, "", "UserTest", "test", "daaa099")
 
 	assert.Equal(t, r_1[0].Vod, true, "they should be equal")
-	assert.Equal(t, r_1[0].Live, true, "they should be equal")
+	assert.Equal(t, r_1[0].Live, 1, "they should be equal")
 	assert.Equal(t, r_1[0].Online, true, "they should be equal")
 	assert.Equal(t, r_1[0].Expire, 7, "they should be equal")
 
