@@ -58,7 +58,7 @@ func GetPlayBackm3u8(c *gin.Context) {
 		return
 	}
 	info, err := UaMod.GetUaInfo(xl, getUid(userInfo.uid), params.namespace, params.uaid)
-	if err != nil && len(info) == 0 {
+	if err != nil || len(info) == 0 {
 		xl.Errorf("get ua info failed, error =  %#v", err)
 		c.JSON(400, gin.H{
 			"error": "ua is not correct",
