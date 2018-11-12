@@ -75,10 +75,10 @@ func (m *UaModel) Delete(xl *xlog.Logger, cond map[string]interface{}) error {
 
 type UaInfo struct {
 	id        string `bson:"_id"       json:"_id"`
-	Uid       string `bson:"uid"       json:"uid"`
+	Uid       string `bson:"uid"       json:"-"`
 	UaId      string `bson:"uaid"       json:"uaid"`
 	Password  string `bson:"password"   json:"password"` //options
-	Namespace string `bson:"namespace"  json:"namespace"`
+	Namespace string `bson:"namespace"  json:"-"`
 	CreateAt  int64  `bson:"createdAt"  json:"createdAt"`
 	UpdatedAt int64  `bson:"updatedAt"   json:"updatedAt"`
 	Vod       bool   `bson:"vod"        json:"vod"`
@@ -96,9 +96,9 @@ func (m *UaModel) GetUaInfos(xl *xlog.Logger, limit int, mark, uid, namespace, p
 
 	newPrefix := uid + "." + namespace + "." + prefix
 	if mark != "" {
-		newMark, err := base64.StdEncoding.DecodeString(mark)
+		newMark, err := base64.URLEncoding.DecodeString(mark)
 		if err == nil {
-			newPrefix = string(newMark)
+			newPrefix = uid + "." + namespace + "." + string(newMark)
 		} else {
 			newPrefix = newPrefix
 		}
@@ -134,8 +134,8 @@ func (m *UaModel) GetUaInfos(xl *xlog.Logger, limit int, mark, uid, namespace, p
 	var encoded string
 	count := len(r)
 	if len(r) > limit {
-		nextMark = r[limit].Uid + "." + r[limit].Namespace + "." + r[limit].UaId
-		encoded = base64.StdEncoding.EncodeToString([]byte(nextMark))
+		nextMark = r[limit].UaId
+		encoded = base64.URLEncoding.EncodeToString([]byte(nextMark))
 		count = len(r) - 1
 	}
 	return r[0:count], encoded, nil

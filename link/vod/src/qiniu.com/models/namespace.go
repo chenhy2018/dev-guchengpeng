@@ -73,11 +73,11 @@ func (m *NamespaceModel) Delete(xl *xlog.Logger, uid, id string) error {
 
 type NamespaceInfo struct {
 	id           string `bson:"_id"  json:"_id"`
-	Space        string `bson:"namespace"  json:"namespace"`
+	Space        string `bson:"namespace"  json:"-"`
 	Regtime      int64  `bson:"createdAt"  json:"createdAt"`
 	UpdateTime   int64  `bson:"updatedAt"  json:"updatedAt"`
 	Bucket       string `bson:"bucket"     json:"bucket"`
-	Uid          string `bson:"uid"        json:"uid"`
+	Uid          string `bson:"uid"        json:"-"`
 	AutoCreateUa bool   `bson:"auto"       json:"auto"`
 	Expire       int    `bson:"expire"     json:"expire"`
 }
@@ -127,9 +127,9 @@ func (m *NamespaceModel) GetNamespaceInfos(xl *xlog.Logger, limit int, mark, uid
 
 	newPrefix := uid + "." + prefix
 	if mark != "" {
-		newMark, err := base64.StdEncoding.DecodeString(mark)
+		newMark, err := base64.URLEncoding.DecodeString(mark)
 		if err == nil {
-			newPrefix = string(newMark)
+			newPrefix = uid + "." + string(newMark)
 		}
 	}
 	// query by keywords
@@ -161,8 +161,8 @@ func (m *NamespaceModel) GetNamespaceInfos(xl *xlog.Logger, limit int, mark, uid
 	var encoded string
 	count := len(r)
 	if len(r) > limit {
-		nextMark = r[limit].Uid + "." + r[limit].Space
-		encoded = base64.StdEncoding.EncodeToString([]byte(nextMark))
+		nextMark = r[limit].Space
+		encoded = base64.URLEncoding.EncodeToString([]byte(nextMark))
 		count = len(r) - 1
 	}
 	return r[0:count], encoded, nil
