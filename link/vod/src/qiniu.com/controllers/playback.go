@@ -47,7 +47,7 @@ func GetPlayBackm3u8(c *gin.Context) {
 		})
 		return
 	}
-	xl.Infof("uaid = %v, from = %v, to = %v", params.uaid, params.from, params.to)
+	xl.Infof("uaid = %v, from = %v, to = %v, namespace = %v", params.uaid, params.from, params.to, params.namespace)
 
 	// fast forward case
 	if params.speed != 1 {
@@ -57,8 +57,8 @@ func GetPlayBackm3u8(c *gin.Context) {
 		}
 		return
 	}
-	info, err := UaMod.GetUaInfo(xl, getUid(userInfo.uid), params.uaid)
-	if err != nil && len(info) == 0 {
+	info, err := UaMod.GetUaInfo(xl, getUid(userInfo.uid), params.namespace, params.uaid)
+	if err != nil || len(info) == 0 {
 		xl.Errorf("get ua info failed, error =  %#v", err)
 		c.JSON(400, gin.H{
 			"error": "ua is not correct",

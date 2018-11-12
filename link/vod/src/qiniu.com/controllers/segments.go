@@ -46,7 +46,7 @@ func GetSegments(c *gin.Context) {
 		return
 	}
 
-	xl.Infof("deviceid = %v, from = %v, to = %v, limit = %v, marker = %v", params.uaid, params.from, params.to, params.limit, params.marker)
+	xl.Infof("deviceid = %v, from = %v, to = %v, limit = %v, marker = %v, namespace = %v", params.uaid, params.from, params.to, params.limit, params.marker, params.namespace)
 
 	user, err := getUserInfo(xl, c.Request)
 	if err != nil {
@@ -55,7 +55,7 @@ func GetSegments(c *gin.Context) {
 		return
 	}
 
-	info, err := UaMod.GetUaInfo(xl, getUid(user.uid), params.uaid)
+	info, err := UaMod.GetUaInfo(xl, getUid(user.uid), params.namespace, params.uaid)
 	if err != nil && len(info) == 0 {
 		xl.Errorf("get ua info failed, error =  %#v", err)
 		c.JSON(400, gin.H{

@@ -49,8 +49,7 @@ func TestRegisterNamespace(t *testing.T) {
 	initDb()
 	// bucket maybe already exist. so not check this response.
 	body := namespacebody{
-		Bucket:    "ipcamera",
-		Namespace: "test1",
+		Bucket: "ipcamera",
 	}
 	bodyBuffer, _ := json.Marshal(body)
 	bodyT := bytes.NewBuffer(bodyBuffer)
@@ -70,8 +69,7 @@ func TestRegisterNamespace(t *testing.T) {
 	// bucket already exit. return 400
 	monkey.Patch(getUserInfo, func(xl *xlog.Logger, req *http.Request) (*userInfo, error) { return &user, nil })
 	body = namespacebody{
-		Bucket:    "ipcamera",
-		Namespace: "test1",
+		Bucket: "ipcamera",
 	}
 	bodyBuffer, _ = json.Marshal(body)
 	bodyT = bytes.NewBuffer(bodyBuffer)
@@ -84,8 +82,7 @@ func TestRegisterNamespace(t *testing.T) {
 
 	// get namespace  info error
 	body = namespacebody{
-		Bucket:    "doman",
-		Namespace: "aabbdd",
+		Bucket: "doman",
 	}
 	bodyBuffer, _ = json.Marshal(body)
 	bodyT = bytes.NewBuffer(bodyBuffer)
@@ -101,8 +98,7 @@ func TestRegisterNamespace(t *testing.T) {
 	guard.Unpatch()
 	// namesapce already exist
 	body = namespacebody{
-		Bucket:    "doman",
-		Namespace: "aabbccc",
+		Bucket: "doman",
 	}
 	guard2 := monkey.PatchInstanceMethod(
 		reflect.TypeOf((*models.NamespaceModel)(nil)), "GetNamespaceInfo", func(ss *models.NamespaceModel, xl *xlog.Logger, uid, namespace string) ([]models.NamespaceInfo, error) {
@@ -118,11 +114,10 @@ func TestRegisterNamespace(t *testing.T) {
 	guard2.Unpatch()
 	// get user info failed. return 500
 	guard4 := monkey.Patch(getUserInfo, func(xl *xlog.Logger, req *http.Request) (*userInfo, error) {
-		return &userInfo{}, errors.New("get user info error")
+		return &userInfo{}, errors.New("get user  info error")
 	})
 	body = namespacebody{
-		Bucket:    "ipcamera10",
-		Namespace: "aabb",
+		Bucket: "ipcamera10",
 	}
 	bodyBuffer, _ = json.Marshal(body)
 	bodyT = bytes.NewBuffer(bodyBuffer)
@@ -144,8 +139,7 @@ func TestRegisterNamespace(t *testing.T) {
 		})
 	monkey.Patch(getUserInfo, func(xl *xlog.Logger, req *http.Request) (*userInfo, error) { return &user, nil })
 	body = namespacebody{
-		Bucket:    "doman",
-		Namespace: "aabbccc",
+		Bucket: "doman",
 	}
 	bodyBuffer, _ = json.Marshal(body)
 	bodyT = bytes.NewBuffer(bodyBuffer)
@@ -255,8 +249,7 @@ func TestUpdateNamespace(t *testing.T) {
 	monkey.UnpatchAll()
 	// bucket maybe already exit. so not check this response.
 	body := namespacebody{
-		Bucket:    "ipcamera",
-		Namespace: "aab",
+		Bucket: "ipcamera",
 	}
 
 	bodyBuffer, _ := json.Marshal(body)
@@ -280,8 +273,7 @@ func TestUpdateNamespace(t *testing.T) {
 
 	// Change namespace to aab
 	body = namespacebody{
-		Bucket:    "ipcamera",
-		Namespace: "aab",
+		Bucket: "ipcamera",
 	}
 
 	bodyBuffer, _ = json.Marshal(body)
@@ -301,8 +293,7 @@ func TestUpdateNamespace(t *testing.T) {
 
 	// Change invaild bucket, return 403
 	body = namespacebody{
-		Bucket:    "ipcamera1",
-		Namespace: "aab",
+		Bucket: "ipcamera1",
 	}
 
 	bodyBuffer, _ = json.Marshal(body)
@@ -337,34 +328,12 @@ func TestUpdateNamespace(t *testing.T) {
 	UpdateNamespace(c)
 	assert.Equal(t, c.Writer.Status(), 400, "they should be equal")
 
-	// Change namespace to test1
-	body = namespacebody{
-		Bucket:    "ipcamera",
-		Namespace: "test1",
-	}
-
-	bodyBuffer, _ = json.Marshal(body)
-	bodyT = bytes.NewBuffer(bodyBuffer)
-
-	req, _ = http.NewRequest("Put", "/v1/namespaces/aab", bodyT)
-	recoder = httptest.NewRecorder()
-	c, _ = gin.CreateTestContext(recoder)
-	param = gin.Param{
-		Key:   "namespace",
-		Value: "aab",
-	}
-	c.Params = append(c.Params, param)
-	c.Request = req
-	UpdateNamespace(c)
-	assert.Equal(t, c.Writer.Status(), 200, "they should be equal")
-
 	// get user info failed if get user info failed
 	guard1 := monkey.Patch(getUserInfo, func(xl *xlog.Logger, req *http.Request) (*userInfo, error) {
 		return &userInfo{}, errors.New("get user  info error")
 	})
 	body = namespacebody{
-		Bucket:    "ipcamera",
-		Namespace: "test1",
+		Bucket: "ipcamera",
 	}
 
 	bodyBuffer, _ = json.Marshal(body)
@@ -391,12 +360,8 @@ func TestUpdateNamespace(t *testing.T) {
 	guard2 := monkey.Patch(getUserInfo, func(xl *xlog.Logger, req *http.Request) (*userInfo, error) {
 		return &user, nil
 	})
-	guard3 := monkey.Patch(updateNamespace, func(xl *xlog.Logger, uid, space, newSpace string) error {
-		return errors.New("update namespace failed")
-	})
 	body = namespacebody{
-		Bucket:    "ipcamera",
-		Namespace: "test1",
+		Bucket: "ipcamera",
 	}
 
 	bodyBuffer, _ = json.Marshal(body)
@@ -412,16 +377,12 @@ func TestUpdateNamespace(t *testing.T) {
 	c.Params = append(c.Params, param)
 	c.Request = req
 	UpdateNamespace(c)
-	assert.Equal(t, c.Writer.Status(), 500, "500 internal error if get namesapce info error")
+	assert.Equal(t, c.Writer.Status(), 400, "400 not support update namesapce")
 	guard2.Unpatch()
-	guard3.Unpatch()
 
 	// get user info failed if get update autocraeteUa error
 	guard4 := monkey.Patch(getUserInfo, func(xl *xlog.Logger, req *http.Request) (*userInfo, error) {
 		return &user, nil
-	})
-	guard5 := monkey.Patch(updateNamespace, func(xl *xlog.Logger, uid, space, newSpace string) error {
-		return nil
 	})
 
 	guard6 := monkey.Patch(updateAutoCreateUa, func(xl *xlog.Logger, uid, space string, auto, newauto bool) error {
@@ -431,8 +392,7 @@ func TestUpdateNamespace(t *testing.T) {
 		return nil
 	})
 	body = namespacebody{
-		Bucket:    "ipcamera",
-		Namespace: "test1",
+		Bucket: "ipcamera",
 	}
 
 	bodyBuffer, _ = json.Marshal(body)
@@ -450,7 +410,6 @@ func TestUpdateNamespace(t *testing.T) {
 	UpdateNamespace(c)
 	assert.Equal(t, c.Writer.Status(), 500, "500 internal error if get namesapce info error")
 	guard4.Unpatch()
-	guard5.Unpatch()
 	guard6.Unpatch()
 
 	monkey.UnpatchAll()
@@ -565,8 +524,7 @@ func TestAutoCreateUa(t *testing.T) {
 	xl := xlog.NewDummy()
 	// bucket maybe already exist. so not check this response.
 	body := namespacebody{
-		Bucket:    "ipcamera",
-		Namespace: "test1",
+		Bucket: "ipcamera",
 	}
 
 	bodyBuffer, _ := json.Marshal(body)
@@ -585,7 +543,6 @@ func TestAutoCreateUa(t *testing.T) {
 	// bucket maybe already exit. so not check this response.
 	body = namespacebody{
 		Bucket:       "ipcamera",
-		Namespace:    "test1",
 		AutoCreateUa: true,
 	}
 
@@ -624,8 +581,7 @@ func TestGetNameSpaceInfo(t *testing.T) {
 
 	// bucket maybe already exist. so not check this response.
 	body := namespacebody{
-		Bucket:    "ipcamera",
-		Namespace: "test1",
+		Bucket: "ipcamera",
 	}
 
 	bodyBuffer, _ := json.Marshal(body)
@@ -645,7 +601,6 @@ func TestGetNameSpaceInfo(t *testing.T) {
 	// bucket maybe already exit. so not check this response.
 	body = namespacebody{
 		Bucket:       "ipcamera",
-		Namespace:    "test1",
 		AutoCreateUa: true,
 	}
 

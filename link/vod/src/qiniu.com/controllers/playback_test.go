@@ -50,7 +50,7 @@ func (suite *PlayBackTestSuite) TestPlayBackWithoutFrom() {
 		return true
 	})
 	monkey.PatchInstanceMethod(
-		reflect.TypeOf((*models.UaModel)(nil)), "GetUaInfo", func(ss *models.UaModel, xl *xlog.Logger, uid, uaid string) ([]models.UaInfo, error) {
+		reflect.TypeOf((*models.UaModel)(nil)), "GetUaInfo", func(ss *models.UaModel, xl *xlog.Logger, uid, namespace, uaid string) ([]models.UaInfo, error) {
 			info := []models.UaInfo{}
 			item := models.UaInfo{
 				Uid:       "link",
@@ -110,14 +110,13 @@ func (suite *PlayBackTestSuite) TestPlayBack() {
 				UpdateTime:   3333333,
 				Bucket:       "ipcamera",
 				Uid:          "link",
-				Domain:       "www.baidu.com",
 				AutoCreateUa: true,
 			}
 			info = append(info, item)
 			return info, nil
 		})
 	monkey.PatchInstanceMethod(
-		reflect.TypeOf((*models.UaModel)(nil)), "GetUaInfo", func(ss *models.UaModel, xl *xlog.Logger, uid, uaid string) ([]models.UaInfo, error) {
+		reflect.TypeOf((*models.UaModel)(nil)), "GetUaInfo", func(ss *models.UaModel, xl *xlog.Logger, uid, namespace, uaid string) ([]models.UaInfo, error) {
 			info := []models.UaInfo{}
 			item := models.UaInfo{
 				Uid:       "link",
@@ -147,7 +146,7 @@ func (suite *PlayBackTestSuite) TestPlayBackWithGetSegmentsInfoError() {
 		return "ipcamera", nil
 	})
 	monkey.PatchInstanceMethod(
-		reflect.TypeOf((*models.UaModel)(nil)), "GetUaInfo", func(ss *models.UaModel, xl *xlog.Logger, uid, uaid string) ([]models.UaInfo, error) {
+		reflect.TypeOf((*models.UaModel)(nil)), "GetUaInfo", func(ss *models.UaModel, xl *xlog.Logger, uid, namespace, uaid string) ([]models.UaInfo, error) {
 			info := []models.UaInfo{}
 			item := models.UaInfo{
 				Uid:       "link",
@@ -173,7 +172,7 @@ func (suite *PlayBackTestSuite) TestGetFastForwardStreamError() {
 		return true
 	})
 	monkey.PatchInstanceMethod(
-		reflect.TypeOf((*models.UaModel)(nil)), "GetUaInfo", func(ss *models.UaModel, xl *xlog.Logger, uid, uaid string) ([]models.UaInfo, error) {
+		reflect.TypeOf((*models.UaModel)(nil)), "GetUaInfo", func(ss *models.UaModel, xl *xlog.Logger, uid, namespace, uaid string) ([]models.UaInfo, error) {
 			info := []models.UaInfo{}
 			item := models.UaInfo{
 				Uid:       "link",
@@ -218,7 +217,7 @@ func (suite *PlayBackTestSuite) TestPlayBackWithBadNameSpace() {
 	})
 	monkey.Patch(getUserInfo, func(xl *xlog.Logger, req *http.Request) (*userInfo, error) { return &userinfo, nil })
 	monkey.PatchInstanceMethod(
-		reflect.TypeOf((*models.UaModel)(nil)), "GetUaInfo", func(ss *models.UaModel, xl *xlog.Logger, uid, uaid string) ([]models.UaInfo, error) {
+		reflect.TypeOf((*models.UaModel)(nil)), "GetUaInfo", func(ss *models.UaModel, xl *xlog.Logger, uid, namespace, uaid string) ([]models.UaInfo, error) {
 			info := []models.UaInfo{}
 			item := models.UaInfo{
 				Uid:       "link",
@@ -245,7 +244,7 @@ func (suite *PlayBackTestSuite) TestPlayBackWithCorrectDomain() {
 		return &userInfo{ak: "fadsfasfsd", sk: "fadsfasfsadf"}, nil
 	})
 	monkey.PatchInstanceMethod(
-		reflect.TypeOf((*models.UaModel)(nil)), "GetUaInfo", func(ss *models.UaModel, xl *xlog.Logger, uid, uaid string) ([]models.UaInfo, error) {
+		reflect.TypeOf((*models.UaModel)(nil)), "GetUaInfo", func(ss *models.UaModel, xl *xlog.Logger, uid, namespace, uaid string) ([]models.UaInfo, error) {
 			info := []models.UaInfo{}
 			item := models.UaInfo{
 				Uid:       "link",
