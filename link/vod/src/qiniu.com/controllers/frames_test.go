@@ -7,7 +7,6 @@ import (
 	"testing"
 
 	"github.com/bouk/monkey"
-	"github.com/qiniu/api.v7/auth/qbox"
 	xlog "github.com/qiniu/xlog.v1"
 	"github.com/stretchr/testify/suite"
 	"qiniu.com/models"
@@ -81,7 +80,7 @@ func (suite *FramesTestSuite) TestFrames6() {
 		return "ipcamera", nil
 	})
 	monkey.PatchInstanceMethod(
-		reflect.TypeOf((*models.SegmentKodoModel)(nil)), "GetFrameInfo", func(ss *models.SegmentKodoModel, xl *xlog.Logger, starttime int64, endtime int64, bucket string, uaid string, mac *qbox.Mac) ([]map[string]interface{}, error) {
+		reflect.TypeOf((*models.SegmentKodoModel)(nil)), "GetFrameInfo", func(ss *models.SegmentKodoModel, xl *xlog.Logger, starttime int64, endtime int64, bucket string, uaid string, uid, userAk string) ([]map[string]interface{}, error) {
 			info := []map[string]interface{}{
 				map[string]interface{}{
 					models.SEGMENT_ITEM_START_TIME: int64(1536142906000),
@@ -118,7 +117,7 @@ func (suite *FramesTestSuite) TestFrames7() {
 		return "ipcamera", nil
 	})
 	monkey.PatchInstanceMethod(
-		reflect.TypeOf((*models.SegmentKodoModel)(nil)), "GetFrameInfo", func(ss *models.SegmentKodoModel, xl *xlog.Logger, starttime int64, endtime int64, bucket string, uaid string, mac *qbox.Mac) ([]map[string]interface{}, error) {
+		reflect.TypeOf((*models.SegmentKodoModel)(nil)), "GetFrameInfo", func(ss *models.SegmentKodoModel, xl *xlog.Logger, starttime int64, endtime int64, bucket string, uaid string, uid, userAk string) ([]map[string]interface{}, error) {
 			return nil, errors.New("can't  find frames")
 		})
 	w := PerformRequest(suite.r, req)
@@ -143,6 +142,10 @@ func (suite *FramesTestSuite) TestFrames9() {
 	monkey.Patch(GetBucket, func(xl *xlog.Logger, uid, namespace string) (string, error) {
 		return "ipcamera", nil
 	})
+	monkey.PatchInstanceMethod(
+		reflect.TypeOf((*models.SegmentKodoModel)(nil)), "GetFrameInfo", func(ss *models.SegmentKodoModel, xl *xlog.Logger, starttime int64, endtime int64, bucket string, uaid string, uid, userAk string) ([]map[string]interface{}, error) {
+			return nil, nil
+		})
 	w := PerformRequest(suite.r, req)
 	suite.Equal(200, w.Code, "")
 	monkey.UnpatchAll()

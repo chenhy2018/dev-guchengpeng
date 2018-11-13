@@ -2,8 +2,11 @@ package controllers
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
+	"net/http"
 	"strconv"
 	"time"
 
@@ -17,7 +20,6 @@ import (
 
 // sample requset url = /playback/12345.m3u8?from=1532499345&to=1532499345&e=1532499345&token=xxxxxx
 func GetPlayBackm3u8(c *gin.Context) {
-
 	xl := xlog.New(c.Writer, c.Request)
 	params, err := ParseRequest(c, xl)
 	if err != nil {
@@ -39,26 +41,10 @@ func GetPlayBackm3u8(c *gin.Context) {
 		c.JSON(500, gin.H{"error": err.Error()})
 		return
 	}
+	xl.Infof("uid = %v, uaid = %v, from = %v, to = %v", userInfo.uid, params.uaid, params.from, params.to)
 
-	if !VerifyToken(xl, params.expire, params.token, c.Request, userInfo) {
-		xl.Errorf("verify token falied")
-		c.JSON(401, gin.H{
-			"error": "bad token",
-		})
-		return
-	}
-	xl.Infof("uaid = %v, from = %v, to = %v", params.uaid, params.from, params.to)
-
-	// fast forward case
-	if params.speed != 1 {
-		if err := getFastForwardStream(xl, params, c, userInfo); err != nil {
-			xl.Errorf("get fastforward stream error , error = %v", err.Error())
-			c.JSON(500, gin.H{"error": "Service Internal Error"})
-		}
-		return
-	}
-	info, err := UaMod.GetUaInfo(xl, getUid(userInfo.uid), params.uaid)
-	if err != nil && len(info) == 0 {
+	info, err := UaMod.GetUaInfo(xl, userInfo.uid, params.uaid)
+	if err != nil || len(info) == 0 {
 		xl.Errorf("get ua info failed, error =  %#v", err)
 		c.JSON(400, gin.H{
 			"error": "ua is not correct",
@@ -67,7 +53,7 @@ func GetPlayBackm3u8(c *gin.Context) {
 	}
 	xl.Infof("info[0].Namespace %v", info[0].Namespace)
 	namespace := info[0].Namespace
-	bucket, err := GetBucket(xl, getUid(userInfo.uid), namespace)
+	bucket, err := GetBucket(xl, userInfo.uid, namespace)
 	if err != nil {
 		xl.Errorf("get bucket error, error =  %#v", err)
 		c.JSON(400, gin.H{
@@ -76,10 +62,8 @@ func GetPlayBackm3u8(c *gin.Context) {
 		return
 	}
 
-	mac := qbox.NewMac(userInfo.ak, userInfo.sk)
-
 	// get ts list from kodo
-	playlist, err, code := getPlaybackList(xl, mac, params, bucket)
+	playlist, err, code := getPlaybackList(xl, params, bucket, userInfo)
 	if err != nil {
 		xl.Errorf("get playback list error, error = %#v", err.Error())
 		c.JSON(code, gin.H{"error": err.Error()})
@@ -90,30 +74,36 @@ func GetPlayBackm3u8(c *gin.Context) {
 	fileName := params.m3u8FileName
 	if fileName == "" {
 		from := strconv.FormatInt(params.from, 10)
-		end := strconv.FormatInt(params.from, 10)
+		end := strconv.FormatInt(params.to, 10)
 		fileName = params.uaid + from + end + ".m3u8"
 	}
 
 	// upload new m3u8 file to kodo bucket
 	m3u8File := m3u8.Mkm3u8(playlist, xl)
-	err = uploadNewFile(fileName, bucket, []byte(m3u8File), mac)
+	err = uploadNewFile(fileName, bucket, []byte(m3u8File), userInfo)
 	if err != nil {
-		if err.Error() != "file exists" {
-			xl.Errorf("uplaod New m3u8 file failed, error = %#v", err.Error())
-			c.JSON(500, gin.H{"error": "Service Internal Error"})
-			return
-		}
+		xl.Errorf("uplaod New m3u8 file failed, error = %#v", err.Error())
+		c.JSON(500, gin.H{"error": "Service Internal Error"})
+		return
 	}
 	c.Header("Access-Control-Allow-Origin", "*")
 
+	// fast forward case
+	if params.speed != 1 {
+		if err := getFastForwardStream(xl, params, c, userInfo, bucket, fileName); err != nil {
+			xl.Errorf("get fastforward stream error , error = %v", err.Error())
+			c.JSON(500, gin.H{"error": "Service Internal Error"})
+		}
+		return
+	}
 	c.JSON(200, gin.H{
 		"key":    fileName,
 		"bucket": bucket,
 	})
 }
 
-func getPlaybackList(xl *xlog.Logger, mac *qbox.Mac, params *requestParams, bucket string) ([]map[string]interface{}, error, int) {
-	segs, _, err := segMod.GetSegmentTsInfo(xl, params.from, params.to, bucket, params.uaid, 0, "", mac)
+func getPlaybackList(xl *xlog.Logger, params *requestParams, bucket string, user *userInfo) ([]map[string]interface{}, error, int) {
+	segs, _, err := segMod.GetSegmentTsInfo(xl, params.from, params.to, bucket, params.uaid, 0, "", user.uid, user.ak)
 	if err != nil {
 		xl.Errorf("getTsInfo error, error =  %#v", err)
 		return nil, errors.New("Service Internal Error"), 500
@@ -151,7 +141,7 @@ func getPlaybackList(xl *xlog.Logger, mac *qbox.Mac, params *requestParams, buck
 	}
 	return playlist, nil, 200
 }
-func getFastForwardStream(xl *xlog.Logger, params *requestParams, c *gin.Context, user *userInfo) error {
+func getFastForwardStream(xl *xlog.Logger, params *requestParams, c *gin.Context, user *userInfo, bucket, fileName string) error {
 	// remove speed fmt from url
 	url := c.Request.URL
 	query := url.Query()
@@ -159,11 +149,11 @@ func getFastForwardStream(xl *xlog.Logger, params *requestParams, c *gin.Context
 	query.Del("speed")
 	query.Del("token")
 	query.Del("e")
-	url.RawQuery = query.Encode()
-	fullUrl := "http://" + c.Request.Host + url.String()
 	req := new(pb.FastForwardInfo)
-	expire := time.Now().Add(time.Hour).Unix()
-	req.Url = getNewToken(fullUrl, expire, user)
+	domain, err := getDomain(xl, bucket, user)
+	req.Url = getDownUrlWithPm3u8(domain, fileName, user)
+	fmt.Println(req.Url)
+	return nil
 	req.Speed = params.speed
 	req.Fmt = params.fmt
 	ctx, cancel := context.WithCancel(context.Background())
@@ -191,8 +181,62 @@ func getFastForwardStream(xl *xlog.Logger, params *requestParams, c *gin.Context
 
 func getNewToken(origin string, expire int64, user *userInfo) string {
 	playbackBaseUrl := origin + "&e=" + strconv.FormatInt(expire, 10)
-	// using uid password as ak/sk
+	// using uid password a ak/sk
 	mac := qbox.NewMac(user.ak, user.sk)
 	token := mac.Sign([]byte(playbackBaseUrl))
 	return playbackBaseUrl + "&token=" + token
+}
+func getDownUrlWithPm3u8(domain, fileName string, user *userInfo) string {
+	mac := qbox.Mac{
+		AccessKey: defaultUser.AccessKey,
+		SecretKey: []byte(defaultUser.SecretKey),
+	}
+	expireT := time.Now().Add(time.Hour).Unix()
+	pm3u8 := "pm3u8/0/expires/86400"
+	urlToSign := fmt.Sprintf("http://%s/%s?%s&e=%d", domain, fileName, pm3u8, expireT)
+	token := mac.Sign([]byte(urlToSign))
+	realUrl := ""
+	if defaultUser.IsAdmin {
+		realUrl = fmt.Sprintf("%s&token=%s:%s", urlToSign, "1381539624", token)
+	} else {
+		realUrl = fmt.Sprintf("%s&token=%s", urlToSign, token)
+	}
+	return realUrl
+}
+
+func getDomain(xl *xlog.Logger, bucket string, user *userInfo) (string, error) {
+	zone, err := models.GetZone(user.ak, bucket)
+	host := zone.GetApiHost(false)
+	url := fmt.Sprintf("%s%s", host+"/v6/domain/list?tbl=", bucket)
+	request, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		xl.Errorf("%#v", err)
+		return "", err
+
+	}
+	rpcClient := models.NewRpcClient(user.uid, &defaultUser)
+	resp, err := rpcClient.Do(context.Background(), request)
+	if err != nil {
+		return "", err
+
+	}
+
+	defer resp.Body.Close()
+	dec := json.NewDecoder(resp.Body)
+	var domain []string
+	for {
+		if err := dec.Decode(&domain); err == io.EOF {
+			break
+
+		} else if err != nil {
+			return "", err
+
+		}
+
+	}
+	if len(domain) == 0 {
+		return "", nil
+	}
+
+	return domain[0], nil
 }

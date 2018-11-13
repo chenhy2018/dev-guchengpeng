@@ -4,7 +4,6 @@ import (
 	"errors"
 
 	"github.com/gin-gonic/gin"
-	"github.com/qiniu/api.v7/auth/qbox"
 	xlog "github.com/qiniu/xlog.v1"
 	"qiniu.com/models"
 )
@@ -39,8 +38,8 @@ func GetFrames(c *gin.Context) {
 		return
 	}
 
-	info, err := UaMod.GetUaInfo(xl, getUid(user.uid), params.uaid)
-	if err != nil && len(info) == 0 {
+	info, err := UaMod.GetUaInfo(xl, user.uid, params.uaid)
+	if err != nil || len(info) == 0 {
 		xl.Errorf("get ua info failed, error =  %#v", err)
 		c.JSON(400, gin.H{
 			"error": "ua is not correct",
@@ -49,7 +48,7 @@ func GetFrames(c *gin.Context) {
 	}
 	namespace := info[0].Namespace
 
-	bucket, err := GetBucket(xl, getUid(user.uid), namespace)
+	bucket, err := GetBucket(xl, user.uid, namespace)
 	if err != nil {
 		xl.Errorf("get bucket error, error =  %#v", err)
 		c.JSON(400, gin.H{
@@ -58,8 +57,7 @@ func GetFrames(c *gin.Context) {
 		return
 	}
 
-	mac := qbox.NewMac(user.ak, user.sk)
-	frames, err := segMod.GetFrameInfo(xl, params.from, params.to, bucket, params.uaid, mac)
+	frames, err := segMod.GetFrameInfo(xl, params.from, params.to, bucket, params.uaid, user.uid, user.ak)
 	if err != nil {
 		xl.Errorf("get FrameInfo falied, error = %#v", err)
 		c.JSON(500, gin.H{"error": "Service Internal Error"})

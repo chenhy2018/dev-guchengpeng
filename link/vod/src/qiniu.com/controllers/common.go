@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"net/http"
@@ -14,7 +15,8 @@ import (
 	"github.com/qiniu/api.v7/storage"
 	xlog "github.com/qiniu/xlog.v1"
 	"google.golang.org/grpc"
-	"qiniu.com/auth"
+	rs "qbox.us/api/rs.v3"
+	qboxmac "qiniu.com/auth/qboxmac.v1"
 	"qiniu.com/models"
 	pb "qiniu.com/proto"
 	"qiniu.com/system"
@@ -25,17 +27,24 @@ var (
 	segMod           *models.SegmentKodoModel
 	fastForwardClint pb.FastForwardClient
 	UaMod            *models.UaModel
+	defaultUser      system.UserConf
 )
 
-func Init(conf *system.GrpcConf) {
+const (
+	RsHost  = "http://rs.qbox.me"
+	RsfHost = "http://rsf.qbox.me"
+	UpHost  = "http://up.qiniup.com"
+)
+
+func Init(conf *system.Configuration) {
+	defaultUser = conf.UserConf
 	namespaceMod = &models.NamespaceModel{}
 	namespaceMod.Init()
 	segMod = &models.SegmentKodoModel{}
-	segMod.Init()
-	FFGrpcClientInit(conf)
+	segMod.Init(defaultUser)
+	FFGrpcClientInit(&conf.GrpcConf)
 	UaMod = &models.UaModel{}
 	UaMod.Init()
-
 }
 
 func FFGrpcClientInit(conf *system.GrpcConf) {
@@ -50,8 +59,6 @@ type requestParams struct {
 	uaid             string
 	from             int64
 	to               int64
-	expire           int64
-	token            string
 	limit            int
 	marker           string
 	namespace        string
@@ -63,21 +70,9 @@ type requestParams struct {
 	m3u8FileName     string
 }
 type userInfo struct {
-	uid uint32
+	uid string
 	ak  string
 	sk  string
-}
-
-const TOKEN_HEADER_LEN = 5
-
-var (
-	localInfo userInfo
-)
-
-func SetUserInfo(ak, sk string) {
-	localInfo.uid = 0
-	localInfo.ak = ak
-	localInfo.sk = sk
 }
 
 func checkParams(xl *xlog.Logger, params *requestParams) error {
@@ -95,69 +90,32 @@ func checkParams(xl *xlog.Logger, params *requestParams) error {
 }
 
 func getUserInfo(xl *xlog.Logger, req *http.Request) (*userInfo, error) {
-	reqUrl := req.URL.String()
-	if strings.Contains(reqUrl, "token=") {
-		token := strings.Split(reqUrl, "&token=")[1]
-		req.Header.Set("Authorization", "QBox ak="+strings.Split(token, ":")[0])
-	}
 	authHeader := req.Header.Get("Authorization")
-	auths := strings.Split(authHeader, " ")
-	if len(auths) != 2 {
-		return nil, errors.New("Parse auth header Failed")
+	if !strings.HasPrefix(authHeader, "QiniuStub ") {
+		return nil, errors.New("Parse Authorization header failed")
 	}
-	u, err := url.ParseQuery(auths[1])
+
+	auths := authHeader[10:]
+
+	u, err := url.ParseQuery(auths)
 	if err != nil {
-		return nil, errors.New("Parse auth header Failed")
+		return nil, errors.New("Parse Authorization header Failed")
 	}
-	ak := u["ak"][0]
-	var info userInfo
-	if system.HaveQconf() == true {
-		user, err := auth.GetUserInfoFromQconf(xl, ak)
-		if err != nil {
-			return nil, errors.New("get userinfo error")
-		}
-		uid := user.Uid
-		info = userInfo{
-			uid: uid,
-			ak:  ak,
-			sk:  string(user.Secret[:]),
-		}
-	} else {
-		if ak == localInfo.ak {
-			info = userInfo{
-				uid: localInfo.uid,
-				ak:  localInfo.ak,
-				sk:  localInfo.sk,
-			}
-		} else {
-			return nil, errors.New("private ak/sk not set")
-		}
+	user := userInfo{
+		ak:  u.Get("ak"),
+		uid: u.Get("uid"),
 	}
-	return &info, nil
+	return &user, nil
 }
 
 func HandleToken(c *gin.Context) {
 	c.Header("Access-Control-Allow-Origin", "*")
-	if system.HaveQconf() {
-		return
-	}
-	xl := xlog.New(c.Writer, c.Request)
-	token := c.Request.Header.Get("Authorization")
-	if len(token) <= TOKEN_HEADER_LEN && !strings.Contains(c.Request.URL.String(), "playback") {
-		xl.Errorf("bad token")
-		c.AbortWithStatusJSON(401, gin.H{
-			"error": "bad token",
-		})
-		return
-	}
-	if !strings.Contains(c.Request.URL.String(), "playback") {
-		c.Request.Header.Set("Authorization", "QBox ak="+strings.Split(token[TOKEN_HEADER_LEN:], ":")[0])
+	// TODO verify token if private deploy
+	authHeader := c.Request.Header.Get("Authorization")
+	if strings.HasPrefix(authHeader, "QBox ") {
+		c.Request.Header.Set("Authorization", "QiniuStub uid="+defaultUser.Uid+"&ut=2&ak=Ves3WTXC8XnEHT0I_vacEQQz-9jrJZxNExcmarzQ")
 	}
 	c.Next()
-}
-
-func getUid(uid uint32) string {
-	return strconv.Itoa(int(uid))
 }
 
 func GetUrlWithDownLoadToken(xl *xlog.Logger, domain, fname string, tsExpire int64, mac *qbox.Mac) string {
@@ -196,29 +154,12 @@ func IsAutoCreateUa(xl *xlog.Logger, bucket string) (bool, []models.NamespaceInf
 	}
 	return info[0].AutoCreateUa, info, nil
 }
-
-func VerifyToken(xl *xlog.Logger, expire int64, realToken string, req *http.Request, userInfo *userInfo) bool {
-	if expire == 0 || realToken == "" {
-		return false
-	}
-	if expire < time.Now().Unix() {
-		return false
-	}
-	url := "http://" + req.Host + req.URL.String()
-	tokenIndex := strings.Index(url, "&token=")
-	mac := qbox.NewMac(userInfo.ak, userInfo.sk)
-	token := mac.Sign([]byte(url[0:tokenIndex]))
-	return token == realToken
-}
-
 func ParseRequest(c *gin.Context, xl *xlog.Logger) (*requestParams, error) {
 	uaid := c.Param("uaid")
 	namespace := c.Param("namespace")
 	namespaceInQuery := c.DefaultQuery("namespace", "")
 	from := c.DefaultQuery("from", "0")
 	to := c.DefaultQuery("to", "0")
-	expire := c.DefaultQuery("e", "0")
-	token := c.Query("token")
 	limit := c.DefaultQuery("limit", "1000")
 	marker := c.DefaultQuery("marker", "")
 	regex := c.DefaultQuery("regex", "")
@@ -237,10 +178,6 @@ func ParseRequest(c *gin.Context, xl *xlog.Logger) (*requestParams, error) {
 	toT, err := strconv.ParseInt(to, 10, 64)
 	if err != nil {
 		return nil, errors.New("Parse to time failed")
-	}
-	expireT, err := strconv.ParseInt(expire, 10, 64)
-	if err != nil {
-		return nil, errors.New("Parse expire time failed")
 	}
 	limitT, err := strconv.ParseInt(limit, 10, 32)
 	if err != nil {
@@ -265,8 +202,6 @@ func ParseRequest(c *gin.Context, xl *xlog.Logger) (*requestParams, error) {
 		uaid:             uaid,
 		from:             fromT * 1000,
 		to:               toT * 1000,
-		expire:           expireT * 1000,
-		token:            token,
 		limit:            int(limitT),
 		marker:           marker,
 		namespace:        namespace,
@@ -292,10 +227,6 @@ func isValidSpeed(speed int64) bool {
 
 func GetNameSpaceInfo(xl *xlog.Logger, bucket, uaid string) (error, int) {
 
-	if system.HaveDb() == false {
-		return nil, 0
-	}
-
 	isAuto, info, err := IsAutoCreateUa(xl, bucket)
 	if err != nil {
 		return err, 0
@@ -313,4 +244,31 @@ func GetNameSpaceInfo(xl *xlog.Logger, bucket, uaid string) (error, int) {
 		}
 	}
 	return nil, info[0].Expire
+}
+
+func newRsService(user *userInfo, bucket string) (*rs.Service, error) {
+	mac := qboxmac.Mac{AccessKey: defaultUser.AccessKey, SecretKey: []byte(defaultUser.SecretKey)}
+	var tr http.RoundTripper
+	user.uid = "1810757928"
+	if defaultUser.IsAdmin {
+		tr = qboxmac.NewAdminTransport(&mac, user.uid+"/0", nil)
+	} else {
+		tr = qboxmac.NewTransport(&mac, nil)
+	}
+	zone, err := models.GetZone(user.ak, bucket)
+	if err != nil {
+		return nil, err
+	}
+	upHost := "http://" + zone.SrcUpHosts[0]
+	return rs.NewService(tr, zone.GetRsHost(false), zone.GetRsfHost(false), upHost), nil
+}
+
+func uploadNewFile(filename, bucket string, data []byte, user *userInfo) error {
+	rsService, err := newRsService(user, bucket)
+	if err != nil {
+		return err
+	}
+	entry := bucket + ":" + filename
+	_, _, err = rsService.Put(entry, "", bytes.NewReader(data), int64(len(data)), "", "", "")
+	return err
 }

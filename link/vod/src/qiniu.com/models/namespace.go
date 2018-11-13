@@ -169,7 +169,7 @@ func (m *NamespaceModel) GetNamespaceInfos(xl *xlog.Logger, limit int, mark, uid
 	return r, nextMark, nil
 }
 
-func (m *NamespaceModel) UpdateBucket(xl *xlog.Logger, uid, space, bucket, domain string) error {
+func (m *NamespaceModel) UpdateBucket(xl *xlog.Logger, uid, space, bucket string) error {
 	/*
 	   db.namespace.update({"uid": uid, "namespace": space}, bson.M{"$set":{"bucket": bucket, "domain" : domain }}),
 	*/
@@ -185,7 +185,6 @@ func (m *NamespaceModel) UpdateBucket(xl *xlog.Logger, uid, space, bucket, domai
 					"$set": bson.M{
 						NAMESPACE_ITEM_BUCKET: bucket,
 						ITEM_UPDATA_TIME:      time.Now().Unix(),
-						NAMESPACE_ITEM_DOMAIN: domain,
 					},
 				},
 			)

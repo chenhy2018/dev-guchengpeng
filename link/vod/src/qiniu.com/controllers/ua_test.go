@@ -280,6 +280,7 @@ func TestUpdateUa(t *testing.T) {
 	bodyBuffer, _ := json.Marshal(body)
 	bodyT := bytes.NewBuffer(bodyBuffer)
 	monkey.Patch(getUserInfo, func(xl *xlog.Logger, req *http.Request) (*userInfo, error) { return &user, nil })
+	monkey.Patch(checkBucketInKodo, func(bucket string, user *userInfo) error { fmt.Println("fdsafasfd"); return nil })
 	req, _ := http.NewRequest("Put", "/v1/uas/ipcamera2", bodyT)
 	recoder := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(recoder)
@@ -377,7 +378,6 @@ func TestUpdateUa(t *testing.T) {
 
 	bodyBuffer, _ = json.Marshal(body)
 	bodyT = bytes.NewBuffer(bodyBuffer)
-
 	req, _ = http.NewRequest("Put", "/v1/uas/ipcamera1", bodyT)
 	recoder = httptest.NewRecorder()
 	c, _ = gin.CreateTestContext(recoder)
@@ -389,7 +389,7 @@ func TestUpdateUa(t *testing.T) {
 	c.Params = append(c.Params, param)
 	c.Request = req
 	UpdateUa(c)
-	assert.Equal(t, c.Writer.Status(), 200, "they should be equal")
+	assert.Equal(t, c.Writer.Status(), 200, c.Writer.Header().Get("x-Reqid"))
 
 	// get userinfo failed
 	fmt.Printf("get userinfo failed. \n")
@@ -591,6 +591,7 @@ func TestDeleteUa(t *testing.T) {
 	// remove invaild uid ipcamer1, return 400
 	fmt.Printf("remove invaild uid ipcamer1, return 400. \n")
 	monkey.Patch(getUserInfo, func(xl *xlog.Logger, req *http.Request) (*userInfo, error) { return &user, nil })
+	monkey.Patch(checkBucketInKodo, func(bucket string, user *userInfo) error { fmt.Println("fdsafasfd"); return nil })
 	req, _ := http.NewRequest("Del", "/v1/uas/ipcamera2", nil)
 	recoder := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(recoder)

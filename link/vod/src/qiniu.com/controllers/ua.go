@@ -59,7 +59,7 @@ func RegisterUa(c *gin.Context) {
 	}
 
 	ua := models.UaInfo{
-		Uid:       getUid(user.uid),
+		Uid:       user.uid,
 		UaId:      params.uaid,
 		Namespace: uaData.Namespace,
 		Password:  uaData.Password,
@@ -71,7 +71,7 @@ func RegisterUa(c *gin.Context) {
 	model := models.NamespaceModel{}
 	fmt.Println(uaData.Namespace)
 
-	r, err := model.GetNamespaceInfo(xl, getUid(user.uid), uaData.Namespace)
+	r, err := model.GetNamespaceInfo(xl, user.uid, uaData.Namespace)
 	if err != nil {
 		xl.Errorf("get namespace error, error =%#v", err)
 		c.JSON(500, gin.H{"error": "Service Internal Error"})
@@ -130,10 +130,10 @@ func DeleteUa(c *gin.Context) {
 		return
 	}
 	cond := map[string]interface{}{
-		models.UA_ITEM_UID:  getUid(user.uid),
+		models.UA_ITEM_UID:  user.uid,
 		models.UA_ITEM_UAID: params.uaid,
 	}
-	info, err := UaMod.GetUaInfo(xl, getUid(user.uid), params.uaid)
+	info, err := UaMod.GetUaInfo(xl, user.uid, params.uaid)
 	if err != nil {
 		xl.Errorf("get use info error, error =%#v", err)
 		c.JSON(500, gin.H{"error": "Service Internal Error"})
@@ -177,7 +177,7 @@ func UpdateUa(c *gin.Context) {
 		return
 	}
 
-	uaInfo, err := UaMod.GetUaInfo(xl, getUid(user.uid), params.uaid)
+	uaInfo, err := UaMod.GetUaInfo(xl, user.uid, params.uaid)
 	if err != nil {
 		xl.Errorf("get ua info error, error =  %#v", err)
 		c.JSON(400, gin.H{"error =  %#v": "err"})
@@ -214,7 +214,7 @@ func UpdateUa(c *gin.Context) {
 		}
 	}
 	ua := models.UaInfo{
-		Uid:       getUid(user.uid),
+		Uid:       user.uid,
 		UaId:      uaData.Uaid,
 		Namespace: uaData.Namespace,
 		Password:  uaData.Password,
@@ -225,7 +225,7 @@ func UpdateUa(c *gin.Context) {
 	}
 
 	model := models.NamespaceModel{}
-	r, err := model.GetNamespaceInfo(xl, getUid(user.uid), uaData.Namespace)
+	r, err := model.GetNamespaceInfo(xl, user.uid, uaData.Namespace)
 	if err != nil {
 		xl.Errorf("namespace is not correct")
 		c.JSON(500, gin.H{
@@ -241,7 +241,7 @@ func UpdateUa(c *gin.Context) {
 		return
 	}
 
-	err = UaMod.UpdateUa(xl, getUid(user.uid), params.uaid, ua)
+	err = UaMod.UpdateUa(xl, user.uid, params.uaid, ua)
 	if err != nil {
 		xl.Errorf("Update falied error = %#v", err.Error())
 		c.JSON(500, gin.H{"error": "Service Internal Error"})
@@ -274,9 +274,9 @@ func GetUaInfo(c *gin.Context) {
 	var r []models.UaInfo
 	xl.Infof("limit %d, marker %s, regex %s namespace %s", params.limit, params.marker, params.regex, params.namespaceInQuery)
 	if params.exact {
-		r, err = UaMod.GetUaInfo(xl, getUid(user.uid), params.regex)
+		r, err = UaMod.GetUaInfo(xl, user.uid, params.regex)
 	} else {
-		r, nextMark, err = UaMod.GetUaInfos(xl, params.limit, params.marker, getUid(user.uid), params.namespaceInQuery, models.UA_ITEM_UAID, params.regex)
+		r, nextMark, err = UaMod.GetUaInfos(xl, params.limit, params.marker, user.uid, params.namespaceInQuery, models.UA_ITEM_UAID, params.regex)
 	}
 	if err != nil {
 		xl.Errorf("Get falied error = %#v", err.Error())
