@@ -50,17 +50,17 @@ func FFGrpcClientInit(conf *system.GrpcConf) {
 }
 
 type requestParams struct {
-	uaid         string
-	from         int64
-	to           int64
-	limit        int
-	marker       string
-	namespace    string
-	prefix       string
-	exact        bool
-	speed        int32
-	fmt          string
-	m3u8FileName string
+	uaid      string
+	from      int64
+	to        int64
+	limit     int
+	marker    string
+	namespace string
+	prefix    string
+	exact     bool
+	speed     int32
+	fmt       string
+	key       string
 }
 type userInfo struct {
 	uid string
@@ -153,7 +153,7 @@ func ParseRequest(c *gin.Context, xl *xlog.Logger) (*requestParams, error) {
 	prefix := c.DefaultQuery("prefix", "")
 	exact := c.DefaultQuery("exact", "false")
 	speed := c.DefaultQuery("speed", "1")
-	m3u8Name := c.DefaultQuery("m3u8Name", "")
+	m3u8Name := c.DefaultQuery("key", "")
 	fmt := c.Query("fmt")
 
 	if strings.Contains(uaid, ".m3u8") {
@@ -187,17 +187,17 @@ func ParseRequest(c *gin.Context, xl *xlog.Logger) (*requestParams, error) {
 		return nil, errors.New("fmt error, it should be flv or fmp4")
 	}
 	params := &requestParams{
-		uaid:         uaid,
-		from:         fromT * 1000,
-		to:           toT * 1000,
-		limit:        int(limitT),
-		marker:       marker,
-		namespace:    namespace,
-		prefix:       prefix,
-		exact:        exactT,
-		speed:        int32(speedT),
-		fmt:          fmt,
-		m3u8FileName: m3u8Name,
+		uaid:      uaid,
+		from:      fromT * 1000,
+		to:        toT * 1000,
+		limit:     int(limitT),
+		marker:    marker,
+		namespace: namespace,
+		prefix:    prefix,
+		exact:     exactT,
+		speed:     int32(speedT),
+		fmt:       fmt,
+		key:       m3u8Name,
 	}
 
 	return params, nil

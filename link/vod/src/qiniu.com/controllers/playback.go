@@ -72,7 +72,7 @@ func GetPlayBackm3u8(c *gin.Context) {
 	}
 
 	// make m3u8 file name with "uaid + from + end.m3u8" if user not given
-	fileName := params.m3u8FileName
+	fileName := params.key
 	if fileName == "" {
 		from := strconv.FormatInt(params.from, 10)
 		end := strconv.FormatInt(params.to, 10)
