@@ -100,7 +100,6 @@ func TestRegisterUa(t *testing.T) {
 	// 500 if get user info failed
 	guard1 := monkey.Patch(getUserInfo, func(xl *xlog.Logger, req *http.Request) (*userInfo, error) {
 		return &userInfo{}, errors.New("get user  info error")
-
 	})
 	body = uabody{}
 
@@ -149,12 +148,10 @@ func TestRegisterUa(t *testing.T) {
 	guard4 := monkey.PatchInstanceMethod(
 		reflect.TypeOf((*models.UaModel)(nil)), "GetUaInfo", func(ss *models.UaModel, xl *xlog.Logger, uid, namesapce, uaid string) ([]models.UaInfo, error) {
 			return []models.UaInfo{}, errors.New("get ua  info failed")
-
 		})
 	monkey.PatchInstanceMethod(
 		reflect.TypeOf((*models.NamespaceModel)(nil)), "GetNamespaceInfo", func(ss *models.NamespaceModel, xl *xlog.Logger, uid, namespace string) ([]models.NamespaceInfo, error) {
 			return []models.NamespaceInfo{models.NamespaceInfo{}}, nil
-
 		})
 	body = uabody{}
 
@@ -171,7 +168,6 @@ func TestRegisterUa(t *testing.T) {
 	guard5 := monkey.PatchInstanceMethod(
 		reflect.TypeOf((*models.UaModel)(nil)), "GetUaInfo", func(ss *models.UaModel, xl *xlog.Logger, uid, namesapce, uaid string) ([]models.UaInfo, error) {
 			return []models.UaInfo{models.UaInfo{}}, nil
-
 		})
 	body = uabody{}
 
@@ -188,12 +184,10 @@ func TestRegisterUa(t *testing.T) {
 	monkey.PatchInstanceMethod(
 		reflect.TypeOf((*models.UaModel)(nil)), "GetUaInfo", func(ss *models.UaModel, xl *xlog.Logger, uid, namesapce, uaid string) ([]models.UaInfo, error) {
 			return []models.UaInfo{}, nil
-
 		})
 	monkey.PatchInstanceMethod(
 		reflect.TypeOf((*models.UaModel)(nil)), "Register", func(ss *models.UaModel, xl *xlog.Logger, ua models.UaInfo) error {
 			return errors.New("register ua failed")
-
 		})
 	body = uabody{}
 
@@ -272,7 +266,6 @@ func TestGetUa(t *testing.T) {
 	monkey.PatchInstanceMethod(
 		reflect.TypeOf((*models.UaModel)(nil)), "GetUaInfo", func(ss *models.UaModel, xl *xlog.Logger, uid, namesapce, uaid string) ([]models.UaInfo, error) {
 			return []models.UaInfo{}, errors.New("get ua info failed")
-
 		})
 	req, _ = http.NewRequest("Get", "/v1/namespaces?regex=ip&limit=10&marker=&exact=true", nil)
 	recoder = httptest.NewRecorder()
@@ -287,7 +280,6 @@ func TestGetUa(t *testing.T) {
 	body, err = ioutil.ReadAll(recoder.Body)
 	if err != nil {
 		fmt.Printf("parse request body failed, body = %#v", body)
-
 	}
 	assert.Equal(t, c.Writer.Status(), 500, "they should be equal")
 	monkey.UnpatchAll()
@@ -423,7 +415,6 @@ func TestUpdateUa(t *testing.T) {
 	// get userinfo failed
 	guard1 := monkey.Patch(getUserInfo, func(xl *xlog.Logger, req *http.Request) (*userInfo, error) {
 		return &userInfo{}, errors.New("get user  info error")
-
 	})
 	body = uabody{}
 
@@ -455,7 +446,6 @@ func TestUpdateUa(t *testing.T) {
 	guard2 := monkey.PatchInstanceMethod(
 		reflect.TypeOf((*models.NamespaceModel)(nil)), "GetNamespaceInfo", func(ss *models.NamespaceModel, xl *xlog.Logger, uid, namespace string) ([]models.NamespaceInfo, error) {
 			return nil, errors.New("xxxxx error")
-
 		})
 	body = uabody{}
 
@@ -485,12 +475,10 @@ func TestUpdateUa(t *testing.T) {
 	monkey.PatchInstanceMethod(
 		reflect.TypeOf((*models.NamespaceModel)(nil)), "GetNamespaceInfo", func(ss *models.NamespaceModel, xl *xlog.Logger, uid, namespace string) ([]models.NamespaceInfo, error) {
 			return []models.NamespaceInfo{models.NamespaceInfo{}}, nil
-
 		})
 	guard4 := monkey.PatchInstanceMethod(
 		reflect.TypeOf((*models.UaModel)(nil)), "GetUaInfo", func(ss *models.UaModel, xl *xlog.Logger, uid, namesapce, uaid string) ([]models.UaInfo, error) {
 			return []models.UaInfo{}, errors.New("get ua  info failed")
-
 		})
 	body = uabody{}
 
@@ -521,15 +509,12 @@ func TestUpdateUa(t *testing.T) {
 		reflect.TypeOf((*models.UaModel)(nil)), "GetUaInfo", func(ss *models.UaModel, xl *xlog.Logger, uid, namesapce, uaid string) ([]models.UaInfo, error) {
 			if uaid == "ipcamera1" {
 				return []models.UaInfo{models.UaInfo{}}, nil
-
 			}
 			return []models.UaInfo{}, nil
-
 		})
 	monkey.PatchInstanceMethod(
 		reflect.TypeOf((*models.UaModel)(nil)), "UpdateUa", func(ss *models.UaModel, xl *xlog.Logger, uid, namesapce, uaid string, ua models.UaInfo) error {
 			return errors.New("update ua failed")
-
 		})
 	body = uabody{}
 
@@ -636,7 +621,6 @@ func TestDeleteUa(t *testing.T) {
 	guard1 := monkey.PatchInstanceMethod(
 		reflect.TypeOf((*models.UaModel)(nil)), "GetUaInfo", func(ss *models.UaModel, xl *xlog.Logger, uid, namesapce, uaid string) ([]models.UaInfo, error) {
 			return []models.UaInfo{}, errors.New("get ua  info failed")
-
 		})
 	req, _ = http.NewRequest("Del", "/v1/namespaces/test1", nil)
 	recoder = httptest.NewRecorder()
@@ -660,7 +644,6 @@ func TestDeleteUa(t *testing.T) {
 	monkey.PatchInstanceMethod(
 		reflect.TypeOf((*models.UaModel)(nil)), "Delete", func(ss *models.UaModel, xl *xlog.Logger, cond map[string]interface{}) error {
 			return errors.New("delete ua failed")
-
 		})
 	req, _ = http.NewRequest("Del", "/v1/namespaces/test1", nil)
 	recoder = httptest.NewRecorder()
@@ -674,5 +657,4 @@ func TestDeleteUa(t *testing.T) {
 	DeleteUa(c)
 	assert.Equal(t, c.Writer.Status(), 500, "they should be equal")
 	monkey.UnpatchAll()
-
 }
