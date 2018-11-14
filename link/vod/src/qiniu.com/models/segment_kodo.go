@@ -22,8 +22,8 @@ var (
 )
 
 type Segment interface {
-	GetSegmentTsInfo(xl *xlog.Logger, index, rows int, starttime, endtime int64, bucket, uaid, mark, uid string, defaultUser *system.UserConf) ([]map[string]interface{}, error)
-	GetFragmentTsInfo(xl *xlog.Logger, index, rows int, starttime, endtime int64, bucket, uaid, mark, uid string, defaultUser *system.UserConf) ([]map[string]interface{}, error)
+	GetSegmentTsInfo(xl *xlog.Logger, starttime, endtime int64, bucket, uaid string, limit int, mark, uid, userAk string) ([]map[string]interface{}, string, error)
+	GetFragmentTsInfo(xl *xlog.Logger, count int, starttime, endtime int64, bucket, uaid, mark, uid, userAk string) ([]map[string]interface{}, string, error)
 }
 
 const (
@@ -301,7 +301,7 @@ func (m *SegmentKodoModel) GetFrameInfo(xl *xlog.Logger, starttime, endtime int6
 	return r, err
 }
 
-func NewRpcClient(uid string, defaultUser *system.UserConf) *storage.Client {
+func NewRpcClient(uid string) *storage.Client {
 	mac := qboxmac.Mac{AccessKey: defaultUser.AccessKey, SecretKey: []byte(defaultUser.SecretKey)}
 	var tr http.RoundTripper
 	if defaultUser.IsAdmin {
@@ -316,7 +316,7 @@ func NewRpcClient(uid string, defaultUser *system.UserConf) *storage.Client {
 }
 
 func NewBucketMgtWithEx(xl *xlog.Logger, uid string, userAk, bucket string) *storage.BucketManager {
-	rpcClient := NewRpcClient(uid, &defaultUser)
+	rpcClient := NewRpcClient(uid)
 	mac := qbox.Mac{
 		AccessKey: defaultUser.AccessKey,
 		SecretKey: []byte(defaultUser.SecretKey),
@@ -329,14 +329,14 @@ func NewBucketMgtWithEx(xl *xlog.Logger, uid string, userAk, bucket string) *sto
 		Zone: zone,
 	}
 	cfg.CentralRsHost = storage.DefaultRsHost
-	if defaultUser.IsTestUser {
+	if defaultUser.IsTestEnv {
 		cfg.CentralRsHost = defaultUser.KodoConf.RsHost
 	}
 	return storage.NewBucketManagerEx(&mac, &cfg, rpcClient)
 
 }
 func GetZone(ak, bucket string) (*storage.Zone, error) {
-	if defaultUser.IsTestUser {
+	if defaultUser.IsTestEnv {
 		zone := storage.Zone{}
 		zone.SrcUpHosts = []string{defaultUser.KodoConf.UpHost}
 		zone.RsHost = defaultUser.KodoConf.RsHost

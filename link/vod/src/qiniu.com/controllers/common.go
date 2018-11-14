@@ -214,6 +214,10 @@ func isValidSpeed(speed int64) bool {
 
 func GetNameSpaceInfo(xl *xlog.Logger, bucket, uaid, uid string) (error, int) {
 
+	if system.HaveDb() == false {
+		return nil, 0
+
+	}
 	isAuto, info, err := IsAutoCreateUa(xl, uid, bucket)
 	if err != nil {
 		return err, 0

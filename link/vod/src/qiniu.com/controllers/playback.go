@@ -203,7 +203,7 @@ func getDomain(xl *xlog.Logger, bucket string, user *userInfo) (string, error) {
 		return "", err
 
 	}
-	rpcClient := models.NewRpcClient(user.uid, &defaultUser)
+	rpcClient := models.NewRpcClient(user.uid)
 	resp, err := rpcClient.Do(context.Background(), request)
 	if err != nil {
 		return "", err
@@ -235,6 +235,7 @@ func getDomain(xl *xlog.Logger, bucket string, user *userInfo) (string, error) {
 // after new fastforward developed this code will deleted
 // from here, please DON'T using this code this other purpose.
 func getSKByAkFromQconf(xl *xlog.Logger, ak string) (*qbox.Mac, error) {
+	return &qbox.Mac{AccessKey: "JAwTPb8dmrbiwt89Eaxa4VsL4_xSIYJoJh4rQfOQ", SecretKey: []byte("G5mtjT3QzG4Lf7jpCAN5PZHrGeoSH9jRdC96ecYS")}, nil
 	accessInfo, err := auth.GetUserInfoFromQconf(xl, ak)
 	if err != nil {
 		return nil, err

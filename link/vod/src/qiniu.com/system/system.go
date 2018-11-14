@@ -23,12 +23,12 @@ type GrpcConf struct {
 	Addr string `json:"addr"`
 }
 type UserConf struct {
-	AccessKey  string   `json:"access_key"`
-	SecretKey  string   `json:"secret_key"`
-	IsAdmin    bool     `json:"is_admin"`
-	Uid        string   `json:"uid"`
-	IsTestUser bool     `json:"is_test_user"`
-	KodoConf   KodoConf `json:"kodo_conf"`
+	AccessKey string   `json:"access_key"`
+	SecretKey string   `json:"secret_key"`
+	IsAdmin   bool     `json:"is_admin"`
+	Uid       string   `json:"uid"`
+	IsTestEnv bool     `json:"is_test_env"`
+	KodoConf  KodoConf `json:"kodo_conf"`
 }
 type KodoConf struct {
 	RsHost  string `json:"rs_host"`

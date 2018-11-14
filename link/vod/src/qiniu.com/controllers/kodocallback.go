@@ -193,7 +193,7 @@ func fop(xl *xlog.Logger, filename, bucket, jpegName string, user *userInfo) err
 	cfg := storage.Config{
 		UseHTTPS: false,
 	}
-	rpcClient := models.NewRpcClient(user.uid, &defaultUser)
+	rpcClient := models.NewRpcClient(user.uid)
 	mac := qbox.Mac{
 		AccessKey: defaultUser.AccessKey,
 		SecretKey: []byte(defaultUser.SecretKey),
