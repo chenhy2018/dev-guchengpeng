@@ -69,7 +69,7 @@ func UploadTs(c *gin.Context) {
 	}
 
 	// Add namespace&ua check
-	err, exprie := GetNameSpaceInfo(xl, kodoData.Bucket, ids[1])
+	err, exprie := GetNameSpaceInfo(xl, kodoData.Bucket, ids[1], user.uid)
 	if err != nil {
 		xl.Errorf("error = %#v", err.Error())
 		c.JSON(400, gin.H{
@@ -203,7 +203,7 @@ func fop(xl *xlog.Logger, filename, bucket, jpegName string, user *userInfo) err
 		return err
 	}
 	cfg.Zone = zone
-	operationManager := storage.NewOperationManagerEx(&mac, &cfg, &rpcClient)
+	operationManager := storage.NewOperationManagerEx(&mac, &cfg, rpcClient)
 
 	fopVframe := fmt.Sprintf("vframe/jpg/offset/0|saveas/%s",
 		storage.EncodedEntry(bucket, jpegName))

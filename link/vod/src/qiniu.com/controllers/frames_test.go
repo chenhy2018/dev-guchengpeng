@@ -67,7 +67,7 @@ func (suite *FramesTestSuite) TestFrames6() {
 		return &userinfo, nil
 	})
 	monkey.PatchInstanceMethod(
-		reflect.TypeOf((*models.UaModel)(nil)), "GetUaInfo", func(ss *models.UaModel, xl *xlog.Logger, uid, uaid string) ([]models.UaInfo, error) {
+		reflect.TypeOf((*models.UaModel)(nil)), "GetUaInfo", func(ss *models.UaModel, xl *xlog.Logger, uid, namespace, uaid string) ([]models.UaInfo, error) {
 			info := []models.UaInfo{}
 			item := models.UaInfo{
 				Uid:       "link",
@@ -104,7 +104,7 @@ func (suite *FramesTestSuite) TestFrames7() {
 		return &userinfo, nil
 	})
 	monkey.PatchInstanceMethod(
-		reflect.TypeOf((*models.UaModel)(nil)), "GetUaInfo", func(ss *models.UaModel, xl *xlog.Logger, uid, uaid string) ([]models.UaInfo, error) {
+		reflect.TypeOf((*models.UaModel)(nil)), "GetUaInfo", func(ss *models.UaModel, xl *xlog.Logger, uid, namespace, uaid string) ([]models.UaInfo, error) {
 			info := []models.UaInfo{}
 			item := models.UaInfo{
 				Uid:       "link",
@@ -130,7 +130,7 @@ func (suite *FramesTestSuite) TestFrames9() {
 		return &userinfo, nil
 	})
 	monkey.PatchInstanceMethod(
-		reflect.TypeOf((*models.UaModel)(nil)), "GetUaInfo", func(ss *models.UaModel, xl *xlog.Logger, uid, uaid string) ([]models.UaInfo, error) {
+		reflect.TypeOf((*models.UaModel)(nil)), "GetUaInfo", func(ss *models.UaModel, xl *xlog.Logger, uid, namespace, uaid string) ([]models.UaInfo, error) {
 			info := []models.UaInfo{}
 			item := models.UaInfo{
 				Uid:       "link",

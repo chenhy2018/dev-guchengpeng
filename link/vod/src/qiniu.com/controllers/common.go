@@ -30,12 +30,6 @@ var (
 	defaultUser      system.UserConf
 )
 
-const (
-	RsHost  = "http://rs.qbox.me"
-	RsfHost = "http://rsf.qbox.me"
-	UpHost  = "http://up.qiniup.com"
-)
-
 func Init(conf *system.Configuration) {
 	defaultUser = conf.UserConf
 	namespaceMod = &models.NamespaceModel{}
@@ -56,18 +50,17 @@ func FFGrpcClientInit(conf *system.GrpcConf) {
 }
 
 type requestParams struct {
-	uaid             string
-	from             int64
-	to               int64
-	limit            int
-	marker           string
-	namespace        string
-	namespaceInQuery string
-	regex            string
-	exact            bool
-	speed            int32
-	fmt              string
-	m3u8FileName     string
+	uaid         string
+	from         int64
+	to           int64
+	limit        int
+	marker       string
+	namespace    string
+	prefix       string
+	exact        bool
+	speed        int32
+	fmt          string
+	m3u8FileName string
 }
 type userInfo struct {
 	uid string
@@ -111,10 +104,6 @@ func getUserInfo(xl *xlog.Logger, req *http.Request) (*userInfo, error) {
 func HandleToken(c *gin.Context) {
 	c.Header("Access-Control-Allow-Origin", "*")
 	// TODO verify token if private deploy
-	authHeader := c.Request.Header.Get("Authorization")
-	if strings.HasPrefix(authHeader, "QBox ") {
-		c.Request.Header.Set("Authorization", "QiniuStub uid="+defaultUser.Uid+"&ut=2&ak=Ves3WTXC8XnEHT0I_vacEQQz-9jrJZxNExcmarzQ")
-	}
 	c.Next()
 }
 
@@ -139,13 +128,13 @@ func GetBucket(xl *xlog.Logger, uid, namespace string) (string, error) {
 	return info[0].Bucket, nil
 }
 
-func IsAutoCreateUa(xl *xlog.Logger, bucket string) (bool, []models.NamespaceInfo, error) {
+func IsAutoCreateUa(xl *xlog.Logger, uid, bucket string) (bool, []models.NamespaceInfo, error) {
 	if system.HaveDb() == false {
 		return true, []models.NamespaceInfo{}, nil
 	}
 
 	namespaceMod = &models.NamespaceModel{}
-	info, err := namespaceMod.GetNamespaceByBucket(xl, bucket)
+	info, err := namespaceMod.GetNamespaceByBucket(xl, uid, bucket)
 	if err != nil {
 		return false, []models.NamespaceInfo{}, err
 	}
@@ -157,12 +146,11 @@ func IsAutoCreateUa(xl *xlog.Logger, bucket string) (bool, []models.NamespaceInf
 func ParseRequest(c *gin.Context, xl *xlog.Logger) (*requestParams, error) {
 	uaid := c.Param("uaid")
 	namespace := c.Param("namespace")
-	namespaceInQuery := c.DefaultQuery("namespace", "")
 	from := c.DefaultQuery("from", "0")
 	to := c.DefaultQuery("to", "0")
 	limit := c.DefaultQuery("limit", "1000")
 	marker := c.DefaultQuery("marker", "")
-	regex := c.DefaultQuery("regex", "")
+	prefix := c.DefaultQuery("prefix", "")
 	exact := c.DefaultQuery("exact", "false")
 	speed := c.DefaultQuery("speed", "1")
 	m3u8Name := c.DefaultQuery("m3u8Name", "")
@@ -199,18 +187,17 @@ func ParseRequest(c *gin.Context, xl *xlog.Logger) (*requestParams, error) {
 		return nil, errors.New("fmt error, it should be flv or fmp4")
 	}
 	params := &requestParams{
-		uaid:             uaid,
-		from:             fromT * 1000,
-		to:               toT * 1000,
-		limit:            int(limitT),
-		marker:           marker,
-		namespace:        namespace,
-		namespaceInQuery: namespaceInQuery,
-		regex:            regex,
-		exact:            exactT,
-		speed:            int32(speedT),
-		fmt:              fmt,
-		m3u8FileName:     m3u8Name,
+		uaid:         uaid,
+		from:         fromT * 1000,
+		to:           toT * 1000,
+		limit:        int(limitT),
+		marker:       marker,
+		namespace:    namespace,
+		prefix:       prefix,
+		exact:        exactT,
+		speed:        int32(speedT),
+		fmt:          fmt,
+		m3u8FileName: m3u8Name,
 	}
 
 	return params, nil
@@ -225,17 +212,16 @@ func isValidSpeed(speed int64) bool {
 	return false
 }
 
-func GetNameSpaceInfo(xl *xlog.Logger, bucket, uaid string) (error, int) {
+func GetNameSpaceInfo(xl *xlog.Logger, bucket, uaid, uid string) (error, int) {
 
-	isAuto, info, err := IsAutoCreateUa(xl, bucket)
+	isAuto, info, err := IsAutoCreateUa(xl, uid, bucket)
 	if err != nil {
 		return err, 0
 	}
 
 	if isAuto == false {
 		model := models.UaModel{}
-		r, err := model.GetUaInfo(xl, info[0].Uid, uaid)
-		xl.Errorf("3333333  r = #%v  ua #%v info #%v", r, uaid, info[0])
+		r, err := model.GetUaInfo(xl, info[0].Uid, info[0].Space, uaid)
 		if err != nil {
 			return err, 0
 		}
@@ -249,7 +235,6 @@ func GetNameSpaceInfo(xl *xlog.Logger, bucket, uaid string) (error, int) {
 func newRsService(user *userInfo, bucket string) (*rs.Service, error) {
 	mac := qboxmac.Mac{AccessKey: defaultUser.AccessKey, SecretKey: []byte(defaultUser.SecretKey)}
 	var tr http.RoundTripper
-	user.uid = "1810757928"
 	if defaultUser.IsAdmin {
 		tr = qboxmac.NewAdminTransport(&mac, user.uid+"/0", nil)
 	} else {

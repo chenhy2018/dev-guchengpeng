@@ -38,15 +38,15 @@ func GetFrames(c *gin.Context) {
 		return
 	}
 
-	info, err := UaMod.GetUaInfo(xl, user.uid, params.uaid)
-	if err != nil || len(info) == 0 {
+	namespace := params.namespace
+	info, err := UaMod.GetUaInfo(xl, user.uid, namespace, params.uaid)
+	if err != nil && len(info) == 0 {
 		xl.Errorf("get ua info failed, error =  %#v", err)
 		c.JSON(400, gin.H{
 			"error": "ua is not correct",
 		})
 		return
 	}
-	namespace := info[0].Namespace
 
 	bucket, err := GetBucket(xl, user.uid, namespace)
 	if err != nil {

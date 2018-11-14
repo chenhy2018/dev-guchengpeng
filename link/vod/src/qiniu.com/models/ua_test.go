@@ -1,12 +1,12 @@
 package models
 
 import (
+	"encoding/base64"
 	"fmt"
-	"testing"
-
 	"github.com/qiniu/xlog.v1"
 	"github.com/stretchr/testify/assert"
 	"qiniu.com/db"
+	"testing"
 	//"time"
 )
 
@@ -40,52 +40,66 @@ func TestUa(t *testing.T) {
 	}
 	xl.Infof("DB Register done")
 	// Get ua.
-	r, _, err := model.GetUaInfos(xl, 100, "", "UserTest", "test", "uaid", "daaa")
+	r, _, err := model.GetUaInfos(xl, 100, "", "UserTest", "test", "daaa")
 	assert.Equal(t, err, nil, "they should be equal")
 	size := len(r)
 	assert.Equal(t, size, 100, "they should be equal")
 
-	r_1, _, err_1 := model.GetUaInfos(xl, 0, "", "UserTest", "test", UA_ITEM_UAID, "daaa099")
+	r, next, err := model.GetUaInfos(xl, 2, "", "UserTest", "test", "daaa09")
+	assert.Equal(t, err, nil, "they should be equal")
+	size = len(r)
+	assert.Equal(t, size, 2, "they should be equal")
+	assert.Equal(t, r[0].UaId, "daaa090", "they should be equal")
+	newMark, err := base64.StdEncoding.DecodeString(next)
+	assert.Equal(t, string(newMark), "daaa092", "they should be equal")
+
+	r, _, err = model.GetUaInfos(xl, 100, next, "UserTest", "test", "daaa09")
+	assert.Equal(t, err, nil, "they should be equal")
+	size = len(r)
+	assert.Equal(t, size, 8, "they should be equal")
+	assert.Equal(t, r[0].UaId, "daaa092", "they should be equal")
+
+	r_1, _, err_1 := model.GetUaInfos(xl, 0, "", "UserTest", "test", "daaa099")
 	assert.Equal(t, err_1, nil, "they should be equal")
 	size_1 := len(r_1)
 	assert.Equal(t, size_1, 1, "they should be equal")
 	assert.Equal(t, r_1[0].Namespace, "test", "they should be equal")
 	assert.Equal(t, r_1[0].Vod, false, "they should be equal")
-	assert.Equal(t, r_1[0].Live, false, "they should be equal")
+	assert.Equal(t, r_1[0].Live, 0, "they should be equal")
 	assert.Equal(t, r_1[0].Online, false, "they should be equal")
 	assert.Equal(t, r_1[0].Expire, 0, "they should be equal")
 
 	cond := map[string]interface{}{
 		UA_ITEM_VOD: true,
 	}
-	model.UpdateFunction(xl, "UserTest", "daaa099", UA_ITEM_VOD, cond)
+	model.UpdateFunction(xl, "UserTest", "test", "daaa099", UA_ITEM_VOD, cond)
 
 	cond = map[string]interface{}{
 		UA_ITEM_LIVE: true,
 	}
-	model.UpdateFunction(xl, "UserTest", "daaa099", UA_ITEM_LIVE, cond)
+	model.UpdateFunction(xl, "UserTest", "test", "daaa099", UA_ITEM_LIVE, cond)
 
 	cond = map[string]interface{}{
 		UA_ITEM_ONLINE: true,
 	}
-	model.UpdateFunction(xl, "UserTest", "daaa099", UA_ITEM_ONLINE, cond)
+	model.UpdateFunction(xl, "UserTest", "test", "daaa099", UA_ITEM_ONLINE, cond)
 
 	cond = map[string]interface{}{
 		UA_ITEM_EXPIRE: 7,
 	}
-	model.UpdateFunction(xl, "UserTest", "daaa099", UA_ITEM_EXPIRE, cond)
+	model.UpdateFunction(xl, "UserTest", "test", "daaa099", UA_ITEM_EXPIRE, cond)
 
-	r_1, _, err_1 = model.GetUaInfos(xl, 0, "", "UserTest", "test", UA_ITEM_UAID, "daaa099")
+	r_1, _, err_1 = model.GetUaInfos(xl, 0, "", "UserTest", "test", "daaa099")
 
 	assert.Equal(t, r_1[0].Vod, true, "they should be equal")
-	assert.Equal(t, r_1[0].Live, true, "they should be equal")
+	assert.Equal(t, r_1[0].Live, 1, "they should be equal")
 	assert.Equal(t, r_1[0].Online, true, "they should be equal")
 	assert.Equal(t, r_1[0].Expire, 7, "they should be equal")
 
 	for count := 0; count < 100; count++ {
 		cond := map[string]interface{}{
-			UA_ITEM_UID:  "UserTest",
-			UA_ITEM_UAID: fmt.Sprintf("daaa%03d", count),
+			UA_ITEM_NAMESPACE: "test",
+			UA_ITEM_UAID:      fmt.Sprintf("daaa%03d", count),
 		}
 		model.Delete(xl, cond)
 	}
@@ -125,14 +139,14 @@ func TestWrongPriUrl(t *testing.T) {
 	}
 
 	// Get ua.
-	r, _, err := model.GetUaInfos(xl, 0, "", "UserTest", "test", "uaid", "daaa")
+	r, _, err := model.GetUaInfos(xl, 0, "", "UserTest", "test", "daaa")
 	assert.Equal(t, err, nil, "they should be equal")
 	size := len(r)
 	assert.Equal(t, size, 100, "they should be equal")
 	for count := 0; count < 100; count++ {
 		cond := map[string]interface{}{
-			UA_ITEM_UID:  "UserTest",
-			UA_ITEM_UAID: fmt.Sprintf("daaa%03d", count),
+			UA_ITEM_NAMESPACE: "test",
+			UA_ITEM_UAID:      fmt.Sprintf("daaa%03d", count),
 		}
 		model.Delete(xl, cond)
 	}

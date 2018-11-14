@@ -301,9 +301,8 @@ func (m *SegmentKodoModel) GetFrameInfo(xl *xlog.Logger, starttime, endtime int6
 	return r, err
 }
 
-func NewRpcClient(uid string, defaultUser *system.UserConf) storage.Client {
+func NewRpcClient(uid string, defaultUser *system.UserConf) *storage.Client {
 	mac := qboxmac.Mac{AccessKey: defaultUser.AccessKey, SecretKey: []byte(defaultUser.SecretKey)}
-	uid = "1810757928"
 	var tr http.RoundTripper
 	if defaultUser.IsAdmin {
 		tr = qboxmac.NewAdminTransport(&mac, uid+"/0", nil)
@@ -313,7 +312,7 @@ func NewRpcClient(uid string, defaultUser *system.UserConf) storage.Client {
 
 	}
 	client := &http.Client{Transport: tr}
-	return storage.Client{client}
+	return &storage.Client{client}
 }
 
 func NewBucketMgtWithEx(xl *xlog.Logger, uid string, userAk, bucket string) *storage.BucketManager {
@@ -333,7 +332,7 @@ func NewBucketMgtWithEx(xl *xlog.Logger, uid string, userAk, bucket string) *sto
 	if defaultUser.IsTestUser {
 		cfg.CentralRsHost = defaultUser.KodoConf.RsHost
 	}
-	return storage.NewBucketManagerEx(&mac, &cfg, &rpcClient)
+	return storage.NewBucketManagerEx(&mac, &cfg, rpcClient)
 
 }
 func GetZone(ak, bucket string) (*storage.Zone, error) {

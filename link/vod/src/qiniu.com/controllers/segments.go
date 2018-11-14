@@ -45,7 +45,7 @@ func GetSegments(c *gin.Context) {
 		return
 	}
 
-	xl.Infof("deviceid = %v, from = %v, to = %v, limit = %v, marker = %v", params.uaid, params.from, params.to, params.limit, params.marker)
+	xl.Infof("deviceid = %v, from = %v, to = %v, limit = %v, marker = %v, namespace = %v", params.uaid, params.from, params.to, params.limit, params.marker, params.namespace)
 
 	user, err := getUserInfo(xl, c.Request)
 	if err != nil {
@@ -54,7 +54,7 @@ func GetSegments(c *gin.Context) {
 		return
 	}
 
-	info, err := UaMod.GetUaInfo(xl, user.uid, params.uaid)
+	info, err := UaMod.GetUaInfo(xl, user.uid, params.namespace, params.uaid)
 	if err != nil || len(info) == 0 {
 		xl.Errorf("get ua info failed, error =  %#v", err)
 		c.JSON(400, gin.H{
@@ -85,6 +85,7 @@ func GetSegments(c *gin.Context) {
 		})
 		return
 	}
+
 	segs, err := filterSegs(xl, ret, params, tsStart)
 	if err != nil {
 		xl.Error("parse seg start/end failed")
@@ -118,7 +119,8 @@ func getFristTsAfterFrom(xl *xlog.Logger, from, to int64, bucket, uaid string, u
 	return newSegFrom, newTsStart
 }
 
-func filterSegs(xl *xlog.Logger, ret []map[string]interface{}, params *requestParams, tsStart int64) (segs []segInfo, err error) {
+func filterSegs(xl *xlog.Logger, ret []map[string]interface{}, params *requestParams, tsStart int64) ([]segInfo, error) {
+	segs := []segInfo{}
 	for _, v := range ret {
 		starttime, ok := v[models.SEGMENT_ITEM_START_TIME].(int64)
 		if !ok {
@@ -165,6 +167,6 @@ func filterSegs(xl *xlog.Logger, ret []map[string]interface{}, params *requestPa
 		segs = append(segs, seg)
 
 	}
-	return
+	return segs, nil
 
 }

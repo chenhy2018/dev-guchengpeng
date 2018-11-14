@@ -13,6 +13,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/qiniu/api.v7/auth/qbox"
 	xlog "github.com/qiniu/xlog.v1"
+	"qiniu.com/auth"
 	"qiniu.com/m3u8"
 	"qiniu.com/models"
 	pb "qiniu.com/proto"
@@ -43,7 +44,7 @@ func GetPlayBackm3u8(c *gin.Context) {
 	}
 	xl.Infof("uid = %v, uaid = %v, from = %v, to = %v", userInfo.uid, params.uaid, params.from, params.to)
 
-	info, err := UaMod.GetUaInfo(xl, userInfo.uid, params.uaid)
+	info, err := UaMod.GetUaInfo(xl, userInfo.uid, params.namespace, params.uaid)
 	if err != nil || len(info) == 0 {
 		xl.Errorf("get ua info failed, error =  %#v", err)
 		c.JSON(400, gin.H{
@@ -151,9 +152,14 @@ func getFastForwardStream(xl *xlog.Logger, params *requestParams, c *gin.Context
 	query.Del("e")
 	req := new(pb.FastForwardInfo)
 	domain, err := getDomain(xl, bucket, user)
-	req.Url = getDownUrlWithPm3u8(domain, fileName, user)
-	fmt.Println(req.Url)
-	return nil
+	if err != nil {
+		return err
+	}
+	mac, err := getSKByAkFromQconf(xl, user.ak)
+	if err != nil {
+		return err
+	}
+	req.Url = getDownUrlWithPm3u8(domain, fileName, mac)
 	req.Speed = params.speed
 	req.Fmt = params.fmt
 	ctx, cancel := context.WithCancel(context.Background())
@@ -179,29 +185,12 @@ func getFastForwardStream(xl *xlog.Logger, params *requestParams, c *gin.Context
 	return nil
 }
 
-func getNewToken(origin string, expire int64, user *userInfo) string {
-	playbackBaseUrl := origin + "&e=" + strconv.FormatInt(expire, 10)
-	// using uid password a ak/sk
-	mac := qbox.NewMac(user.ak, user.sk)
-	token := mac.Sign([]byte(playbackBaseUrl))
-	return playbackBaseUrl + "&token=" + token
-}
-func getDownUrlWithPm3u8(domain, fileName string, user *userInfo) string {
-	mac := qbox.Mac{
-		AccessKey: defaultUser.AccessKey,
-		SecretKey: []byte(defaultUser.SecretKey),
-	}
+func getDownUrlWithPm3u8(domain, fileName string, mac *qbox.Mac) string {
 	expireT := time.Now().Add(time.Hour).Unix()
 	pm3u8 := "pm3u8/0/expires/86400"
 	urlToSign := fmt.Sprintf("http://%s/%s?%s&e=%d", domain, fileName, pm3u8, expireT)
 	token := mac.Sign([]byte(urlToSign))
-	realUrl := ""
-	if defaultUser.IsAdmin {
-		realUrl = fmt.Sprintf("%s&token=%s:%s", urlToSign, "1381539624", token)
-	} else {
-		realUrl = fmt.Sprintf("%s&token=%s", urlToSign, token)
-	}
-	return realUrl
+	return fmt.Sprintf("%s&token=%s", urlToSign, token)
 }
 
 func getDomain(xl *xlog.Logger, bucket string, user *userInfo) (string, error) {
@@ -239,4 +228,17 @@ func getDomain(xl *xlog.Logger, bucket string, user *userInfo) (string, error) {
 	}
 
 	return domain[0], nil
+}
+
+// cause admin ak/sk can't sign download token for
+// normal user, only get user ak/sk for fastforward
+// after new fastforward developed this code will deleted
+// from here, please DON'T using this code this other purpose.
+func getSKByAkFromQconf(xl *xlog.Logger, ak string) (*qbox.Mac, error) {
+	accessInfo, err := auth.GetUserInfoFromQconf(xl, ak)
+	if err != nil {
+		return nil, err
+	}
+	return &qbox.Mac{AccessKey: ak, SecretKey: accessInfo.Secret}, nil
+
 }

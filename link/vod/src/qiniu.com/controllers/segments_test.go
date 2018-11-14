@@ -40,7 +40,7 @@ func (suite *SegmentsTestSuite) TestFromEndInTwoSeg1() {
 		return &userInfo{}, nil
 	})
 	monkey.PatchInstanceMethod(
-		reflect.TypeOf((*models.UaModel)(nil)), "GetUaInfo", func(ss *models.UaModel, xl *xlog.Logger, uid, uaid string) ([]models.UaInfo, error) {
+		reflect.TypeOf((*models.UaModel)(nil)), "GetUaInfo", func(ss *models.UaModel, xl *xlog.Logger, uid, namespace, uaid string) ([]models.UaInfo, error) {
 			info := []models.UaInfo{}
 			item := models.UaInfo{
 				Uid:       "link",
@@ -58,7 +58,6 @@ func (suite *SegmentsTestSuite) TestFromEndInTwoSeg1() {
 				UpdateTime:   3333333,
 				Bucket:       "ipcamera",
 				Uid:          "link",
-				Domain:       "www.baidu.com",
 				AutoCreateUa: true,
 			}
 			info = append(info, item)
@@ -103,7 +102,7 @@ func (suite *SegmentsTestSuite) TestFromEndInTwoSeg2() {
 		return &userInfo{}, nil
 	})
 	monkey.PatchInstanceMethod(
-		reflect.TypeOf((*models.UaModel)(nil)), "GetUaInfo", func(ss *models.UaModel, xl *xlog.Logger, uid, uaid string) ([]models.UaInfo, error) {
+		reflect.TypeOf((*models.UaModel)(nil)), "GetUaInfo", func(ss *models.UaModel, xl *xlog.Logger, uid, namespace, uaid string) ([]models.UaInfo, error) {
 			info := []models.UaInfo{}
 			item := models.UaInfo{
 				Uid:       "link",
@@ -125,7 +124,6 @@ func (suite *SegmentsTestSuite) TestFromEndInTwoSeg2() {
 				UpdateTime:   3333333,
 				Bucket:       "ipcamera",
 				Uid:          "link",
-				Domain:       "www.baidu.com",
 				AutoCreateUa: true,
 			}
 			info = append(info, item)
@@ -187,7 +185,6 @@ func (suite *SegmentsTestSuite) TestFromEndInTwoSeg3() {
 				UpdateTime:   3333333,
 				Bucket:       "ipcamera",
 				Uid:          "link",
-				Domain:       "www.baidu.com",
 				AutoCreateUa: true,
 			}
 			info = append(info, item)
@@ -195,7 +192,7 @@ func (suite *SegmentsTestSuite) TestFromEndInTwoSeg3() {
 		})
 
 	monkey.PatchInstanceMethod(
-		reflect.TypeOf((*models.UaModel)(nil)), "GetUaInfo", func(ss *models.UaModel, xl *xlog.Logger, uid, uaid string) ([]models.UaInfo, error) {
+		reflect.TypeOf((*models.UaModel)(nil)), "GetUaInfo", func(ss *models.UaModel, xl *xlog.Logger, uid, namespace, uaid string) ([]models.UaInfo, error) {
 			info := []models.UaInfo{}
 			item := models.UaInfo{
 				Uid:       "link",
@@ -254,7 +251,7 @@ func (suite *SegmentsTestSuite) TestFromEndInTwoSeg4() {
 			return rets, "", nil
 		})
 	monkey.PatchInstanceMethod(
-		reflect.TypeOf((*models.UaModel)(nil)), "GetUaInfo", func(ss *models.UaModel, xl *xlog.Logger, uid, uaid string) ([]models.UaInfo, error) {
+		reflect.TypeOf((*models.UaModel)(nil)), "GetUaInfo", func(ss *models.UaModel, xl *xlog.Logger, uid, namespace, uaid string) ([]models.UaInfo, error) {
 			info := []models.UaInfo{}
 			item := models.UaInfo{
 				Uid:       "link",
@@ -280,7 +277,6 @@ func (suite *SegmentsTestSuite) TestFromEndInTwoSeg4() {
 				UpdateTime:   3333333,
 				Bucket:       "ipcamera",
 				Uid:          "link",
-				Domain:       "www.baidu.com",
 				AutoCreateUa: true,
 			}
 			info = append(info, item)
@@ -325,7 +321,7 @@ func (suite *SegmentsTestSuite) TestFromEndInTwoSeg5() {
 			return rets, "", nil
 		})
 	monkey.PatchInstanceMethod(
-		reflect.TypeOf((*models.UaModel)(nil)), "GetUaInfo", func(ss *models.UaModel, xl *xlog.Logger, uid, uaid string) ([]models.UaInfo, error) {
+		reflect.TypeOf((*models.UaModel)(nil)), "GetUaInfo", func(ss *models.UaModel, xl *xlog.Logger, uid, namespace, uaid string) ([]models.UaInfo, error) {
 			info := []models.UaInfo{}
 			item := models.UaInfo{
 				Uid:       "link",
@@ -351,7 +347,6 @@ func (suite *SegmentsTestSuite) TestFromEndInTwoSeg5() {
 				UpdateTime:   3333333,
 				Bucket:       "ipcamera",
 				Uid:          "link",
-				Domain:       "www.baidu.com",
 				AutoCreateUa: true,
 			}
 			info = append(info, item)
@@ -400,7 +395,7 @@ func (suite *SegmentsTestSuite) TestFromEndInTwoSeg6() {
 		return &userInfo{}, nil
 	})
 	monkey.PatchInstanceMethod(
-		reflect.TypeOf((*models.UaModel)(nil)), "GetUaInfo", func(ss *models.UaModel, xl *xlog.Logger, uid, uaid string) ([]models.UaInfo, error) {
+		reflect.TypeOf((*models.UaModel)(nil)), "GetUaInfo", func(ss *models.UaModel, xl *xlog.Logger, uid, namespace, uaid string) ([]models.UaInfo, error) {
 			info := []models.UaInfo{}
 			item := models.UaInfo{
 				Uid:       "link",
@@ -426,7 +421,6 @@ func (suite *SegmentsTestSuite) TestFromEndInTwoSeg6() {
 				UpdateTime:   3333333,
 				Bucket:       "ipcamera",
 				Uid:          "link",
-				Domain:       "www.baidu.com",
 				AutoCreateUa: true,
 			}
 			info = append(info, item)
@@ -470,7 +464,7 @@ func (suite *SegmentsTestSuite) TestFromEndInTwoSeg7() {
 		return &userInfo{}, nil
 	})
 	monkey.PatchInstanceMethod(
-		reflect.TypeOf((*models.UaModel)(nil)), "GetUaInfo", func(ss *models.UaModel, xl *xlog.Logger, uid, uaid string) ([]models.UaInfo, error) {
+		reflect.TypeOf((*models.UaModel)(nil)), "GetUaInfo", func(ss *models.UaModel, xl *xlog.Logger, uid, namespace, uaid string) ([]models.UaInfo, error) {
 			info := []models.UaInfo{}
 			item := models.UaInfo{
 				Uid:       "link",
@@ -496,7 +490,6 @@ func (suite *SegmentsTestSuite) TestFromEndInTwoSeg7() {
 				UpdateTime:   3333333,
 				Bucket:       "ipcamera",
 				Uid:          "link",
-				Domain:       "www.baidu.com",
 				AutoCreateUa: true,
 			}
 			info = append(info, item)
@@ -556,7 +549,6 @@ func (suite *SegmentsTestSuite) TestFromEndInTwoSeg8() {
 				UpdateTime:   3333333,
 				Bucket:       "ipcamera",
 				Uid:          "link",
-				Domain:       "www.baidu.com",
 				AutoCreateUa: true,
 			}
 			info = append(info, item)
@@ -567,7 +559,7 @@ func (suite *SegmentsTestSuite) TestFromEndInTwoSeg8() {
 	})
 
 	monkey.PatchInstanceMethod(
-		reflect.TypeOf((*models.UaModel)(nil)), "GetUaInfo", func(ss *models.UaModel, xl *xlog.Logger, uid, uaid string) ([]models.UaInfo, error) {
+		reflect.TypeOf((*models.UaModel)(nil)), "GetUaInfo", func(ss *models.UaModel, xl *xlog.Logger, uid, namespace, uaid string) ([]models.UaInfo, error) {
 			info := []models.UaInfo{}
 			item := models.UaInfo{
 				Uid:       "link",
@@ -632,7 +624,7 @@ func (suite *SegmentsTestSuite) TestFromEndInTwoSeg13() {
 		return &userinfo, nil
 	})
 	monkey.PatchInstanceMethod(
-		reflect.TypeOf((*models.UaModel)(nil)), "GetUaInfo", func(ss *models.UaModel, xl *xlog.Logger, uid, uaid string) ([]models.UaInfo, error) {
+		reflect.TypeOf((*models.UaModel)(nil)), "GetUaInfo", func(ss *models.UaModel, xl *xlog.Logger, uid, namespace, uaid string) ([]models.UaInfo, error) {
 			info := []models.UaInfo{}
 			item := models.UaInfo{
 				Uid:       "link",
@@ -652,7 +644,7 @@ func (suite *SegmentsTestSuite) TestFromEndInTwoSeg14() {
 		return &userinfo, nil
 	})
 	monkey.PatchInstanceMethod(
-		reflect.TypeOf((*models.UaModel)(nil)), "GetUaInfo", func(ss *models.UaModel, xl *xlog.Logger, uid, uaid string) ([]models.UaInfo, error) {
+		reflect.TypeOf((*models.UaModel)(nil)), "GetUaInfo", func(ss *models.UaModel, xl *xlog.Logger, uid, namespace, uaid string) ([]models.UaInfo, error) {
 			info := []models.UaInfo{}
 			item := models.UaInfo{
 				Uid:       "link",
@@ -679,7 +671,7 @@ func (suite *SegmentsTestSuite) TestFromEndInTwoSeg15() {
 		return &userinfo, nil
 	})
 	monkey.PatchInstanceMethod(
-		reflect.TypeOf((*models.UaModel)(nil)), "GetUaInfo", func(ss *models.UaModel, xl *xlog.Logger, uid, uaid string) ([]models.UaInfo, error) {
+		reflect.TypeOf((*models.UaModel)(nil)), "GetUaInfo", func(ss *models.UaModel, xl *xlog.Logger, uid, namespace, uaid string) ([]models.UaInfo, error) {
 			info := []models.UaInfo{}
 			item := models.UaInfo{
 				Uid:       "link",
