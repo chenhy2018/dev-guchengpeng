@@ -1,19 +1,16 @@
 package main
 
 import (
-	"flag"
 	"fmt"
-	"github.com/gin-gonic/gin"
 	"os"
+
+	"github.com/gin-gonic/gin"
 	"qiniu.com/auth"
 	"qiniu.com/controllers"
 	"qiniu.com/db"
 	"qiniu.com/system"
 	log "qiniupkg.com/x/log.v7"
 )
-
-var ak = flag.String("access_key", "", "help message for flagname")
-var sk = flag.String("secret_key", "", "help message for flagname")
 
 func main() {
 
@@ -23,14 +20,9 @@ func main() {
 		log.Error("Load conf fail", err)
 		return
 	}
-	flag.Parse()
-	fmt.Println(*ak, *sk)
-	controllers.SetUserInfo(*ak, *sk)
 	initDb(conf)
-	if system.HaveQconf() == true {
-		auth.Init(conf)
-	}
-	controllers.Init(&conf.GrpcConf)
+	controllers.Init(conf)
+	auth.Init(conf)
 	r.Use(controllers.HandleToken)
 	r.POST("/v1/namespaces/:namespace/uas/:uaid", controllers.RegisterUa)
 	r.DELETE("/v1/namespaces/:namespace/uas/:uaid", controllers.DeleteUa)
@@ -48,11 +40,9 @@ func main() {
 	r.POST("/qiniu/upload/callback", controllers.UploadTs)
 
 	//Priavte api
-	r.POST("/v1/aksk", controllers.SetPrivateAkSk)
 	r.Run(conf.Bind) // listen and serve on 0.0.0.0:8080
 
 }
-
 func initDb(conf *system.Configuration) {
 	if system.HaveDb() == false {
 		return

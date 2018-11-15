@@ -3,11 +3,12 @@ package models
 import (
 	"encoding/base64"
 	"fmt"
+	"time"
+
 	"github.com/qiniu/xlog.v1"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 	"qiniu.com/db"
-	"time"
 )
 
 type NamespaceModel struct {
@@ -100,7 +101,7 @@ func (m *NamespaceModel) GetNamespaceInfo(xl *xlog.Logger, uid, namespace string
 	return r, err
 }
 
-func (m *NamespaceModel) GetNamespaceByBucket(xl *xlog.Logger, bucket string) ([]NamespaceInfo, error) {
+func (m *NamespaceModel) GetNamespaceByBucket(xl *xlog.Logger, uid, bucket string) ([]NamespaceInfo, error) {
 	/*
 	   db.namespace.find({"bucket": bucket})
 	*/
@@ -110,6 +111,7 @@ func (m *NamespaceModel) GetNamespaceByBucket(xl *xlog.Logger, bucket string) ([
 		func(c *mgo.Collection) error {
 			return c.Find(
 				bson.M{
+					NAMESPACE_ITEM_UID:    uid,
 					NAMESPACE_ITEM_BUCKET: bucket,
 				},
 			).All(&r)
@@ -169,7 +171,7 @@ func (m *NamespaceModel) GetNamespaceInfos(xl *xlog.Logger, limit int, mark, uid
 
 }
 
-func (m *NamespaceModel) UpdateBucket(xl *xlog.Logger, uid, space, bucket, domain string) error {
+func (m *NamespaceModel) UpdateBucket(xl *xlog.Logger, uid, space, bucket string) error {
 	/*
 	   db.namespace.update({"uid": uid, "namespace": space}, bson.M{"$set":{"bucket": bucket, "domain" : domain }}),
 	*/

@@ -36,6 +36,8 @@ func TestRegisterUa(t *testing.T) {
 		Value: "test1",
 	}
 	monkey.Patch(getUserInfo, func(xl *xlog.Logger, req *http.Request) (*userInfo, error) { return &user, nil })
+	monkey.Patch(checkBucketInKodo, func(bucket string, user *userInfo) error { return nil })
+
 	c.Params = append(c.Params, param)
 	c.Request = req
 	RegisterNamespace(c)
@@ -217,6 +219,7 @@ func TestGetUa(t *testing.T) {
 	body, err := ioutil.ReadAll(recoder.Body)
 	if err != nil {
 		fmt.Printf("parse request body failed, body = %#v", body)
+
 	}
 	//{"item":[{"namespace":"test1","createdAt":1535539324,"updatedAt":1535539324,"bucket":"ipcamera","uid":"link","domain":"pdwjeyj6v.bkt.clouddn.com"}],"marker":""}
 	assert.Equal(t, c.Writer.Status(), 200, "they should be equal")
@@ -234,6 +237,7 @@ func TestGetUa(t *testing.T) {
 	body, err = ioutil.ReadAll(recoder.Body)
 	if err != nil {
 		fmt.Printf("parse request body failed, body = %#v", body)
+
 	}
 	//{"item":[],"marker":""}
 	bodye := []uint8([]byte{0x7b, 0x22, 0x69, 0x74, 0x65, 0x6d, 0x22, 0x3a, 0x5b, 0x5d, 0x2c, 0x22, 0x6d, 0x61, 0x72, 0x6b, 0x65, 0x72, 0x22, 0x3a, 0x22, 0x22, 0x7d})
@@ -253,6 +257,7 @@ func TestGetUa(t *testing.T) {
 	body, err = ioutil.ReadAll(recoder.Body)
 	if err != nil {
 		fmt.Printf("parse request body failed, body = %#v", body)
+
 	}
 	//{"item":[],"marker":""}
 	assert.Equal(t, c.Writer.Status(), 200, "they should be equal")
@@ -278,6 +283,7 @@ func TestGetUa(t *testing.T) {
 	}
 	assert.Equal(t, c.Writer.Status(), 500, "they should be equal")
 	monkey.UnpatchAll()
+
 }
 
 func TestUpdateUa(t *testing.T) {
@@ -534,6 +540,7 @@ func TestUpdateUa(t *testing.T) {
 	assert.Equal(t, c.Writer.Status(), 500, "they should be equal")
 	guard7.Unpatch()
 	monkey.UnpatchAll()
+
 }
 
 func TestDeleteUa(t *testing.T) {
@@ -632,6 +639,7 @@ func TestDeleteUa(t *testing.T) {
 	monkey.PatchInstanceMethod(
 		reflect.TypeOf((*models.UaModel)(nil)), "GetUaInfo", func(ss *models.UaModel, xl *xlog.Logger, uid, namesapce, uaid string) ([]models.UaInfo, error) {
 			return []models.UaInfo{models.UaInfo{}}, nil
+
 		})
 	monkey.PatchInstanceMethod(
 		reflect.TypeOf((*models.UaModel)(nil)), "Delete", func(ss *models.UaModel, xl *xlog.Logger, cond map[string]interface{}) error {
@@ -649,5 +657,4 @@ func TestDeleteUa(t *testing.T) {
 	DeleteUa(c)
 	assert.Equal(t, c.Writer.Status(), 500, "they should be equal")
 	monkey.UnpatchAll()
-
 }

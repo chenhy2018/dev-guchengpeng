@@ -1,8 +1,6 @@
 package controllers
 
 import (
-	"bytes"
-	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -14,6 +12,7 @@ import (
 	"github.com/qiniu/api.v7/auth/qbox"
 	"github.com/qiniu/api.v7/storage"
 	xlog "github.com/qiniu/xlog.v1"
+	"qiniu.com/models"
 	rpc "qiniupkg.com/x/rpc.v7"
 	//	redis "gopkg.in/redis.v5"
 )
@@ -32,6 +31,7 @@ func UploadTs(c *gin.Context) {
 
 	xl := xlog.New(c.Writer, c.Request)
 
+	user, _ := getUserInfo(xl, c.Request)
 	c.Header("Content-Type", "application/json")
 
 	dec := json.NewDecoder(c.Request.Body)
@@ -69,7 +69,7 @@ func UploadTs(c *gin.Context) {
 	}
 
 	// Add namespace&ua check
-	err, exprie := GetNameSpaceInfo(xl, kodoData.Bucket, ids[1])
+	err, exprie := GetNameSpaceInfo(xl, kodoData.Bucket, ids[1], user.uid)
 	if err != nil {
 		xl.Errorf("error = %#v", err.Error())
 		c.JSON(400, gin.H{
@@ -78,7 +78,7 @@ func UploadTs(c *gin.Context) {
 		return
 	}
 
-	err = HandleTs(xl, kodoData.Bucket, ids, kodoData, c.Request, exprie)
+	err = HandleTs(xl, kodoData.Bucket, ids, kodoData, c.Request, exprie, user)
 	if err != nil {
 		xl.Errorf("error = %#v", err.Error())
 		c.JSON(500, gin.H{
@@ -92,7 +92,7 @@ func UploadTs(c *gin.Context) {
 	})
 }
 
-func HandleTs(xl *xlog.Logger, bucket string, ids []string, kodoData kodoCallBack, req *http.Request, dbExprie int) error {
+func HandleTs(xl *xlog.Logger, bucket string, ids []string, kodoData kodoCallBack, req *http.Request, dbExprie int, user *userInfo) error {
 	startTime, err := strconv.ParseInt(ids[2], 10, 64)
 	if err != nil {
 		return fmt.Errorf("parse ts file name failed, filename = %#v", ids[2])
@@ -119,45 +119,36 @@ func HandleTs(xl *xlog.Logger, bucket string, ids []string, kodoData kodoCallBac
 	// key -->ts/ua_id/start_ts/endts/segment_start_ts/expiry.ts
 	newFilName := append(ids[:3], append([]string{strconv.FormatInt(endTime, 10)}, ids[3:]...)...)
 	xl.Infof("oldFileName = %v, newFileName = %v", kodoData.Key, strings.Join(newFilName[:], "/"))
-
-	user, err := getUserInfo(xl, req)
-	if err != nil {
-		return fmt.Errorf("get user info falied, erro = %#v", err)
-	}
-	mac := qbox.NewMac(user.ak, user.sk)
 	segPrefix := strings.Join([]string{"seg", ids[1], ids[3]}, "/")
-	if err := updateTsName(xl, kodoData.Key, strings.Join(newFilName[:], "/"), bucket, segPrefix, endTime, int(tsExpire), mac); err != nil {
+	if err := updateTsName(xl, kodoData.Key, strings.Join(newFilName[:], "/"), bucket, segPrefix, endTime, int(tsExpire), user); err != nil {
 		return fmt.Errorf("ts filename update failed err = %#v", err)
 	}
 	jpegName := strings.Join([]string{"frame", ids[1], ids[2], ids[3]}, "/")
-	if err = fop(strings.Join(newFilName[:], "/"), kodoData.Bucket, jpegName+".jpeg", mac); err != nil {
+	if err = fop(xl, strings.Join(newFilName[:], "/"), kodoData.Bucket, jpegName+".jpeg", user); err != nil {
 		return fmt.Errorf("fop operation failed err = %#v", err)
 	}
 	return nil
 }
 
-func updateTsName(xl *xlog.Logger, srcTsKey, destTsKey, bucket, segPrefix string, endTime int64, expire int, mac *qbox.Mac) (err error) {
-	cfg := storage.Config{
-		UseHTTPS: false,
-	}
-	bucketManager := storage.NewBucketManager(mac, &cfg)
+func updateTsName(xl *xlog.Logger, srcTsKey, destTsKey, bucket, segPrefix string, endTime int64, expire int, user *userInfo) (err error) {
+	bucketManager := models.NewBucketMgtWithEx(xl, user.uid, user.ak, bucket)
+
+	ops := []string{}
+	force := true
 
 	delimiter := ""
 	marker := ""
-	force := true
 	limit := 1000
 	// list seg file by segment id
 	entries, _, _, _, err := bucketManager.ListFiles(bucket, segPrefix, delimiter, marker, limit)
 	if err != nil {
 		return
 	}
-
-	ops := []string{}
 	var segAction string
 	newSegName := segPrefix + "/" + strconv.FormatInt(endTime, 10)
 	if len(entries) == 0 {
 		// create new seg file if doesn't exist
-		if err := uploadNewFile(newSegName, bucket, []byte{}, mac); err != nil {
+		if err := uploadNewFile(newSegName, bucket, []byte{}, user); err != nil {
 			xl.Errorf("create seg file error, err = %#v", err)
 		}
 		xl.Info("create new seg file file name =%#v", newSegName)
@@ -179,10 +170,8 @@ func updateTsName(xl *xlog.Logger, srcTsKey, destTsKey, bucket, segPrefix string
 			xl.Info("delete file = ", entries[i])
 		}
 	}
-
 	// add endtime for ts file
 	ops = append(ops, storage.URIMove(bucket, srcTsKey, bucket, destTsKey, force))
-
 	rets, err := bucketManager.Batch(ops)
 	// check batch error
 	if err != nil {
@@ -200,37 +189,25 @@ func updateTsName(xl *xlog.Logger, srcTsKey, destTsKey, bucket, segPrefix string
 	return
 }
 
-func uploadNewFile(filename, bucket string, data []byte, mac *qbox.Mac) error {
-
-	putPolicy := storage.PutPolicy{
-		Scope: bucket,
-	}
-
-	upToken := putPolicy.UploadToken(mac)
-
-	cfg := storage.Config{}
-	// 空间对应的机房
-	//cfg.Zone = &storage.ZoneHuadong
-	// 是否使用https域名
-	cfg.UseHTTPS = false
-	// 上传是否使用CDN上传加速
-	cfg.UseCdnDomains = false
-
-	formUploader := storage.NewFormUploader(&cfg)
-	ret := storage.PutRet{}
-	putExtra := storage.PutExtra{}
-
-	return formUploader.Put(context.Background(), &ret, upToken, filename, bytes.NewReader(data), int64(len(data)), &putExtra)
-}
-
-func fop(filename, bucket, jpegName string, mac *qbox.Mac) error {
+func fop(xl *xlog.Logger, filename, bucket, jpegName string, user *userInfo) error {
 	cfg := storage.Config{
 		UseHTTPS: false,
 	}
-	operationManager := storage.NewOperationManager(mac, &cfg)
+	rpcClient := models.NewRpcClient(user.uid)
+	mac := qbox.Mac{
+		AccessKey: defaultUser.AccessKey,
+		SecretKey: []byte(defaultUser.SecretKey),
+	}
+	zone, err := models.GetZone(user.ak, bucket)
+	if err != nil {
+		return err
+	}
+	cfg.Zone = zone
+	operationManager := storage.NewOperationManagerEx(&mac, &cfg, rpcClient)
 
 	fopVframe := fmt.Sprintf("vframe/jpg/offset/0|saveas/%s",
 		storage.EncodedEntry(bucket, jpegName))
-	_, err := operationManager.Pfop(bucket, filename, fopVframe, "", "", true)
+	_, err = operationManager.Pfop(bucket, filename, fopVframe, "", "", true)
 	return err
+
 }

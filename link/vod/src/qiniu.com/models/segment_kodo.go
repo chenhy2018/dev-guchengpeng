@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"strconv"
 	"strings"
 	"time"
@@ -12,15 +13,17 @@ import (
 	"github.com/qiniu/api.v7/auth/qbox"
 	"github.com/qiniu/api.v7/storage"
 	"github.com/qiniu/xlog.v1"
+	qboxmac "qiniu.com/auth/qboxmac.v1"
+	"qiniu.com/system"
 )
 
 var (
-	cfg storage.Config
+	defaultUser system.UserConf
 )
 
 type Segment interface {
-	GetSegmentTsInfo(xl *xlog.Logger, index, rows int, starttime, endtime int64, bucket, uaid, mark string, mac *qbox.Mac) ([]map[string]interface{}, error)
-	GetFragmentTsInfo(xl *xlog.Logger, index, rows int, starttime, endtime int64, bucket, uaid, mark string, mac *qbox.Mac) ([]map[string]interface{}, error)
+	GetSegmentTsInfo(xl *xlog.Logger, starttime, endtime int64, bucket, uaid string, limit int, mark, uid, userAk string) ([]map[string]interface{}, string, error)
+	GetFragmentTsInfo(xl *xlog.Logger, count int, starttime, endtime int64, bucket, uaid, mark, uid, userAk string) ([]map[string]interface{}, string, error)
 }
 
 const (
@@ -34,12 +37,9 @@ type SegmentKodoModel struct {
 }
 
 //TODO AKSK should be get in packet
-func (m *SegmentKodoModel) Init() error {
+func (m *SegmentKodoModel) Init(user system.UserConf) error {
 
-	cfg = storage.Config{
-		// 是否使用https域名进行资源管理
-		UseHTTPS: false,
-	}
+	defaultUser = user
 	return nil
 }
 
@@ -131,11 +131,7 @@ func calculateMark(xl *xlog.Logger, starttime int64, uaid, head string) string {
 }
 
 // Get Segment TS info List.
-func (m *SegmentKodoModel) GetSegmentTsInfo(xl *xlog.Logger, starttime, endtime int64, bucket, uaid string, limit int, mark string, mac *qbox.Mac) ([]map[string]interface{}, string, error) {
-	// 指定空间所在的区域，如果不指定将自动探测
-	// 如果没有特殊需求，默认不需要指定
-	//cfg.Zone=&storage.ZoneHuabei
-	bucketManager := storage.NewBucketManager(mac, &cfg)
+func (m *SegmentKodoModel) GetSegmentTsInfo(xl *xlog.Logger, starttime, endtime int64, bucket, uaid string, limit int, mark, uid, userAk string) ([]map[string]interface{}, string, error) {
 	pre := time.Now().UnixNano()
 	var r []map[string]interface{}
 	delimiter := ""
@@ -144,14 +140,18 @@ func (m *SegmentKodoModel) GetSegmentTsInfo(xl *xlog.Logger, starttime, endtime 
 	total := 0
 	if mark != "" {
 		marker = mark
+
 	} else {
 		marker = calculateMark(xl, starttime, uaid, "ts")
+
 	}
 
 	prefix := "ts/" + uaid + "/"
 	ctx, cancelFunc := context.WithCancel(context.Background())
 	xl.Infof("GetSegmentTsInfo prefix  %s \n", prefix)
 	defer cancelFunc()
+
+	bucketManager := NewBucketMgtWithEx(xl, uid, userAk, bucket)
 	entries, err := bucketManager.ListBucketContext(ctx, bucket, prefix, delimiter, marker)
 	if err != nil {
 		info, ok := err.(*storage.ErrorInfo)
@@ -193,12 +193,8 @@ func (m *SegmentKodoModel) GetSegmentTsInfo(xl *xlog.Logger, starttime, endtime 
 }
 
 // Get Fragment Ts info List.
-func (m *SegmentKodoModel) GetFragmentTsInfo(xl *xlog.Logger, count int, starttime, endtime int64, bucket, uaid, mark string, mac *qbox.Mac) ([]map[string]interface{}, string, error) {
+func (m *SegmentKodoModel) GetFragmentTsInfo(xl *xlog.Logger, count int, starttime, endtime int64, bucket, uaid, mark, uid, userAk string) ([]map[string]interface{}, string, error) {
 	pre := time.Now().UnixNano()
-	// 指定空间所在的区域，如果不指定将自动探测
-	// 如果没有特殊需求，默认不需要指定
-	//cfg.Zone=&storage.ZoneHuabei
-	bucketManager := storage.NewBucketManager(mac, &cfg)
 	var r []map[string]interface{}
 	delimiter := ""
 	nextMarker := ""
@@ -213,18 +209,26 @@ func (m *SegmentKodoModel) GetFragmentTsInfo(xl *xlog.Logger, count int, startti
 	xl.Infof("GetFragmentTsInfo prefix  %s \n", prefix)
 	ctx, cancelFunc := context.WithCancel(context.Background())
 	defer cancelFunc()
+	bucketManager := NewBucketMgtWithEx(xl, uid, userAk, bucket)
 	entries, err := bucketManager.ListBucketContext(ctx, bucket, prefix, delimiter, marker)
 	if err != nil {
-		xl.Errorf("GetFragmentTsInfo ListBucketContext %#v", err)
-		info := err.(*storage.ErrorInfo)
-		if info.Code == 200 {
-			return r, "", nil
+		info, ok := err.(*storage.ErrorInfo)
+		if ok {
+			if info.Code == 200 {
+				return r, "", nil
+
+			} else {
+				return r, "", err
+
+			}
+
 		} else {
+			xl.Infof("Not ok")
 			return r, "", err
+
 		}
 	}
 	for listItem1 := range entries {
-
 		err, info := GetInfoFromFilename(listItem1.Item.Key, "/")
 		if err != nil {
 			// if one file is not correct, continue to next
@@ -248,12 +252,8 @@ func (m *SegmentKodoModel) GetFragmentTsInfo(xl *xlog.Logger, count int, startti
 }
 
 // Get Frame info List.
-func (m *SegmentKodoModel) GetFrameInfo(xl *xlog.Logger, starttime, endtime int64, bucket, uaid string, mac *qbox.Mac) ([]map[string]interface{}, error) {
+func (m *SegmentKodoModel) GetFrameInfo(xl *xlog.Logger, starttime, endtime int64, bucket, uaid, uid, userAk string) ([]map[string]interface{}, error) {
 	pre := time.Now().UnixNano()
-	// 指定空间所在的区域，如果不指定将自动探测
-	// 如果没有特殊需求，默认不需要指定
-	//cfg.Zone=&storage.ZoneHuabei
-	bucketManager := storage.NewBucketManager(mac, &cfg)
 	var r []map[string]interface{}
 	delimiter := ""
 	total := 0
@@ -262,14 +262,23 @@ func (m *SegmentKodoModel) GetFrameInfo(xl *xlog.Logger, starttime, endtime int6
 	xl.Infof("GetFragmentTsInfo prefix  %s \n", prefix)
 	ctx, cancelFunc := context.WithCancel(context.Background())
 	defer cancelFunc()
+	bucketManager := NewBucketMgtWithEx(xl, uid, userAk, bucket)
 	entries, err := bucketManager.ListBucketContext(ctx, bucket, prefix, delimiter, marker)
 	if err != nil {
-		xl.Errorf("GetFrameTsInfo ListBucketContext %#v", err)
-		info := err.(*storage.ErrorInfo)
-		if info.Code == 200 {
-			return r, nil
+		info, ok := err.(*storage.ErrorInfo)
+		if ok {
+			if info.Code == 200 {
+				return r, nil
+
+			} else {
+				return r, err
+
+			}
+
 		} else {
+			xl.Infof("Not ok")
 			return r, err
+
 		}
 	}
 	for listItem1 := range entries {
@@ -290,4 +299,55 @@ func (m *SegmentKodoModel) GetFrameInfo(xl *xlog.Logger, starttime, endtime int6
 	}
 	xl.Infof("find frame need %d ms\n", (time.Now().UnixNano()-pre)/1000000)
 	return r, err
+}
+
+func NewRpcClient(uid string) *storage.Client {
+	mac := qboxmac.Mac{AccessKey: defaultUser.AccessKey, SecretKey: []byte(defaultUser.SecretKey)}
+	var tr http.RoundTripper
+	if defaultUser.IsAdmin {
+		tr = qboxmac.NewAdminTransport(&mac, uid+"/0", nil)
+
+	} else {
+		tr = qboxmac.NewTransport(&mac, nil)
+
+	}
+	client := &http.Client{Transport: tr}
+	return &storage.Client{client}
+}
+
+func NewBucketMgtWithEx(xl *xlog.Logger, uid string, userAk, bucket string) *storage.BucketManager {
+	rpcClient := NewRpcClient(uid)
+	mac := qbox.Mac{
+		AccessKey: defaultUser.AccessKey,
+		SecretKey: []byte(defaultUser.SecretKey),
+	}
+	zone, err := GetZone(userAk, bucket)
+	if err != nil {
+		xl.Errorf("get zone error%#v", err)
+	}
+	cfg := storage.Config{
+		Zone: zone,
+	}
+	cfg.CentralRsHost = storage.DefaultRsHost
+	if defaultUser.IsTestEnv {
+		cfg.CentralRsHost = defaultUser.KodoConf.RsHost
+	}
+	return storage.NewBucketManagerEx(&mac, &cfg, rpcClient)
+
+}
+func GetZone(ak, bucket string) (*storage.Zone, error) {
+	if defaultUser.IsTestEnv {
+		zone := storage.Zone{}
+		zone.SrcUpHosts = []string{defaultUser.KodoConf.UpHost}
+		zone.RsHost = defaultUser.KodoConf.RsHost
+		zone.RsfHost = defaultUser.KodoConf.RsfHost
+		zone.ApiHost = defaultUser.KodoConf.ApiHost
+		return &zone, nil
+
+	}
+	zone, err := storage.GetZone(ak, bucket)
+	if err != nil {
+		return nil, err
+	}
+	return zone, nil
 }
