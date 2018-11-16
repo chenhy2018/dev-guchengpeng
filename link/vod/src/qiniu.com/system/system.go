@@ -22,11 +22,26 @@ type DBConfiguration struct {
 type GrpcConf struct {
 	Addr string `json:"addr"`
 }
+type UserConf struct {
+	AccessKey string   `json:"access_key"`
+	SecretKey string   `json:"secret_key"`
+	IsAdmin   bool     `json:"is_admin"`
+	Uid       string   `json:"uid"`
+	IsTestEnv bool     `json:"is_test_env"`
+	KodoConf  KodoConf `json:"kodo_conf"`
+}
+type KodoConf struct {
+	RsHost  string `json:"rs_host"`
+	RsfHost string `json:"rsf_host"`
+	ApiHost string `json:"api_host"`
+	UpHost  string `json:"up_host"`
+}
 type Configuration struct {
 	Bind     string          `json:"bind"`
 	DbConf   DBConfiguration `json:"db_conf"`
 	Qconf    qconfapi.Config `json:"qconfg"`
 	GrpcConf GrpcConf        `json:"grpc_conf"`
+	UserConf UserConf        `json:"user_conf"`
 }
 
 func LoadConf(dir, file string) (conf *Configuration, err error) {
@@ -51,9 +66,4 @@ func HaveDb() bool {
 	// so we just disable this inline
 	defer func() {}()
 	return haveDbConf
-}
-
-func HaveQconf() bool {
-	defer func() {}()
-	return haveQconf
 }

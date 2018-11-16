@@ -2,16 +2,13 @@ package controllers
 
 import (
 	"errors"
-	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
-	"github.com/bouk/monkey"
 	"github.com/gin-gonic/gin"
 	xlog "github.com/qiniu/xlog.v1"
 	"github.com/stretchr/testify/assert"
-	"qiniu.com/system"
 )
 
 func GetRouter() *gin.Engine {
@@ -70,16 +67,4 @@ func TestParseRequset(t *testing.T) {
 	ret, err = ParseRequest(c, xlog.NewDummy())
 
 	assert.Equal(t, errors.New("Parse speed failed"), err)
-}
-
-func TestGetUserInfoIfPrivateAkSkNotSet(t *testing.T) {
-
-	monkey.Patch(system.HaveQconf, func() bool {
-		return false
-	})
-	fmt.Println(system.HaveQconf())
-	url := "http://47.105.118.51:8088/v1/namespaces/ipcamera/uas/testdeviceid8/playback?from=1535500184&to=1535530184&speed=2&e=1536663799&token=JAwTPb8dmrbiwt89Eaxa4VsL4_xSIYJoJh4rQfOQ:7a3afxy3zT4STw5OKKX"
-	req, _ := http.NewRequest("Get", url, nil)
-	_, err := getUserInfo(xlog.NewDummy(), req)
-	assert.Equal(t, errors.New("private ak/sk not set"), err)
 }

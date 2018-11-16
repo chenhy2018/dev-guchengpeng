@@ -8,7 +8,6 @@ import (
 
 	"github.com/bouk/monkey"
 	"github.com/gin-gonic/gin"
-	"github.com/qiniu/api.v7/auth/qbox"
 	xlog "github.com/qiniu/xlog.v1"
 	"github.com/stretchr/testify/suite"
 	"qiniu.com/models"
@@ -21,9 +20,9 @@ type PlayBackTestSuite struct {
 
 var (
 	userinfo = userInfo{
-		uid: 1,
-		ak:  "JAwTPb8dmrbiwt89Eaxa4VsL4_xSIYJoJh4rQfOQ",
-		sk:  "G5mtjT3QzG4Lf7jpCAN5PZHrGeoSH9jRdC96ecYS",
+		uid: "123",
+		ak:  "xxxxxxxxxxx002",
+		sk:  "xxxxxxxxxxx003",
 	}
 )
 
@@ -44,11 +43,8 @@ func (suite *PlayBackTestSuite) TestPlayBackWithoutUid() {
 }
 
 func (suite *PlayBackTestSuite) TestPlayBackWithoutFrom() {
-	req, _ := http.NewRequest("GET", "/v1/namespaces/ipcamera/uas/testdeviceid8/playback?to=1532499345&e=1532499345&token=xxxxxx", nil)
+	req, _ := http.NewRequest("GET", "/v1/namespaces/ipcamera/uas/testdeviceid8/playback?to=1532499345", nil)
 	defer monkey.UnpatchAll()
-	monkey.Patch(VerifyToken, func(xl *xlog.Logger, expire int64, realToken string, req *http.Request, user *userInfo) bool {
-		return true
-	})
 	monkey.PatchInstanceMethod(
 		reflect.TypeOf((*models.UaModel)(nil)), "GetUaInfo", func(ss *models.UaModel, xl *xlog.Logger, uid, namespace, uaid string) ([]models.UaInfo, error) {
 			info := []models.UaInfo{}
@@ -61,33 +57,29 @@ func (suite *PlayBackTestSuite) TestPlayBackWithoutFrom() {
 		})
 	monkey.Patch(getUserInfo, func(xl *xlog.Logger, req *http.Request) (*userInfo, error) { return &userinfo, nil })
 	w := PerformRequest(suite.r, req)
-	//suite.Equal(true, testObj.VerifyToken(xlog.NewDummy(), int64(10), "", "", ""), "successxxx")
 	suite.Equal(400, w.Code, "should be 400 for no from requset")
 }
 
 func (suite *PlayBackTestSuite) TestPlayBackWithoutTo() {
-	req, _ := http.NewRequest("GET", "/v1/namespaces/ipcamera/uas/testdeviceid8/playback?from=1532499345&e=1532499345&token=xxxxxx", nil)
+	req, _ := http.NewRequest("GET", "/v1/namespaces/ipcamera/uas/testdeviceid8/playback?from=1532499345", nil)
 	w := PerformRequest(suite.r, req)
 	suite.Equal(400, w.Code, "should be 400 for no to requset")
 }
 
 func (suite *PlayBackTestSuite) TestPlayBackWithoutExpire() {
-	req, _ := http.NewRequest("GET", "/v1/namespaces/ipcamera/uas/testdeviceid8/playback?from=1532499345&to=1532499345&token=xxxxxx", nil)
+	req, _ := http.NewRequest("GET", "/v1/namespaces/ipcamera/uas/testdeviceid8/playback?from=1532499345&to=1532499345", nil)
 	w := PerformRequest(suite.r, req)
 	suite.Equal(400, w.Code, "should be 400 for no expire requset")
 }
 
 func (suite *PlayBackTestSuite) TestPlayBackWithoutToken() {
-	req, _ := http.NewRequest("GET", "/v1/namespaces/ipcamera/uas/testdeviceid8/playback?from=1532499345&to=1532499345&e=1532499345", nil)
+	req, _ := http.NewRequest("GET", "/v1/namespaces/ipcamera/uas/testdeviceid8/playback?from=1532499345&to=1532499345", nil)
 	w := PerformRequest(suite.r, req)
 	suite.Equal(400, w.Code, "should be 400 for no token")
 }
 func (suite *PlayBackTestSuite) TestPlayBack500IfGetUseInfoFailed() {
-	req, _ := http.NewRequest("GET", "/v1/namespaces/ipcamera/uas/testdeviceid8/playback?from=1532499325&to=1532499345&e=1532499345&token=13764829407:4ZNcW_AanSVccUmwq6MnA_8SWk8=", nil)
+	req, _ := http.NewRequest("GET", "/v1/namespaces/ipcamera/uas/testdeviceid8/playback?from=1532499325&to=1532499345", nil)
 	defer monkey.UnpatchAll()
-	monkey.Patch(VerifyToken, func(xl *xlog.Logger, expire int64, realToken string, req *http.Request, user *userInfo) bool {
-		return true
-	})
 	monkey.Patch(getUserInfo, func(xl *xlog.Logger, req *http.Request) (*userInfo, error) {
 		return nil, errors.New("get user info error")
 	})
@@ -95,11 +87,8 @@ func (suite *PlayBackTestSuite) TestPlayBack500IfGetUseInfoFailed() {
 	suite.Equal(500, w.Code, "500 for get user info failed")
 }
 func (suite *PlayBackTestSuite) TestPlayBack() {
-	req, _ := http.NewRequest("GET", "/v1/namespaces/ipcamera/uas/testdeviceid8/playback?from=1532499325&to=1532499345&e=1532499345&token=13764829407:4ZNcW_AanSVccUmwq6MnA_8SWk8=", nil)
+	req, _ := http.NewRequest("GET", "/v1/namespaces/ipcamera/uas/testdeviceid8/playback?from=1532499325&to=1532499345", nil)
 	defer monkey.UnpatchAll()
-	monkey.Patch(VerifyToken, func(xl *xlog.Logger, expire int64, realToken string, req *http.Request, user *userInfo) bool {
-		return true
-	})
 	monkey.Patch(getUserInfo, func(xl *xlog.Logger, req *http.Request) (*userInfo, error) { return &userinfo, nil })
 	monkey.PatchInstanceMethod(
 		reflect.TypeOf((*models.NamespaceModel)(nil)), "GetNamespaceInfo", func(ss *models.NamespaceModel, xl *xlog.Logger, uid, namespace string) ([]models.NamespaceInfo, error) {
@@ -127,7 +116,7 @@ func (suite *PlayBackTestSuite) TestPlayBack() {
 		})
 	monkey.PatchInstanceMethod(
 		reflect.TypeOf((*models.SegmentKodoModel)(nil)), "GetSegmentTsInfo", func(ss *models.SegmentKodoModel,
-			xl *xlog.Logger, starttime, endtime int64, bucketurl, uaid string, limit int, marker string, mac *qbox.Mac) ([]map[string]interface{}, string, error) {
+			xl *xlog.Logger, starttime, endtime int64, bucketurl, uaid string, limit int, marker string, uid, userAk string) ([]map[string]interface{}, string, error) {
 			return nil, "", nil
 		})
 
@@ -136,11 +125,8 @@ func (suite *PlayBackTestSuite) TestPlayBack() {
 }
 
 func (suite *PlayBackTestSuite) TestPlayBackWithGetSegmentsInfoError() {
-	req, _ := http.NewRequest("GET", "/v1/namespaces/ipcamera/uas/testdeviceid8/playback?from=1532499325&to=1532499345&e=1532499345&token=13764829407:4ZNcW_AanSVccUmwq6MnA_8SWk8=", nil)
+	req, _ := http.NewRequest("GET", "/v1/namespaces/ipcamera/uas/testdeviceid8/playback?from=1532499325&to=1532499345", nil)
 	defer monkey.UnpatchAll()
-	monkey.Patch(VerifyToken, func(xl *xlog.Logger, expire int64, realToken string, req *http.Request, user *userInfo) bool {
-		return true
-	})
 	monkey.Patch(getUserInfo, func(xl *xlog.Logger, req *http.Request) (*userInfo, error) { return &userinfo, nil })
 	monkey.Patch(GetBucket, func(xl *xlog.Logger, uid, namespace string) (string, error) {
 		return "ipcamera", nil
@@ -157,7 +143,7 @@ func (suite *PlayBackTestSuite) TestPlayBackWithGetSegmentsInfoError() {
 		})
 	monkey.PatchInstanceMethod(
 		reflect.TypeOf((*models.SegmentKodoModel)(nil)), "GetSegmentTsInfo", func(ss *models.SegmentKodoModel,
-			xl *xlog.Logger, starttime, endtime int64, bucketurl, uaid string, limit int, marker string, mac *qbox.Mac) ([]map[string]interface{}, string, error) {
+			xl *xlog.Logger, starttime, endtime int64, bucketurl, uaid string, limit int, marker string, uid, userAk string) ([]map[string]interface{}, string, error) {
 			return nil, "", errors.New("get kodo data error")
 		})
 
@@ -166,10 +152,10 @@ func (suite *PlayBackTestSuite) TestPlayBackWithGetSegmentsInfoError() {
 }
 
 func (suite *PlayBackTestSuite) TestGetFastForwardStreamError() {
-	req, _ := http.NewRequest("GET", "/v1/namespaces/ipcamera/uas/testdeviceid8/playback?from=1532499325&to=1532499345&speed=2&e=1532499345&token=13764829407:4ZNcW_AanSVccUmwq6MnA_8SWk8=", nil)
+	req, _ := http.NewRequest("GET", "/v1/namespaces/ipcamera/uas/testdeviceid8/playback?to=1536143287&from=1536142906&speed=2", nil)
 	defer monkey.UnpatchAll()
-	monkey.Patch(VerifyToken, func(xl *xlog.Logger, expire int64, realToken string, req *http.Request, user *userInfo) bool {
-		return true
+	monkey.Patch(getUserInfo, func(xl *xlog.Logger, req *http.Request) (*userInfo, error) {
+		return &userInfo{ak: "fadsfasfsd", sk: "fadsfasfsadf", uid: "123"}, nil
 	})
 	monkey.PatchInstanceMethod(
 		reflect.TypeOf((*models.UaModel)(nil)), "GetUaInfo", func(ss *models.UaModel, xl *xlog.Logger, uid, namespace, uaid string) ([]models.UaInfo, error) {
@@ -181,7 +167,30 @@ func (suite *PlayBackTestSuite) TestGetFastForwardStreamError() {
 			info = append(info, item)
 			return info, nil
 		})
-	monkey.Patch(getFastForwardStream, func(xl *xlog.Logger, params *requestParams, c *gin.Context, user *userInfo) error {
+	monkey.Patch(GetBucket, func(xl *xlog.Logger, uid, namespace string) (string, error) {
+		return "ipcamera", nil
+	})
+
+	monkey.Patch(uploadNewFile, func(filename, bucket string, data []byte, user *userInfo) error {
+		return nil
+	})
+	monkey.PatchInstanceMethod(
+		reflect.TypeOf((*models.SegmentKodoModel)(nil)), "GetSegmentTsInfo", func(ss *models.SegmentKodoModel,
+			xl *xlog.Logger, starttime, endtime int64, bucketurl, uaid string, limit int, marker string, uid, userAk string) ([]map[string]interface{}, string, error) {
+			info := []map[string]interface{}{
+				map[string]interface{}{
+					models.SEGMENT_ITEM_START_TIME: int64(1536142906000),
+					models.SEGMENT_ITEM_END_TIME:   int64(1536143141000),
+					models.SEGMENT_ITEM_FILE_NAME:  "ts/ipc00a/1537856214961/1537856214961/7.ts",
+				},
+				map[string]interface{}{
+					models.SEGMENT_ITEM_START_TIME: int64(1536143141000),
+					models.SEGMENT_ITEM_END_TIME:   int64(1536143280000),
+					models.SEGMENT_ITEM_FILE_NAME:  "ts/ipc00a/1537856214961/1537856214961/7.ts",
+				}}
+			return info, "", nil
+		})
+	monkey.Patch(getFastForwardStream, func(xl *xlog.Logger, params *requestParams, c *gin.Context, user *userInfo, bucket, filename string) error {
 		return errors.New("get Ts Stream Error")
 	})
 	w := PerformRequest(suite.r, req)
@@ -189,32 +198,23 @@ func (suite *PlayBackTestSuite) TestGetFastForwardStreamError() {
 }
 
 func (suite *PlayBackTestSuite) TestPlayBackWithBadParam() {
-	req, _ := http.NewRequest("GET", "/v1/namespaces/ipcamera/uas/testdeviceid8/playback?to=1532499345&from=15324993x45&e=1532499345&token=xxxxxx", nil)
+	req, _ := http.NewRequest("GET", "/v1/namespaces/ipcamera/uas/testdeviceid8/playback?to=1532499345&from=15324993x45", nil)
 	defer monkey.UnpatchAll()
-	monkey.Patch(VerifyToken, func(xl *xlog.Logger, expire int64, realToken string, req *http.Request, user *userInfo) bool {
-		return true
-	})
 	monkey.Patch(getUserInfo, func(xl *xlog.Logger, req *http.Request) (*userInfo, error) { return &userinfo, nil })
 	w := PerformRequest(suite.r, req)
 	suite.Equal(400, w.Code, "should be 400 for no from requset")
 }
 func (suite *PlayBackTestSuite) TestPlayBackWithBadToken() {
-	req, _ := http.NewRequest("GET", "/v1/namespaces/ipcamera/uas/testdeviceid8/playback?to=1532499345&from=1532499045&e=1532499345&token=xxxxxx", nil)
+	req, _ := http.NewRequest("GET", "/v1/namespaces/ipcamera/uas/testdeviceid8/playback?to=1532499345&from=1532499045", nil)
 	defer monkey.UnpatchAll()
-	monkey.Patch(VerifyToken, func(xl *xlog.Logger, expire int64, realToken string, req *http.Request, user *userInfo) bool {
-		return false
-	})
 	monkey.Patch(getUserInfo, func(xl *xlog.Logger, req *http.Request) (*userInfo, error) { return &userinfo, nil })
 	w := PerformRequest(suite.r, req)
-	suite.Equal(401, w.Code, "should be 400 for bad token")
+	suite.Equal(400, w.Code, "should be 400 for bad token")
 }
 
 func (suite *PlayBackTestSuite) TestPlayBackWithBadNameSpace() {
-	req, _ := http.NewRequest("GET", "/v1/namespaces/ipcamera/uas/testdeviceid8/playback?to=1532499345&from=1532499045&e=1532499345&token=xxxxxx", nil)
+	req, _ := http.NewRequest("GET", "/v1/namespaces/ipcamera/uas/testdeviceid8/playback?to=1532499345&from=1532499045", nil)
 	defer monkey.UnpatchAll()
-	monkey.Patch(VerifyToken, func(xl *xlog.Logger, expire int64, realToken string, req *http.Request, user *userInfo) bool {
-		return true
-	})
 	monkey.Patch(getUserInfo, func(xl *xlog.Logger, req *http.Request) (*userInfo, error) { return &userinfo, nil })
 	monkey.PatchInstanceMethod(
 		reflect.TypeOf((*models.UaModel)(nil)), "GetUaInfo", func(ss *models.UaModel, xl *xlog.Logger, uid, namespace, uaid string) ([]models.UaInfo, error) {
@@ -235,13 +235,10 @@ func (suite *PlayBackTestSuite) TestPlayBackWithBadNameSpace() {
 }
 
 func (suite *PlayBackTestSuite) TestPlayBackWithCorrectDomain() {
-	req, _ := http.NewRequest("GET", "/v1/namespaces/ipcamera/uas/testdeviceid8/playback?to=1536143287&from=1536142906&e=1532499345&token=xxxxxx", nil)
+	req, _ := http.NewRequest("GET", "/v1/namespaces/ipcamera/uas/testdeviceid8/playback?to=1536143287&from=1536142906", nil)
 	defer monkey.UnpatchAll()
-	monkey.Patch(VerifyToken, func(xl *xlog.Logger, expire int64, realToken string, req *http.Request, user *userInfo) bool {
-		return true
-	})
 	monkey.Patch(getUserInfo, func(xl *xlog.Logger, req *http.Request) (*userInfo, error) {
-		return &userInfo{ak: "fadsfasfsd", sk: "fadsfasfsadf"}, nil
+		return &userInfo{ak: "fadsfasfsd", sk: "fadsfasfsadf", uid: "123"}, nil
 	})
 	monkey.PatchInstanceMethod(
 		reflect.TypeOf((*models.UaModel)(nil)), "GetUaInfo", func(ss *models.UaModel, xl *xlog.Logger, uid, namespace, uaid string) ([]models.UaInfo, error) {
@@ -257,12 +254,12 @@ func (suite *PlayBackTestSuite) TestPlayBackWithCorrectDomain() {
 		return "ipcamera", nil
 	})
 
-	monkey.Patch(uploadNewFile, func(filename, bucket string, data []byte, mac *qbox.Mac) error {
+	monkey.Patch(uploadNewFile, func(filename, bucket string, data []byte, user *userInfo) error {
 		return nil
 	})
 	monkey.PatchInstanceMethod(
 		reflect.TypeOf((*models.SegmentKodoModel)(nil)), "GetSegmentTsInfo", func(ss *models.SegmentKodoModel,
-			xl *xlog.Logger, starttime, endtime int64, bucketurl, uaid string, limit int, marker string, mac *qbox.Mac) ([]map[string]interface{}, string, error) {
+			xl *xlog.Logger, starttime, endtime int64, bucketurl, uaid string, limit int, marker string, uid, userAk string) ([]map[string]interface{}, string, error) {
 			info := []map[string]interface{}{
 				map[string]interface{}{
 					models.SEGMENT_ITEM_START_TIME: int64(1536142906000),

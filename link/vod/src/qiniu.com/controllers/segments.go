@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/qiniu/api.v7/auth/qbox"
 	xlog "github.com/qiniu/xlog.v1"
 	"qiniu.com/models"
 )
@@ -55,8 +54,8 @@ func GetSegments(c *gin.Context) {
 		return
 	}
 
-	info, err := UaMod.GetUaInfo(xl, getUid(user.uid), params.namespace, params.uaid)
-	if err != nil && len(info) == 0 {
+	info, err := UaMod.GetUaInfo(xl, user.uid, params.namespace, params.uaid)
+	if err != nil || len(info) == 0 {
 		xl.Errorf("get ua info failed, error =  %#v", err)
 		c.JSON(400, gin.H{
 			"error": "ua is not correct",
@@ -66,15 +65,14 @@ func GetSegments(c *gin.Context) {
 
 	namespace := info[0].Namespace
 
-	bucket, err := GetBucket(xl, getUid(user.uid), namespace)
+	bucket, err := GetBucket(xl, user.uid, namespace)
 	if err != nil {
 		xl.Errorf("get bucket error, error =  %#v", err)
 		c.JSON(400, gin.H{"error": "namespace is not correct"})
 		return
 	}
-	mac := qbox.NewMac(user.ak, user.sk)
-	newSegFrom, tsStart := getFristTsAfterFrom(xl, params.from, params.to, bucket, params.uaid, mac)
-	ret, marker, err := segMod.GetFragmentTsInfo(xl, params.limit, newSegFrom, params.to, bucket, params.uaid, params.marker, mac)
+	newSegFrom, tsStart := getFristTsAfterFrom(xl, params.from, params.to, bucket, params.uaid, user)
+	ret, marker, err := segMod.GetFragmentTsInfo(xl, params.limit, newSegFrom, params.to, bucket, params.uaid, params.marker, user.uid, user.ak)
 	if err != nil {
 		xl.Errorf("get segments list error, error =%#v", err)
 		c.JSON(500, gin.H{"error": "Service Internal Error"})
@@ -87,6 +85,7 @@ func GetSegments(c *gin.Context) {
 		})
 		return
 	}
+
 	segs, err := filterSegs(xl, ret, params, tsStart)
 	if err != nil {
 		xl.Error("parse seg start/end failed")
@@ -102,9 +101,9 @@ func GetSegments(c *gin.Context) {
 	})
 
 }
-func getFristTsAfterFrom(xl *xlog.Logger, from, to int64, bucket, uaid string, mac *qbox.Mac) (int64, int64) {
+func getFristTsAfterFrom(xl *xlog.Logger, from, to int64, bucket, uaid string, user *userInfo) (int64, int64) {
 
-	segs, _, err := segMod.GetSegmentTsInfo(xl, from, to, bucket, uaid, 1, "", mac)
+	segs, _, err := segMod.GetSegmentTsInfo(xl, from, to, bucket, uaid, 1, "", user.uid, user.ak)
 	if err != nil || segs == nil {
 		return from, from
 	}
@@ -120,7 +119,8 @@ func getFristTsAfterFrom(xl *xlog.Logger, from, to int64, bucket, uaid string, m
 	return newSegFrom, newTsStart
 }
 
-func filterSegs(xl *xlog.Logger, ret []map[string]interface{}, params *requestParams, tsStart int64) (segs []segInfo, err error) {
+func filterSegs(xl *xlog.Logger, ret []map[string]interface{}, params *requestParams, tsStart int64) ([]segInfo, error) {
+	segs := []segInfo{}
 	for _, v := range ret {
 		starttime, ok := v[models.SEGMENT_ITEM_START_TIME].(int64)
 		if !ok {
@@ -167,6 +167,6 @@ func filterSegs(xl *xlog.Logger, ret []map[string]interface{}, params *requestPa
 		segs = append(segs, seg)
 
 	}
-	return
+	return segs, nil
 
 }

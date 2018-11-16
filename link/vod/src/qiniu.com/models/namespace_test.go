@@ -81,7 +81,7 @@ func TestUpdateNamespace(t *testing.T) {
 	model.UpdateNamespace(xl, "Uid", "test", "test1")
 	r_1, _, err_1 := model.GetNamespaceInfos(xl, 0, "", "Uid", "test1")
 	assert.Equal(t, len(r_1), 1, "they should be equal")
-	model.UpdateBucket(xl, "Uid", "test1", "www.qiniu.com", "domain")
+	model.UpdateBucket(xl, "Uid", "test1", "www.qiniu.com")
 	r_1, _, err_1 = model.GetNamespaceInfos(xl, 0, "", "Uid", "test1")
 	assert.Equal(t, r_1[0].Bucket, "www.qiniu.com", "they should be equal")
 	model.UpdateAutoCreateUa(xl, "Uid", "test1", true)
