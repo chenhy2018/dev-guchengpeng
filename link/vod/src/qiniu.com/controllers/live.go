@@ -35,7 +35,7 @@ func GetLivem3u8(c *gin.Context) {
 		return
 	}
 
-	if !verifyToken(xl, params.expire, params.token, c.Request, &userInfo) {
+	if !verifyToken(xl, params.expire, params.token, c.Request, userInfo) {
 		xl.Errorf("verify token falied")
 		c.JSON(401, gin.H{
 			"error": "bad token",
@@ -43,7 +43,7 @@ func GetLivem3u8(c *gin.Context) {
 		return
 	}
 	xl.Infof("uaid = %v, from = %v, namespace = %v", params.uaid, params.from, params.namespace)
-	key := mkkey(&userInfo, params)
+	key := mkkey(userInfo, params)
 	value := redisGet(key)
 	sub := strings.Split(value, "/")
 	xl.Infof("key %s mark %s", key, value)
@@ -72,7 +72,7 @@ func GetLivem3u8(c *gin.Context) {
 		return
 	}
 
-	domain, err := getDomain(xl, bucket, &userInfo)
+	domain, err := getDomain(xl, bucket, userInfo)
 	if err != nil {
 		xl.Errorf("get domain error, error =  %#v", err)
 		c.JSON(400, gin.H{
@@ -87,7 +87,7 @@ func GetLivem3u8(c *gin.Context) {
 		c.JSON(500, gin.H{"error": "Service Internal Error"})
 		return
 	}
-	playlist, err := getLiveList(xl, sequeue, mac, params, bucket, "http://"+domain, mark, key, &userInfo)
+	playlist, err := getLiveList(xl, sequeue, mac, params, bucket, "http://"+domain, mark, key, userInfo)
 	if err != nil {
 		xl.Errorf("get playback list error, error = %#v", err.Error())
 		c.JSON(500, gin.H{"error": "Service Internal Error"})
