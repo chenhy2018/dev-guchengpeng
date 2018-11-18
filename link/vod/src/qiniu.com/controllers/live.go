@@ -27,7 +27,13 @@ func GetLivem3u8(c *gin.Context) {
 		})
 		return
 	}
-
+	if params.from == 0 {
+		xl.Errorf("parse request falied from = %#v", params.from)
+		c.JSON(400, gin.H{
+			"error": "params.from == 0",
+		})
+		return
+	}
 	userInfo, err := getUserInfo(xl, c.Request)
 	if err != nil {
 		xl.Errorf("get user Info failed %v", err)

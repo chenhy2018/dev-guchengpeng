@@ -169,7 +169,6 @@ func (m *SegmentKodoModel) GetSegmentTsInfo(xl *xlog.Logger, starttime, endtime 
 
 	for listItem1 := range entries {
 		err, info := GetInfoFromFilename(listItem1.Item.Key, "/")
-		fmt.Printf("%d     ----   %d \n", info[SEGMENT_ITEM_START_TIME].(int64), endtime/1000)
 		if err != nil {
 			fmt.Println(err)
 			break
