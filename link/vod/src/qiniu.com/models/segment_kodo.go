@@ -169,6 +169,7 @@ func (m *SegmentKodoModel) GetSegmentTsInfo(xl *xlog.Logger, starttime, endtime 
 
 	for listItem1 := range entries {
 		err, info := GetInfoFromFilename(listItem1.Item.Key, "/")
+		fmt.Printf("%d     ----   %d \n", info[SEGMENT_ITEM_START_TIME].(int64), endtime/1000)
 		if err != nil {
 			fmt.Println(err)
 			break
@@ -183,6 +184,7 @@ func (m *SegmentKodoModel) GetSegmentTsInfo(xl *xlog.Logger, starttime, endtime 
 			r = append(r, info)
 			total++
 		}
+		info[SEGMENT_ITEM_MARK] = listItem1.Marker
 		if total >= limit && limit != 0 {
 			nextMarker = listItem1.Marker
 			break

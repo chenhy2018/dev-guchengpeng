@@ -4,22 +4,22 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"net/http"
-	"net/url"
-	"strconv"
-	"strings"
-	"time"
-
 	"github.com/gin-gonic/gin"
 	"github.com/qiniu/api.v7/auth/qbox"
 	"github.com/qiniu/api.v7/storage"
 	xlog "github.com/qiniu/xlog.v1"
 	"google.golang.org/grpc"
+	"gopkg.in/redis.v5"
+	"net/http"
+	"net/url"
 	rs "qbox.us/api/rs.v3"
 	qboxmac "qiniu.com/auth/qboxmac.v1"
 	"qiniu.com/models"
 	pb "qiniu.com/proto"
 	"qiniu.com/system"
+	"strconv"
+	"strings"
+	"time"
 )
 
 var (
@@ -28,9 +28,10 @@ var (
 	fastForwardClint pb.FastForwardClient
 	UaMod            *models.UaModel
 	defaultUser      system.UserConf
+	c                *redis.Client
 )
 
-func Init(conf *system.Configuration) {
+func Init(conf *system.Configuration, client *redis.Client) {
 	defaultUser = conf.UserConf
 	namespaceMod = &models.NamespaceModel{}
 	namespaceMod.Init()
@@ -39,6 +40,7 @@ func Init(conf *system.Configuration) {
 	FFGrpcClientInit(&conf.GrpcConf)
 	UaMod = &models.UaModel{}
 	UaMod.Init()
+	c = client
 }
 
 func FFGrpcClientInit(conf *system.GrpcConf) {
@@ -54,6 +56,8 @@ type requestParams struct {
 	from      int64
 	to        int64
 	limit     int
+	expire    int64
+	token     string
 	marker    string
 	namespace string
 	prefix    string
@@ -66,6 +70,33 @@ type userInfo struct {
 	uid string
 	ak  string
 	sk  string
+}
+
+func redisGet(key string) string {
+	s := c.Get(key).Val()
+	return s
+}
+
+func redisSet(key, value string) error {
+	err := c.Set(key, value, time.Hour).Err()
+	if err != nil {
+		fmt.Println(err)
+	}
+	return err
+}
+
+func verifyToken(xl *xlog.Logger, expire int64, realToken string, req *http.Request, userInfo *userInfo) bool {
+	if expire == 0 || realToken == "" {
+		return false
+	}
+	if expire < time.Now().Unix() {
+		return false
+	}
+	url := "http://" + req.Host + req.URL.String()
+	tokenIndex := strings.Index(url, "&token=")
+	mac := qbox.NewMac(userInfo.ak, userInfo.sk)
+	token := mac.Sign([]byte(url[0:tokenIndex]))
+	return token == realToken
 }
 
 func checkParams(xl *xlog.Logger, params *requestParams) error {
@@ -148,6 +179,8 @@ func ParseRequest(c *gin.Context, xl *xlog.Logger) (*requestParams, error) {
 	namespace := c.Param("namespace")
 	from := c.DefaultQuery("from", "0")
 	to := c.DefaultQuery("to", "0")
+	expire := c.DefaultQuery("e", "0")
+	token := c.Query("token")
 	limit := c.DefaultQuery("limit", "1000")
 	marker := c.DefaultQuery("marker", "")
 	prefix := c.DefaultQuery("prefix", "")
@@ -166,6 +199,10 @@ func ParseRequest(c *gin.Context, xl *xlog.Logger) (*requestParams, error) {
 	toT, err := strconv.ParseInt(to, 10, 64)
 	if err != nil {
 		return nil, errors.New("Parse to time failed")
+	}
+	expireT, err := strconv.ParseInt(expire, 10, 64)
+	if err != nil {
+		return nil, errors.New("Parse expire time failed")
 	}
 	limitT, err := strconv.ParseInt(limit, 10, 32)
 	if err != nil {
@@ -190,6 +227,8 @@ func ParseRequest(c *gin.Context, xl *xlog.Logger) (*requestParams, error) {
 		uaid:      uaid,
 		from:      fromT * 1000,
 		to:        toT * 1000,
+		expire:    expireT * 1000,
+		token:     token,
 		limit:     int(limitT),
 		marker:    marker,
 		namespace: namespace,

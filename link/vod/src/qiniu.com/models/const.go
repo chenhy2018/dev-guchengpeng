@@ -5,6 +5,7 @@ const (
 	ITEM_ID                          = "_id"
 	ITEM_CREATE_TIME                 = "createdAt"
 	ITEM_UPDATA_TIME                 = "updatedAt"
+	SEGMENT_ITEM_MARK                = "mark"
 	SEGMENT_ITEM_FRAGMENT_START_TIME = "fragmentstarttime"
 	SEGMENT_ITEM_START_TIME          = "starttime"
 	SEGMENT_ITEM_END_TIME            = "endtime"

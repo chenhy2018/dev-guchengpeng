@@ -22,6 +22,11 @@ type DBConfiguration struct {
 type GrpcConf struct {
 	Addr string `json:"addr"`
 }
+
+type RedisConf struct {
+	Addr string `json:"addrs"`
+}
+
 type UserConf struct {
 	AccessKey string   `json:"access_key"`
 	SecretKey string   `json:"secret_key"`
@@ -37,11 +42,12 @@ type KodoConf struct {
 	UpHost  string `json:"up_host"`
 }
 type Configuration struct {
-	Bind     string          `json:"bind"`
-	DbConf   DBConfiguration `json:"db_conf"`
-	Qconf    qconfapi.Config `json:"qconfg"`
-	GrpcConf GrpcConf        `json:"grpc_conf"`
-	UserConf UserConf        `json:"user_conf"`
+	Bind      string          `json:"bind"`
+	DbConf    DBConfiguration `json:"db_conf"`
+	RedisConf RedisConf       `json:"redis_conf"`
+	Qconf     qconfapi.Config `json:"qconfg"`
+	GrpcConf  GrpcConf        `json:"grpc_conf"`
+	UserConf  UserConf        `json:"user_conf"`
 }
 
 func LoadConf(dir, file string) (conf *Configuration, err error) {
