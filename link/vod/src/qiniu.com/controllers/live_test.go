@@ -84,7 +84,7 @@ func (suite *LiveTestSuite) TestLive() {
 	monkey.Patch(redisGet, func(key string) string {
 		return "12345"
 	})
-	monkey.Patch(redisSet, func(key, value string) error {
+	monkey.Patch(redisSet, func(xl *xlog.Logger, key, value string) error {
 		return nil
 	})
 	monkey.Patch(getDomain, func(xl *xlog.Logger, bucket string, user *userInfo) (string, error) {
@@ -138,7 +138,7 @@ func (suite *LiveTestSuite) TestLiveWithGetSegmentsInfoError() {
 	monkey.Patch(redisGet, func(key string) string {
 		return "12345"
 	})
-	monkey.Patch(redisSet, func(key, value string) error {
+	monkey.Patch(redisSet, func(xl *xlog.Logger, key, value string) error {
 		return nil
 	})
 	monkey.Patch(getDomain, func(xl *xlog.Logger, bucket string, user *userInfo) (string, error) {
@@ -173,7 +173,7 @@ func (suite *LiveTestSuite) TestLiveWithBadParam() {
 	monkey.Patch(redisGet, func(key string) string {
 		return "12345"
 	})
-	monkey.Patch(redisSet, func(key, value string) error {
+	monkey.Patch(redisSet, func(xl *xlog.Logger, key, value string) error {
 		return nil
 	})
 	monkey.Patch(getDomain, func(xl *xlog.Logger, bucket string, user *userInfo) (string, error) {
@@ -192,7 +192,7 @@ func (suite *LiveTestSuite) TestLiveWithBadToken() {
 	monkey.Patch(redisGet, func(key string) string {
 		return "12345"
 	})
-	monkey.Patch(redisSet, func(key, value string) error {
+	monkey.Patch(redisSet, func(xl *xlog.Logger, key, value string) error {
 		return nil
 	})
 	monkey.Patch(getDomain, func(xl *xlog.Logger, bucket string, user *userInfo) (string, error) {
@@ -212,7 +212,7 @@ func (suite *LiveTestSuite) TestLiveWithBadNameSpace() {
 	monkey.Patch(redisGet, func(key string) string {
 		return "12345"
 	})
-	monkey.Patch(redisSet, func(key, value string) error {
+	monkey.Patch(redisSet, func(xl *xlog.Logger, key, value string) error {
 		return nil
 	})
 	monkey.Patch(getDomain, func(xl *xlog.Logger, bucket string, user *userInfo) (string, error) {
@@ -249,7 +249,7 @@ func (suite *LiveTestSuite) TestLiveWithCorrectDomain() {
 	monkey.Patch(redisGet, func(key string) string {
 		return "12345"
 	})
-	monkey.Patch(redisSet, func(key, value string) error {
+	monkey.Patch(redisSet, func(xl *xlog.Logger, key, value string) error {
 		return nil
 	})
 	monkey.Patch(getDomain, func(xl *xlog.Logger, bucket string, user *userInfo) (string, error) {
