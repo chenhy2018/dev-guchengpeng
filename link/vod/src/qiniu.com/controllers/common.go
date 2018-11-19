@@ -77,10 +77,10 @@ func redisGet(key string) string {
 	return s
 }
 
-func redisSet(key, value string) error {
+func redisSet(xl *xlog.Logger, key, value string) error {
 	err := c.Set(key, value, time.Hour).Err()
 	if err != nil {
-		fmt.Println(err)
+		xl.Errorf("Redis set failed %#v", err)
 	}
 	return err
 }

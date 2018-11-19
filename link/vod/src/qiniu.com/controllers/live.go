@@ -117,9 +117,9 @@ func getLiveList(xl *xlog.Logger, sequeue int64, mac *qbox.Mac, params *requestP
 	if len(segs) > 1 {
 		next, ok := segs[0][models.SEGMENT_ITEM_MARK].(string)
 		if mark != next && ok {
-			redisSet(key, fmt.Sprintf("%d/%s", sequeue+1, next))
+			redisSet(xl, key, fmt.Sprintf("%d/%s", sequeue+1, next))
 		}
-		fmt.Printf("set key %s, value %s \n", key, fmt.Sprintf("%d/%s", sequeue+1, next))
+		xl.Infof("set key %s, value %s \n", key, fmt.Sprintf("%d/%s", sequeue+1, next))
 	}
 	var playlist []map[string]interface{}
 
