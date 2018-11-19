@@ -61,6 +61,8 @@ type requestParams struct {
 	speed     int32
 	fmt       string
 	key       string
+	expire    int64
+	token     string
 }
 type userInfo struct {
 	uid string
@@ -155,6 +157,8 @@ func ParseRequest(c *gin.Context, xl *xlog.Logger) (*requestParams, error) {
 	speed := c.DefaultQuery("speed", "1")
 	m3u8Name := c.DefaultQuery("key", "")
 	fmt := c.Query("fmt")
+	expire := c.DefaultQuery("e", "0")
+	token := c.Query("token")
 
 	if strings.Contains(uaid, ".m3u8") {
 		uaid = strings.Split(uaid, ".")[0]
@@ -186,6 +190,12 @@ func ParseRequest(c *gin.Context, xl *xlog.Logger) (*requestParams, error) {
 	if fmt != "fmp4" && fmt != "flv" && fmt != "" {
 		return nil, errors.New("fmt error, it should be flv or fmp4")
 	}
+
+	expireT, err := strconv.ParseInt(expire, 10, 64)
+	if err != nil {
+		return nil, errors.New("Parse expire time failed")
+
+	}
 	params := &requestParams{
 		uaid:      uaid,
 		from:      fromT * 1000,
@@ -198,6 +208,8 @@ func ParseRequest(c *gin.Context, xl *xlog.Logger) (*requestParams, error) {
 		speed:     int32(speedT),
 		fmt:       fmt,
 		key:       m3u8Name,
+		expire:    expireT,
+		token:     token,
 	}
 
 	return params, nil
@@ -260,4 +272,18 @@ func uploadNewFile(filename, bucket string, data []byte, user *userInfo) error {
 	entry := bucket + ":" + filename
 	_, _, err = rsService.Put(entry, "", bytes.NewReader(data), int64(len(data)), "", "", "")
 	return err
+}
+
+func verifyToken(xl *xlog.Logger, expire int64, realToken string, req *http.Request, user *userInfo) bool {
+	if expire == 0 || realToken == "" {
+		return false
+	}
+	if expire < time.Now().Unix() {
+		return false
+	}
+	url := "http://" + req.Host + req.URL.String()
+	tokenIndex := strings.Index(url, "&token=")
+	mac := &qbox.Mac{AccessKey: user.ak, SecretKey: []byte(user.sk)}
+	token := mac.Sign([]byte(url[0:tokenIndex]))
+	return token == realToken
 }
