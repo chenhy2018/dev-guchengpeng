@@ -7,7 +7,6 @@ import (
 	"testing"
 
 	"github.com/bouk/monkey"
-	"github.com/gin-gonic/gin"
 	xlog "github.com/qiniu/xlog.v1"
 	"github.com/stretchr/testify/suite"
 	"qiniu.com/models"
@@ -147,52 +146,6 @@ func (suite *PlayBackTestSuite) TestPlayBackWithGetSegmentsInfoError() {
 			return nil, "", errors.New("get kodo data error")
 		})
 
-	w := PerformRequest(suite.r, req)
-	suite.Equal(500, w.Code, "500 for query kodo data error")
-}
-
-func (suite *PlayBackTestSuite) TestGetFastForwardStreamError() {
-	req, _ := http.NewRequest("GET", "/v1/namespaces/ipcamera/uas/testdeviceid8/playback?to=1536143287&from=1536142906&speed=2", nil)
-	defer monkey.UnpatchAll()
-	monkey.Patch(getUserInfo, func(xl *xlog.Logger, req *http.Request) (*userInfo, error) {
-		return &userInfo{ak: "fadsfasfsd", sk: "fadsfasfsadf", uid: "123"}, nil
-	})
-	monkey.PatchInstanceMethod(
-		reflect.TypeOf((*models.UaModel)(nil)), "GetUaInfo", func(ss *models.UaModel, xl *xlog.Logger, uid, namespace, uaid string) ([]models.UaInfo, error) {
-			info := []models.UaInfo{}
-			item := models.UaInfo{
-				Uid:       "link",
-				Namespace: "ipcamera",
-			}
-			info = append(info, item)
-			return info, nil
-		})
-	monkey.Patch(GetBucket, func(xl *xlog.Logger, uid, namespace string) (string, error) {
-		return "ipcamera", nil
-	})
-
-	monkey.Patch(uploadNewFile, func(filename, bucket string, data []byte, user *userInfo) error {
-		return nil
-	})
-	monkey.PatchInstanceMethod(
-		reflect.TypeOf((*models.SegmentKodoModel)(nil)), "GetSegmentTsInfo", func(ss *models.SegmentKodoModel,
-			xl *xlog.Logger, starttime, endtime int64, bucketurl, uaid string, limit int, marker string, uid, userAk string) ([]map[string]interface{}, string, error) {
-			info := []map[string]interface{}{
-				map[string]interface{}{
-					models.SEGMENT_ITEM_START_TIME: int64(1536142906000),
-					models.SEGMENT_ITEM_END_TIME:   int64(1536143141000),
-					models.SEGMENT_ITEM_FILE_NAME:  "ts/ipc00a/1537856214961/1537856214961/7.ts",
-				},
-				map[string]interface{}{
-					models.SEGMENT_ITEM_START_TIME: int64(1536143141000),
-					models.SEGMENT_ITEM_END_TIME:   int64(1536143280000),
-					models.SEGMENT_ITEM_FILE_NAME:  "ts/ipc00a/1537856214961/1537856214961/7.ts",
-				}}
-			return info, "", nil
-		})
-	monkey.Patch(getFastForwardStream, func(xl *xlog.Logger, params *requestParams, c *gin.Context, user *userInfo, bucket, filename string) error {
-		return errors.New("get Ts Stream Error")
-	})
 	w := PerformRequest(suite.r, req)
 	suite.Equal(500, w.Code, "500 for query kodo data error")
 }

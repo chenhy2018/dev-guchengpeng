@@ -18,6 +18,7 @@ func GetRouter() *gin.Engine {
 	r.GET("/v1/namespaces/:namespace/uas/:uaid/playback", GetPlayBackm3u8)
 	r.GET("/v1/namespaces/:namespace/uas/:uaid/segments", GetSegments)
 	r.GET("/v1/namespaces/:namespace/uas/:uaid/frames", GetFrames)
+	r.GET("/v1/namespaces/:namespace/uas/:uaid/fastforward", GetFastForward)
 	r.POST("/upload", UploadTs)
 	return r
 }
