@@ -87,7 +87,7 @@ func GetLivem3u8(c *gin.Context) {
 		return
 	}
 
-	mac := &qbox.Mac{AccessKey: user.ak, SecretKey: []byte(user.sk)}
+	mac := &qbox.Mac{AccessKey: userInfo.ak, SecretKey: []byte(userInfo.sk)}
 
 	playlist, err := getLiveList(xl, sequeue, mac, params, bucket, "http://"+domain, mark, key, userInfo)
 	if err != nil {
