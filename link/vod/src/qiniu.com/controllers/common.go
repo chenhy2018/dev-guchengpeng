@@ -2,6 +2,8 @@ package controllers
 
 import (
 	"bytes"
+	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"github.com/gin-gonic/gin"
@@ -10,9 +12,11 @@ import (
 	xlog "github.com/qiniu/xlog.v1"
 	"google.golang.org/grpc"
 	"gopkg.in/redis.v5"
+	"io"
 	"net/http"
 	"net/url"
 	rs "qbox.us/api/rs.v3"
+	"qiniu.com/auth"
 	qboxmac "qiniu.com/auth/qboxmac.v1"
 	"qiniu.com/models"
 	pb "qiniu.com/proto"
@@ -65,8 +69,6 @@ type requestParams struct {
 	speed     int32
 	fmt       string
 	key       string
-	expire    int64
-	token     string
 }
 type userInfo struct {
 	uid string
@@ -85,20 +87,6 @@ func redisSet(xl *xlog.Logger, key, value string) error {
 		xl.Errorf("Redis set failed %#v", err)
 	}
 	return err
-}
-
-func verifyToken(xl *xlog.Logger, expire int64, realToken string, req *http.Request, userInfo *userInfo) bool {
-	if expire == 0 || realToken == "" {
-		return false
-	}
-	if expire < time.Now().Unix() {
-		return false
-	}
-	url := "http://" + req.Host + req.URL.String()
-	tokenIndex := strings.Index(url, "&token=")
-	mac := qbox.NewMac(userInfo.ak, userInfo.sk)
-	token := mac.Sign([]byte(url[0:tokenIndex]))
-	return token == realToken
 }
 
 func checkParams(xl *xlog.Logger, params *requestParams) error {
@@ -190,8 +178,6 @@ func ParseRequest(c *gin.Context, xl *xlog.Logger) (*requestParams, error) {
 	speed := c.DefaultQuery("speed", "1")
 	m3u8Name := c.DefaultQuery("key", "")
 	fmt := c.Query("fmt")
-	expire := c.DefaultQuery("e", "0")
-	token := c.Query("token")
 
 	if strings.Contains(uaid, ".m3u8") {
 		uaid = strings.Split(uaid, ".")[0]
@@ -228,11 +214,6 @@ func ParseRequest(c *gin.Context, xl *xlog.Logger) (*requestParams, error) {
 		return nil, errors.New("fmt error, it should be flv or fmp4")
 	}
 
-	expireT, err := strconv.ParseInt(expire, 10, 64)
-	if err != nil {
-		return nil, errors.New("Parse expire time failed")
-
-	}
 	params := &requestParams{
 		uaid:      uaid,
 		from:      fromT * 1000,
@@ -247,8 +228,6 @@ func ParseRequest(c *gin.Context, xl *xlog.Logger) (*requestParams, error) {
 		speed:     int32(speedT),
 		fmt:       fmt,
 		key:       m3u8Name,
-		expire:    expireT,
-		token:     token,
 	}
 
 	return params, nil
@@ -325,4 +304,59 @@ func verifyToken(xl *xlog.Logger, expire int64, realToken string, req *http.Requ
 	mac := &qbox.Mac{AccessKey: user.ak, SecretKey: []byte(user.sk)}
 	token := mac.Sign([]byte(url[0:tokenIndex]))
 	return token == realToken
+}
+
+func getUserInfoByAk(xl *xlog.Logger, req *http.Request) (*userInfo, error, int) {
+	reqUrl := req.URL.String()
+	if !strings.Contains(reqUrl, "token=") {
+		return nil, errors.New("bad url, should contain a token in url"), 401
+	}
+	token := strings.Split(reqUrl, "&token=")[1]
+	ak := strings.Split(token, ":")[0]
+	accessInfo, err := auth.GetUserInfoFromQconf(xl, ak)
+	if err != nil {
+		xl.Errorf("get user info from Qconf failed, err = %#v", err)
+		return nil, errors.New("get user info from Qconf failed"), 500
+	}
+	user := &userInfo{ak: ak,
+		sk:  string(accessInfo.Secret[:]),
+		uid: fmt.Sprint(accessInfo.Uid)}
+
+	return user, nil, 200
+}
+
+func getDomain(xl *xlog.Logger, bucket string, user *userInfo) (string, error) {
+	zone, err := models.GetZone(user.ak, bucket)
+	host := zone.GetApiHost(false)
+	url := fmt.Sprintf("%s%s", host+"/v6/domain/list?tbl=", bucket)
+	request, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		xl.Errorf("%#v", err)
+		return "", err
+	}
+	rpcClient := models.NewRpcClient(user.uid)
+	resp, err := rpcClient.Do(context.Background(), request)
+	if err != nil {
+		return "", err
+
+	}
+
+	defer resp.Body.Close()
+	dec := json.NewDecoder(resp.Body)
+	var domain []string
+	for {
+		if err := dec.Decode(&domain); err == io.EOF {
+			break
+
+		} else if err != nil {
+			return "", err
+
+		}
+
+	}
+	if len(domain) == 0 {
+		return "", nil
+	}
+
+	return domain[0], nil
 }

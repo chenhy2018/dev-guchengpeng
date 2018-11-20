@@ -34,10 +34,10 @@ func GetLivem3u8(c *gin.Context) {
 		})
 		return
 	}
-	userInfo, err := getUserInfo(xl, c.Request)
+	userInfo, err, code := getUserInfoByAk(xl, c.Request)
 	if err != nil {
 		xl.Errorf("get user Info failed %v", err)
-		c.JSON(500, gin.H{"error": err.Error()})
+		c.JSON(code, gin.H{"error": err.Error()})
 		return
 	}
 
@@ -87,12 +87,8 @@ func GetLivem3u8(c *gin.Context) {
 		return
 	}
 
-	mac, err := getSKByAkFromQconf(xl, userInfo.ak)
-	if err != nil {
-		xl.Errorf("getSKByAkFromQconf error, error =  %#v", err)
-		c.JSON(500, gin.H{"error": "Service Internal Error"})
-		return
-	}
+	mac := &qbox.Mac{AccessKey: user.ak, SecretKey: []byte(user.sk)}
+
 	playlist, err := getLiveList(xl, sequeue, mac, params, bucket, "http://"+domain, mark, key, userInfo)
 	if err != nil {
 		xl.Errorf("get playback list error, error = %#v", err.Error())

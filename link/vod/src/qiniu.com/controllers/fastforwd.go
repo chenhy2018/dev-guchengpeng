@@ -2,21 +2,16 @@ package controllers
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
-	"net/http"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/qiniu/api.v7/auth/qbox"
 	xlog "github.com/qiniu/xlog.v1"
-	"qiniu.com/auth"
 	"qiniu.com/m3u8"
-	"qiniu.com/models"
 	pb "qiniu.com/proto"
 )
 
@@ -153,59 +148,4 @@ func getDownUrlWithPm3u8(domain, fileName string, user *userInfo) string {
 	mac := &qbox.Mac{AccessKey: user.ak, SecretKey: []byte(user.sk)}
 	token := mac.Sign([]byte(urlToSign))
 	return fmt.Sprintf("%s&token=%s", urlToSign, token)
-}
-
-func getDomain(xl *xlog.Logger, bucket string, user *userInfo) (string, error) {
-	zone, err := models.GetZone(user.ak, bucket)
-	host := zone.GetApiHost(false)
-	url := fmt.Sprintf("%s%s", host+"/v6/domain/list?tbl=", bucket)
-	request, err := http.NewRequest("GET", url, nil)
-	if err != nil {
-		xl.Errorf("%#v", err)
-		return "", err
-	}
-	rpcClient := models.NewRpcClient(user.uid)
-	resp, err := rpcClient.Do(context.Background(), request)
-	if err != nil {
-		return "", err
-
-	}
-
-	defer resp.Body.Close()
-	dec := json.NewDecoder(resp.Body)
-	var domain []string
-	for {
-		if err := dec.Decode(&domain); err == io.EOF {
-			break
-
-		} else if err != nil {
-			return "", err
-
-		}
-
-	}
-	if len(domain) == 0 {
-		return "", nil
-	}
-
-	return domain[0], nil
-}
-
-func getUserInfoByAk(xl *xlog.Logger, req *http.Request) (*userInfo, error, int) {
-	reqUrl := req.URL.String()
-	if !strings.Contains(reqUrl, "token=") {
-		return nil, errors.New("bad url, should contain a token in url"), 401
-	}
-	token := strings.Split(reqUrl, "&token=")[1]
-	ak := strings.Split(token, ":")[0]
-	accessInfo, err := auth.GetUserInfoFromQconf(xl, ak)
-	if err != nil {
-		xl.Errorf("get user info from Qconf failed, err = %#v", err)
-		return nil, errors.New("get user info from Qconf failed"), 500
-	}
-	user := &userInfo{ak: ak,
-		sk:  string(accessInfo.Secret[:]),
-		uid: fmt.Sprint(accessInfo.Uid)}
-
-	return user, nil, 200
 }

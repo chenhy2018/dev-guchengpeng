@@ -3,7 +3,6 @@ package controllers
 import (
 	"errors"
 	"github.com/bouk/monkey"
-	"github.com/qiniu/api.v7/auth/qbox"
 	xlog "github.com/qiniu/xlog.v1"
 	"github.com/stretchr/testify/suite"
 	"net/http"
@@ -46,14 +45,14 @@ func (suite *LiveTestSuite) TestLiveWithoutFrom() {
 			info = append(info, item)
 			return info, nil
 		})
-	monkey.Patch(getUserInfo, func(xl *xlog.Logger, req *http.Request) (*userInfo, error) { return &userinfo, nil })
+	monkey.Patch(getUserInfoByAk, func(xl *xlog.Logger, req *http.Request) (*userInfo, error, int) { return &userinfo, nil, 200 })
 	w := PerformRequest(suite.r, req)
 	suite.Equal(400, w.Code, "should be 400 for no from requset")
 }
 
 func (suite *LiveTestSuite) TestLiveWithoutExpire() {
 	defer monkey.UnpatchAll()
-	monkey.Patch(getUserInfo, func(xl *xlog.Logger, req *http.Request) (*userInfo, error) { return &userinfo, nil })
+	monkey.Patch(getUserInfoByAk, func(xl *xlog.Logger, req *http.Request) (*userInfo, error, int) { return &userinfo, nil, 200 })
 	req, _ := http.NewRequest("GET", "/v1/namespaces/ipcamera/uas/testdeviceid8/live?from=1532499345", nil)
 	w := PerformRequest(suite.r, req)
 	suite.Equal(401, w.Code, "should be 401 for no expire requset")
@@ -61,7 +60,7 @@ func (suite *LiveTestSuite) TestLiveWithoutExpire() {
 
 func (suite *LiveTestSuite) TestLiveWithoutToken() {
 	defer monkey.UnpatchAll()
-	monkey.Patch(getUserInfo, func(xl *xlog.Logger, req *http.Request) (*userInfo, error) { return &userinfo, nil })
+	monkey.Patch(getUserInfoByAk, func(xl *xlog.Logger, req *http.Request) (*userInfo, error, int) { return &userinfo, nil, 200 })
 	req, _ := http.NewRequest("GET", "/v1/namespaces/ipcamera/uas/testdeviceid8/live?from=1532499345", nil)
 	w := PerformRequest(suite.r, req)
 	suite.Equal(401, w.Code, "should be 400 for no token")
@@ -69,8 +68,8 @@ func (suite *LiveTestSuite) TestLiveWithoutToken() {
 func (suite *LiveTestSuite) TestLive500IfGetUseInfoFailed() {
 	req, _ := http.NewRequest("GET", "/v1/namespaces/ipcamera/uas/testdeviceid8/live?from=1532499325", nil)
 	defer monkey.UnpatchAll()
-	monkey.Patch(getUserInfo, func(xl *xlog.Logger, req *http.Request) (*userInfo, error) {
-		return nil, errors.New("get user info error")
+	monkey.Patch(getUserInfoByAk, func(xl *xlog.Logger, req *http.Request) (*userInfo, error, int) {
+		return nil, errors.New("get user info error"), 500
 	})
 	w := PerformRequest(suite.r, req)
 	suite.Equal(500, w.Code, "500 for get user info failed")
@@ -90,7 +89,7 @@ func (suite *LiveTestSuite) TestLive() {
 	monkey.Patch(getDomain, func(xl *xlog.Logger, bucket string, user *userInfo) (string, error) {
 		return "www.baidu.com", nil
 	})
-	monkey.Patch(getUserInfo, func(xl *xlog.Logger, req *http.Request) (*userInfo, error) { return &userinfo, nil })
+	monkey.Patch(getUserInfoByAk, func(xl *xlog.Logger, req *http.Request) (*userInfo, error, int) { return &userinfo, nil, 200 })
 	monkey.PatchInstanceMethod(
 		reflect.TypeOf((*models.NamespaceModel)(nil)), "GetNamespaceInfo", func(ss *models.NamespaceModel, xl *xlog.Logger, uid, namespace string) ([]models.NamespaceInfo, error) {
 			info := []models.NamespaceInfo{}
@@ -131,7 +130,7 @@ func (suite *LiveTestSuite) TestLiveWithGetSegmentsInfoError() {
 	monkey.Patch(verifyToken, func(xl *xlog.Logger, expire int64, realToken string, req *http.Request, user *userInfo) bool {
 		return true
 	})
-	monkey.Patch(getUserInfo, func(xl *xlog.Logger, req *http.Request) (*userInfo, error) { return &userinfo, nil })
+	monkey.Patch(getUserInfoByAk, func(xl *xlog.Logger, req *http.Request) (*userInfo, error, int) { return &userinfo, nil, 200 })
 	monkey.Patch(GetBucket, func(xl *xlog.Logger, uid, namespace string) (string, error) {
 		return "ipcamera", nil
 	})
@@ -179,7 +178,7 @@ func (suite *LiveTestSuite) TestLiveWithBadParam() {
 	monkey.Patch(getDomain, func(xl *xlog.Logger, bucket string, user *userInfo) (string, error) {
 		return "www.baidu.com", nil
 	})
-	monkey.Patch(getUserInfo, func(xl *xlog.Logger, req *http.Request) (*userInfo, error) { return &userinfo, nil })
+	monkey.Patch(getUserInfoByAk, func(xl *xlog.Logger, req *http.Request) (*userInfo, error, int) { return &userinfo, nil, 200 })
 	w := PerformRequest(suite.r, req)
 	suite.Equal(400, w.Code, "should be 400 for no from requset")
 }
@@ -198,7 +197,7 @@ func (suite *LiveTestSuite) TestLiveWithBadToken() {
 	monkey.Patch(getDomain, func(xl *xlog.Logger, bucket string, user *userInfo) (string, error) {
 		return "www.baidu.com", nil
 	})
-	monkey.Patch(getUserInfo, func(xl *xlog.Logger, req *http.Request) (*userInfo, error) { return &userinfo, nil })
+	monkey.Patch(getUserInfoByAk, func(xl *xlog.Logger, req *http.Request) (*userInfo, error, int) { return &userinfo, nil, 200 })
 	w := PerformRequest(suite.r, req)
 	suite.Equal(400, w.Code, "should be 400 for bad token")
 }
@@ -218,7 +217,7 @@ func (suite *LiveTestSuite) TestLiveWithBadNameSpace() {
 	monkey.Patch(getDomain, func(xl *xlog.Logger, bucket string, user *userInfo) (string, error) {
 		return "www.baidu.com", nil
 	})
-	monkey.Patch(getUserInfo, func(xl *xlog.Logger, req *http.Request) (*userInfo, error) { return &userinfo, nil })
+	monkey.Patch(getUserInfoByAk, func(xl *xlog.Logger, req *http.Request) (*userInfo, error, int) { return &userinfo, nil, 200 })
 	monkey.PatchInstanceMethod(
 		reflect.TypeOf((*models.UaModel)(nil)), "GetUaInfo", func(ss *models.UaModel, xl *xlog.Logger, uid, namespace, uaid string) ([]models.UaInfo, error) {
 			info := []models.UaInfo{}
@@ -243,8 +242,8 @@ func (suite *LiveTestSuite) TestLiveWithCorrectDomain() {
 	monkey.Patch(verifyToken, func(xl *xlog.Logger, expire int64, realToken string, req *http.Request, user *userInfo) bool {
 		return true
 	})
-	monkey.Patch(getUserInfo, func(xl *xlog.Logger, req *http.Request) (*userInfo, error) {
-		return &userInfo{ak: "fadsfasfsd", sk: "fadsfasfsadf", uid: "123"}, nil
+	monkey.Patch(getUserInfoByAk, func(xl *xlog.Logger, req *http.Request) (*userInfo, error, int) {
+		return &userInfo{ak: "fadsfasfsd", sk: "fadsfasfsadf", uid: "123"}, nil, 200
 	})
 	monkey.Patch(redisGet, func(key string) string {
 		return "12345"
@@ -254,10 +253,6 @@ func (suite *LiveTestSuite) TestLiveWithCorrectDomain() {
 	})
 	monkey.Patch(getDomain, func(xl *xlog.Logger, bucket string, user *userInfo) (string, error) {
 		return "www.baidu.com", nil
-	})
-	monkey.Patch(getSKByAkFromQconf, func(xl *xlog.Logger, ak string) (*qbox.Mac, error) {
-		mac := qbox.NewMac(ak, "H9jRdC96ecYS")
-		return mac, nil
 	})
 	monkey.PatchInstanceMethod(
 		reflect.TypeOf((*models.UaModel)(nil)), "GetUaInfo", func(ss *models.UaModel, xl *xlog.Logger, uid, namespace, uaid string) ([]models.UaInfo, error) {
