@@ -94,9 +94,7 @@ func (suite *FastForwardTestSuite) TestGetFastForwardStreamError() {
 	monkey.Patch(getFastForwardStream, func(xl *xlog.Logger, params *requestParams, c *gin.Context, user *userInfo, bucket, domain, filename string) error {
 		return errors.New("get Ts Stream Error")
 	})
-	fmt.Printf("11111111111111\n")
 	w := PerformRequest(suite.r, req)
-	fmt.Printf("111111111111112222222\n")
 	suite.Equal(500, w.Code, "500 for query kodo data error")
 }
 
