@@ -49,7 +49,7 @@ func GetLivem3u8(c *gin.Context) {
 		return
 	}
 	xl.Infof("uaid = %v, from = %v, namespace = %v", params.uaid, params.from, params.namespace)
-	key := params.repoid
+	key := params.reqid
 	value := redisGet(key)
 	sub := strings.Split(value, "/")
 	sequeue := int64(1)

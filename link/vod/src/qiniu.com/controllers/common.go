@@ -69,7 +69,7 @@ type requestParams struct {
 	speed     int32
 	fmt       string
 	key       string
-	repoid    string
+	reqid     string
 }
 type userInfo struct {
 	uid string
@@ -178,7 +178,7 @@ func ParseRequest(c *gin.Context, xl *xlog.Logger) (*requestParams, error) {
 	exact := c.DefaultQuery("exact", "false")
 	speed := c.DefaultQuery("speed", "1")
 	m3u8Name := c.DefaultQuery("key", "")
-	repoid := c.DefaultQuery("repoid", "")
+	reqid := c.DefaultQuery("reqid", "")
 	fmt := c.Query("fmt")
 
 	if strings.Contains(uaid, ".m3u8") {
@@ -230,7 +230,7 @@ func ParseRequest(c *gin.Context, xl *xlog.Logger) (*requestParams, error) {
 		speed:     int32(speedT),
 		fmt:       fmt,
 		key:       m3u8Name,
-		repoid:    repoid,
+		reqid:     reqid,
 	}
 
 	return params, nil
@@ -324,7 +324,6 @@ func getUserInfoByAk(xl *xlog.Logger, req *http.Request) (*userInfo, error, int)
 	user := &userInfo{ak: ak,
 		sk:  string(accessInfo.Secret[:]),
 		uid: fmt.Sprint(accessInfo.Uid)}
-
 	return user, nil, 200
 }
 
@@ -353,7 +352,6 @@ func getDomain(xl *xlog.Logger, bucket string, user *userInfo) ([]string, error)
 
 		} else if err != nil {
 			return domain, err
-
 		}
 
 	}

@@ -33,4 +33,6 @@ const (
 	NAMESPACE_ITEM_DOMAIN            = "domain"
 	NAMESPACE_ITEM_AUTO_CREATE_UA    = "auto"
 	NAMESPACE_ITEM_EXPIRE            = "expire"
+	NAMESPACE_ITEM_NAME              = "name"
+	NAMESPACE_ITEM_CATEGORY          = "category"
 )

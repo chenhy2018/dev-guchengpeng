@@ -68,7 +68,6 @@ func TestRegisterNamespace(t *testing.T) {
 	monkey.Patch(checkBucketInKodo, func(bucket string, user *userInfo) error { return nil })
 	monkey.Patch(checkdomain, func(xl *xlog.Logger, domain, bucket string, user *userInfo) error { return nil })
 	RegisterNamespace(c)
-
 	// bucket already exit. return 400
 	monkey.Patch(getUserInfo, func(xl *xlog.Logger, req *http.Request) (*userInfo, error) { return &user, nil })
 	body = namespacebody{
@@ -81,7 +80,7 @@ func TestRegisterNamespace(t *testing.T) {
 	c.Params = append(c.Params, param)
 	c.Request = req
 	RegisterNamespace(c)
-	assert.Equal(t, c.Writer.Status(), 403, "they should be equal")
+	assert.Equal(t, c.Writer.Status(), 400, "they should be equal")
 
 	// get namespace  info error
 	body = namespacebody{
@@ -360,69 +359,6 @@ func TestUpdateNamespace(t *testing.T) {
 	UpdateNamespace(c)
 	assert.Equal(t, c.Writer.Status(), 500, "500 internal error if get user info error")
 	guard1.Unpatch()
-
-	// 500 if update namesapce error
-	monkey.PatchInstanceMethod(
-		reflect.TypeOf((*models.NamespaceModel)(nil)), "GetNamespaceInfo", func(ss *models.NamespaceModel, xl *xlog.Logger, uid, namespace string) ([]models.NamespaceInfo, error) {
-			return []models.NamespaceInfo{models.NamespaceInfo{}}, nil
-		})
-	guard2 := monkey.Patch(getUserInfo, func(xl *xlog.Logger, req *http.Request) (*userInfo, error) {
-		return &user, nil
-	})
-	body = namespacebody{
-		Bucket: "ipcamera",
-	}
-
-	bodyBuffer, _ = json.Marshal(body)
-	bodyT = bytes.NewBuffer(bodyBuffer)
-
-	req, _ = http.NewRequest("Put", "/v1/namespaces/aab", bodyT)
-	recoder = httptest.NewRecorder()
-	c, _ = gin.CreateTestContext(recoder)
-	param = gin.Param{
-		Key:   "namespace",
-		Value: "aab",
-	}
-	c.Params = append(c.Params, param)
-	c.Request = req
-	UpdateNamespace(c)
-	assert.Equal(t, c.Writer.Status(), 400, "400 not support update namesapce")
-	guard2.Unpatch()
-
-	// get user info failed if get update autocreateUa error
-	guard4 := monkey.Patch(getUserInfo, func(xl *xlog.Logger, req *http.Request) (*userInfo, error) {
-		return &user, nil
-	})
-
-	guard6 := monkey.Patch(updateAutoCreateUa, func(xl *xlog.Logger, uid, space string, auto, newauto bool) error {
-		return errors.New("update auto create ua failed")
-	})
-	monkey.Patch(updateBucket, func(xl *xlog.Logger, uid, space, bucket, newBucket string, info *userInfo) error {
-		return nil
-	})
-	monkey.Patch(updateDomain, func(xl *xlog.Logger, uid, space, domain, newDomain, bucket string, info *userInfo) error {
-		return nil
-	})
-	body = namespacebody{
-		Bucket: "ipcamera",
-	}
-
-	bodyBuffer, _ = json.Marshal(body)
-	bodyT = bytes.NewBuffer(bodyBuffer)
-
-	req, _ = http.NewRequest("Put", "/v1/namespaces/aab", bodyT)
-	recoder = httptest.NewRecorder()
-	c, _ = gin.CreateTestContext(recoder)
-	param = gin.Param{
-		Key:   "namespace",
-		Value: "aab",
-	}
-	c.Params = append(c.Params, param)
-	c.Request = req
-	UpdateNamespace(c)
-	assert.Equal(t, c.Writer.Status(), 500, "500 internal error if get namespace info error")
-	guard4.Unpatch()
-	guard6.Unpatch()
 
 	monkey.UnpatchAll()
 }

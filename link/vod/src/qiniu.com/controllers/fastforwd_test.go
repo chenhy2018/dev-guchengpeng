@@ -2,15 +2,15 @@ package controllers
 
 import (
 	"errors"
-	"net/http"
-	"reflect"
-	"testing"
-
+	"fmt"
 	"github.com/bouk/monkey"
 	"github.com/gin-gonic/gin"
 	xlog "github.com/qiniu/xlog.v1"
 	"github.com/stretchr/testify/suite"
+	"net/http"
 	"qiniu.com/models"
+	"reflect"
+	"testing"
 )
 
 type FastForwardTestSuite struct {
@@ -55,6 +55,9 @@ func (suite *FastForwardTestSuite) TestGetFastForwardStreamError() {
 	monkey.Patch(getUserInfo, func(xl *xlog.Logger, req *http.Request) (*userInfo, error) {
 		return &userInfo{ak: "fadsfasfsd", sk: "fadsfasfsadf", uid: "123"}, nil
 	})
+	monkey.Patch(verifyToken, func(xl *xlog.Logger, expire int64, realToken string, req *http.Request, user *userInfo) bool {
+		return true
+	})
 	monkey.PatchInstanceMethod(
 		reflect.TypeOf((*models.UaModel)(nil)), "GetUaInfo", func(ss *models.UaModel, xl *xlog.Logger, uid, namespace, uaid string) ([]models.UaInfo, error) {
 			info := []models.UaInfo{}
@@ -91,7 +94,9 @@ func (suite *FastForwardTestSuite) TestGetFastForwardStreamError() {
 	monkey.Patch(getFastForwardStream, func(xl *xlog.Logger, params *requestParams, c *gin.Context, user *userInfo, bucket, domain, filename string) error {
 		return errors.New("get Ts Stream Error")
 	})
+	fmt.Printf("11111111111111\n")
 	w := PerformRequest(suite.r, req)
+	fmt.Printf("111111111111112222222\n")
 	suite.Equal(500, w.Code, "500 for query kodo data error")
 }
 
