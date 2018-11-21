@@ -2,7 +2,6 @@ package controllers
 
 import (
 	"errors"
-	"fmt"
 	"github.com/bouk/monkey"
 	"github.com/gin-gonic/gin"
 	xlog "github.com/qiniu/xlog.v1"
