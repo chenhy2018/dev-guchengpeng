@@ -69,6 +69,7 @@ type requestParams struct {
 	speed     int32
 	fmt       string
 	key       string
+	repoid    string
 }
 type userInfo struct {
 	uid string
@@ -134,19 +135,19 @@ func GetUrlWithDownLoadToken(xl *xlog.Logger, domain, fname string, tsExpire int
 	return realUrl
 }
 
-func GetBucket(xl *xlog.Logger, uid, namespace string) (string, error) {
+func GetBucketAndDomain(xl *xlog.Logger, uid, namespace string) (string, string, error) {
 	if system.HaveDb() == false {
-		return namespace, nil
+		return namespace, "", nil
 	}
 	namespaceMod = &models.NamespaceModel{}
 	info, err := namespaceMod.GetNamespaceInfo(xl, uid, namespace)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 	if len(info) == 0 {
-		return "", errors.New("can't find namespace")
+		return "", "", errors.New("can't find namespace")
 	}
-	return info[0].Bucket, nil
+	return info[0].Bucket, info[0].Domain, nil
 }
 
 func IsAutoCreateUa(xl *xlog.Logger, uid, bucket string) (bool, []models.NamespaceInfo, error) {
@@ -177,6 +178,7 @@ func ParseRequest(c *gin.Context, xl *xlog.Logger) (*requestParams, error) {
 	exact := c.DefaultQuery("exact", "false")
 	speed := c.DefaultQuery("speed", "1")
 	m3u8Name := c.DefaultQuery("key", "")
+	repoid := c.DefaultQuery("repoid", "")
 	fmt := c.Query("fmt")
 
 	if strings.Contains(uaid, ".m3u8") {
@@ -228,6 +230,7 @@ func ParseRequest(c *gin.Context, xl *xlog.Logger) (*requestParams, error) {
 		speed:     int32(speedT),
 		fmt:       fmt,
 		key:       m3u8Name,
+		repoid:    repoid,
 	}
 
 	return params, nil
@@ -325,38 +328,38 @@ func getUserInfoByAk(xl *xlog.Logger, req *http.Request) (*userInfo, error, int)
 	return user, nil, 200
 }
 
-func getDomain(xl *xlog.Logger, bucket string, user *userInfo) (string, error) {
+func getDomain(xl *xlog.Logger, bucket string, user *userInfo) ([]string, error) {
 	zone, err := models.GetZone(user.ak, bucket)
 	host := zone.GetApiHost(false)
 	url := fmt.Sprintf("%s%s", host+"/v6/domain/list?tbl=", bucket)
+	var domain []string
 	request, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		xl.Errorf("%#v", err)
-		return "", err
+		return domain, err
 	}
 	rpcClient := models.NewRpcClient(user.uid)
 	resp, err := rpcClient.Do(context.Background(), request)
 	if err != nil {
-		return "", err
+		return domain, err
 
 	}
 
 	defer resp.Body.Close()
 	dec := json.NewDecoder(resp.Body)
-	var domain []string
 	for {
 		if err := dec.Decode(&domain); err == io.EOF {
 			break
 
 		} else if err != nil {
-			return "", err
+			return domain, err
 
 		}
 
 	}
 	if len(domain) == 0 {
-		return "", nil
+		return domain, nil
 	}
 
-	return domain[0], nil
+	return domain, nil
 }

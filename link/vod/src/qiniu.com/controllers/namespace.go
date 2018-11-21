@@ -21,6 +21,7 @@ type namespacebody struct {
 	UpdatedAt    int64  `json:"updatedAt"`
 	AutoCreateUa bool   `json:"auto"`
 	Expire       int    `json:"expire"`
+	Domain       string `json:"domain"`
 }
 
 func checkBucketInKodo(bucket string, user *userInfo) error {
@@ -51,6 +52,20 @@ func checkbucket(xl *xlog.Logger, bucket string, user *userInfo) error {
 		return fmt.Errorf("bucket is already register")
 	}
 	return nil
+}
+
+func checkdomain(xl *xlog.Logger, domain, bucket string, user *userInfo) error {
+	domains, err := getDomain(xl, bucket, user)
+	if err != nil || domain == "" {
+		xl.Errorf("bucket is not correct")
+		return fmt.Errorf("bucket is not correct")
+	}
+	for _, s := range domains {
+		if s == domain {
+			return nil
+		}
+	}
+	return fmt.Errorf("domain is not correct")
 }
 
 // sample requset url = /v1/namespaces/<Namespace>
@@ -94,6 +109,15 @@ func RegisterNamespace(c *gin.Context) {
 		return
 	}
 
+	err = checkdomain(xl, namespaceData.Domain, namespaceData.Bucket, info)
+	if err != nil {
+		xl.Errorf("domain is not correct, err = %#v", err)
+		c.JSON(403, gin.H{
+			"error": "domain is not correct",
+		})
+		return
+	}
+
 	oldinfo, err := namespaceMod.GetNamespaceInfo(xl, info.uid, params.namespace)
 	if err != nil {
 		xl.Errorf("get Namesapce Info error %#v", err)
@@ -119,6 +143,7 @@ func RegisterNamespace(c *gin.Context) {
 		Bucket:       namespaceData.Bucket,
 		AutoCreateUa: namespaceData.AutoCreateUa,
 		Expire:       expire,
+		Domain:       namespaceData.Domain,
 	}
 
 	err = namespaceMod.Register(xl, namespace)
@@ -180,6 +205,25 @@ func DeleteNamespace(c *gin.Context) {
 	c.JSON(200, gin.H{"success": true})
 }
 
+func updateDomain(xl *xlog.Logger, uid, space, bucket, domain, newDomain string, info *userInfo) error {
+	if domain != newDomain && newDomain != "" {
+		err := checkdomain(xl, newDomain, bucket, info)
+		if err != nil {
+			xl.Errorf("err = %#v", err)
+			return err
+		}
+		cond := map[string]interface{}{
+			models.NAMESPACE_ITEM_DOMAIN: newDomain,
+		}
+		err = namespaceMod.UpdateFunction(xl, uid, space, models.NAMESPACE_ITEM_DOMAIN, cond)
+		if err != nil {
+			xl.Errorf("Update falied error = %#v", err.Error())
+			return err
+		}
+	}
+	return nil
+}
+
 func updateBucket(xl *xlog.Logger, uid, space, bucket, newBucket string, info *userInfo) error {
 	if bucket != newBucket && newBucket != "" {
 		err := checkbucket(xl, newBucket, info)
@@ -188,11 +232,14 @@ func updateBucket(xl *xlog.Logger, uid, space, bucket, newBucket string, info *u
 			return err
 		}
 		domain, err := getDomain(xl, newBucket, info)
-		if err != nil || domain == "" {
+		if err != nil || len(domain) == 0 {
 			xl.Errorf("bucket is not correct")
 			return fmt.Errorf("bucket is not correct")
 		}
-		err = namespaceMod.UpdateBucket(xl, uid, space, newBucket)
+		cond := map[string]interface{}{
+			models.NAMESPACE_ITEM_BUCKET: newBucket,
+		}
+		err = namespaceMod.UpdateFunction(xl, uid, space, models.NAMESPACE_ITEM_BUCKET, cond)
 		if err != nil {
 			xl.Errorf("Update falied error = %#v", err.Error())
 			return err
@@ -204,7 +251,10 @@ func updateBucket(xl *xlog.Logger, uid, space, bucket, newBucket string, info *u
 func updateAutoCreateUa(xl *xlog.Logger, uid, space string, auto, newauto bool) error {
 	if auto != newauto {
 		namespaceMod := models.NamespaceModel{}
-		err := namespaceMod.UpdateAutoCreateUa(xl, uid, space, newauto)
+		cond := map[string]interface{}{
+			models.NAMESPACE_ITEM_AUTO_CREATE_UA: newauto,
+		}
+		err := namespaceMod.UpdateFunction(xl, uid, space, models.NAMESPACE_ITEM_AUTO_CREATE_UA, cond)
 		if err != nil {
 			xl.Errorf("Update falied error = %#v", err.Error())
 			return err
@@ -216,7 +266,10 @@ func updateAutoCreateUa(xl *xlog.Logger, uid, space string, auto, newauto bool) 
 func updateExpire(xl *xlog.Logger, uid, space string, expire, newExpire int) error {
 	if expire != newExpire && newExpire != 0 {
 		namespaceMod := models.NamespaceModel{}
-		err := namespaceMod.UpdateExpire(xl, uid, space, newExpire)
+		cond := map[string]interface{}{
+			models.NAMESPACE_ITEM_EXPIRE: newExpire,
+		}
+		err := namespaceMod.UpdateFunction(xl, uid, space, models.NAMESPACE_ITEM_EXPIRE, cond)
 		if err != nil {
 			xl.Errorf("Update falied error = %#v", err.Error())
 			return err
@@ -280,6 +333,16 @@ func UpdateNamespace(c *gin.Context) {
 		})
 		return
 	}
+
+	err = updateDomain(xl, info.uid, params.namespace, oldinfo[0].Domain, namespaceData.Domain, namespaceData.Bucket, info)
+	if err != nil {
+		xl.Errorf("update domain failed, err = %#v", err)
+		c.JSON(400, gin.H{
+			"error": "update domain failed",
+		})
+		return
+	}
+
 	err = updateAutoCreateUa(xl, info.uid, params.namespace, oldinfo[0].AutoCreateUa, namespaceData.AutoCreateUa)
 	if err != nil {
 		xl.Errorf("update auto create ua failed")

@@ -78,16 +78,25 @@ func TestUpdateNamespace(t *testing.T) {
 	}
 	err := model.Register(xl, p)
 	assert.Equal(t, err, nil, "they should be equal")
+	cond := map[string]interface{}{
+		NAMESPACE_ITEM_BUCKET: "www.qiniu.com",
+	}
 	model.UpdateNamespace(xl, "Uid", "test", "test1")
 	r_1, _, err_1 := model.GetNamespaceInfos(xl, 0, "", "Uid", "test1")
 	assert.Equal(t, len(r_1), 1, "they should be equal")
-	model.UpdateBucket(xl, "Uid", "test1", "www.qiniu.com")
+	model.UpdateFunction(xl, "Uid", "test1", NAMESPACE_ITEM_BUCKET, cond)
 	r_1, _, err_1 = model.GetNamespaceInfos(xl, 0, "", "Uid", "test1")
+	cond = map[string]interface{}{
+		NAMESPACE_ITEM_AUTO_CREATE_UA: true,
+	}
 	assert.Equal(t, r_1[0].Bucket, "www.qiniu.com", "they should be equal")
-	model.UpdateAutoCreateUa(xl, "Uid", "test1", true)
+	model.UpdateFunction(xl, "Uid", "test1", NAMESPACE_ITEM_AUTO_CREATE_UA, cond)
 	r_1, _, err_1 = model.GetNamespaceInfos(xl, 0, "", "Uid", "test1")
 	assert.Equal(t, r_1[0].AutoCreateUa, true, "they should be equal")
-	model.UpdateExpire(xl, "Uid", "test1", 7)
+	cond = map[string]interface{}{
+		NAMESPACE_ITEM_EXPIRE: 7,
+	}
+	model.UpdateFunction(xl, "Uid", "test1", NAMESPACE_ITEM_EXPIRE, cond)
 	r_1, _, err_1 = model.GetNamespaceInfos(xl, 0, "", "Uid", "test1")
 	assert.Equal(t, r_1[0].Expire, 7, "they should be equal")
 	assert.Equal(t, err_1, nil, "they should be equal")

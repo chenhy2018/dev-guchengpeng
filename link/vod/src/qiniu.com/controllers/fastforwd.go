@@ -59,7 +59,7 @@ func GetFastForward(c *gin.Context) {
 	}
 	xl.Infof("info[0].Namespace %v", info[0].Namespace)
 	namespace := info[0].Namespace
-	bucket, err := GetBucket(xl, userInfo.uid, namespace)
+	bucket, domain, err := GetBucketAndDomain(xl, userInfo.uid, namespace)
 	if err != nil {
 		xl.Errorf("get bucket error, error =  %#v", err)
 		c.JSON(400, gin.H{
@@ -93,14 +93,14 @@ func GetFastForward(c *gin.Context) {
 		return
 	}
 
-	if err = getFastForwardStream(xl, params, c, userInfo, bucket, fileName); err != nil {
+	if err = getFastForwardStream(xl, params, c, userInfo, bucket, domain, fileName); err != nil {
 		xl.Errorf("get fastforward stream error , error = %v", err.Error())
 		c.JSON(500, gin.H{"error": "Service Internal Error"})
 		return
 	}
 }
 
-func getFastForwardStream(xl *xlog.Logger, params *requestParams, c *gin.Context, user *userInfo, bucket, fileName string) error {
+func getFastForwardStream(xl *xlog.Logger, params *requestParams, c *gin.Context, user *userInfo, bucket, domain, fileName string) error {
 	// remove speed fmt from url
 	url := c.Request.URL
 	query := url.Query()
@@ -109,11 +109,6 @@ func getFastForwardStream(xl *xlog.Logger, params *requestParams, c *gin.Context
 	query.Del("token")
 	query.Del("e")
 	req := new(pb.FastForwardInfo)
-	domain, err := getDomain(xl, bucket, user)
-	if err != nil {
-		xl.Errorf("get domain error, err = %#v", err)
-		return err
-	}
 
 	req.Url = getDownUrlWithPm3u8(domain, fileName, user)
 	req.Speed = params.speed

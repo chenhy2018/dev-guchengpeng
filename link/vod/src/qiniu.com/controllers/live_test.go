@@ -86,9 +86,6 @@ func (suite *LiveTestSuite) TestLive() {
 	monkey.Patch(redisSet, func(xl *xlog.Logger, key, value string) error {
 		return nil
 	})
-	monkey.Patch(getDomain, func(xl *xlog.Logger, bucket string, user *userInfo) (string, error) {
-		return "www.baidu.com", nil
-	})
 	monkey.Patch(getUserInfoByAk, func(xl *xlog.Logger, req *http.Request) (*userInfo, error, int) { return &userinfo, nil, 200 })
 	monkey.PatchInstanceMethod(
 		reflect.TypeOf((*models.NamespaceModel)(nil)), "GetNamespaceInfo", func(ss *models.NamespaceModel, xl *xlog.Logger, uid, namespace string) ([]models.NamespaceInfo, error) {
@@ -131,17 +128,14 @@ func (suite *LiveTestSuite) TestLiveWithGetSegmentsInfoError() {
 		return true
 	})
 	monkey.Patch(getUserInfoByAk, func(xl *xlog.Logger, req *http.Request) (*userInfo, error, int) { return &userinfo, nil, 200 })
-	monkey.Patch(GetBucket, func(xl *xlog.Logger, uid, namespace string) (string, error) {
-		return "ipcamera", nil
+	monkey.Patch(GetBucketAndDomain, func(xl *xlog.Logger, uid, namespace string) (string, string, error) {
+		return "ipcamera", "www.baidu.com", nil
 	})
 	monkey.Patch(redisGet, func(key string) string {
 		return "12345"
 	})
 	monkey.Patch(redisSet, func(xl *xlog.Logger, key, value string) error {
 		return nil
-	})
-	monkey.Patch(getDomain, func(xl *xlog.Logger, bucket string, user *userInfo) (string, error) {
-		return "www.baidu.com", nil
 	})
 	monkey.PatchInstanceMethod(
 		reflect.TypeOf((*models.UaModel)(nil)), "GetUaInfo", func(ss *models.UaModel, xl *xlog.Logger, uid, namespace, uaid string) ([]models.UaInfo, error) {
@@ -175,9 +169,6 @@ func (suite *LiveTestSuite) TestLiveWithBadParam() {
 	monkey.Patch(redisSet, func(xl *xlog.Logger, key, value string) error {
 		return nil
 	})
-	monkey.Patch(getDomain, func(xl *xlog.Logger, bucket string, user *userInfo) (string, error) {
-		return "www.baidu.com", nil
-	})
 	monkey.Patch(getUserInfoByAk, func(xl *xlog.Logger, req *http.Request) (*userInfo, error, int) { return &userinfo, nil, 200 })
 	w := PerformRequest(suite.r, req)
 	suite.Equal(400, w.Code, "should be 400 for no from requset")
@@ -193,9 +184,6 @@ func (suite *LiveTestSuite) TestLiveWithBadToken() {
 	})
 	monkey.Patch(redisSet, func(xl *xlog.Logger, key, value string) error {
 		return nil
-	})
-	monkey.Patch(getDomain, func(xl *xlog.Logger, bucket string, user *userInfo) (string, error) {
-		return "www.baidu.com", nil
 	})
 	monkey.Patch(getUserInfoByAk, func(xl *xlog.Logger, req *http.Request) (*userInfo, error, int) { return &userinfo, nil, 200 })
 	w := PerformRequest(suite.r, req)
@@ -214,9 +202,6 @@ func (suite *LiveTestSuite) TestLiveWithBadNameSpace() {
 	monkey.Patch(redisSet, func(xl *xlog.Logger, key, value string) error {
 		return nil
 	})
-	monkey.Patch(getDomain, func(xl *xlog.Logger, bucket string, user *userInfo) (string, error) {
-		return "www.baidu.com", nil
-	})
 	monkey.Patch(getUserInfoByAk, func(xl *xlog.Logger, req *http.Request) (*userInfo, error, int) { return &userinfo, nil, 200 })
 	monkey.PatchInstanceMethod(
 		reflect.TypeOf((*models.UaModel)(nil)), "GetUaInfo", func(ss *models.UaModel, xl *xlog.Logger, uid, namespace, uaid string) ([]models.UaInfo, error) {
@@ -228,8 +213,8 @@ func (suite *LiveTestSuite) TestLiveWithBadNameSpace() {
 			info = append(info, item)
 			return info, nil
 		})
-	monkey.Patch(GetBucket, func(xl *xlog.Logger, uid, namespace string) (string, error) {
-		return "", errors.New("bucket can't find")
+	monkey.Patch(GetBucketAndDomain, func(xl *xlog.Logger, uid, namespace string) (string, string, error) {
+		return "", "", errors.New("bucket can't find")
 	})
 
 	w := PerformRequest(suite.r, req)
@@ -251,9 +236,6 @@ func (suite *LiveTestSuite) TestLiveWithCorrectDomain() {
 	monkey.Patch(redisSet, func(xl *xlog.Logger, key, value string) error {
 		return nil
 	})
-	monkey.Patch(getDomain, func(xl *xlog.Logger, bucket string, user *userInfo) (string, error) {
-		return "www.baidu.com", nil
-	})
 	monkey.PatchInstanceMethod(
 		reflect.TypeOf((*models.UaModel)(nil)), "GetUaInfo", func(ss *models.UaModel, xl *xlog.Logger, uid, namespace, uaid string) ([]models.UaInfo, error) {
 			info := []models.UaInfo{}
@@ -264,8 +246,8 @@ func (suite *LiveTestSuite) TestLiveWithCorrectDomain() {
 			info = append(info, item)
 			return info, nil
 		})
-	monkey.Patch(GetBucket, func(xl *xlog.Logger, uid, namespace string) (string, error) {
-		return "ipcamera", nil
+	monkey.Patch(GetBucketAndDomain, func(xl *xlog.Logger, uid, namespace string) (string, string, error) {
+		return "ipcamera", "", nil
 	})
 
 	monkey.Patch(uploadNewFile, func(filename, bucket string, data []byte, user *userInfo) error {

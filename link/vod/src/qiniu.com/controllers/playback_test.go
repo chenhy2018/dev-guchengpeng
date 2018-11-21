@@ -127,8 +127,8 @@ func (suite *PlayBackTestSuite) TestPlayBackWithGetSegmentsInfoError() {
 	req, _ := http.NewRequest("GET", "/v1/namespaces/ipcamera/uas/testdeviceid8/playback?from=1532499325&to=1532499345", nil)
 	defer monkey.UnpatchAll()
 	monkey.Patch(getUserInfo, func(xl *xlog.Logger, req *http.Request) (*userInfo, error) { return &userinfo, nil })
-	monkey.Patch(GetBucket, func(xl *xlog.Logger, uid, namespace string) (string, error) {
-		return "ipcamera", nil
+	monkey.Patch(GetBucketAndDomain, func(xl *xlog.Logger, uid, namespace string) (string, string, error) {
+		return "ipcamera", "", nil
 	})
 	monkey.PatchInstanceMethod(
 		reflect.TypeOf((*models.UaModel)(nil)), "GetUaInfo", func(ss *models.UaModel, xl *xlog.Logger, uid, namespace, uaid string) ([]models.UaInfo, error) {
@@ -179,8 +179,8 @@ func (suite *PlayBackTestSuite) TestPlayBackWithBadNameSpace() {
 			info = append(info, item)
 			return info, nil
 		})
-	monkey.Patch(GetBucket, func(xl *xlog.Logger, uid, namespace string) (string, error) {
-		return "", errors.New("bucket can't find")
+	monkey.Patch(GetBucketAndDomain, func(xl *xlog.Logger, uid, namespace string) (string, string, error) {
+		return "", "", errors.New("bucket can't find")
 	})
 
 	w := PerformRequest(suite.r, req)
@@ -203,8 +203,8 @@ func (suite *PlayBackTestSuite) TestPlayBackWithCorrectDomain() {
 			info = append(info, item)
 			return info, nil
 		})
-	monkey.Patch(GetBucket, func(xl *xlog.Logger, uid, namespace string) (string, error) {
-		return "ipcamera", nil
+	monkey.Patch(GetBucketAndDomain, func(xl *xlog.Logger, uid, namespace string) (string, string, error) {
+		return "ipcamera", "", nil
 	})
 
 	monkey.Patch(uploadNewFile, func(filename, bucket string, data []byte, user *userInfo) error {

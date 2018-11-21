@@ -65,8 +65,8 @@ func (suite *FastForwardTestSuite) TestGetFastForwardStreamError() {
 			info = append(info, item)
 			return info, nil
 		})
-	monkey.Patch(GetBucket, func(xl *xlog.Logger, uid, namespace string) (string, error) {
-		return "ipcamera", nil
+	monkey.Patch(GetBucketAndDomain, func(xl *xlog.Logger, uid, namespace string) (string, string, error) {
+		return "ipcamera", "www.baidu.com", nil
 	})
 
 	monkey.Patch(uploadNewFile, func(filename, bucket string, data []byte, user *userInfo) error {
@@ -88,7 +88,7 @@ func (suite *FastForwardTestSuite) TestGetFastForwardStreamError() {
 				}}
 			return info, "", nil
 		})
-	monkey.Patch(getFastForwardStream, func(xl *xlog.Logger, params *requestParams, c *gin.Context, user *userInfo, bucket, filename string) error {
+	monkey.Patch(getFastForwardStream, func(xl *xlog.Logger, params *requestParams, c *gin.Context, user *userInfo, bucket, domain, filename string) error {
 		return errors.New("get Ts Stream Error")
 	})
 	w := PerformRequest(suite.r, req)

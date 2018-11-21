@@ -64,8 +64,9 @@ func TestRegisterNamespace(t *testing.T) {
 	c.Request = req
 	monkey.UnpatchAll()
 	monkey.Patch(getUserInfo, func(xl *xlog.Logger, req *http.Request) (*userInfo, error) { return &user, nil })
-	monkey.Patch(system.HaveDb, func() bool { fmt.Printf("111111"); return true })
+	monkey.Patch(system.HaveDb, func() bool { return true })
 	monkey.Patch(checkBucketInKodo, func(bucket string, user *userInfo) error { return nil })
+	monkey.Patch(checkdomain, func(xl *xlog.Logger, domain, bucket string, user *userInfo) error { return nil })
 	RegisterNamespace(c)
 
 	// bucket already exit. return 400
@@ -96,6 +97,7 @@ func TestRegisterNamespace(t *testing.T) {
 			return nil, errors.New("xxxxx error")
 		})
 	monkey.Patch(checkBucketInKodo, func(bucket string, user *userInfo) error { return nil })
+	monkey.Patch(checkdomain, func(xl *xlog.Logger, domain, bucket string, user *userInfo) error { return nil })
 	RegisterNamespace(c)
 	assert.Equal(t, c.Writer.Status(), 500, "they should be equal")
 	guard.Unpatch()
@@ -266,6 +268,7 @@ func TestUpdateNamespace(t *testing.T) {
 	monkey.Patch(getUserInfo, func(xl *xlog.Logger, req *http.Request) (*userInfo, error) { return &user, nil })
 	monkey.Patch(checkBucketInKodo, func(bucket string, user *userInfo) error { return nil })
 	monkey.Patch(system.HaveDb, func() bool { return true })
+	monkey.Patch(checkdomain, func(xl *xlog.Logger, domain, bucket string, user *userInfo) error { return nil })
 	// namespace is not exist
 	param := gin.Param{
 		Key:   "namespace",
@@ -386,7 +389,7 @@ func TestUpdateNamespace(t *testing.T) {
 	assert.Equal(t, c.Writer.Status(), 400, "400 not support update namesapce")
 	guard2.Unpatch()
 
-	// get user info failed if get update autocraeteUa error
+	// get user info failed if get update autocreateUa error
 	guard4 := monkey.Patch(getUserInfo, func(xl *xlog.Logger, req *http.Request) (*userInfo, error) {
 		return &user, nil
 	})
@@ -395,6 +398,9 @@ func TestUpdateNamespace(t *testing.T) {
 		return errors.New("update auto create ua failed")
 	})
 	monkey.Patch(updateBucket, func(xl *xlog.Logger, uid, space, bucket, newBucket string, info *userInfo) error {
+		return nil
+	})
+	monkey.Patch(updateDomain, func(xl *xlog.Logger, uid, space, domain, newDomain, bucket string, info *userInfo) error {
 		return nil
 	})
 	body = namespacebody{
@@ -414,7 +420,7 @@ func TestUpdateNamespace(t *testing.T) {
 	c.Params = append(c.Params, param)
 	c.Request = req
 	UpdateNamespace(c)
-	assert.Equal(t, c.Writer.Status(), 500, "500 internal error if get namesapce info error")
+	assert.Equal(t, c.Writer.Status(), 500, "500 internal error if get namespace info error")
 	guard4.Unpatch()
 	guard6.Unpatch()
 
@@ -528,6 +534,7 @@ func TestAutoCreateUa(t *testing.T) {
 	monkey.Patch(getUserInfo, func(xl *xlog.Logger, req *http.Request) (*userInfo, error) { return &user, nil })
 	monkey.Patch(checkBucketInKodo, func(bucket string, user *userInfo) error { fmt.Println("fdsafasfd"); return nil })
 	monkey.Patch(system.HaveDb, func() bool { return true })
+	monkey.Patch(checkdomain, func(xl *xlog.Logger, domain, bucket string, user *userInfo) error { return nil })
 	xl := xlog.NewDummy()
 	// bucket maybe already exist. so not check this response.
 	body := namespacebody{
@@ -564,6 +571,7 @@ func TestAutoCreateUa(t *testing.T) {
 	c.Request = req
 	monkey.Patch(checkBucketInKodo, func(bucket string, user *userInfo) error { fmt.Println("fdsafasfd"); return nil })
 	monkey.Patch(getUserInfo, func(xl *xlog.Logger, req *http.Request) (*userInfo, error) { return &user, nil })
+	monkey.Patch(checkdomain, func(xl *xlog.Logger, domain, bucket string, user *userInfo) error { return nil })
 	UpdateNamespace(c)
 	check, _, _ = IsAutoCreateUa(xl, user.uid, "ipcamera")
 	assert.Equal(t, check, true, c.Writer.Header().Get("x-Reqid"))
@@ -585,7 +593,7 @@ func TestGetNameSpaceInfo(t *testing.T) {
 	monkey.UnpatchAll()
 	monkey.Patch(getUserInfo, func(xl *xlog.Logger, req *http.Request) (*userInfo, error) { return &user, nil })
 	monkey.Patch(checkBucketInKodo, func(bucket string, user *userInfo) error { fmt.Println("fdsafasfd"); return nil })
-
+	monkey.Patch(checkdomain, func(xl *xlog.Logger, domain, bucket string, user *userInfo) error { return nil })
 	monkey.Patch(system.HaveDb, func() bool { return true })
 	xl := xlog.NewDummy()
 	err, _ := GetNameSpaceInfo(xl, "ipcamera", "test1", user.uid)

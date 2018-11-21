@@ -65,7 +65,7 @@ func GetSegments(c *gin.Context) {
 
 	namespace := info[0].Namespace
 
-	bucket, err := GetBucket(xl, user.uid, namespace)
+	bucket, _, err := GetBucketAndDomain(xl, user.uid, namespace)
 	if err != nil {
 		xl.Errorf("get bucket error, error =  %#v", err)
 		c.JSON(400, gin.H{"error": "namespace is not correct"})

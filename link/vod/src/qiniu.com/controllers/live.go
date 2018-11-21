@@ -49,10 +49,9 @@ func GetLivem3u8(c *gin.Context) {
 		return
 	}
 	xl.Infof("uaid = %v, from = %v, namespace = %v", params.uaid, params.from, params.namespace)
-	key := mkkey(userInfo, params)
+	key := params.repoid
 	value := redisGet(key)
 	sub := strings.Split(value, "/")
-	xl.Infof("key %s mark %s", key, value)
 	sequeue := int64(1)
 	mark := ""
 	if len(sub) > 1 {
@@ -68,21 +67,12 @@ func GetLivem3u8(c *gin.Context) {
 		return
 	}
 	namespace := params.namespace
-	bucket, err := GetBucket(xl, userInfo.uid, namespace)
+	bucket, domain, err := GetBucketAndDomain(xl, userInfo.uid, namespace)
 
 	if err != nil {
 		xl.Errorf("get bucket error, error =  %#v", err)
 		c.JSON(400, gin.H{
 			"error": "namespace is not correct",
-		})
-		return
-	}
-
-	domain, err := getDomain(xl, bucket, userInfo)
-	if err != nil {
-		xl.Errorf("get domain error, error =  %#v", err)
-		c.JSON(400, gin.H{
-			"error": "domain is not correct",
 		})
 		return
 	}
@@ -115,7 +105,6 @@ func getLiveList(xl *xlog.Logger, sequeue int64, mac *qbox.Mac, params *requestP
 		if mark != next && ok {
 			redisSet(xl, key, fmt.Sprintf("%d/%s", sequeue+1, next))
 		}
-		xl.Infof("set key %s, value %s \n", key, fmt.Sprintf("%d/%s", sequeue+1, next))
 	}
 	var playlist []map[string]interface{}
 

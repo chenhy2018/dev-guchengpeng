@@ -48,7 +48,7 @@ func GetFrames(c *gin.Context) {
 		return
 	}
 
-	bucket, err := GetBucket(xl, user.uid, namespace)
+	bucket, _, err := GetBucketAndDomain(xl, user.uid, namespace)
 	if err != nil {
 		xl.Errorf("get bucket error, error =  %#v", err)
 		c.JSON(400, gin.H{
