@@ -111,8 +111,8 @@ func (suite *SegmentsTestSuite) TestFromEndInTwoSeg2() {
 			info = append(info, item)
 			return info, nil
 		})
-	monkey.Patch(GetBucket, func(xl *xlog.Logger, uid, namespace string) (string, error) {
-		return "ipcamera", nil
+	monkey.Patch(GetBucketAndDomain, func(xl *xlog.Logger, uid, namespace string) (string, string, error) {
+		return "ipcamera", "", nil
 	})
 
 	monkey.PatchInstanceMethod(
@@ -172,8 +172,8 @@ func (suite *SegmentsTestSuite) TestFromEndInTwoSeg3() {
 			rets = append(rets, item)
 			return rets, "", nil
 		})
-	monkey.Patch(GetBucket, func(xl *xlog.Logger, uid, namespace string) (string, error) {
-		return "ipcamera", nil
+	monkey.Patch(GetBucketAndDomain, func(xl *xlog.Logger, uid, namespace string) (string, string, error) {
+		return "ipcamera", "", nil
 	})
 
 	monkey.PatchInstanceMethod(
@@ -282,8 +282,8 @@ func (suite *SegmentsTestSuite) TestFromEndInTwoSeg4() {
 			info = append(info, item)
 			return info, nil
 		})
-	monkey.Patch(GetBucket, func(xl *xlog.Logger, uid, namespace string) (string, error) {
-		return "ipcamera", nil
+	monkey.Patch(GetBucketAndDomain, func(xl *xlog.Logger, uid, namespace string) (string, string, error) {
+		return "ipcamera", "", nil
 	})
 
 	w := PerformRequest(suite.r, req)
@@ -355,8 +355,8 @@ func (suite *SegmentsTestSuite) TestFromEndInTwoSeg5() {
 	monkey.Patch(getUserInfo, func(xl *xlog.Logger, req *http.Request) (*userInfo, error) {
 		return &userInfo{}, nil
 	})
-	monkey.Patch(GetBucket, func(xl *xlog.Logger, uid, namespace string) (string, error) {
-		return "ipcamera", nil
+	monkey.Patch(GetBucketAndDomain, func(xl *xlog.Logger, uid, namespace string) (string, string, error) {
+		return "ipcamera", "", nil
 	})
 
 	w := PerformRequest(suite.r, req)
@@ -426,8 +426,8 @@ func (suite *SegmentsTestSuite) TestFromEndInTwoSeg6() {
 			info = append(info, item)
 			return info, nil
 		})
-	monkey.Patch(GetBucket, func(xl *xlog.Logger, uid, namespace string) (string, error) {
-		return "ipcamera", nil
+	monkey.Patch(GetBucketAndDomain, func(xl *xlog.Logger, uid, namespace string) (string, string, error) {
+		return "ipcamera", "", nil
 	})
 
 	w := PerformRequest(suite.r, req)
@@ -495,8 +495,8 @@ func (suite *SegmentsTestSuite) TestFromEndInTwoSeg7() {
 			info = append(info, item)
 			return info, nil
 		})
-	monkey.Patch(GetBucket, func(xl *xlog.Logger, uid, namespace string) (string, error) {
-		return "ipcamera", nil
+	monkey.Patch(GetBucketAndDomain, func(xl *xlog.Logger, uid, namespace string) (string, string, error) {
+		return "ipcamera", "", nil
 	})
 
 	w := PerformRequest(suite.r, req)
@@ -568,8 +568,8 @@ func (suite *SegmentsTestSuite) TestFromEndInTwoSeg8() {
 			info = append(info, item)
 			return info, nil
 		})
-	monkey.Patch(GetBucket, func(xl *xlog.Logger, uid, namespace string) (string, error) {
-		return "ipcamera", nil
+	monkey.Patch(GetBucketAndDomain, func(xl *xlog.Logger, uid, namespace string) (string, string, error) {
+		return "ipcamera", "", nil
 	})
 
 	w := PerformRequest(suite.r, req)
@@ -653,8 +653,8 @@ func (suite *SegmentsTestSuite) TestFromEndInTwoSeg14() {
 			info = append(info, item)
 			return info, nil
 		})
-	monkey.Patch(GetBucket, func(xl *xlog.Logger, uid, namespace string) (string, error) {
-		return "ipcamera", nil
+	monkey.Patch(GetBucketAndDomain, func(xl *xlog.Logger, uid, namespace string) (string, string, error) {
+		return "ipcamera", "", nil
 	})
 	monkey.PatchInstanceMethod(
 		reflect.TypeOf((*models.SegmentKodoModel)(nil)), "GetFragmentTsInfo", func(ss *models.SegmentKodoModel, xl *xlog.Logger, count int, starttime, endtime int64, bucketurl, uaid, mark string, uid, userAk string) ([]map[string]interface{}, string, error) {
@@ -680,8 +680,8 @@ func (suite *SegmentsTestSuite) TestFromEndInTwoSeg15() {
 			info = append(info, item)
 			return info, nil
 		})
-	monkey.Patch(GetBucket, func(xl *xlog.Logger, uid, namespace string) (string, error) {
-		return "ipcamera", nil
+	monkey.Patch(GetBucketAndDomain, func(xl *xlog.Logger, uid, namespace string) (string, string, error) {
+		return "ipcamera", "www.baidu.com", nil
 	})
 	monkey.PatchInstanceMethod(
 		reflect.TypeOf((*models.SegmentKodoModel)(nil)), "GetFragmentTsInfo", func(ss *models.SegmentKodoModel, xl *xlog.Logger, count int, starttime, endtime int64, bucketurl, uaid, mark string, uid, userAk string) ([]map[string]interface{}, string, error) {

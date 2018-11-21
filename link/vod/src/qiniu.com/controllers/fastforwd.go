@@ -2,21 +2,16 @@ package controllers
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
-	"net/http"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/qiniu/api.v7/auth/qbox"
 	xlog "github.com/qiniu/xlog.v1"
-	"qiniu.com/auth"
 	"qiniu.com/m3u8"
-	"qiniu.com/models"
 	pb "qiniu.com/proto"
 )
 
@@ -64,7 +59,7 @@ func GetFastForward(c *gin.Context) {
 	}
 	xl.Infof("info[0].Namespace %v", info[0].Namespace)
 	namespace := info[0].Namespace
-	bucket, err := GetBucket(xl, userInfo.uid, namespace)
+	bucket, domain, err := GetBucketAndDomain(xl, userInfo.uid, namespace)
 	if err != nil {
 		xl.Errorf("get bucket error, error =  %#v", err)
 		c.JSON(400, gin.H{
@@ -98,14 +93,14 @@ func GetFastForward(c *gin.Context) {
 		return
 	}
 
-	if err = getFastForwardStream(xl, params, c, userInfo, bucket, fileName); err != nil {
+	if err = getFastForwardStream(xl, params, c, userInfo, bucket, domain, fileName); err != nil {
 		xl.Errorf("get fastforward stream error , error = %v", err.Error())
 		c.JSON(500, gin.H{"error": "Service Internal Error"})
 		return
 	}
 }
 
-func getFastForwardStream(xl *xlog.Logger, params *requestParams, c *gin.Context, user *userInfo, bucket, fileName string) error {
+func getFastForwardStream(xl *xlog.Logger, params *requestParams, c *gin.Context, user *userInfo, bucket, domain, fileName string) error {
 	// remove speed fmt from url
 	url := c.Request.URL
 	query := url.Query()
@@ -114,11 +109,6 @@ func getFastForwardStream(xl *xlog.Logger, params *requestParams, c *gin.Context
 	query.Del("token")
 	query.Del("e")
 	req := new(pb.FastForwardInfo)
-	domain, err := getDomain(xl, bucket, user)
-	if err != nil {
-		xl.Errorf("get domain error, err = %#v", err)
-		return err
-	}
 
 	req.Url = getDownUrlWithPm3u8(domain, fileName, user)
 	req.Speed = params.speed
@@ -153,59 +143,4 @@ func getDownUrlWithPm3u8(domain, fileName string, user *userInfo) string {
 	mac := &qbox.Mac{AccessKey: user.ak, SecretKey: []byte(user.sk)}
 	token := mac.Sign([]byte(urlToSign))
 	return fmt.Sprintf("%s&token=%s", urlToSign, token)
-}
-
-func getDomain(xl *xlog.Logger, bucket string, user *userInfo) (string, error) {
-	zone, err := models.GetZone(user.ak, bucket)
-	host := zone.GetApiHost(false)
-	url := fmt.Sprintf("%s%s", host+"/v6/domain/list?tbl=", bucket)
-	request, err := http.NewRequest("GET", url, nil)
-	if err != nil {
-		xl.Errorf("%#v", err)
-		return "", err
-	}
-	rpcClient := models.NewRpcClient(user.uid)
-	resp, err := rpcClient.Do(context.Background(), request)
-	if err != nil {
-		return "", err
-
-	}
-
-	defer resp.Body.Close()
-	dec := json.NewDecoder(resp.Body)
-	var domain []string
-	for {
-		if err := dec.Decode(&domain); err == io.EOF {
-			break
-
-		} else if err != nil {
-			return "", err
-
-		}
-
-	}
-	if len(domain) == 0 {
-		return "", nil
-	}
-
-	return domain[0], nil
-}
-
-func getUserInfoByAk(xl *xlog.Logger, req *http.Request) (*userInfo, error, int) {
-	reqUrl := req.URL.String()
-	if !strings.Contains(reqUrl, "token=") {
-		return nil, errors.New("bad url, should contain a token in url"), 401
-	}
-	token := strings.Split(reqUrl, "&token=")[1]
-	ak := strings.Split(token, ":")[0]
-	accessInfo, err := auth.GetUserInfoFromQconf(xl, ak)
-	if err != nil {
-		xl.Errorf("get user info from Qconf failed, err = %#v", err)
-		return nil, errors.New("get user info from Qconf failed"), 500
-	}
-	user := &userInfo{ak: ak,
-		sk:  string(accessInfo.Secret[:]),
-		uid: fmt.Sprint(accessInfo.Uid)}
-
-	return user, nil, 200
 }

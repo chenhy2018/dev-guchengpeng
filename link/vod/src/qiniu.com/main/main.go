@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"gopkg.in/redis.v5"
 	"os"
 
 	"github.com/gin-gonic/gin"
@@ -10,6 +11,10 @@ import (
 	"qiniu.com/db"
 	"qiniu.com/system"
 	log "qiniupkg.com/x/log.v7"
+)
+
+var (
+	client *redis.Client
 )
 
 func main() {
@@ -21,7 +26,8 @@ func main() {
 		return
 	}
 	initDb(conf)
-	controllers.Init(conf)
+	initRedis(conf)
+	controllers.Init(conf, client)
 	auth.Init(conf)
 	r.Use(controllers.HandleToken)
 	r.POST("/v1/namespaces/:namespace/uas/:uaid", controllers.RegisterUa)
@@ -33,7 +39,7 @@ func main() {
 	r.DELETE("/v1/namespaces/:namespace", controllers.DeleteNamespace)
 	r.PUT("/v1/namespaces/:namespace", controllers.UpdateNamespace)
 	r.GET("/v1/namespaces", controllers.GetNamespaceInfo)
-
+	r.GET("/v1/namespaces/:namespace/uas/:uaid/live", controllers.GetLivem3u8)
 	r.GET("/v1/namespaces/:namespace/uas/:uaid/playback", controllers.GetPlayBackm3u8)
 	r.GET("/v1/namespaces/:namespace/uas/:uaid/fastforward", controllers.GetFastForward)
 	r.GET("/v1/namespaces/:namespace/uas/:uaid/segments", controllers.GetSegments)
@@ -60,6 +66,17 @@ func initDb(conf *system.Configuration) {
 		Proxies:  nil,
 	}
 	if err := db.InitDb(&config); err != nil {
+		fmt.Println(err)
+		os.Exit(3)
+	}
+}
+
+func initRedis(conf *system.Configuration) {
+	client = redis.NewClient(&redis.Options{
+		Addr: conf.RedisConf.Addr,
+	})
+	_, err := client.Ping().Result()
+	if err != nil {
 		fmt.Println(err)
 		os.Exit(3)
 	}

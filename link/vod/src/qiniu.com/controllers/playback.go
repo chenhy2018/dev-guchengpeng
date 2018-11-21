@@ -45,7 +45,7 @@ func GetPlayBackm3u8(c *gin.Context) {
 	}
 	xl.Infof("info[0].Namespace %v", info[0].Namespace)
 	namespace := info[0].Namespace
-	bucket, err := GetBucket(xl, userInfo.uid, namespace)
+	bucket, _, err := GetBucketAndDomain(xl, userInfo.uid, namespace)
 	if err != nil {
 		xl.Errorf("get bucket error, error =  %#v", err)
 		c.JSON(400, gin.H{
@@ -80,14 +80,6 @@ func GetPlayBackm3u8(c *gin.Context) {
 	}
 	c.Header("Access-Control-Allow-Origin", "*")
 
-	// fast forward case
-	if params.speed != 1 {
-		if err := getFastForwardStream(xl, params, c, userInfo, bucket, fileName); err != nil {
-			xl.Errorf("get fastforward stream error , error = %v", err.Error())
-			c.JSON(500, gin.H{"error": "Service Internal Error"})
-		}
-		return
-	}
 	c.JSON(200, gin.H{
 		"key":    fileName,
 		"bucket": bucket,

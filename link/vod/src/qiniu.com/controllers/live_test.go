@@ -2,47 +2,38 @@ package controllers
 
 import (
 	"errors"
-	"net/http"
-	"reflect"
-	"testing"
-
 	"github.com/bouk/monkey"
 	xlog "github.com/qiniu/xlog.v1"
 	"github.com/stretchr/testify/suite"
+	"net/http"
 	"qiniu.com/models"
+	"reflect"
+	"testing"
 )
 
-type PlayBackTestSuite struct {
+type LiveTestSuite struct {
 	suite.Suite
 	r http.Handler
 }
 
-var (
-	userinfo = userInfo{
-		uid: "123",
-		ak:  "xxxxxxxxxxx002",
-		sk:  "xxxxxxxxxxx003",
-	}
-)
-
-func (suite *PlayBackTestSuite) SetupTest() {
+func (suite *LiveTestSuite) SetupTest() {
 	suite.r = GetRouter()
 
 }
-func (suite *PlayBackTestSuite) TestPlayBackWithBadURL() {
+func (suite *LiveTestSuite) TestLiveWithBadURL() {
 	req, _ := http.NewRequest("GET", "/xxx/xx/xx", nil)
 	w := PerformRequest(suite.r, req)
 	suite.Equal(404, w.Code, "should be 404 for not implement bad url")
 }
 
-func (suite *PlayBackTestSuite) TestPlayBackWithoutUid() {
-	req, _ := http.NewRequest("GET", "/playback/xxxxx/123445", nil)
+func (suite *LiveTestSuite) TestLiveWithoutUid() {
+	req, _ := http.NewRequest("GET", "/live/xxxxx/123445", nil)
 	w := PerformRequest(suite.r, req)
 	suite.Equal(404, w.Code, "should be 404 for bad url")
 }
 
-func (suite *PlayBackTestSuite) TestPlayBackWithoutFrom() {
-	req, _ := http.NewRequest("GET", "/v1/namespaces/ipcamera/uas/testdeviceid8/playback?to=1532499345", nil)
+func (suite *LiveTestSuite) TestLiveWithoutFrom() {
+	req, _ := http.NewRequest("GET", "/v1/namespaces/ipcamera/uas/testdeviceid8/live", nil)
 	defer monkey.UnpatchAll()
 	monkey.PatchInstanceMethod(
 		reflect.TypeOf((*models.UaModel)(nil)), "GetUaInfo", func(ss *models.UaModel, xl *xlog.Logger, uid, namespace, uaid string) ([]models.UaInfo, error) {
@@ -54,41 +45,48 @@ func (suite *PlayBackTestSuite) TestPlayBackWithoutFrom() {
 			info = append(info, item)
 			return info, nil
 		})
-	monkey.Patch(getUserInfo, func(xl *xlog.Logger, req *http.Request) (*userInfo, error) { return &userinfo, nil })
+	monkey.Patch(getUserInfoByAk, func(xl *xlog.Logger, req *http.Request) (*userInfo, error, int) { return &userinfo, nil, 200 })
 	w := PerformRequest(suite.r, req)
 	suite.Equal(400, w.Code, "should be 400 for no from requset")
 }
 
-func (suite *PlayBackTestSuite) TestPlayBackWithoutTo() {
-	req, _ := http.NewRequest("GET", "/v1/namespaces/ipcamera/uas/testdeviceid8/playback?from=1532499345", nil)
-	w := PerformRequest(suite.r, req)
-	suite.Equal(400, w.Code, "should be 400 for no to requset")
-}
-
-func (suite *PlayBackTestSuite) TestPlayBackWithoutExpire() {
-	req, _ := http.NewRequest("GET", "/v1/namespaces/ipcamera/uas/testdeviceid8/playback?from=1532499345&to=1532499345", nil)
-	w := PerformRequest(suite.r, req)
-	suite.Equal(400, w.Code, "should be 400 for no expire requset")
-}
-
-func (suite *PlayBackTestSuite) TestPlayBackWithoutToken() {
-	req, _ := http.NewRequest("GET", "/v1/namespaces/ipcamera/uas/testdeviceid8/playback?from=1532499345&to=1532499345", nil)
-	w := PerformRequest(suite.r, req)
-	suite.Equal(400, w.Code, "should be 400 for no token")
-}
-func (suite *PlayBackTestSuite) TestPlayBack500IfGetUseInfoFailed() {
-	req, _ := http.NewRequest("GET", "/v1/namespaces/ipcamera/uas/testdeviceid8/playback?from=1532499325&to=1532499345", nil)
+func (suite *LiveTestSuite) TestLiveWithoutExpire() {
 	defer monkey.UnpatchAll()
-	monkey.Patch(getUserInfo, func(xl *xlog.Logger, req *http.Request) (*userInfo, error) {
-		return nil, errors.New("get user info error")
+	monkey.Patch(getUserInfoByAk, func(xl *xlog.Logger, req *http.Request) (*userInfo, error, int) { return &userinfo, nil, 200 })
+	req, _ := http.NewRequest("GET", "/v1/namespaces/ipcamera/uas/testdeviceid8/live?from=1532499345", nil)
+	w := PerformRequest(suite.r, req)
+	suite.Equal(401, w.Code, "should be 401 for no expire requset")
+}
+
+func (suite *LiveTestSuite) TestLiveWithoutToken() {
+	defer monkey.UnpatchAll()
+	monkey.Patch(getUserInfoByAk, func(xl *xlog.Logger, req *http.Request) (*userInfo, error, int) { return &userinfo, nil, 200 })
+	req, _ := http.NewRequest("GET", "/v1/namespaces/ipcamera/uas/testdeviceid8/live?from=1532499345", nil)
+	w := PerformRequest(suite.r, req)
+	suite.Equal(401, w.Code, "should be 400 for no token")
+}
+func (suite *LiveTestSuite) TestLive500IfGetUseInfoFailed() {
+	req, _ := http.NewRequest("GET", "/v1/namespaces/ipcamera/uas/testdeviceid8/live?from=1532499325", nil)
+	defer monkey.UnpatchAll()
+	monkey.Patch(getUserInfoByAk, func(xl *xlog.Logger, req *http.Request) (*userInfo, error, int) {
+		return nil, errors.New("get user info error"), 500
 	})
 	w := PerformRequest(suite.r, req)
 	suite.Equal(500, w.Code, "500 for get user info failed")
 }
-func (suite *PlayBackTestSuite) TestPlayBack() {
-	req, _ := http.NewRequest("GET", "/v1/namespaces/ipcamera/uas/testdeviceid8/playback?from=1532499325&to=1532499345", nil)
+func (suite *LiveTestSuite) TestLive() {
+	req, _ := http.NewRequest("GET", "/v1/namespaces/ipcamera/uas/testdeviceid8/live?from=1532499325", nil)
 	defer monkey.UnpatchAll()
-	monkey.Patch(getUserInfo, func(xl *xlog.Logger, req *http.Request) (*userInfo, error) { return &userinfo, nil })
+	monkey.Patch(verifyToken, func(xl *xlog.Logger, expire int64, realToken string, req *http.Request, user *userInfo) bool {
+		return true
+	})
+	monkey.Patch(redisGet, func(key string) string {
+		return "12345"
+	})
+	monkey.Patch(redisSet, func(xl *xlog.Logger, key, value string) error {
+		return nil
+	})
+	monkey.Patch(getUserInfoByAk, func(xl *xlog.Logger, req *http.Request) (*userInfo, error, int) { return &userinfo, nil, 200 })
 	monkey.PatchInstanceMethod(
 		reflect.TypeOf((*models.NamespaceModel)(nil)), "GetNamespaceInfo", func(ss *models.NamespaceModel, xl *xlog.Logger, uid, namespace string) ([]models.NamespaceInfo, error) {
 			info := []models.NamespaceInfo{}
@@ -120,15 +118,24 @@ func (suite *PlayBackTestSuite) TestPlayBack() {
 		})
 
 	w := PerformRequest(suite.r, req)
-	suite.Equal(404, w.Code, "404 for nil")
+	suite.Equal(500, w.Code, "500 for nil")
 }
 
-func (suite *PlayBackTestSuite) TestPlayBackWithGetSegmentsInfoError() {
-	req, _ := http.NewRequest("GET", "/v1/namespaces/ipcamera/uas/testdeviceid8/playback?from=1532499325&to=1532499345", nil)
+func (suite *LiveTestSuite) TestLiveWithGetSegmentsInfoError() {
+	req, _ := http.NewRequest("GET", "/v1/namespaces/ipcamera/uas/testdeviceid8/live?from=1532499325&to=1532499345", nil)
 	defer monkey.UnpatchAll()
-	monkey.Patch(getUserInfo, func(xl *xlog.Logger, req *http.Request) (*userInfo, error) { return &userinfo, nil })
+	monkey.Patch(verifyToken, func(xl *xlog.Logger, expire int64, realToken string, req *http.Request, user *userInfo) bool {
+		return true
+	})
+	monkey.Patch(getUserInfoByAk, func(xl *xlog.Logger, req *http.Request) (*userInfo, error, int) { return &userinfo, nil, 200 })
 	monkey.Patch(GetBucketAndDomain, func(xl *xlog.Logger, uid, namespace string) (string, string, error) {
-		return "ipcamera", "", nil
+		return "ipcamera", "www.baidu.com", nil
+	})
+	monkey.Patch(redisGet, func(key string) string {
+		return "12345"
+	})
+	monkey.Patch(redisSet, func(xl *xlog.Logger, key, value string) error {
+		return nil
 	})
 	monkey.PatchInstanceMethod(
 		reflect.TypeOf((*models.UaModel)(nil)), "GetUaInfo", func(ss *models.UaModel, xl *xlog.Logger, uid, namespace, uaid string) ([]models.UaInfo, error) {
@@ -150,25 +157,52 @@ func (suite *PlayBackTestSuite) TestPlayBackWithGetSegmentsInfoError() {
 	suite.Equal(500, w.Code, "500 for query kodo data error")
 }
 
-func (suite *PlayBackTestSuite) TestPlayBackWithBadParam() {
-	req, _ := http.NewRequest("GET", "/v1/namespaces/ipcamera/uas/testdeviceid8/playback?to=1532499345&from=15324993x45", nil)
+func (suite *LiveTestSuite) TestLiveWithBadParam() {
+	req, _ := http.NewRequest("GET", "/v1/namespaces/ipcamera/uas/testdeviceid8/live?to=1532499345&from=15324993x45", nil)
 	defer monkey.UnpatchAll()
-	monkey.Patch(getUserInfo, func(xl *xlog.Logger, req *http.Request) (*userInfo, error) { return &userinfo, nil })
+	monkey.Patch(verifyToken, func(xl *xlog.Logger, expire int64, realToken string, req *http.Request, user *userInfo) bool {
+		return true
+	})
+	monkey.Patch(redisGet, func(key string) string {
+		return "12345"
+	})
+	monkey.Patch(redisSet, func(xl *xlog.Logger, key, value string) error {
+		return nil
+	})
+	monkey.Patch(getUserInfoByAk, func(xl *xlog.Logger, req *http.Request) (*userInfo, error, int) { return &userinfo, nil, 200 })
 	w := PerformRequest(suite.r, req)
 	suite.Equal(400, w.Code, "should be 400 for no from requset")
 }
-func (suite *PlayBackTestSuite) TestPlayBackWithBadToken() {
-	req, _ := http.NewRequest("GET", "/v1/namespaces/ipcamera/uas/testdeviceid8/playback?to=1532499345&from=1532499045", nil)
+func (suite *LiveTestSuite) TestLiveWithBadToken() {
+	req, _ := http.NewRequest("GET", "/v1/namespaces/ipcamera/uas/testdeviceid8/live?to=1532499345&from=1532499045", nil)
 	defer monkey.UnpatchAll()
-	monkey.Patch(getUserInfo, func(xl *xlog.Logger, req *http.Request) (*userInfo, error) { return &userinfo, nil })
+	monkey.Patch(verifyToken, func(xl *xlog.Logger, expire int64, realToken string, req *http.Request, user *userInfo) bool {
+		return true
+	})
+	monkey.Patch(redisGet, func(key string) string {
+		return "12345"
+	})
+	monkey.Patch(redisSet, func(xl *xlog.Logger, key, value string) error {
+		return nil
+	})
+	monkey.Patch(getUserInfoByAk, func(xl *xlog.Logger, req *http.Request) (*userInfo, error, int) { return &userinfo, nil, 200 })
 	w := PerformRequest(suite.r, req)
 	suite.Equal(400, w.Code, "should be 400 for bad token")
 }
 
-func (suite *PlayBackTestSuite) TestPlayBackWithBadNameSpace() {
-	req, _ := http.NewRequest("GET", "/v1/namespaces/ipcamera/uas/testdeviceid8/playback?to=1532499345&from=1532499045", nil)
+func (suite *LiveTestSuite) TestLiveWithBadNameSpace() {
+	req, _ := http.NewRequest("GET", "/v1/namespaces/ipcamera/uas/testdeviceid8/live?to=1532499345&from=1532499045", nil)
 	defer monkey.UnpatchAll()
-	monkey.Patch(getUserInfo, func(xl *xlog.Logger, req *http.Request) (*userInfo, error) { return &userinfo, nil })
+	monkey.Patch(verifyToken, func(xl *xlog.Logger, expire int64, realToken string, req *http.Request, user *userInfo) bool {
+		return true
+	})
+	monkey.Patch(redisGet, func(key string) string {
+		return "12345"
+	})
+	monkey.Patch(redisSet, func(xl *xlog.Logger, key, value string) error {
+		return nil
+	})
+	monkey.Patch(getUserInfoByAk, func(xl *xlog.Logger, req *http.Request) (*userInfo, error, int) { return &userinfo, nil, 200 })
 	monkey.PatchInstanceMethod(
 		reflect.TypeOf((*models.UaModel)(nil)), "GetUaInfo", func(ss *models.UaModel, xl *xlog.Logger, uid, namespace, uaid string) ([]models.UaInfo, error) {
 			info := []models.UaInfo{}
@@ -187,11 +221,20 @@ func (suite *PlayBackTestSuite) TestPlayBackWithBadNameSpace() {
 	suite.Equal(400, w.Code, "bucket can't find")
 }
 
-func (suite *PlayBackTestSuite) TestPlayBackWithCorrectDomain() {
-	req, _ := http.NewRequest("GET", "/v1/namespaces/ipcamera/uas/testdeviceid8/playback?to=1536143287&from=1536142906", nil)
+func (suite *LiveTestSuite) TestLiveWithCorrectDomain() {
+	req, _ := http.NewRequest("GET", "/v1/namespaces/ipcamera/uas/testdeviceid8/live?to=1536143287&from=1536142906", nil)
 	defer monkey.UnpatchAll()
-	monkey.Patch(getUserInfo, func(xl *xlog.Logger, req *http.Request) (*userInfo, error) {
-		return &userInfo{ak: "fadsfasfsd", sk: "fadsfasfsadf", uid: "123"}, nil
+	monkey.Patch(verifyToken, func(xl *xlog.Logger, expire int64, realToken string, req *http.Request, user *userInfo) bool {
+		return true
+	})
+	monkey.Patch(getUserInfoByAk, func(xl *xlog.Logger, req *http.Request) (*userInfo, error, int) {
+		return &userInfo{ak: "fadsfasfsd", sk: "fadsfasfsadf", uid: "123"}, nil, 200
+	})
+	monkey.Patch(redisGet, func(key string) string {
+		return "12345"
+	})
+	monkey.Patch(redisSet, func(xl *xlog.Logger, key, value string) error {
+		return nil
 	})
 	monkey.PatchInstanceMethod(
 		reflect.TypeOf((*models.UaModel)(nil)), "GetUaInfo", func(ss *models.UaModel, xl *xlog.Logger, uid, namespace, uaid string) ([]models.UaInfo, error) {
@@ -230,6 +273,6 @@ func (suite *PlayBackTestSuite) TestPlayBackWithCorrectDomain() {
 	suite.Equal(200, w.Code, "correct")
 }
 
-func TestPlayBackSuite(t *testing.T) {
-	suite.Run(t, new(PlayBackTestSuite))
+func TestLiveSuite(t *testing.T) {
+	suite.Run(t, new(LiveTestSuite))
 }

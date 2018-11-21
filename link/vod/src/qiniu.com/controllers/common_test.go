@@ -14,6 +14,7 @@ import (
 func GetRouter() *gin.Engine {
 	gin.SetMode(gin.ReleaseMode)
 	r := gin.Default()
+	r.GET("/v1/namespaces/:namespace/uas/:uaid/live", GetLivem3u8)
 	r.GET("/v1/namespaces/:namespace/uas/:uaid/playback", GetPlayBackm3u8)
 	r.GET("/v1/namespaces/:namespace/uas/:uaid/segments", GetSegments)
 	r.GET("/v1/namespaces/:namespace/uas/:uaid/frames", GetFrames)

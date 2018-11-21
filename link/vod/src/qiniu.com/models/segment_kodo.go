@@ -183,6 +183,7 @@ func (m *SegmentKodoModel) GetSegmentTsInfo(xl *xlog.Logger, starttime, endtime 
 			r = append(r, info)
 			total++
 		}
+		info[SEGMENT_ITEM_MARK] = listItem1.Marker
 		if total >= limit && limit != 0 {
 			nextMarker = listItem1.Marker
 			break

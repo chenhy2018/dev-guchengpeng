@@ -3,12 +3,11 @@ package models
 import (
 	"encoding/base64"
 	"fmt"
-	"time"
-
 	"github.com/qiniu/xlog.v1"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 	"qiniu.com/db"
+	"time"
 )
 
 type NamespaceModel struct {
@@ -44,6 +43,9 @@ func (m *NamespaceModel) Register(xl *xlog.Logger, req NamespaceInfo) error {
 						NAMESPACE_ITEM_UID:            req.Uid,
 						NAMESPACE_ITEM_AUTO_CREATE_UA: req.AutoCreateUa,
 						NAMESPACE_ITEM_EXPIRE:         req.Expire,
+						NAMESPACE_ITEM_NAME:           req.Name,
+						NAMESPACE_ITEM_CATEGORY:       req.Category,
+						NAMESPACE_ITEM_DOMAIN:         req.Domain,
 					},
 				},
 			)
@@ -56,6 +58,42 @@ func (m *NamespaceModel) Register(xl *xlog.Logger, req NamespaceInfo) error {
 	return nil
 }
 
+func (m *NamespaceModel) Update(xl *xlog.Logger, req NamespaceInfo) error {
+	/*
+	   db.namespace.update( {"uid":req.Uid,  "namespace": req.Space}, {"$set": {"bucketurl": req.Bucketurl}},
+	   { upsert: true })
+	*/
+	err := db.WithCollection(
+		NAMESPACE_COL,
+		func(c *mgo.Collection) error {
+			err := c.Update(
+				bson.M{
+					ITEM_ID: req.Uid + "." + req.Space,
+				},
+				bson.M{
+					"$set": bson.M{
+						ITEM_ID:                       req.Uid + "." + req.Space,
+						NAMESPACE_ITEM_ID:             req.Space,
+						ITEM_CREATE_TIME:              time.Now().Unix(),
+						NAMESPACE_ITEM_BUCKET:         req.Bucket,
+						ITEM_UPDATA_TIME:              time.Now().Unix(),
+						NAMESPACE_ITEM_UID:            req.Uid,
+						NAMESPACE_ITEM_AUTO_CREATE_UA: req.AutoCreateUa,
+						NAMESPACE_ITEM_EXPIRE:         req.Expire,
+						NAMESPACE_ITEM_NAME:           req.Name,
+						NAMESPACE_ITEM_CATEGORY:       req.Category,
+						NAMESPACE_ITEM_DOMAIN:         req.Domain,
+					},
+				},
+			)
+			return err
+		},
+	)
+	if err != nil {
+		return err
+	}
+	return nil
+}
 func (m *NamespaceModel) Delete(xl *xlog.Logger, uid, id string) error {
 	/*
 	   db.namespace.remove({"_id": uid + "." + id})
@@ -79,8 +117,12 @@ type NamespaceInfo struct {
 	UpdateTime   int64  `bson:"updatedAt"  json:"updatedAt"`
 	Bucket       string `bson:"bucket"     json:"bucket"`
 	Uid          string `bson:"uid"        json:"-"`
+	Domain       string `bson:"domain"     json:"domain"`
 	AutoCreateUa bool   `bson:"auto"       json:"auto"`
 	Expire       int    `bson:"expire"     json:"expire"`
+	Name         string `bson:"name"       json:"name"`
+	Category     string `bson:"category"   json:"category"`
+	Remark       string `bson:"remark"     json:"remark"`
 }
 
 func (m *NamespaceModel) GetNamespaceInfo(xl *xlog.Logger, uid, namespace string) ([]NamespaceInfo, error) {
@@ -171,67 +213,22 @@ func (m *NamespaceModel) GetNamespaceInfos(xl *xlog.Logger, limit int, mark, uid
 
 }
 
-func (m *NamespaceModel) UpdateBucket(xl *xlog.Logger, uid, space, bucket string) error {
+func (m *NamespaceModel) UpdateFunction(xl *xlog.Logger, uid, namespace, parameter string, cond map[string]interface{}) error {
 	/*
-	   db.namespace.update({"uid": uid, "namespace": space}, bson.M{"$set":{"bucket": bucket, "domain" : domain }}),
+	   db.ua.update({_id: id, uaid: uaid}, bson.M{"$set":{parameter: cond[parameter]}}),
 	*/
 	return db.WithCollection(
 		NAMESPACE_COL,
 		func(c *mgo.Collection) error {
 			return c.Update(
 				bson.M{
-					NAMESPACE_ITEM_ID: space,
-					ITEM_ID:           uid + "." + space,
+					ITEM_ID:           uid + "." + namespace,
+					NAMESPACE_ITEM_ID: namespace,
 				},
 				bson.M{
 					"$set": bson.M{
-						NAMESPACE_ITEM_BUCKET: bucket,
-						ITEM_UPDATA_TIME:      time.Now().Unix(),
-					},
-				},
-			)
-		},
-	)
-}
-
-func (m *NamespaceModel) UpdateAutoCreateUa(xl *xlog.Logger, uid, space string, auto bool) error {
-	/*
-	   db.namespace.update({"uid": uid, "namespace": space}, bson.M{"$set":{"autocreateua": auto}}),
-	*/
-	return db.WithCollection(
-		NAMESPACE_COL,
-		func(c *mgo.Collection) error {
-			return c.Update(
-				bson.M{
-					NAMESPACE_ITEM_ID: space,
-					ITEM_ID:           uid + "." + space,
-				},
-				bson.M{
-					"$set": bson.M{
-						NAMESPACE_ITEM_AUTO_CREATE_UA: auto,
-						ITEM_UPDATA_TIME:              time.Now().Unix(),
-					},
-				},
-			)
-		},
-	)
-}
-
-func (m *NamespaceModel) UpdateExpire(xl *xlog.Logger, uid, space string, expire int) error {
-	/*
-	   db.namespace.update({"uid": uid, "namespace": space}, bson.M{"$set":{"expire": expire}}),
-	*/
-	return db.WithCollection(
-		NAMESPACE_COL,
-		func(c *mgo.Collection) error {
-			return c.Update(
-				bson.M{
-					NAMESPACE_ITEM_ID: space,
-					ITEM_ID:           uid + "." + space,
-				},
-				bson.M{
-					"$set": bson.M{
-						NAMESPACE_ITEM_EXPIRE: expire,
+						ITEM_UPDATA_TIME: time.Now().Unix(),
+						parameter:        cond[parameter],
 					},
 				},
 			)
@@ -282,8 +279,6 @@ func (m *NamespaceModel) UpdateNamespace(xl *xlog.Logger, uid, space, newSpace s
 				},
 				bson.M{
 					"$set": bson.M{
-						ITEM_ID:                       uid + "." + newSpace,
-						ITEM_CREATE_TIME:              r[0].Regtime,
 						NAMESPACE_ITEM_ID:             newSpace,
 						NAMESPACE_ITEM_BUCKET:         r[0].Bucket,
 						ITEM_UPDATA_TIME:              time.Now().Unix(),

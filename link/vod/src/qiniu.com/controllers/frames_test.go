@@ -76,8 +76,8 @@ func (suite *FramesTestSuite) TestFrames6() {
 			info = append(info, item)
 			return info, nil
 		})
-	monkey.Patch(GetBucket, func(xl *xlog.Logger, uid, namespace string) (string, error) {
-		return "ipcamera", nil
+	monkey.Patch(GetBucketAndDomain, func(xl *xlog.Logger, uid, namespace string) (string, string, error) {
+		return "ipcamera", "", nil
 	})
 	monkey.PatchInstanceMethod(
 		reflect.TypeOf((*models.SegmentKodoModel)(nil)), "GetFrameInfo", func(ss *models.SegmentKodoModel, xl *xlog.Logger, starttime int64, endtime int64, bucket string, uaid string, uid, userAk string) ([]map[string]interface{}, error) {
@@ -113,8 +113,8 @@ func (suite *FramesTestSuite) TestFrames7() {
 			info = append(info, item)
 			return info, nil
 		})
-	monkey.Patch(GetBucket, func(xl *xlog.Logger, uid, namespace string) (string, error) {
-		return "ipcamera", nil
+	monkey.Patch(GetBucketAndDomain, func(xl *xlog.Logger, uid, namespace string) (string, string, error) {
+		return "ipcamera", "", nil
 	})
 	monkey.PatchInstanceMethod(
 		reflect.TypeOf((*models.SegmentKodoModel)(nil)), "GetFrameInfo", func(ss *models.SegmentKodoModel, xl *xlog.Logger, starttime int64, endtime int64, bucket string, uaid string, uid, userAk string) ([]map[string]interface{}, error) {
@@ -139,8 +139,8 @@ func (suite *FramesTestSuite) TestFrames9() {
 			info = append(info, item)
 			return info, nil
 		})
-	monkey.Patch(GetBucket, func(xl *xlog.Logger, uid, namespace string) (string, error) {
-		return "ipcamera", nil
+	monkey.Patch(GetBucketAndDomain, func(xl *xlog.Logger, uid, namespace string) (string, string, error) {
+		return "ipcamera", "", nil
 	})
 	monkey.PatchInstanceMethod(
 		reflect.TypeOf((*models.SegmentKodoModel)(nil)), "GetFrameInfo", func(ss *models.SegmentKodoModel, xl *xlog.Logger, starttime int64, endtime int64, bucket string, uaid string, uid, userAk string) ([]map[string]interface{}, error) {

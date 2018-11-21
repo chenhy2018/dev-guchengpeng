@@ -37,6 +37,7 @@ func TestRegisterUa(t *testing.T) {
 	}
 	monkey.Patch(getUserInfo, func(xl *xlog.Logger, req *http.Request) (*userInfo, error) { return &user, nil })
 	monkey.Patch(checkBucketInKodo, func(bucket string, user *userInfo) error { return nil })
+	monkey.Patch(checkdomain, func(xl *xlog.Logger, domain, bucket string, user *userInfo) error { return nil })
 
 	c.Params = append(c.Params, param)
 	c.Request = req

@@ -84,19 +84,22 @@ func (p *MediaPlaylist) SetWinSize(winsize uint) error {
 
 // Append general chunk to the tail of chunk slice for a media playlist.
 // This operation does reset playlist cache.
-func (p *MediaPlaylist) AppendSegment(uri string, duration float64, title string) error {
+func (p *MediaPlaylist) AppendSegment(uri string, duration float64, title string, isVod bool) error {
 	seg := new(MediaSegment)
 	seg.URI = uri
 	seg.Duration = duration
 	seg.Title = title
 
 	eles := strings.Split(uri, "/")
-
-	startTime, err := strconv.ParseInt(eles[3], 10, 64)
+	offset := 3
+	if isVod != true {
+		offset = 5
+	}
+	startTime, err := strconv.ParseInt(eles[offset], 10, 64)
 	if err != nil {
 		return err
 	}
-	endTime, err := strconv.ParseInt(eles[4], 10, 64)
+	endTime, err := strconv.ParseInt(eles[offset+1], 10, 64)
 	if err != nil {
 		return err
 	}
@@ -151,9 +154,9 @@ func (p *MediaPlaylist) addPlaylistType() {
 	}
 }
 
-func (p *MediaPlaylist) addMediaSequence() {
+func (p *MediaPlaylist) addMediaSequence(sequence uint64) {
 	p.buf.WriteString("#EXT-X-MEDIA-SEQUENCE:")
-	p.buf.WriteString(strconv.FormatUint(1, 10))
+	p.buf.WriteString(strconv.FormatUint(sequence, 10))
 	p.buf.WriteRune('\n')
 
 	p.buf.WriteString("#EXT-X-DISCONTINUITY")
@@ -239,10 +242,25 @@ func (p *MediaPlaylist) mkM3u8() *bytes.Buffer {
 	p.addCacheInfo()
 	p.addPlaylistType()
 	p.addTargetDuraion()
-	p.addMediaSequence()
+	p.addMediaSequence(uint64(1))
 	p.addIframe()
 	p.addSegments()
 	p.buf.WriteString("#EXT-X-ENDLIST\n")
+	return &p.buf
+}
+
+// Encode Generate output in live M3U8 format. Marshal `winsize` elements from bottom of the `segments` queue.
+func (p *MediaPlaylist) mkLiveM3u8(sequence uint64) *bytes.Buffer {
+	if p.buf.Len() > 0 {
+		return &p.buf
+	}
+
+	p.addVersion()
+	p.addCacheInfo()
+	p.addTargetDuraion()
+	p.addMediaSequence(sequence)
+	p.addIframe()
+	p.addSegments()
 	return &p.buf
 }
 
@@ -251,6 +269,10 @@ func (p *MediaPlaylist) mkM3u8() *bytes.Buffer {
 // playist and print its string representation.
 func (p *MediaPlaylist) String() string {
 	return p.mkM3u8().String()
+}
+
+func (p *MediaPlaylist) LiveString(sequence uint64) string {
+	return p.mkLiveM3u8(sequence).String()
 }
 
 func Mkm3u8(_segList []map[string]interface{}, _xl *xlog.Logger) string {
@@ -262,7 +284,21 @@ func Mkm3u8(_segList []map[string]interface{}, _xl *xlog.Logger) string {
 	for _, v := range _segList {
 		url := v["url"].(string)
 		duration := v["duration"].(float64)
-		pPlaylist.AppendSegment(url, duration, "")
+		pPlaylist.AppendSegment(url, duration, "", true)
 	}
 	return pPlaylist.String()
+}
+
+func MkLivem3u8(_segList []map[string]interface{}, sequence uint64, _xl *xlog.Logger) string {
+	length := len(_segList)
+	pPlaylist := new(MediaPlaylist)
+	pPlaylist.lastEndTime = -1
+	pPlaylist.Init(uint(length), uint(length))
+	_xl.Infof("length = %v", length)
+	for _, v := range _segList {
+		url := v["url"].(string)
+		duration := v["duration"].(float64)
+		pPlaylist.AppendSegment(url, duration, "", false)
+	}
+	return pPlaylist.LiveString(sequence)
 }

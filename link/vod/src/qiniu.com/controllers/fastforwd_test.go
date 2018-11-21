@@ -2,15 +2,14 @@ package controllers
 
 import (
 	"errors"
-	"net/http"
-	"reflect"
-	"testing"
-
 	"github.com/bouk/monkey"
 	"github.com/gin-gonic/gin"
 	xlog "github.com/qiniu/xlog.v1"
 	"github.com/stretchr/testify/suite"
+	"net/http"
 	"qiniu.com/models"
+	"reflect"
+	"testing"
 )
 
 type FastForwardTestSuite struct {
@@ -55,6 +54,9 @@ func (suite *FastForwardTestSuite) TestGetFastForwardStreamError() {
 	monkey.Patch(getUserInfo, func(xl *xlog.Logger, req *http.Request) (*userInfo, error) {
 		return &userInfo{ak: "fadsfasfsd", sk: "fadsfasfsadf", uid: "123"}, nil
 	})
+	monkey.Patch(verifyToken, func(xl *xlog.Logger, expire int64, realToken string, req *http.Request, user *userInfo) bool {
+		return true
+	})
 	monkey.PatchInstanceMethod(
 		reflect.TypeOf((*models.UaModel)(nil)), "GetUaInfo", func(ss *models.UaModel, xl *xlog.Logger, uid, namespace, uaid string) ([]models.UaInfo, error) {
 			info := []models.UaInfo{}
@@ -65,8 +67,8 @@ func (suite *FastForwardTestSuite) TestGetFastForwardStreamError() {
 			info = append(info, item)
 			return info, nil
 		})
-	monkey.Patch(GetBucket, func(xl *xlog.Logger, uid, namespace string) (string, error) {
-		return "ipcamera", nil
+	monkey.Patch(GetBucketAndDomain, func(xl *xlog.Logger, uid, namespace string) (string, string, error) {
+		return "ipcamera", "www.baidu.com", nil
 	})
 
 	monkey.Patch(uploadNewFile, func(filename, bucket string, data []byte, user *userInfo) error {
@@ -88,7 +90,7 @@ func (suite *FastForwardTestSuite) TestGetFastForwardStreamError() {
 				}}
 			return info, "", nil
 		})
-	monkey.Patch(getFastForwardStream, func(xl *xlog.Logger, params *requestParams, c *gin.Context, user *userInfo, bucket, filename string) error {
+	monkey.Patch(getFastForwardStream, func(xl *xlog.Logger, params *requestParams, c *gin.Context, user *userInfo, bucket, domain, filename string) error {
 		return errors.New("get Ts Stream Error")
 	})
 	w := PerformRequest(suite.r, req)

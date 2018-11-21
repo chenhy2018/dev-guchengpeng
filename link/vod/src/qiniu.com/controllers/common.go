@@ -2,24 +2,28 @@ package controllers
 
 import (
 	"bytes"
+	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
-	"net/http"
-	"net/url"
-	"strconv"
-	"strings"
-	"time"
-
 	"github.com/gin-gonic/gin"
 	"github.com/qiniu/api.v7/auth/qbox"
 	"github.com/qiniu/api.v7/storage"
 	xlog "github.com/qiniu/xlog.v1"
 	"google.golang.org/grpc"
+	"gopkg.in/redis.v5"
+	"io"
+	"net/http"
+	"net/url"
 	rs "qbox.us/api/rs.v3"
+	"qiniu.com/auth"
 	qboxmac "qiniu.com/auth/qboxmac.v1"
 	"qiniu.com/models"
 	pb "qiniu.com/proto"
 	"qiniu.com/system"
+	"strconv"
+	"strings"
+	"time"
 )
 
 var (
@@ -28,9 +32,10 @@ var (
 	fastForwardClint pb.FastForwardClient
 	UaMod            *models.UaModel
 	defaultUser      system.UserConf
+	c                *redis.Client
 )
 
-func Init(conf *system.Configuration) {
+func Init(conf *system.Configuration, client *redis.Client) {
 	defaultUser = conf.UserConf
 	namespaceMod = &models.NamespaceModel{}
 	namespaceMod.Init()
@@ -39,6 +44,7 @@ func Init(conf *system.Configuration) {
 	FFGrpcClientInit(&conf.GrpcConf)
 	UaMod = &models.UaModel{}
 	UaMod.Init()
+	c = client
 }
 
 func FFGrpcClientInit(conf *system.GrpcConf) {
@@ -54,6 +60,8 @@ type requestParams struct {
 	from      int64
 	to        int64
 	limit     int
+	expire    int64
+	token     string
 	marker    string
 	namespace string
 	prefix    string
@@ -61,13 +69,25 @@ type requestParams struct {
 	speed     int32
 	fmt       string
 	key       string
-	expire    int64
-	token     string
+	reqid     string
 }
 type userInfo struct {
 	uid string
 	ak  string
 	sk  string
+}
+
+func redisGet(key string) string {
+	s := c.Get(key).Val()
+	return s
+}
+
+func redisSet(xl *xlog.Logger, key, value string) error {
+	err := c.Set(key, value, time.Hour).Err()
+	if err != nil {
+		xl.Errorf("Redis set failed %#v", err)
+	}
+	return err
 }
 
 func checkParams(xl *xlog.Logger, params *requestParams) error {
@@ -115,19 +135,19 @@ func GetUrlWithDownLoadToken(xl *xlog.Logger, domain, fname string, tsExpire int
 	return realUrl
 }
 
-func GetBucket(xl *xlog.Logger, uid, namespace string) (string, error) {
+func GetBucketAndDomain(xl *xlog.Logger, uid, namespace string) (string, string, error) {
 	if system.HaveDb() == false {
-		return namespace, nil
+		return namespace, "", nil
 	}
 	namespaceMod = &models.NamespaceModel{}
 	info, err := namespaceMod.GetNamespaceInfo(xl, uid, namespace)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 	if len(info) == 0 {
-		return "", errors.New("can't find namespace")
+		return "", "", errors.New("can't find namespace")
 	}
-	return info[0].Bucket, nil
+	return info[0].Bucket, info[0].Domain, nil
 }
 
 func IsAutoCreateUa(xl *xlog.Logger, uid, bucket string) (bool, []models.NamespaceInfo, error) {
@@ -150,15 +170,16 @@ func ParseRequest(c *gin.Context, xl *xlog.Logger) (*requestParams, error) {
 	namespace := c.Param("namespace")
 	from := c.DefaultQuery("from", "0")
 	to := c.DefaultQuery("to", "0")
+	expire := c.DefaultQuery("e", "0")
+	token := c.Query("token")
 	limit := c.DefaultQuery("limit", "1000")
 	marker := c.DefaultQuery("marker", "")
 	prefix := c.DefaultQuery("prefix", "")
 	exact := c.DefaultQuery("exact", "false")
 	speed := c.DefaultQuery("speed", "1")
 	m3u8Name := c.DefaultQuery("key", "")
+	reqid := c.DefaultQuery("reqid", "")
 	fmt := c.Query("fmt")
-	expire := c.DefaultQuery("e", "0")
-	token := c.Query("token")
 
 	if strings.Contains(uaid, ".m3u8") {
 		uaid = strings.Split(uaid, ".")[0]
@@ -170,6 +191,10 @@ func ParseRequest(c *gin.Context, xl *xlog.Logger) (*requestParams, error) {
 	toT, err := strconv.ParseInt(to, 10, 64)
 	if err != nil {
 		return nil, errors.New("Parse to time failed")
+	}
+	expireT, err := strconv.ParseInt(expire, 10, 64)
+	if err != nil {
+		return nil, errors.New("Parse expire time failed")
 	}
 	limitT, err := strconv.ParseInt(limit, 10, 32)
 	if err != nil {
@@ -191,15 +216,12 @@ func ParseRequest(c *gin.Context, xl *xlog.Logger) (*requestParams, error) {
 		return nil, errors.New("fmt error, it should be flv or fmp4")
 	}
 
-	expireT, err := strconv.ParseInt(expire, 10, 64)
-	if err != nil {
-		return nil, errors.New("Parse expire time failed")
-
-	}
 	params := &requestParams{
 		uaid:      uaid,
 		from:      fromT * 1000,
 		to:        toT * 1000,
+		expire:    expireT * 1000,
+		token:     token,
 		limit:     int(limitT),
 		marker:    marker,
 		namespace: namespace,
@@ -208,8 +230,7 @@ func ParseRequest(c *gin.Context, xl *xlog.Logger) (*requestParams, error) {
 		speed:     int32(speedT),
 		fmt:       fmt,
 		key:       m3u8Name,
-		expire:    expireT,
-		token:     token,
+		reqid:     reqid,
 	}
 
 	return params, nil
@@ -286,4 +307,57 @@ func verifyToken(xl *xlog.Logger, expire int64, realToken string, req *http.Requ
 	mac := &qbox.Mac{AccessKey: user.ak, SecretKey: []byte(user.sk)}
 	token := mac.Sign([]byte(url[0:tokenIndex]))
 	return token == realToken
+}
+
+func getUserInfoByAk(xl *xlog.Logger, req *http.Request) (*userInfo, error, int) {
+	reqUrl := req.URL.String()
+	if !strings.Contains(reqUrl, "token=") {
+		return nil, errors.New("bad url, should contain a token in url"), 401
+	}
+	token := strings.Split(reqUrl, "&token=")[1]
+	ak := strings.Split(token, ":")[0]
+	accessInfo, err := auth.GetUserInfoFromQconf(xl, ak)
+	if err != nil {
+		xl.Errorf("get user info from Qconf failed, err = %#v", err)
+		return nil, errors.New("get user info from Qconf failed"), 500
+	}
+	user := &userInfo{ak: ak,
+		sk:  string(accessInfo.Secret[:]),
+		uid: fmt.Sprint(accessInfo.Uid)}
+	return user, nil, 200
+}
+
+func getDomain(xl *xlog.Logger, bucket string, user *userInfo) ([]string, error) {
+	zone, err := models.GetZone(user.ak, bucket)
+	host := zone.GetApiHost(false)
+	url := fmt.Sprintf("%s%s", host+"/v6/domain/list?tbl=", bucket)
+	var domain []string
+	request, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		xl.Errorf("%#v", err)
+		return domain, err
+	}
+	rpcClient := models.NewRpcClient(user.uid)
+	resp, err := rpcClient.Do(context.Background(), request)
+	if err != nil {
+		return domain, err
+
+	}
+
+	defer resp.Body.Close()
+	dec := json.NewDecoder(resp.Body)
+	for {
+		if err := dec.Decode(&domain); err == io.EOF {
+			break
+
+		} else if err != nil {
+			return domain, err
+		}
+
+	}
+	if len(domain) == 0 {
+		return domain, nil
+	}
+
+	return domain, nil
 }
