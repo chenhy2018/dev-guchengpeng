@@ -308,7 +308,6 @@ func UpdateNamespace(c *gin.Context) {
 		AutoCreateUa: namespaceInfo[0].AutoCreateUa,
 		Expire:       namespaceInfo[0].Expire,
 		Domain:       namespaceInfo[0].Domain,
-		Name:         namespaceInfo[0].Name,
 		Category:     namespaceInfo[0].Category,
 		Remark:       namespaceInfo[0].Remark,
 	}
@@ -351,7 +350,6 @@ func UpdateNamespace(c *gin.Context) {
 		AutoCreateUa: namespaceData.AutoCreateUa,
 		Expire:       namespaceData.Expire,
 		Domain:       namespaceData.Domain,
-		Name:         namespaceData.Name,
 		Category:     namespaceData.Category,
 		Remark:       namespaceData.Remark,
 	}
