@@ -78,7 +78,7 @@ type UaInfo struct {
 	Uid       string `bson:"uid"       json:"-"`
 	UaId      string `bson:"uaid"       json:"uaid"`
 	Password  string `bson:"password"   json:"password"` //options
-	Namespace string `bson:"namespace"  json:"-"`
+	Namespace string `bson:"namespace"  json:"namespace"`
 	CreateAt  int64  `bson:"createdAt"  json:"createdAt"`
 	UpdatedAt int64  `bson:"updatedAt"   json:"updatedAt"`
 	Vod       bool   `bson:"vod"        json:"vod"`

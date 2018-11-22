@@ -22,7 +22,6 @@ type namespacebody struct {
 	AutoCreateUa bool   `json:"auto"`
 	Expire       int    `json:"expire"`
 	Domain       string `json:"domain"`
-	Name         string `json:"name"`
 	Category     string `json:"category"`
 	Remark       string `json:"remark"`
 }
