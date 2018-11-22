@@ -14,6 +14,7 @@ import (
 )
 
 type uabody struct {
+	Name      string `json:"name"`
 	CreatedAt int64  `json:"createdAt"`
 	UpdatedAt int64  `json:"updatedAt"`
 	Password  string `json:"password"`
@@ -61,6 +62,7 @@ func RegisterUa(c *gin.Context) {
 		UaId:      params.uaid,
 		Namespace: params.namespace,
 		Password:  uaData.Password,
+		Name:      uaData.Name,
 		Vod:       uaData.Vod,
 		Live:      uaData.Live,
 		Online:    uaData.Online,
@@ -193,6 +195,7 @@ func UpdateUa(c *gin.Context) {
 	}
 
 	uaData := uabody{
+		Name:     uaInfo[0].Name,
 		Password: uaInfo[0].Password,
 		Vod:      uaInfo[0].Vod,
 		Live:     uaInfo[0].Live,
@@ -218,6 +221,7 @@ func UpdateUa(c *gin.Context) {
 		UaId:      params.uaid,
 		Namespace: params.namespace,
 		Password:  uaData.Password,
+		Name:      uaData.Name,
 		Vod:       uaData.Vod,
 		Live:      uaData.Live,
 		Online:    uaData.Online,
