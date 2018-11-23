@@ -43,7 +43,6 @@ func (m *NamespaceModel) Register(xl *xlog.Logger, req NamespaceInfo) error {
 						NAMESPACE_ITEM_UID:            req.Uid,
 						NAMESPACE_ITEM_AUTO_CREATE_UA: req.AutoCreateUa,
 						NAMESPACE_ITEM_EXPIRE:         req.Expire,
-						NAMESPACE_ITEM_NAME:           req.Name,
 						NAMESPACE_ITEM_CATEGORY:       req.Category,
 						NAMESPACE_ITEM_DOMAIN:         req.Domain,
 					},
@@ -80,7 +79,6 @@ func (m *NamespaceModel) Update(xl *xlog.Logger, req NamespaceInfo) error {
 						NAMESPACE_ITEM_UID:            req.Uid,
 						NAMESPACE_ITEM_AUTO_CREATE_UA: req.AutoCreateUa,
 						NAMESPACE_ITEM_EXPIRE:         req.Expire,
-						NAMESPACE_ITEM_NAME:           req.Name,
 						NAMESPACE_ITEM_CATEGORY:       req.Category,
 						NAMESPACE_ITEM_DOMAIN:         req.Domain,
 					},
@@ -112,7 +110,7 @@ func (m *NamespaceModel) Delete(xl *xlog.Logger, uid, id string) error {
 
 type NamespaceInfo struct {
 	id           string `bson:"_id"  json:"_id"`
-	Space        string `bson:"namespace"  json:"-"`
+	Space        string `bson:"namespace"  json:"namespace"`
 	Regtime      int64  `bson:"createdAt"  json:"createdAt"`
 	UpdateTime   int64  `bson:"updatedAt"  json:"updatedAt"`
 	Bucket       string `bson:"bucket"     json:"bucket"`
@@ -120,7 +118,6 @@ type NamespaceInfo struct {
 	Domain       string `bson:"domain"     json:"domain"`
 	AutoCreateUa bool   `bson:"auto"       json:"auto"`
 	Expire       int    `bson:"expire"     json:"expire"`
-	Name         string `bson:"name"       json:"name"`
 	Category     string `bson:"category"   json:"category"`
 	Remark       string `bson:"remark"     json:"remark"`
 }
@@ -285,6 +282,8 @@ func (m *NamespaceModel) UpdateNamespace(xl *xlog.Logger, uid, space, newSpace s
 						NAMESPACE_ITEM_UID:            r[0].Uid,
 						NAMESPACE_ITEM_AUTO_CREATE_UA: r[0].AutoCreateUa,
 						NAMESPACE_ITEM_EXPIRE:         r[0].Expire,
+						NAMESPACE_ITEM_CATEGORY:       r[0].Category,
+						NAMESPACE_ITEM_DOMAIN:         r[0].Domain,
 					},
 				},
 			)

@@ -40,6 +40,7 @@ func (m *UaModel) Register(xl *xlog.Logger, req UaInfo) error {
 						UA_ITEM_UID:       req.Uid,
 						UA_ITEM_UAID:      req.UaId,
 						UA_ITEM_PASSWORD:  req.Password,
+						UA_ITEM_NAME:      req.Name,
 						ITEM_CREATE_TIME:  time.Now().Unix(),
 						UA_ITEM_NAMESPACE: req.Namespace,
 						ITEM_UPDATA_TIME:  time.Now().Unix(),
@@ -77,8 +78,9 @@ type UaInfo struct {
 	id        string `bson:"_id"       json:"_id"`
 	Uid       string `bson:"uid"       json:"-"`
 	UaId      string `bson:"uaid"       json:"uaid"`
+	Name      string `bson:"name"       json:"name"`
 	Password  string `bson:"password"   json:"password"` //options
-	Namespace string `bson:"namespace"  json:"-"`
+	Namespace string `bson:"namespace"  json:"namespace"`
 	CreateAt  int64  `bson:"createdAt"  json:"createdAt"`
 	UpdatedAt int64  `bson:"updatedAt"   json:"updatedAt"`
 	Vod       bool   `bson:"vod"        json:"vod"`
@@ -186,6 +188,7 @@ func (m *UaModel) UpdateUa(xl *xlog.Logger, uid, namespace, uaid string, info Ua
 						UA_ITEM_PASSWORD:  info.Password,
 						ITEM_UPDATA_TIME:  time.Now().Unix(),
 						UA_ITEM_NAMESPACE: info.Namespace,
+						UA_ITEM_NAME:      info.Name,
 						UA_ITEM_VOD:       info.Vod,
 						UA_ITEM_LIVE:      info.Live,
 						UA_ITEM_ONLINE:    info.Online,
