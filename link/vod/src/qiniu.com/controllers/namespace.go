@@ -135,6 +135,8 @@ func RegisterNamespace(c *gin.Context) {
 		AutoCreateUa: namespaceData.AutoCreateUa,
 		Expire:       expire,
 		Domain:       namespaceData.Domain,
+		Category:     namespaceData.Category,
+		Remark:       namespaceData.Remark,
 	}
 
 	err = namespaceMod.Register(xl, namespace)

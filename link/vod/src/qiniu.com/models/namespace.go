@@ -45,6 +45,7 @@ func (m *NamespaceModel) Register(xl *xlog.Logger, req NamespaceInfo) error {
 						NAMESPACE_ITEM_EXPIRE:         req.Expire,
 						NAMESPACE_ITEM_CATEGORY:       req.Category,
 						NAMESPACE_ITEM_DOMAIN:         req.Domain,
+						NAMESPACE_ITEM_REMARK:         req.Remark,
 					},
 				},
 			)
@@ -81,6 +82,7 @@ func (m *NamespaceModel) Update(xl *xlog.Logger, req NamespaceInfo) error {
 						NAMESPACE_ITEM_EXPIRE:         req.Expire,
 						NAMESPACE_ITEM_CATEGORY:       req.Category,
 						NAMESPACE_ITEM_DOMAIN:         req.Domain,
+						NAMESPACE_ITEM_REMARK:         req.Remark,
 					},
 				},
 			)
@@ -284,6 +286,7 @@ func (m *NamespaceModel) UpdateNamespace(xl *xlog.Logger, uid, space, newSpace s
 						NAMESPACE_ITEM_EXPIRE:         r[0].Expire,
 						NAMESPACE_ITEM_CATEGORY:       r[0].Category,
 						NAMESPACE_ITEM_DOMAIN:         r[0].Domain,
+						NAMESPACE_ITEM_REMARK:         r[0].Remark,
 					},
 				},
 			)
