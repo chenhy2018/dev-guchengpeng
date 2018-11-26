@@ -10,6 +10,7 @@ const (
 	SEGMENT_ITEM_START_TIME          = "starttime"
 	SEGMENT_ITEM_END_TIME            = "endtime"
 	SEGMENT_ITEM_FILE_NAME           = "filename"
+	SEGMENT_ITEM_FSIZE               = "fsize"
 	SEGMENT_ITEM_EXPIRE              = "expireAt"
 	UA_COL                           = "ua"
 	UA_ITEM_UID                      = "uid"
@@ -36,4 +37,5 @@ const (
 	NAMESPACE_ITEM_EXPIRE            = "expire"
 	NAMESPACE_ITEM_NAME              = "name"
 	NAMESPACE_ITEM_CATEGORY          = "category"
+	NAMESPACE_ITEM_REMARK            = "remark"
 )
