@@ -24,7 +24,12 @@ type GrpcConf struct {
 }
 
 type RedisConf struct {
-	Addr string `json:"addrs"`
+	Addrs        []string `json:"addrs"`
+	PoolSize     int      `json:"pool_size"`
+	DialTimeOut  int      `json:"dial_timeout_se"`
+	RedTimeOut   int      `json:"read_timeout_sec"`
+	WriteTimeOut int      `json:"write_timeout_sec"`
+	Name         string   `json:"master"`
 }
 
 type UserConf struct {
