@@ -24,7 +24,8 @@ type GrpcConf struct {
 }
 
 type RedisConf struct {
-	Addr string `json:"addrs"`
+	Addrs []string `json:"addrs"`
+	Name  string   `json:"master"`
 }
 
 type UserConf struct {
