@@ -24,7 +24,8 @@ func GetPlayBackm3u8(c *gin.Context) {
 
 	err = checkParams(xl, params)
 	if err != nil {
-		c.JSON(400, gin.H{"error": err})
+		c.JSON(400, gin.H{"error": err.Error()})
+		return
 	}
 
 	userInfo, err := getUserInfo(xl, c.Request)

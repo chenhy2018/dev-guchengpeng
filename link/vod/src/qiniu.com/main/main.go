@@ -2,8 +2,9 @@ package main
 
 import (
 	"fmt"
-	"gopkg.in/redis.v5"
 	"os"
+
+	"gopkg.in/redis.v5"
 
 	"github.com/gin-gonic/gin"
 	"qiniu.com/auth"
@@ -77,12 +78,13 @@ func initDb(conf *system.Configuration) {
 }
 
 func initRedis(conf *system.Configuration) {
-	client = redis.NewClient(&redis.Options{
-		Addr: conf.RedisConf.Addr,
+	client = redis.NewFailoverClient(&redis.FailoverOptions{
+		SentinelAddrs: conf.RedisConf.Addrs,
+		MasterName:    conf.RedisConf.MasterName,
 	})
 	_, err := client.Ping().Result()
 	if err != nil {
-		fmt.Println(err)
+		fmt.Printf("make new cluster failed, erro = %#v,addrs = %#v, mastername = %#v\n", err.Error(), conf.RedisConf.Addrs, conf.RedisConf.MasterName)
 		os.Exit(3)
 	}
 }

@@ -6,15 +6,19 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	"net/http"
+	"net/url"
+	"strconv"
+	"strings"
+	"time"
+
 	"github.com/gin-gonic/gin"
 	"github.com/qiniu/api.v7/auth/qbox"
 	"github.com/qiniu/api.v7/storage"
 	xlog "github.com/qiniu/xlog.v1"
 	"google.golang.org/grpc"
 	"gopkg.in/redis.v5"
-	"io"
-	"net/http"
-	"net/url"
 	rs "qbox.us/api/rs.v3"
 	"qiniu.com/auth"
 	qboxmac "qiniu.com/auth/qboxmac.v1"
@@ -22,9 +26,6 @@ import (
 	pb "qiniu.com/proto"
 	"qiniu.com/system"
 	"qiniupkg.com/x/rpc.v7"
-	"strconv"
-	"strings"
-	"time"
 )
 
 var (
