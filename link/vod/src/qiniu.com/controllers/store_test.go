@@ -279,9 +279,9 @@ func (suite *StoreTestSuite) TestMkStoreWithCorrectDomain() {
 		return "ipcamera", "pdwjeyj6v.bkt.clouddn.com", nil
 	})
 
-	//monkey.Patch(uploadNewFile, func(filename, bucket string, data []byte, user *userInfo) error {
-	//	return nil
-	//})
+	monkey.Patch(uploadNewFile, func(filename, bucket string, data []byte, user *userInfo) error {
+		return nil
+	})
 	monkey.PatchInstanceMethod(
 		reflect.TypeOf((*models.SegmentKodoModel)(nil)), "GetSegmentTsInfo", func(ss *models.SegmentKodoModel,
 			xl *xlog.Logger, starttime, endtime int64, bucketurl, uaid string, limit int, marker string, uid, userAk string) ([]map[string]interface{}, string, error) {
@@ -323,10 +323,9 @@ func (suite *StoreTestSuite) TestGetStoreWithCorrectDomain() {
 	monkey.Patch(GetBucketAndDomain, func(xl *xlog.Logger, uid, namespace string) (string, string, error) {
 		return "ipcamera", "pdwjeyj6v.bkt.clouddn.com", nil
 	})
-
 	monkey.PatchInstanceMethod(
 		reflect.TypeOf((*models.SegmentKodoModel)(nil)), "GetStoreInfo", func(ss *models.SegmentKodoModel,
-			xl *xlog.Logger, limit int, starttime, endtime int64, bucketurl, uaid string, marker string, uid, userAk string) ([]map[string]interface{}, string, error) {
+			xl *xlog.Logger, limit int, starttime, endtime int64, bucketurl, namespace, uaid string, marker string, uid, userAk string) ([]map[string]interface{}, string, error) {
 			info := []map[string]interface{}{
 				map[string]interface{}{
 					models.SEGMENT_ITEM_START_TIME: int64(1537243756373),
@@ -426,7 +425,7 @@ func (suite *StoreTestSuite) TestUpdateStoreWithCorrectDomain() {
 
 	monkey.PatchInstanceMethod(
 		reflect.TypeOf((*models.SegmentKodoModel)(nil)), "GetStoreInfo", func(ss *models.SegmentKodoModel,
-			xl *xlog.Logger, limit int, starttime, endtime int64, bucketurl, uaid string, marker string, uid, userAk string) ([]map[string]interface{}, string, error) {
+			xl *xlog.Logger, limit int, starttime, endtime int64, bucketurl, namespace, uaid string, marker string, uid, userAk string) ([]map[string]interface{}, string, error) {
 			info := []map[string]interface{}{
 				map[string]interface{}{
 					models.SEGMENT_ITEM_START_TIME: int64(1537243756373),
