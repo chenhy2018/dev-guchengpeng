@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/bouk/monkey"
+	"github.com/qiniu/api.v7/storage"
 	xlog "github.com/qiniu/xlog.v1"
 	"github.com/stretchr/testify/suite"
 	"qiniu.com/models"
@@ -130,9 +131,10 @@ func (suite *SaveasTestSuite) TestSaveas() {
 		return nil
 	})
 
-	monkey.Patch(fopSaveas, func(xl *xlog.Logger, key, saveasList, bucket, fname, pipeline, notify string, expires int, user *userInfo) (string, error) {
-		return "12345", nil
-	})
+	monkey.PatchInstanceMethod(
+		reflect.TypeOf((*storage.OperationManager)(nil)), "Pfop", func(ss *storage.OperationManager, bucket, key, fops, pipeline, notifyURL string, force bool) (string, error) {
+			return "12345", nil
+		})
 
 	monkey.PatchInstanceMethod(
 		reflect.TypeOf((*models.SegmentKodoModel)(nil)), "GetSegmentTsInfo", func(ss *models.SegmentKodoModel,
