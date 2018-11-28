@@ -129,6 +129,11 @@ func (suite *SaveasTestSuite) TestSaveas() {
 	monkey.Patch(uploadNewFile, func(filename, bucket string, data []byte, user *userInfo) error {
 		return nil
 	})
+
+	monkey.Patch(fopSaveas, func(xl *xlog.Logger, key, saveasList, bucket, fname, pipeline, notify string, expires int, user *userInfo) (string, error) {
+		return "12345", nil
+	})
+
 	monkey.PatchInstanceMethod(
 		reflect.TypeOf((*models.SegmentKodoModel)(nil)), "GetSegmentTsInfo", func(ss *models.SegmentKodoModel,
 			xl *xlog.Logger, starttime, endtime int64, bucketurl, uaid string, limit int, marker string, uid, userAk string) ([]map[string]interface{}, string, error) {

@@ -81,7 +81,6 @@ func Saveas(c *gin.Context) {
 		})
 		return
 	}
-	xl.Infof("info[0].Namespace %v", info[0].Namespace)
 	namespace := info[0].Namespace
 	bucket, domain, err := GetBucketAndDomain(xl, userInfo.uid, namespace)
 	if err != nil {
@@ -99,7 +98,12 @@ func Saveas(c *gin.Context) {
 		c.JSON(code, gin.H{"error": err.Error()})
 		return
 	}
-	fmt.Println(saveasList)
+	if saveasData.Format == "" {
+		saveasData.Format = "mp4"
+	}
+	if saveasData.Fname == "" {
+		saveasData.Fname = fmt.Sprintf("%s%s%d.%s", namespace, params.uaid, params.from, saveasData.Format)
+	}
 	persistentID, err := fopSaveas(xl, key, saveasList, bucket, saveasData.Fname, saveasData.Pipeline, saveasData.Notify, saveasData.ExpireDays, userInfo)
 	if err != nil {
 		xl.Errorf("fop failed, error = %#v", err.Error())
@@ -118,29 +122,25 @@ func fopSaveas(xl *xlog.Logger, key, saveasList, bucket, fname, pipeline, notify
 	cfg := storage.Config{
 		UseHTTPS: false,
 	}
-	//rpcClient := models.NewRpcClient(user.uid)
-	fmt.Printf("ak %s sk %s  bucket %s uid %s\n", user.ak, user.sk, bucket, user.uid)
+	rpcClient := models.NewRpcClient(user.uid)
 	mac := qbox.Mac{
-		AccessKey: user.ak,
-		SecretKey: []byte(user.sk),
+		AccessKey: defaultUser.AccessKey,
+		SecretKey: []byte(defaultUser.SecretKey),
 	}
-	//mac := qbox.NewMac("JAwTPb8dmrbiwt89Eaxa4VsL4_xSIYJoJh4rQfOQ", "G5mtjT3QzG4Lf7jpCAN5PZHrGeoSH9jRdC96ecYS")
+
 	zone, err := models.GetZone(user.ak, bucket)
 	if err != nil {
 		return "", err
 	}
-	//fmt.Printf("zone %#v rpc %#v \n", zone, rpcClient)
 	cfg.Zone = zone
-	operationManager := storage.NewOperationManager(&mac, &cfg)
+	operationManager := storage.NewOperationManagerEx(&mac, &cfg, rpcClient)
 	saveasFile := storage.EncodedEntry(bucket, fname)
 	fopCmd := fmt.Sprintf("avconcat/2/format/mp4/index/1%s|saveas/%s", saveasList, saveasFile)
 
 	if expires > 0 {
 		fopCmd += fmt.Sprintf("/deleteAfterDays/%d", expires)
 	}
-	fmt.Println(fopCmd)
-	persistentID, err := operationManager.Pfop(bucket, key, fopCmd, "", "", true)
-	fmt.Println(persistentID)
+	persistentID, err := operationManager.Pfop(bucket, key, fopCmd, pipeline, notify, true)
 	return persistentID, err
 }
 
@@ -175,7 +175,6 @@ func getSaveasList(xl *xlog.Logger, params *requestParams, bucket, domain string
 		if key == "" {
 			key = filename
 		} else {
-			fmt.Println(filename)
 			saveaslist += "/" + base64.URLEncoding.EncodeToString([]byte("http://"+domain+"/"+filename))
 		}
 	}
