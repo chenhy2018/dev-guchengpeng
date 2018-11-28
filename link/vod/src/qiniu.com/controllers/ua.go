@@ -22,6 +22,7 @@ type uabody struct {
 	Live      int    `json:"live"`
 	Online    bool   `json:"online"`
 	Expire    int    `json:"expire"`
+	Postion   string `json:"postion"`
 }
 
 // sample requset url = /v1/namespaces/<Namespace>/uas
@@ -67,6 +68,7 @@ func RegisterUa(c *gin.Context) {
 		Live:      uaData.Live,
 		Online:    uaData.Online,
 		Expire:    uaData.Expire,
+		Postion:   uaData.Postion,
 	}
 	model := models.NamespaceModel{}
 
@@ -201,6 +203,7 @@ func UpdateUa(c *gin.Context) {
 		Live:     uaInfo[0].Live,
 		Online:   uaInfo[0].Online,
 		Expire:   uaInfo[0].Expire,
+		Postion:  uaInfo[0].Postion,
 	}
 
 	dec := json.NewDecoder(c.Request.Body)
@@ -226,6 +229,7 @@ func UpdateUa(c *gin.Context) {
 		Live:      uaData.Live,
 		Online:    uaData.Online,
 		Expire:    uaData.Expire,
+		Postion:   uaData.Postion,
 	}
 
 	model := models.NamespaceModel{}

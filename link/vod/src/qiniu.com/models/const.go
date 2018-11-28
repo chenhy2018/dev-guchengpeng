@@ -22,6 +22,7 @@ const (
 	UA_ITEM_ONLINE                   = "online"
 	UA_ITEM_EXPIRE                   = "expire"
 	UA_ITEM_NAME                     = "name"
+	UA_ITEM_POSTION                  = "postion"
 	USER_COL                         = "user"
 	USER_UUID                        = "uid"
 	USER_PASSWORD                    = "password"

@@ -69,7 +69,7 @@ func GetFastForward(c *gin.Context) {
 	}
 
 	// get ts list from kodo
-	playlist, err, code := getPlaybackList(xl, params, bucket, userInfo)
+	playlist, err, _, code := getPlaybackList(xl, params, bucket, userInfo)
 	if err != nil {
 		xl.Errorf("get playback list error, error = %#v", err.Error())
 		c.JSON(code, gin.H{"error": err.Error()})

@@ -48,6 +48,7 @@ func (m *UaModel) Register(xl *xlog.Logger, req UaInfo) error {
 						UA_ITEM_LIVE:      req.Live,
 						UA_ITEM_ONLINE:    req.Online,
 						UA_ITEM_EXPIRE:    req.Expire,
+						UA_ITEM_POSTION:   req.Postion,
 					},
 				},
 			)
@@ -87,6 +88,7 @@ type UaInfo struct {
 	Live      int    `bson:"live"       json:"live"`
 	Online    bool   `bson:"online"     json:"online"`
 	Expire    int    `bson:"expire"     json:"expire"`
+	Postion   string `bson:"postion"     json:"postion"`
 }
 
 func (m *UaModel) GetUaInfos(xl *xlog.Logger, limit int, mark, uid, namespace, prefix string) ([]UaInfo, string, error) {
@@ -185,14 +187,14 @@ func (m *UaModel) UpdateUa(xl *xlog.Logger, uid, namespace, uaid string, info Ua
 				},
 				bson.M{
 					"$set": bson.M{
-						UA_ITEM_PASSWORD:  info.Password,
-						ITEM_UPDATA_TIME:  time.Now().Unix(),
-						UA_ITEM_NAMESPACE: info.Namespace,
-						UA_ITEM_NAME:      info.Name,
-						UA_ITEM_VOD:       info.Vod,
-						UA_ITEM_LIVE:      info.Live,
-						UA_ITEM_ONLINE:    info.Online,
-						UA_ITEM_EXPIRE:    info.Expire,
+						UA_ITEM_PASSWORD: info.Password,
+						ITEM_UPDATA_TIME: time.Now().Unix(),
+						UA_ITEM_NAME:     info.Name,
+						UA_ITEM_VOD:      info.Vod,
+						UA_ITEM_LIVE:     info.Live,
+						UA_ITEM_ONLINE:   info.Online,
+						UA_ITEM_EXPIRE:   info.Expire,
+						UA_ITEM_POSTION:  info.Postion,
 					},
 				},
 			)

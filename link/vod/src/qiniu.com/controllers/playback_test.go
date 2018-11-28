@@ -218,14 +218,19 @@ func (suite *PlayBackTestSuite) TestPlayBackWithCorrectDomain() {
 					models.SEGMENT_ITEM_START_TIME: int64(1536142906000),
 					models.SEGMENT_ITEM_END_TIME:   int64(1536143141000),
 					models.SEGMENT_ITEM_FILE_NAME:  "ts/ipc00a/1537856214961/1537856214961/7.ts",
+					models.SEGMENT_ITEM_FSIZE:      int64(1234567),
 				},
 				map[string]interface{}{
 					models.SEGMENT_ITEM_START_TIME: int64(1536143141000),
 					models.SEGMENT_ITEM_END_TIME:   int64(1536143280000),
 					models.SEGMENT_ITEM_FILE_NAME:  "ts/ipc00a/1537856214961/1537856214961/7.ts",
+					models.SEGMENT_ITEM_FSIZE:      int64(12345679),
 				}}
 			return info, "", nil
 		})
+	monkey.Patch(KodoBatch, func(xl *xlog.Logger, playlist, storelist []map[string]interface{}, command int, bucket string, expires int, user *userInfo) error {
+		return nil
+	})
 	w := PerformRequest(suite.r, req)
 	suite.Equal(200, w.Code, "correct")
 }

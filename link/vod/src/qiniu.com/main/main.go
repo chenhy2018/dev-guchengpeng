@@ -44,6 +44,11 @@ func main() {
 	r.GET("/v1/namespaces/:namespace/uas/:uaid/fastforward", controllers.GetFastForward)
 	r.GET("/v1/namespaces/:namespace/uas/:uaid/segments", controllers.GetSegments)
 	r.GET("/v1/namespaces/:namespace/uas/:uaid/frames", controllers.GetFrames)
+	r.POST("/v1/namespaces/:namespace/uas/:uaid/saveas", controllers.Saveas)
+	r.POST("/v1/namespaces/:namespace/uas/:uaid/store", controllers.MkStore)
+	r.GET("/v1/namespaces/:namespace/uas/:uaid/store", controllers.GetStoreList)
+	r.DELETE("/v1/namespaces/:namespace/uas/:uaid/store", controllers.DeleteStoreList)
+	r.PUT("/v1/namespaces/:namespace/uas/:uaid/store", controllers.UpdateStoreList)
 	r.POST("/qiniu/upload/callback", controllers.UploadTs)
 
 	//Priavte api

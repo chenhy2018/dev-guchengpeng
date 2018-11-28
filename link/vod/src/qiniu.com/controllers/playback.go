@@ -55,7 +55,7 @@ func GetPlayBackm3u8(c *gin.Context) {
 	}
 
 	// get ts list from kodo
-	playlist, err, code := getPlaybackList(xl, params, bucket, userInfo)
+	playlist, err, _, code := getPlaybackList(xl, params, bucket, userInfo)
 	if err != nil {
 		xl.Errorf("get playback list error, error = %#v", err.Error())
 		c.JSON(code, gin.H{"error": err.Error()})
@@ -78,6 +78,18 @@ func GetPlayBackm3u8(c *gin.Context) {
 		c.JSON(500, gin.H{"error": "Service Internal Error"})
 		return
 	}
+	var storelist []map[string]interface{}
+	m := map[string]interface{}{
+		"m3u8": m3u8File,
+	}
+	storelist = append(storelist, m)
+	var list []map[string]interface{}
+	err = KodoBatch(xl, list, storelist, KODO_COMMAND_DELETE_AFTER_DAYS, bucket, 1, userInfo)
+	if err != nil {
+		xl.Error(err)
+		c.JSON(400, gin.H{"error": err.Error()})
+		return
+	}
 	c.Header("Access-Control-Allow-Origin", "*")
 
 	c.JSON(200, gin.H{
@@ -86,34 +98,35 @@ func GetPlayBackm3u8(c *gin.Context) {
 	})
 }
 
-func getPlaybackList(xl *xlog.Logger, params *requestParams, bucket string, user *userInfo) ([]map[string]interface{}, error, int) {
+func getPlaybackList(xl *xlog.Logger, params *requestParams, bucket string, user *userInfo) ([]map[string]interface{}, error, int64, int) {
 	segs, _, err := segMod.GetSegmentTsInfo(xl, params.from, params.to, bucket, params.uaid, 0, "", user.uid, user.ak)
 	if err != nil {
 		xl.Errorf("getTsInfo error, error =  %#v", err)
-		return nil, errors.New("Service Internal Error"), 500
+		return nil, errors.New("Service Internal Error"), 0, 500
 	}
 	if len(segs) == 0 {
 		xl.Errorf("getTsInfo error, error =  %#v", err)
-		return nil, errors.New("can't find stream in this period"), 404
+		return nil, errors.New("can't find stream in this period"), 0, 404
 	}
 	var playlist []map[string]interface{}
 
 	var total int64
+	var fsize int64
 	for _, v := range segs {
 		start, ok := v[models.SEGMENT_ITEM_START_TIME].(int64)
 		if !ok {
-			return nil, errors.New("start time format error"), 500
+			return nil, errors.New("start time format error"), 0, 500
 		}
 		end, ok := v[models.SEGMENT_ITEM_END_TIME].(int64)
 		if !ok {
-			return nil, errors.New("end time format error"), 500
+			return nil, errors.New("end time format error"), 0, 500
 		}
 		duration := float64(end-start) / 1000
 		total += int64(duration)
 		filename, ok := v[models.SEGMENT_ITEM_FILE_NAME].(string)
 
 		if !ok {
-			return nil, errors.New("filename format error"), 500
+			return nil, errors.New("filename format error"), 0, 500
 
 		}
 		m := map[string]interface{}{
@@ -121,7 +134,11 @@ func getPlaybackList(xl *xlog.Logger, params *requestParams, bucket string, user
 			"url":      "/" + filename,
 		}
 		playlist = append(playlist, m)
-
+		size, ok := v[models.SEGMENT_ITEM_FSIZE].(int64)
+		if !ok {
+			return nil, errors.New("size format error"), 0, 500
+		}
+		fsize += size
 	}
-	return playlist, nil, 200
+	return playlist, nil, fsize, 200
 }

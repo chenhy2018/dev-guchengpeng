@@ -30,6 +30,7 @@ const (
 	SEGMENT_FILENAME_SUB_LEN  = 6
 	FRAGMENT_FILENAME_SUB_LEN = 4
 	FRAME_FILENAME_SUB_LEN    = 4
+	STORE_FILENAME_SUB_LEN    = 6
 	MAX_SEGMENT_TS_TIME_STAMP = 20
 )
 
@@ -45,6 +46,8 @@ func (m *SegmentKodoModel) Init(user system.UserConf) error {
 
 // segment filename should be ts/uaid/startts/endts/fragment_start_ts/expiry.ts
 // fragment filename should be seg/uaid/startts/seg_end_ts
+// store filename shoube be namespace/uaid/store/start_timestamp/end_timestamp/size.m3u8
+
 func GetInfoFromFilename(s, sep string) (error, map[string]interface{}) {
 	sub := strings.Split(s, sep)
 	var info map[string]interface{}
@@ -108,6 +111,29 @@ func GetInfoFromFilename(s, sep string) (error, map[string]interface{}) {
 		info = map[string]interface{}{
 			SEGMENT_ITEM_START_TIME: starttime,
 			SEGMENT_ITEM_FILE_NAME:  s,
+		}
+	} else if len(sub) == STORE_FILENAME_SUB_LEN && sub[2] == "store" {
+		starttime, err := strconv.ParseInt(sub[3], 10, 64)
+		if err != nil {
+			return err, info
+		}
+		endtime, err := strconv.ParseInt(sub[4], 10, 64)
+		if err != nil {
+			return err, info
+		}
+		sizey := strings.Split(sub[5], ".")
+		if len(sizey) != 2 {
+			return fmt.Errorf("the filename is error [%s]", sub[5]), info
+		}
+		size, err := strconv.ParseInt(sizey[0], 10, 64)
+		if err != nil {
+			return err, info
+		}
+		info = map[string]interface{}{
+			SEGMENT_ITEM_START_TIME: starttime,
+			SEGMENT_ITEM_END_TIME:   endtime,
+			SEGMENT_ITEM_FILE_NAME:  s,
+			SEGMENT_ITEM_FSIZE:      size,
 		}
 	}
 	return nil, info
@@ -181,9 +207,10 @@ func (m *SegmentKodoModel) GetSegmentTsInfo(xl *xlog.Logger, starttime, endtime 
 		}
 		if info[SEGMENT_ITEM_END_TIME].(int64) > starttime {
 			r = append(r, info)
+			info[SEGMENT_ITEM_FSIZE] = listItem1.Item.Fsize
+			info[SEGMENT_ITEM_MARK] = listItem1.Marker
 			total++
 		}
-		info[SEGMENT_ITEM_MARK] = listItem1.Marker
 		if total >= limit && limit != 0 {
 			nextMarker = listItem1.Marker
 			break
@@ -300,6 +327,81 @@ func (m *SegmentKodoModel) GetFrameInfo(xl *xlog.Logger, starttime, endtime int6
 	}
 	xl.Infof("find frame need %d ms\n", (time.Now().UnixNano()-pre)/1000000)
 	return r, err
+}
+
+// Calculate mark.
+// Return []yyyy/mm/dd, if same day and same hour, return [1]yyyy/mm/dd/hh
+func calculateNewMark(xl *xlog.Logger, starttime int64, head string) string {
+	k2 := fmt.Sprintf("%s/%d", head, starttime/1000-MAX_SEGMENT_TS_TIME_STAMP)
+	xl.Infof("CalculateMark %s", k2)
+
+	m := map[string]interface{}{
+		"k": k2,
+	}
+	b, err := json.Marshal(m)
+	if err != nil {
+		return ""
+	}
+	encodeString := base64.StdEncoding.EncodeToString(b)
+	return encodeString
+}
+
+// Get Store info List.
+func (m *SegmentKodoModel) GetStoreInfo(xl *xlog.Logger, count int, starttime, endtime int64, bucket, namespace, uaid, mark, uid, userAk string) ([]map[string]interface{}, string, error) {
+	pre := time.Now().UnixNano()
+	var r []map[string]interface{}
+	delimiter := ""
+	nextMarker := ""
+	marker := ""
+	total := 0
+	prefix := namespace + "/" + uaid + "/" + "store"
+	if mark != "" {
+		marker = mark
+	} else {
+		marker = calculateNewMark(xl, starttime, prefix)
+	}
+	xl.Infof("GetFragmentTsInfo prefix  %s \n", prefix)
+	ctx, cancelFunc := context.WithCancel(context.Background())
+	defer cancelFunc()
+	bucketManager := NewBucketMgtWithEx(xl, uid, userAk, bucket)
+	entries, err := bucketManager.ListBucketContext(ctx, bucket, prefix, delimiter, marker)
+	if err != nil {
+		info, ok := err.(*storage.ErrorInfo)
+		if ok {
+			if info.Code == 200 {
+				return r, "", nil
+			} else {
+				return r, "", err
+			}
+		} else {
+			xl.Infof("Not ok")
+			return r, "", err
+
+		}
+	}
+	for listItem1 := range entries {
+
+		err, info := GetInfoFromFilename(listItem1.Item.Key, "/")
+		if err != nil {
+			// if one file is not correct, continue to next
+			xl.Infof("GetFrameInfo err  %s \n", err)
+			continue
+		}
+		if info[SEGMENT_ITEM_START_TIME].(int64)/1000 > endtime/1000 {
+			break
+		}
+		if info[SEGMENT_ITEM_START_TIME].(int64) >= starttime {
+			info[SEGMENT_ITEM_MARK] = listItem1.Marker
+			r = append(r, info)
+			total++
+		}
+		if total >= count && count != 0 {
+			nextMarker = listItem1.Marker
+			break
+		}
+	}
+	xl.Infof("find frame need %d ms\n", (time.Now().UnixNano()-pre)/1000000)
+	return r, nextMarker, err
 }
 
 func NewRpcClient(uid string) *storage.Client {

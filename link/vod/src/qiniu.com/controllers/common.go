@@ -21,6 +21,7 @@ import (
 	"qiniu.com/models"
 	pb "qiniu.com/proto"
 	"qiniu.com/system"
+	"qiniupkg.com/x/rpc.v7"
 	"strconv"
 	"strings"
 	"time"
@@ -33,6 +34,11 @@ var (
 	UaMod            *models.UaModel
 	defaultUser      system.UserConf
 	c                *redis.Client
+)
+
+const (
+	KODO_COMMAND_DELETE_AFTER_DAYS = 0
+	KODO_COMMAND_DELETE            = 1
 )
 
 func Init(conf *system.Configuration, client *redis.Client) {
@@ -360,4 +366,60 @@ func getDomain(xl *xlog.Logger, bucket string, user *userInfo) ([]string, error)
 	}
 
 	return domain, nil
+}
+
+func KodoBatch(xl *xlog.Logger, playlist, storelist []map[string]interface{}, command int, bucket string, expires int, user *userInfo) error {
+	//change the ts file lifecycle
+	bucketManager := models.NewBucketMgtWithEx(xl, user.uid, user.ak, bucket)
+
+	/*
+		mac := qbox.Mac{
+			AccessKey: user.ak,
+			SecretKey: []byte(user.sk),
+		}
+		cfg := storage.Config{
+			UseHTTPS: false,
+		}
+		bucketManager := storage.NewBucketManager(&mac, &cfg)
+	*/
+	ops := []string{}
+	for _, v := range playlist {
+		filename, ok := v["url"].(string)
+		if !ok {
+			continue
+		}
+		if command == KODO_COMMAND_DELETE {
+			ops = append(ops, storage.URIDelete(bucket, filename[1:len(filename)]))
+		} else if command == KODO_COMMAND_DELETE_AFTER_DAYS {
+			ops = append(ops, storage.URIDeleteAfterDays(bucket, filename[1:len(filename)], expires))
+		}
+	}
+	for _, v := range storelist {
+		filename, ok := v["m3u8"].(string)
+		if !ok {
+			continue
+		}
+		if command == KODO_COMMAND_DELETE {
+			ops = append(ops, storage.URIDelete(bucket, filename))
+		} else if command == KODO_COMMAND_DELETE_AFTER_DAYS {
+			ops = append(ops, storage.URIDeleteAfterDays(bucket, filename, expires))
+		}
+	}
+
+	rets, err := bucketManager.Batch(ops)
+	// check batch error
+	if err != nil {
+		if _, ok := err.(*rpc.ErrorInfo); ok {
+			for _, ret := range rets {
+				if ret.Code != 200 {
+					xl.Error(ret.Data.Error)
+					return err
+				}
+			}
+		} else {
+			xl.Errorf("batch error, %#v", err)
+			return err
+		}
+	}
+	return nil
 }
