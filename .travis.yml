@@ -18,6 +18,6 @@ script:
   - source env.sh
   - echo $GOPATH
   - echo "TRAVIS_BRANCH=" $TRAVIS_BRANCH
-  - if [[ $TRAVIS_BRANCH == "dev-merge" || $TRAVIS_BRANCH == "master" ]]; then cd link/vod/src; curl https://aone.qiniu.io/api/coverage/collect?token=A59B8029-E9A1-4FF3-B72B-3657CEAC64D4 | bash; else cd link/vod/src; go test -v ./...; fi
+  - if [[ $TRAVIS_BRANCH == "dev-merge" || $TRAVIS_BRANCH == "master" ]]; then cd src/qiniu.com/linking; curl https://aone.qiniu.io/api/coverage/collect?token=A59B8029-E9A1-4FF3-B72B-3657CEAC64D4 | bash; else cd src/qiniu.com/linking; go test -v ./...; fi
   - echo $PWD
   - cd ..; make style
