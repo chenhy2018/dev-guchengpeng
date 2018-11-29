@@ -138,6 +138,16 @@
 			"revision": ""
 		},
 		{
+			"checksumSHA1": "m+BQgzm/uStr08VxIM1tRGbdut4=",
+			"path": "github.com/qiniu/checkstyle",
+			"revision": ""
+		},
+		{
+			"checksumSHA1": "Ti3y3hMrjuskR2DiNRyC+dQ67a8=",
+			"path": "github.com/qiniu/checkstyle/gocheckstyle",
+			"revision": ""
+		},
+		{
 			"checksumSHA1": "pPFzyja+TStmQqjkJd1ZlvbhEJs=",
 			"path": "github.com/qiniu/db/mgoutil.v3",
 			"revision": ""
@@ -633,6 +643,5 @@
 			"path": "qiniupkg.com/x/url.v7",
 			"revision": ""
 		}
-	],
-	"rootPath": ""
+	]
 }

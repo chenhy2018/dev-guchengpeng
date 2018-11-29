@@ -13,7 +13,7 @@ type App struct {
 
 	Bucket               string `json:"bucket" bson:"bucket"`
 	SegmentExpireDays    int    `json:"segmentExpireDays" bson:"segmentExpireDays"`
-	BucketDownloaaDomain string `json:"bucketDownloaaDomain" bson:"bucketDownloaaDomain"`
+	BucketDownloadDomain string `json:"bucketDownloadDomain" bson:"bucketDownloadDomain"`
 
 	CreatedAt int64 `json:"createdAt" bson:"createdAt"`
 	UpdatedAt int64 `json:"updatedAt" bson:"updatedAt"`
