@@ -20,11 +20,6 @@ func GetRouter() *gin.Engine {
 	r.GET("/v1/namespaces/:namespace/uas/:uaid/frames", GetFrames)
 	r.GET("/v1/namespaces/:namespace/uas/:uaid/fastforward", GetFastForward)
 	r.POST("/upload", UploadTs)
-	r.POST("/v1/namespaces/:namespace/uas/:uaid/saveas", Saveas)
-	r.POST("/v1/namespaces/:namespace/uas/:uaid/store", MkStore)
-	r.GET("/v1/namespaces/:namespace/uas/:uaid/store", GetStoreList)
-	r.DELETE("/v1/namespaces/:namespace/uas/:uaid/store", DeleteStoreList)
-	r.PUT("/v1/namespaces/:namespace/uas/:uaid/store", UpdateStoreList)
 	return r
 }
 
