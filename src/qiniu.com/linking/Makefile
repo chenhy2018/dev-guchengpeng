@@ -1,4 +1,4 @@
-QCHECKSTYLE=go run $(QBOXROOT)/linking/src/vendor/github.com/qiniu/checkstyle/gocheckstyle/gocheckstyle.go -config=.qcodestyle
+QCHECKSTYLE=go run $(GOPATH)/src/vendor/github.com/qiniu/checkstyle/gocheckstyle/gocheckstyle.go -config=.qcodestyle
 all:
 	go install ./...
 	gofmt -w -s .
