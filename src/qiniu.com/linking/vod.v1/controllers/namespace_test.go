@@ -106,7 +106,7 @@ func TestRegisterNamespace(t *testing.T) {
 	}
 	guard2 := monkey.PatchInstanceMethod(
 		reflect.TypeOf((*models.NamespaceModel)(nil)), "GetNamespaceInfo", func(ss *models.NamespaceModel, xl *xlog.Logger, uid, namespace string) ([]models.NamespaceInfo, error) {
-			return []models.NamespaceInfo{models.NamespaceInfo{}}, nil
+			return []models.NamespaceInfo{{}}, nil
 		})
 	bodyBuffer, _ = json.Marshal(body)
 	bodyT = bytes.NewBuffer(bodyBuffer)
@@ -397,7 +397,7 @@ func TestDeleteNamespace(t *testing.T) {
 
 	monkey.PatchInstanceMethod(
 		reflect.TypeOf((*models.NamespaceModel)(nil)), "GetNamespaceInfo", func(ss *models.NamespaceModel, xl *xlog.Logger, uid, namespace string) ([]models.NamespaceInfo, error) {
-			return []models.NamespaceInfo{models.NamespaceInfo{}}, nil
+			return []models.NamespaceInfo{{}}, nil
 		})
 	// 500 internal error if get user info failed
 	guard1 := monkey.Patch(getUserInfo, func(xl *xlog.Logger, req *http.Request) (*userInfo, error) {
@@ -444,7 +444,7 @@ func TestDeleteNamespace(t *testing.T) {
 	})
 	guard5 := monkey.PatchInstanceMethod(
 		reflect.TypeOf((*models.NamespaceModel)(nil)), "GetNamespaceInfo", func(ss *models.NamespaceModel, xl *xlog.Logger, uid, namespace string) ([]models.NamespaceInfo, error) {
-			return []models.NamespaceInfo{models.NamespaceInfo{}}, nil
+			return []models.NamespaceInfo{{}}, nil
 		})
 	req, _ = http.NewRequest("Put", "/v1/namespaces/test1", nil)
 	recoder = httptest.NewRecorder()

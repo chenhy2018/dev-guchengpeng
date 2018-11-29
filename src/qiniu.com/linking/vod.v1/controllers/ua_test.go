@@ -152,7 +152,7 @@ func TestRegisterUa(t *testing.T) {
 		})
 	monkey.PatchInstanceMethod(
 		reflect.TypeOf((*models.NamespaceModel)(nil)), "GetNamespaceInfo", func(ss *models.NamespaceModel, xl *xlog.Logger, uid, namespace string) ([]models.NamespaceInfo, error) {
-			return []models.NamespaceInfo{models.NamespaceInfo{}}, nil
+			return []models.NamespaceInfo{{}}, nil
 		})
 	body = uabody{}
 
@@ -168,7 +168,7 @@ func TestRegisterUa(t *testing.T) {
 	// ua is exist
 	guard5 := monkey.PatchInstanceMethod(
 		reflect.TypeOf((*models.UaModel)(nil)), "GetUaInfo", func(ss *models.UaModel, xl *xlog.Logger, uid, namesapce, uaid string) ([]models.UaInfo, error) {
-			return []models.UaInfo{models.UaInfo{}}, nil
+			return []models.UaInfo{{}}, nil
 		})
 	body = uabody{}
 
@@ -475,7 +475,7 @@ func TestUpdateUa(t *testing.T) {
 	// get ua info failed
 	monkey.PatchInstanceMethod(
 		reflect.TypeOf((*models.NamespaceModel)(nil)), "GetNamespaceInfo", func(ss *models.NamespaceModel, xl *xlog.Logger, uid, namespace string) ([]models.NamespaceInfo, error) {
-			return []models.NamespaceInfo{models.NamespaceInfo{}}, nil
+			return []models.NamespaceInfo{{}}, nil
 		})
 	guard4 := monkey.PatchInstanceMethod(
 		reflect.TypeOf((*models.UaModel)(nil)), "GetUaInfo", func(ss *models.UaModel, xl *xlog.Logger, uid, namesapce, uaid string) ([]models.UaInfo, error) {
@@ -509,7 +509,7 @@ func TestUpdateUa(t *testing.T) {
 	guard7 := monkey.PatchInstanceMethod(
 		reflect.TypeOf((*models.UaModel)(nil)), "GetUaInfo", func(ss *models.UaModel, xl *xlog.Logger, uid, namesapce, uaid string) ([]models.UaInfo, error) {
 			if uaid == "ipcamera1" {
-				return []models.UaInfo{models.UaInfo{}}, nil
+				return []models.UaInfo{{}}, nil
 			}
 			return []models.UaInfo{}, nil
 		})
@@ -639,7 +639,7 @@ func TestDeleteUa(t *testing.T) {
 	// delete ua failed
 	monkey.PatchInstanceMethod(
 		reflect.TypeOf((*models.UaModel)(nil)), "GetUaInfo", func(ss *models.UaModel, xl *xlog.Logger, uid, namesapce, uaid string) ([]models.UaInfo, error) {
-			return []models.UaInfo{models.UaInfo{}}, nil
+			return []models.UaInfo{{}}, nil
 
 		})
 	monkey.PatchInstanceMethod(

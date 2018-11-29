@@ -78,12 +78,12 @@ func (suite *FastForwardTestSuite) TestGetFastForwardStreamError() {
 		reflect.TypeOf((*models.SegmentKodoModel)(nil)), "GetSegmentTsInfo", func(ss *models.SegmentKodoModel,
 			xl *xlog.Logger, starttime, endtime int64, bucketurl, uaid string, limit int, marker string, uid, userAk string) ([]map[string]interface{}, string, error) {
 			info := []map[string]interface{}{
-				map[string]interface{}{
+				{
 					models.SEGMENT_ITEM_START_TIME: int64(1536142906000),
 					models.SEGMENT_ITEM_END_TIME:   int64(1536143141000),
 					models.SEGMENT_ITEM_FILE_NAME:  "ts/ipc00a/1537856214961/1537856214961/7.ts",
 				},
-				map[string]interface{}{
+				{
 					models.SEGMENT_ITEM_START_TIME: int64(1536143141000),
 					models.SEGMENT_ITEM_END_TIME:   int64(1536143280000),
 					models.SEGMENT_ITEM_FILE_NAME:  "ts/ipc00a/1537856214961/1537856214961/7.ts",
