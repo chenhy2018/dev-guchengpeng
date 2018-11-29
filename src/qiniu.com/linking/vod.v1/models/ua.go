@@ -75,7 +75,7 @@ func (m *UaModel) Delete(xl *xlog.Logger, cond map[string]interface{}) error {
 }
 
 type UaInfo struct {
-	id        string `bson:"_id"       json:"_id"`
+	Id        string `bson:"_id"       json:"-"`
 	Uid       string `bson:"uid"       json:"-"`
 	UaId      string `bson:"uaid"       json:"uaid"`
 	Name      string `bson:"name"       json:"name"`
@@ -102,7 +102,7 @@ func (m *UaModel) GetUaInfos(xl *xlog.Logger, limit int, mark, uid, namespace, p
 		if err == nil {
 			newPrefix = uid + "." + namespace + "." + string(newMark)
 		} else {
-			newPrefix = newPrefix
+			return []UaInfo{}, "", fmt.Errorf("mark is not correct")
 		}
 	}
 	var query = bson.M{}
