@@ -111,7 +111,7 @@ func (m *NamespaceModel) Delete(xl *xlog.Logger, uid, id string) error {
 }
 
 type NamespaceInfo struct {
-	id           string `bson:"_id"  json:"_id"`
+	id           string `bson:"_id"  json:"-"`
 	Space        string `bson:"namespace"  json:"namespace"`
 	Regtime      int64  `bson:"createdAt"  json:"createdAt"`
 	UpdateTime   int64  `bson:"updatedAt"  json:"updatedAt"`

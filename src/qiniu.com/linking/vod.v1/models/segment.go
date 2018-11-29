@@ -58,14 +58,14 @@ func (m *SegmentModel) AddSegmentTS(xl *xlog.Logger, req SegmentTsInfo) error {
 		func(c *mgo.Collection) error {
 			_, err := c.Upsert(
 				bson.M{
-					ITEM_ID:                          req.Uid + "." + req.UaId + "." + strconv.FormatInt(req.StartTime, 10),
+					ITEM_ID: req.Uid + "." + req.UaId + "." + strconv.FormatInt(req.StartTime, 10),
 					SEGMENT_ITEM_FRAGMENT_START_TIME: req.FragmentStartTime,
 					SEGMENT_ITEM_START_TIME:          req.StartTime,
 					SEGMENT_ITEM_END_TIME:            req.EndTime,
 				},
 				bson.M{
 					"$set": bson.M{
-						ITEM_ID:                          req.Uid + "." + req.UaId + "." + strconv.FormatInt(req.StartTime, 10),
+						ITEM_ID: req.Uid + "." + req.UaId + "." + strconv.FormatInt(req.StartTime, 10),
 						SEGMENT_ITEM_FRAGMENT_START_TIME: req.FragmentStartTime,
 						SEGMENT_ITEM_START_TIME:          req.StartTime,
 						SEGMENT_ITEM_END_TIME:            req.EndTime,
@@ -228,11 +228,11 @@ func (m *SegmentModel) GetFragmentTsInfo(xl *xlog.Logger, count int, starttime, 
 			err := c.Pipe(
 				[]bson.M{
 					{"$match": bson.M{
-						ITEM_ID:                          bson.M{"$gte": uid + "." + uaid + ".", "$lte": uid + "." + uaid + "/"},
+						ITEM_ID: bson.M{"$gte": uid + "." + uaid + ".", "$lte": uid + "." + uaid + "/"},
 						SEGMENT_ITEM_FRAGMENT_START_TIME: bson.M{"$gte": starttime, "$lte": endtime}},
 					},
 					{"$group": bson.M{
-						"_id":                   bson.M{SEGMENT_ITEM_FRAGMENT_START_TIME: "$fragmentstarttime"},
+						"_id": bson.M{SEGMENT_ITEM_FRAGMENT_START_TIME: "$fragmentstarttime"},
 						SEGMENT_ITEM_START_TIME: bson.M{"$min": "$starttime"},
 						SEGMENT_ITEM_END_TIME:   bson.M{"$max": "$endtime"}},
 					},

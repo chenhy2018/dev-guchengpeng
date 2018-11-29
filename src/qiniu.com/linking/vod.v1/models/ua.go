@@ -48,7 +48,6 @@ func (m *UaModel) Register(xl *xlog.Logger, req UaInfo) error {
 						UA_ITEM_LIVE:      req.Live,
 						UA_ITEM_ONLINE:    req.Online,
 						UA_ITEM_EXPIRE:    req.Expire,
-						UA_ITEM_POSTION:   req.Postion,
 					},
 				},
 			)
@@ -76,7 +75,7 @@ func (m *UaModel) Delete(xl *xlog.Logger, cond map[string]interface{}) error {
 }
 
 type UaInfo struct {
-	id        string `bson:"_id"       json:"_id"`
+	id        string `bson:"_id"       json:"-"`
 	Uid       string `bson:"uid"       json:"-"`
 	UaId      string `bson:"uaid"       json:"uaid"`
 	Name      string `bson:"name"       json:"name"`
@@ -88,7 +87,6 @@ type UaInfo struct {
 	Live      int    `bson:"live"       json:"live"`
 	Online    bool   `bson:"online"     json:"online"`
 	Expire    int    `bson:"expire"     json:"expire"`
-	Postion   string `bson:"postion"     json:"postion"`
 }
 
 func (m *UaModel) GetUaInfos(xl *xlog.Logger, limit int, mark, uid, namespace, prefix string) ([]UaInfo, string, error) {
@@ -104,7 +102,7 @@ func (m *UaModel) GetUaInfos(xl *xlog.Logger, limit int, mark, uid, namespace, p
 		if err == nil {
 			newPrefix = uid + "." + namespace + "." + string(newMark)
 		} else {
-			newPrefix = newPrefix
+			return []UaInfo{}, "", fmt.Errorf("mark is not correct")
 		}
 	}
 	var query = bson.M{}
@@ -187,14 +185,14 @@ func (m *UaModel) UpdateUa(xl *xlog.Logger, uid, namespace, uaid string, info Ua
 				},
 				bson.M{
 					"$set": bson.M{
-						UA_ITEM_PASSWORD: info.Password,
-						ITEM_UPDATA_TIME: time.Now().Unix(),
-						UA_ITEM_NAME:     info.Name,
-						UA_ITEM_VOD:      info.Vod,
-						UA_ITEM_LIVE:     info.Live,
-						UA_ITEM_ONLINE:   info.Online,
-						UA_ITEM_EXPIRE:   info.Expire,
-						UA_ITEM_POSTION:  info.Postion,
+						UA_ITEM_PASSWORD:  info.Password,
+						ITEM_UPDATA_TIME:  time.Now().Unix(),
+						UA_ITEM_NAMESPACE: info.Namespace,
+						UA_ITEM_NAME:      info.Name,
+						UA_ITEM_VOD:       info.Vod,
+						UA_ITEM_LIVE:      info.Live,
+						UA_ITEM_ONLINE:    info.Online,
+						UA_ITEM_EXPIRE:    info.Expire,
 					},
 				},
 			)
