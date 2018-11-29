@@ -75,7 +75,7 @@ func (m *UaModel) Delete(xl *xlog.Logger, cond map[string]interface{}) error {
 }
 
 type UaInfo struct {
-	id        string `bson:"_id"       json:"-"`
+	Id        string `bson:"_id"       json:"-"`
 	Uid       string `bson:"uid"       json:"-"`
 	UaId      string `bson:"uaid"       json:"uaid"`
 	Name      string `bson:"name"       json:"name"`

@@ -7,3 +7,8 @@ test:
 	go test ./...
 style:
 	@$(QCHECKSTYLE)
+
+gofmt-check:
+	@test `gofmt -s -l . | wc -l` -eq 0
+govet-check:
+	find . -name '*.go' | xargs -L 1 go tool vet
