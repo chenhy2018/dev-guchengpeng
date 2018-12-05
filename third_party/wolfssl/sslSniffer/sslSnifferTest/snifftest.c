@@ -295,7 +295,6 @@ int main(int argc, char** argv)
         static int packetNumber = 0;
         struct pcap_pkthdr header;
         const unsigned char* packet = pcap_next(pcap, &header);
-        SSLInfo sslInfo;
         packetNumber++;
         if (packet) {
 
@@ -308,8 +307,7 @@ int main(int argc, char** argv)
             else
                 continue;
 
-            ret = ssl_DecodePacketWithSessionInfo(packet, header.caplen, &data,
-                                                  &sslInfo, err);
+            ret = ssl_DecodePacket(packet, header.caplen, &data, err);
             if (ret < 0) {
                 printf("ssl_Decode ret = %d, %s\n", ret, err);
                 hadBadPacket = 1;

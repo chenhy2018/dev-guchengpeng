@@ -12,7 +12,7 @@
 #include <wolfssl/wolfcrypt/random.h>
 #include <wolfssl/wolfcrypt/mem_track.h>
 #if defined(OPENSSL_EXTRA) && defined(SHOW_CERTS)
-    #include <wolfssl/wolfcrypt/asn.h> /* for domain component NID value */
+    #include <wolfssl/openssl/ssl.h> /* for domain component NID value */
 #endif
 
 #ifdef ATOMIC_USER
@@ -137,7 +137,7 @@
 
 #ifndef WOLFSSL_HAVE_MIN
     #define WOLFSSL_HAVE_MIN
-    static WC_INLINE word32 min(word32 a, word32 b)
+    static INLINE word32 min(word32 a, word32 b)
     {
         return a > b ? b : a;
     }
@@ -236,13 +236,10 @@
 #define CLIENT_DTLS_DEFAULT_VERSION (-2)
 #define CLIENT_INVALID_VERSION (-99)
 #define CLIENT_DOWNGRADE_VERSION (-98)
-#define EITHER_DOWNGRADE_VERSION (-97)
 #if !defined(NO_FILESYSTEM) && defined(WOLFSSL_MAX_STRENGTH)
     #define DEFAULT_MIN_DHKEY_BITS 2048
-    #define DEFAULT_MAX_DHKEY_BITS 3072
 #else
     #define DEFAULT_MIN_DHKEY_BITS 1024
-    #define DEFAULT_MAX_DHKEY_BITS 2048
 #endif
 #if !defined(NO_FILESYSTEM) && defined(WOLFSSL_MAX_STRENGTH)
     #define DEFAULT_MIN_RSAKEY_BITS 2048
@@ -273,11 +270,6 @@
 #define cliEccCertFile "certs/client-ecc-cert.pem"
 #define caEccCertFile  "certs/ca-ecc-cert/pem"
 #define crlPemDir      "certs/crl"
-#define edCertFile     "certs/ed25519/server-ed25519-cert.pem"
-#define edKeyFile      "certs/ed25519/server-ed25519-priv.pem"
-#define cliEdCertFile  "certs/ed25519/client-ed25519.pem"
-#define cliEdKeyFile   "certs/ed25519/client-ed25519-priv.pem"
-#define caEdCertFile   "certs/ed25519/ca-ed25519.pem"
 #ifdef HAVE_WNR
     /* Whitewood netRandom default config file */
     #define wnrConfig  "wnr-example.conf"
@@ -299,11 +291,6 @@
 #define cliEccCertFile "./certs/client-ecc-cert.pem"
 #define caEccCertFile  "./certs/ca-ecc-cert.pem"
 #define crlPemDir      "./certs/crl"
-#define edCertFile     "./certs/ed25519/server-ed25519.pem"
-#define edKeyFile      "./certs/ed25519/server-ed25519-priv.pem"
-#define cliEdCertFile  "./certs/ed25519/client-ed25519.pem"
-#define cliEdKeyFile   "./certs/ed25519/client-ed25519-priv.pem"
-#define caEdCertFile   "./certs/ed25519/root-ed25519.pem"
 #ifdef HAVE_WNR
     /* Whitewood netRandom default config file */
     #define wnrConfig  "./wnr-example.conf"
@@ -321,7 +308,7 @@ typedef struct tcp_ready {
 } tcp_ready;
 
 
-static WC_INLINE void InitTcpReady(tcp_ready* ready)
+static INLINE void InitTcpReady(tcp_ready* ready)
 {
     ready->ready = 0;
     ready->port = 0;
@@ -334,7 +321,7 @@ static WC_INLINE void InitTcpReady(tcp_ready* ready)
 }
 
 
-static WC_INLINE void FreeTcpReady(tcp_ready* ready)
+static INLINE void FreeTcpReady(tcp_ready* ready)
 {
 #ifdef SINGLE_THREADED
     (void)ready;
@@ -355,7 +342,6 @@ typedef struct callback_functions {
     ctx_callback ctx_ready;
     ssl_callback ssl_ready;
     ssl_callback on_result;
-    WOLFSSL_CTX* ctx;
 } callback_functions;
 
 typedef struct func_args {
@@ -385,31 +371,7 @@ void join_thread(THREAD_TYPE);
 static const word16      wolfSSLPort = 11111;
 
 
-
-#ifndef MY_EX_USAGE
-#define MY_EX_USAGE 2
-#endif
-
-#ifndef EXIT_FAILURE
-#define EXIT_FAILURE 1
-#endif
-
-#ifdef WOLFSSL_FORCE_MALLOC_FAIL_TEST
-    #define XEXIT(rc)   return rc
-    #define XEXIT_T(rc) return (THREAD_RETURN)rc
-#else
-    #define XEXIT(rc)   exit((int)(rc))
-    #define XEXIT_T(rc) exit((int)(rc))
-#endif
-
-
-static WC_INLINE
-#ifdef WOLFSSL_FORCE_MALLOC_FAIL_TEST
-THREAD_RETURN
-#else
-WC_NORETURN void
-#endif
-err_sys(const char* msg)
+static INLINE WC_NORETURN void err_sys(const char* msg)
 {
     printf("wolfSSL error: %s\n", msg);
 
@@ -423,15 +385,17 @@ err_sys(const char* msg)
     if (msg)
 #endif
     {
-        XEXIT_T(EXIT_FAILURE);
+        exit(EXIT_FAILURE);
     }
 }
 
 
+#define MY_EX_USAGE 2
+
 extern int   myoptind;
 extern char* myoptarg;
 
-static WC_INLINE int mygetopt(int argc, char** argv, const char* optstring)
+static INLINE int mygetopt(int argc, char** argv, const char* optstring)
 {
     static char* next = NULL;
 
@@ -497,7 +461,7 @@ static WC_INLINE int mygetopt(int argc, char** argv, const char* optstring)
 
 #ifdef WOLFSSL_ENCRYPTED_KEYS
 
-static WC_INLINE int PasswordCallBack(char* passwd, int sz, int rw, void* userdata)
+static INLINE int PasswordCallBack(char* passwd, int sz, int rw, void* userdata)
 {
     (void)rw;
     (void)userdata;
@@ -513,55 +477,10 @@ static WC_INLINE int PasswordCallBack(char* passwd, int sz, int rw, void* userda
 
 #endif
 
-static const char* client_showpeer_msg[][8] = {
-    /* English */
-    {
-        "SSL version is",
-        "SSL cipher suite is",
-        "SSL curve name is",
-        "SSL DH size is",
-        "SSL reused session",
-        "Alternate cert chain used",
-        "peer's cert info:",
-        NULL
-    },
-    /* Japanese */
-    {
-        "SSL バージョンは",
-        "SSL 暗号スイートは",
-        "SSL 曲線名は",
-        "SSL DH サイズは",
-        "SSL 再利用セッション",
-        "代替証明チェーンを使用",
-        "相手方証明書情報",
-        NULL
-    }
-};
 
 #if defined(KEEP_PEER_CERT) || defined(SESSION_CERTS)
-static const char* client_showx509_msg[][5] = {
-    /* English */
-    {
-        "issuer",
-        "subject",
-        "altname",
-        "serial number",
-        NULL
-    },
-    /* Japanese */
-    {
-        "発行者",
-        "サブジェクト",
-        "代替名",
-        "シリアル番号",
-        NULL
-    },
-};
 
-/* lng_index is to specify the language for displaying message.              */
-/* 0:English, 1:Japanese                                                     */
-static WC_INLINE void ShowX509Ex(WOLFSSL_X509* x509, const char* hdr, 
-                                                                 int lng_index)
+static INLINE void ShowX509(WOLFSSL_X509* x509, const char* hdr)
 {
     char* altName;
     char* issuer;
@@ -569,7 +488,6 @@ static WC_INLINE void ShowX509Ex(WOLFSSL_X509* x509, const char* hdr,
     byte  serial[32];
     int   ret;
     int   sz = sizeof(serial);
-    const char** words = client_showx509_msg[lng_index];
 
     if (x509 == NULL) {
         printf("%s No Cert\n", hdr);
@@ -581,10 +499,10 @@ static WC_INLINE void ShowX509Ex(WOLFSSL_X509* x509, const char* hdr,
     subject = wolfSSL_X509_NAME_oneline(
                                      wolfSSL_X509_get_subject_name(x509), 0, 0);
 
-    printf("%s\n %s : %s\n %s: %s\n", hdr, words[0], issuer, words[1], subject);
+    printf("%s\n issuer : %s\n subject: %s\n", hdr, issuer, subject);
 
     while ( (altName = wolfSSL_X509_get_next_altname(x509)) != NULL)
-        printf(" %s = %s\n", words[2], altName);
+        printf(" altname = %s\n", altName);
 
     ret = wolfSSL_X509_get_serial_number(x509, serial, &sz);
     if (ret == WOLFSSL_SUCCESS) {
@@ -594,7 +512,7 @@ static WC_INLINE void ShowX509Ex(WOLFSSL_X509* x509, const char* hdr,
 
         /* testsuite has multiple threads writing to stdout, get output
            message ready to write once */
-        strLen = sprintf(serialMsg, " %s", words[3]);
+        strLen = sprintf(serialMsg, " serial number");
         for (i = 0; i < sz; i++)
             sprintf(serialMsg + strLen + (i*3), ":%02x ", serial[i]);
         printf("%s\n", serialMsg);
@@ -627,16 +545,11 @@ static WC_INLINE void ShowX509Ex(WOLFSSL_X509* x509, const char* hdr,
     }
 #endif
 }
-/* original ShowX509 to maintain compatibility */
-static WC_INLINE void ShowX509(WOLFSSL_X509* x509, const char* hdr)
-{
-    ShowX509Ex(x509, hdr, 0);
-}
 
 #endif /* KEEP_PEER_CERT || SESSION_CERTS */
 
 #if defined(SESSION_CERTS) && defined(SHOW_CERTS)
-static WC_INLINE void ShowX509Chain(WOLFSSL_X509_CHAIN* chain, int count,
+static INLINE void ShowX509Chain(WOLFSSL_X509_CHAIN* chain, int count,
     const char* hdr)
 {
     int i;
@@ -659,13 +572,9 @@ static WC_INLINE void ShowX509Chain(WOLFSSL_X509_CHAIN* chain, int count,
 }
 #endif
 
-/* lng_index is to specify the language for displaying message.              */
-/* 0:English, 1:Japanese                                                     */
-static WC_INLINE void showPeerEx(WOLFSSL* ssl, int lng_index)
+static INLINE void showPeer(WOLFSSL* ssl)
 {
     WOLFSSL_CIPHER* cipher;
-    const char** words = client_showpeer_msg[lng_index];
-
 #ifdef HAVE_ECC
     const char *name;
 #endif
@@ -675,7 +584,7 @@ static WC_INLINE void showPeerEx(WOLFSSL* ssl, int lng_index)
 #ifdef KEEP_PEER_CERT
     WOLFSSL_X509* peer = wolfSSL_get_peer_certificate(ssl);
     if (peer)
-        ShowX509Ex(peer, words[6], lng_index);
+        ShowX509(peer, "peer's cert info:");
     else
         printf("peer has no cert!\n");
     wolfSSL_FreeX509(peer);
@@ -684,28 +593,28 @@ static WC_INLINE void showPeerEx(WOLFSSL* ssl, int lng_index)
     ShowX509(wolfSSL_get_certificate(ssl), "our cert info:");
     printf("Peer verify result = %lu\n", wolfSSL_get_verify_result(ssl));
 #endif /* SHOW_CERTS */
-    printf("%s %s\n", words[0], wolfSSL_get_version(ssl));
+    printf("SSL version is %s\n", wolfSSL_get_version(ssl));
 
     cipher = wolfSSL_get_current_cipher(ssl);
 #ifdef HAVE_QSH
-    printf("%s %s%s\n", words[1], (wolfSSL_isQSH(ssl))? "QSH:": "",
+    printf("SSL cipher suite is %s%s\n", (wolfSSL_isQSH(ssl))? "QSH:": "",
             wolfSSL_CIPHER_get_name(cipher));
 #else
-    printf("%s %s\n", words[1], wolfSSL_CIPHER_get_name(cipher));
+    printf("SSL cipher suite is %s\n", wolfSSL_CIPHER_get_name(cipher));
 #endif
 #ifdef HAVE_ECC
     if ((name = wolfSSL_get_curve_name(ssl)) != NULL)
-        printf("%s %s\n", words[2], name);
+        printf("SSL curve name is %s\n", name);
 #endif
 #ifndef NO_DH
     if ((bits = wolfSSL_GetDhKey_Sz(ssl)) > 0)
-        printf("%s %d bits\n", words[3], bits);
+        printf("SSL DH size is %d bits\n", bits);
 #endif
     if (wolfSSL_session_reused(ssl))
-        printf("%s\n", words[4]);
+        printf("SSL reused session\n");
 #ifdef WOLFSSL_ALT_CERT_CHAINS
     if (wolfSSL_is_peer_alt_cert_chain(ssl))
-        printf("%s\n", words[5]);
+        printf("Alternate cert chain used\n");
 #endif
 
 #if defined(SESSION_CERTS) && defined(SHOW_CERTS)
@@ -725,13 +634,9 @@ static WC_INLINE void showPeerEx(WOLFSSL* ssl, int lng_index)
 #endif /* SESSION_CERTS && SHOW_CERTS */
   (void)ssl;
 }
-/* original showPeer to maintain compatibility */
-static WC_INLINE void showPeer(WOLFSSL* ssl)
-{
-    showPeerEx(ssl, 0);
-}
 
-static WC_INLINE void build_addr(SOCKADDR_IN_T* addr, const char* peer,
+
+static INLINE void build_addr(SOCKADDR_IN_T* addr, const char* peer,
                               word16 port, int udp, int sctp)
 {
     int useLookup = 0;
@@ -831,7 +736,7 @@ static WC_INLINE void build_addr(SOCKADDR_IN_T* addr, const char* peer,
 }
 
 
-static WC_INLINE void tcp_socket(SOCKET_T* sockfd, int udp, int sctp)
+static INLINE void tcp_socket(SOCKET_T* sockfd, int udp, int sctp)
 {
     (void)sctp;
 
@@ -877,7 +782,7 @@ static WC_INLINE void tcp_socket(SOCKET_T* sockfd, int udp, int sctp)
 #endif  /* USE_WINDOWS_API */
 }
 
-static WC_INLINE void tcp_connect(SOCKET_T* sockfd, const char* ip, word16 port,
+static INLINE void tcp_connect(SOCKET_T* sockfd, const char* ip, word16 port,
                                int udp, int sctp, WOLFSSL* ssl)
 {
     SOCKADDR_IN_T addr;
@@ -894,7 +799,7 @@ static WC_INLINE void tcp_connect(SOCKET_T* sockfd, const char* ip, word16 port,
 }
 
 
-static WC_INLINE void udp_connect(SOCKET_T* sockfd, void* addr, int addrSz)
+static INLINE void udp_connect(SOCKET_T* sockfd, void* addr, int addrSz)
 {
     if (connect(*sockfd, (const struct sockaddr*)addr, addrSz) != 0)
         err_sys("tcp connect failed");
@@ -911,7 +816,7 @@ enum {
 
 #if !defined(WOLFSSL_MDK_ARM) && !defined(WOLFSSL_KEIL_TCP_NET) && \
                                  !defined(WOLFSSL_TIRTOS)
-static WC_INLINE int tcp_select(SOCKET_T socketfd, int to_sec)
+static INLINE int tcp_select(SOCKET_T socketfd, int to_sec)
 {
     fd_set recvfds, errfds;
     SOCKET_T nfds = socketfd + 1;
@@ -944,14 +849,14 @@ static WC_INLINE int tcp_select(SOCKET_T socketfd, int to_sec)
     return TEST_SELECT_FAIL;
 }
 #elif defined(WOLFSSL_TIRTOS) || defined(WOLFSSL_KEIL_TCP_NET)
-static WC_INLINE int tcp_select(SOCKET_T socketfd, int to_sec)
+static INLINE int tcp_select(SOCKET_T socketfd, int to_sec)
 {
     return TEST_RECV_READY;
 }
 #endif /* !WOLFSSL_MDK_ARM */
 
 
-static WC_INLINE void tcp_listen(SOCKET_T* sockfd, word16* port, int useAnyAddr,
+static INLINE void tcp_listen(SOCKET_T* sockfd, word16* port, int useAnyAddr,
                               int udp, int sctp)
 {
     SOCKADDR_IN_T addr;
@@ -999,7 +904,7 @@ static WC_INLINE void tcp_listen(SOCKET_T* sockfd, word16* port, int useAnyAddr,
 
 
 #if 0
-static WC_INLINE int udp_read_connect(SOCKET_T sockfd)
+static INLINE int udp_read_connect(SOCKET_T sockfd)
 {
     SOCKADDR_IN_T cliaddr;
     byte          b[1500];
@@ -1020,7 +925,7 @@ static WC_INLINE int udp_read_connect(SOCKET_T sockfd)
 }
 #endif
 
-static WC_INLINE void udp_accept(SOCKET_T* sockfd, SOCKET_T* clientfd,
+static INLINE void udp_accept(SOCKET_T* sockfd, SOCKET_T* clientfd,
                               int useAnyAddr, word16 port, func_args* args)
 {
     SOCKADDR_IN_T addr;
@@ -1077,7 +982,7 @@ static WC_INLINE void udp_accept(SOCKET_T* sockfd, SOCKET_T* clientfd,
     *clientfd = *sockfd;
 }
 
-static WC_INLINE void tcp_accept(SOCKET_T* sockfd, SOCKET_T* clientfd,
+static INLINE void tcp_accept(SOCKET_T* sockfd, SOCKET_T* clientfd,
                               func_args* args, word16 port, int useAnyAddr,
                               int udp, int sctp, int ready_file, int do_listen)
 {
@@ -1118,7 +1023,7 @@ static WC_INLINE void tcp_accept(SOCKET_T* sockfd, SOCKET_T* clientfd,
 
         if (ready_file) {
         #if !defined(NO_FILESYSTEM) || defined(FORCE_BUFFER_TEST)
-            XFILE srf = NULL;
+            FILE* srf = NULL;
             if (args)
                 ready = args->signal;
 
@@ -1147,7 +1052,7 @@ static WC_INLINE void tcp_accept(SOCKET_T* sockfd, SOCKET_T* clientfd,
 }
 
 
-static WC_INLINE void tcp_set_nonblocking(SOCKET_T* sockfd)
+static INLINE void tcp_set_nonblocking(SOCKET_T* sockfd)
 {
     #ifdef USE_WINDOWS_API
         unsigned long blocking = 1;
@@ -1173,7 +1078,7 @@ static WC_INLINE void tcp_set_nonblocking(SOCKET_T* sockfd)
 /* identity is OpenSSL testing default for openssl s_client, keep same */
 static const char* kIdentityStr = "Client_identity";
 
-static WC_INLINE unsigned int my_psk_client_cb(WOLFSSL* ssl, const char* hint,
+static INLINE unsigned int my_psk_client_cb(WOLFSSL* ssl, const char* hint,
         char* identity, unsigned int id_max_len, unsigned char* key,
         unsigned int key_max_len)
 {
@@ -1210,7 +1115,7 @@ static WC_INLINE unsigned int my_psk_client_cb(WOLFSSL* ssl, const char* hint,
 }
 
 
-static WC_INLINE unsigned int my_psk_server_cb(WOLFSSL* ssl, const char* identity,
+static INLINE unsigned int my_psk_server_cb(WOLFSSL* ssl, const char* identity,
         unsigned char* key, unsigned int key_max_len)
 {
     (void)ssl;
@@ -1245,58 +1150,6 @@ static WC_INLINE unsigned int my_psk_server_cb(WOLFSSL* ssl, const char* identit
     }
 }
 
-
-static WC_INLINE unsigned int my_psk_client_tls13_cb(WOLFSSL* ssl,
-        const char* hint, char* identity, unsigned int id_max_len,
-        unsigned char* key, unsigned int key_max_len, const char** ciphersuite)
-{
-    int i;
-    int b = 0x01;
-
-    (void)ssl;
-    (void)hint;
-    (void)key_max_len;
-
-    /* see internal.h MAX_PSK_ID_LEN for PSK identity limit */
-    strncpy(identity, kIdentityStr, id_max_len);
-
-    for (i = 0; i < 32; i++, b += 0x22) {
-        if (b >= 0x100)
-            b = 0x01;
-        key[i] = b;
-    }
-
-    *ciphersuite = "TLS13-AES128-GCM-SHA256";
-
-    return 32;   /* length of key in octets or 0 for error */
-}
-
-
-static WC_INLINE unsigned int my_psk_server_tls13_cb(WOLFSSL* ssl,
-        const char* identity, unsigned char* key, unsigned int key_max_len,
-        const char** ciphersuite)
-{
-    int i;
-    int b = 0x01;
-
-    (void)ssl;
-    (void)key_max_len;
-
-    /* see internal.h MAX_PSK_ID_LEN for PSK identity limit */
-    if (strncmp(identity, kIdentityStr, strlen(kIdentityStr)) != 0)
-        return 0;
-
-    for (i = 0; i < 32; i++, b += 0x22) {
-        if (b >= 0x100)
-            b = 0x01;
-        key[i] = b;
-    }
-
-    *ciphersuite = "TLS13-AES128-GCM-SHA256";
-
-    return 32;   /* length of key in octets or 0 for error */
-}
-
 #endif /* NO_PSK */
 
 
@@ -1308,7 +1161,7 @@ static WC_INLINE unsigned int my_psk_server_tls13_cb(WOLFSSL* ssl,
     #define WIN32_LEAN_AND_MEAN
     #include <windows.h>
 
-    static WC_INLINE double current_time(int reset)
+    static INLINE double current_time(int reset)
     {
         static int init = 0;
         static LARGE_INTEGER freq;
@@ -1333,7 +1186,7 @@ static WC_INLINE unsigned int my_psk_server_tls13_cb(WOLFSSL* ssl,
 #if !defined(WOLFSSL_MDK_ARM) && !defined(WOLFSSL_KEIL_TCP_NET) && !defined(WOLFSSL_CHIBIOS)
     #include <sys/time.h>
 
-    static WC_INLINE double current_time(int reset)
+    static INLINE double current_time(int reset)
     {
         struct timeval tv;
         gettimeofday(&tv, 0);
@@ -1348,7 +1201,7 @@ static WC_INLINE unsigned int my_psk_server_tls13_cb(WOLFSSL* ssl,
 
 
 #if defined(HAVE_OCSP) && defined(WOLFSSL_NONBLOCK_OCSP)
-static WC_INLINE int OCSPIOCb(void* ioCtx, const char* url, int urlSz,
+static INLINE int OCSPIOCb(void* ioCtx, const char* url, int urlSz,
     unsigned char* request, int requestSz, unsigned char** response)
 {
 #ifdef TEST_NONBLOCK_CERTS
@@ -1376,7 +1229,7 @@ static WC_INLINE int OCSPIOCb(void* ioCtx, const char* url, int urlSz,
 #endif
 }
 
-static WC_INLINE void OCSPRespFreeCb(void* ioCtx, unsigned char* response)
+static INLINE void OCSPRespFreeCb(void* ioCtx, unsigned char* response)
 {
     (void)ioCtx;
     (void)response;
@@ -1388,11 +1241,11 @@ static WC_INLINE void OCSPRespFreeCb(void* ioCtx, unsigned char* response)
         (defined(NO_FILESYSTEM) && defined(FORCE_BUFFER_TEST))
 
     /* reads file size, allocates buffer, reads into buffer, returns buffer */
-    static WC_INLINE int load_file(const char* fname, byte** buf, size_t* bufLen)
+    static INLINE int load_file(const char* fname, byte** buf, size_t* bufLen)
     {
         int ret;
         long int fileSz;
-        XFILE file;
+        FILE* file;
 
         if (fname == NULL || buf == NULL || bufLen == NULL)
             return BAD_FUNC_ARG;
@@ -1440,7 +1293,7 @@ static WC_INLINE void OCSPRespFreeCb(void* ioCtx, unsigned char* response)
         WOLFSSL_CERT_CHAIN = 4,
     };
 
-    static WC_INLINE void load_buffer(WOLFSSL_CTX* ctx, const char* fname, int type)
+    static INLINE void load_buffer(WOLFSSL_CTX* ctx, const char* fname, int type)
     {
         int format = WOLFSSL_FILETYPE_PEM;
         byte* buff = NULL;
@@ -1480,50 +1333,8 @@ static WC_INLINE void OCSPRespFreeCb(void* ioCtx, unsigned char* response)
             free(buff);
     }
 
-    static WC_INLINE void load_ssl_buffer(WOLFSSL* ssl, const char* fname, int type)
-    {
-        int format = WOLFSSL_FILETYPE_PEM;
-        byte* buff = NULL;
-        size_t sz = 0;
-
-        if (load_file(fname, &buff, &sz) != 0) {
-            err_sys("can't open file for buffer load "
-                    "Please run from wolfSSL home directory if not");
-        }
-
-        /* determine format */
-        if (strstr(fname, ".der"))
-            format = WOLFSSL_FILETYPE_ASN1;
-
-        if (type == WOLFSSL_CA) {
-            /* verify certs (CA's) use the shared ctx->cm (WOLFSSL_CERT_MANAGER) */
-            WOLFSSL_CTX* ctx = wolfSSL_get_SSL_CTX(ssl);
-            if (wolfSSL_CTX_load_verify_buffer(ctx, buff, (long)sz, format)
-                                              != WOLFSSL_SUCCESS)
-                err_sys("can't load buffer ca file");
-        }
-        else if (type == WOLFSSL_CERT) {
-            if (wolfSSL_use_certificate_buffer(ssl, buff, (long)sz,
-                        format) != WOLFSSL_SUCCESS)
-                err_sys("can't load buffer cert file");
-        }
-        else if (type == WOLFSSL_KEY) {
-            if (wolfSSL_use_PrivateKey_buffer(ssl, buff, (long)sz,
-                        format) != WOLFSSL_SUCCESS)
-                err_sys("can't load buffer key file");
-        }
-        else if (type == WOLFSSL_CERT_CHAIN) {
-            if (wolfSSL_use_certificate_chain_buffer_format(ssl, buff,
-                    (long)sz, format) != WOLFSSL_SUCCESS)
-                err_sys("can't load cert chain buffer");
-        }
-
-        if (buff)
-            free(buff);
-    }
-
     #ifdef TEST_PK_PRIVKEY
-    static WC_INLINE int load_key_file(const char* fname, byte** derBuf, word32* derLen)
+    static INLINE int load_key_file(const char* fname, byte** derBuf, word32* derLen)
     {
         int ret;
         byte* buf = NULL;
@@ -1555,29 +1366,13 @@ static WC_INLINE void OCSPRespFreeCb(void* ioCtx, unsigned char* response)
     #endif /* !NO_FILESYSTEM || (NO_FILESYSTEM && FORCE_BUFFER_TEST) */
 #endif /* !NO_CERTS */
 
-static int myVerifyFail = 0;
-static WC_INLINE int myVerify(int preverify, WOLFSSL_X509_STORE_CTX* store)
+static INLINE int myVerify(int preverify, WOLFSSL_X509_STORE_CTX* store)
 {
     char buffer[WOLFSSL_MAX_ERROR_SZ];
 #ifdef OPENSSL_EXTRA
     WOLFSSL_X509* peer;
 #endif
     (void)preverify;
-
-    /* Verify Callback Arguments:
-     * preverify:           1=Verify Okay, 0=Failure
-     * store->error:        Failure error code (0 indicates no failure)
-     * store->current_cert: Current WOLFSSL_X509 object (only with OPENSSL_EXTRA)
-     * store->error_depth:  Current Index
-     * store->domain:       Subject CN as string (null term)
-     * store->totalCerts:   Number of certs presented by peer
-     * store->certs[i]:     A `WOLFSSL_BUFFER_INFO` with plain DER for each cert
-     * store->store:        WOLFSSL_X509_STORE with CA cert chain
-     * store->store->cm:    WOLFSSL_CERT_MANAGER
-     * store->ex_data:      The WOLFSSL object pointer
-     * store->discardSessionCerts: When set to non-zero value session certs
-        will be discarded (only with SESSION_CERTS)
-     */
 
     printf("In verification callback, error = %d, %s\n", store->error,
                                  wolfSSL_ERR_error_string(store->error, buffer));
@@ -1607,25 +1402,14 @@ static WC_INLINE int myVerify(int preverify, WOLFSSL_X509_STORE_CTX* store)
     #endif
 #endif
 
-    printf("\tSubject's domain name at %d is %s\n", store->error_depth, store->domain);
+    printf("\tSubject's domain name is %s\n", store->domain);
 
-    /* Testing forced fail case by return zero */
-    if (myVerifyFail) {
-        return 0; /* test failure case */
-    }
-
-    /* If error indicate we are overriding it for testing purposes */
-    if (store->error != 0) {
-        printf("\tAllowing failed certificate check, testing only "
-            "(shouldn't do this in production)\n");
-    }
-
-    /* A non-zero return code indicates failure override */
+    printf("\tAllowing to continue anyway (shouldn't do this, EVER!!!)\n");
     return 1;
 }
 
 
-static WC_INLINE int myDateCb(int preverify, WOLFSSL_X509_STORE_CTX* store)
+static INLINE int myDateCb(int preverify, WOLFSSL_X509_STORE_CTX* store)
 {
     char buffer[WOLFSSL_MAX_ERROR_SZ];
     (void)preverify;
@@ -1646,7 +1430,7 @@ static WC_INLINE int myDateCb(int preverify, WOLFSSL_X509_STORE_CTX* store)
 
 #ifdef HAVE_EXT_CACHE
 
-static WC_INLINE WOLFSSL_SESSION* mySessGetCb(WOLFSSL* ssl, unsigned char* id,
+static INLINE WOLFSSL_SESSION* mySessGetCb(WOLFSSL* ssl, unsigned char* id,
     int id_len, int* copy)
 {
     (void)ssl;
@@ -1658,7 +1442,7 @@ static WC_INLINE WOLFSSL_SESSION* mySessGetCb(WOLFSSL* ssl, unsigned char* id,
     return NULL;
 }
 
-static WC_INLINE int mySessNewCb(WOLFSSL* ssl, WOLFSSL_SESSION* session)
+static INLINE int mySessNewCb(WOLFSSL* ssl, WOLFSSL_SESSION* session)
 {
     (void)ssl;
     (void)session;
@@ -1667,7 +1451,7 @@ static WC_INLINE int mySessNewCb(WOLFSSL* ssl, WOLFSSL_SESSION* session)
     return 0;
 }
 
-static WC_INLINE void mySessRemCb(WOLFSSL_CTX* ctx, WOLFSSL_SESSION* session)
+static INLINE void mySessRemCb(WOLFSSL_CTX* ctx, WOLFSSL_SESSION* session)
 {
     (void)ctx;
     (void)session;
@@ -1680,7 +1464,7 @@ static WC_INLINE void mySessRemCb(WOLFSSL_CTX* ctx, WOLFSSL_SESSION* session)
 
 #ifdef HAVE_CRL
 
-static WC_INLINE void CRL_CallBack(const char* url)
+static INLINE void CRL_CallBack(const char* url)
 {
     printf("CRL callback url = %s\n", url);
 }
@@ -1688,7 +1472,7 @@ static WC_INLINE void CRL_CallBack(const char* url)
 #endif
 
 #ifndef NO_DH
-static WC_INLINE void SetDH(WOLFSSL* ssl)
+static INLINE void SetDH(WOLFSSL* ssl)
 {
     /* dh1024 p */
     static const unsigned char p[] =
@@ -1715,7 +1499,7 @@ static WC_INLINE void SetDH(WOLFSSL* ssl)
     wolfSSL_SetTmpDH(ssl, p, sizeof(p), g, sizeof(g));
 }
 
-static WC_INLINE void SetDHCtx(WOLFSSL_CTX* ctx)
+static INLINE void SetDHCtx(WOLFSSL_CTX* ctx)
 {
     /* dh1024 p */
     static const unsigned char p[] =
@@ -1745,7 +1529,7 @@ static WC_INLINE void SetDHCtx(WOLFSSL_CTX* ctx)
 
 #ifndef NO_CERTS
 
-static WC_INLINE void CaCb(unsigned char* der, int sz, int type)
+static INLINE void CaCb(unsigned char* der, int sz, int type)
 {
     (void)der;
     printf("Got CA cache add callback, derSz = %d, type = %d\n", sz, type);
@@ -1760,11 +1544,11 @@ static WC_INLINE void CaCb(unsigned char* der, int sz, int type)
     /* Maximum depth to search for WolfSSL root */
     #define MAX_WOLF_ROOT_DEPTH 5
 
-    static WC_INLINE int ChangeToWolfRoot(void)
+    static INLINE int ChangeToWolfRoot(void)
     {
         #if !defined(NO_FILESYSTEM) || defined(FORCE_BUFFER_TEST)
             int depth, res;
-            XFILE file;
+            FILE* file;
             for(depth = 0; depth <= MAX_WOLF_ROOT_DEPTH; depth++) {
                 file = fopen(ntruKeyFile, "rb");
                 if (file != NULL) {
@@ -1795,7 +1579,7 @@ static WC_INLINE void CaCb(unsigned char* der, int sz, int type)
 typedef THREAD_RETURN WOLFSSL_THREAD (*thread_func)(void* args);
 #define STACK_CHECK_VAL 0x01
 
-static WC_INLINE int StackSizeCheck(func_args* args, thread_func tf)
+static INLINE int StackSizeCheck(func_args* args, thread_func tf)
 {
     int            ret, i, used;
     void*          status;
@@ -1864,7 +1648,7 @@ static WC_INLINE int StackSizeCheck(func_args* args, thread_func tf)
     #error "can't use STACK_TRAP with STACK_SIZE, setrlimit will fail"
 #endif /* HAVE_STACK_SIZE */
 
-static WC_INLINE void StackTrap(void)
+static INLINE void StackTrap(void)
 {
     struct rlimit  rl;
     if (getrlimit(RLIMIT_STACK, &rl) != 0)
@@ -1879,7 +1663,7 @@ static WC_INLINE void StackTrap(void)
 
 #else /* STACK_TRAP */
 
-static WC_INLINE void StackTrap(void)
+static INLINE void StackTrap(void)
 {
 }
 
@@ -1902,7 +1686,7 @@ typedef struct AtomicDecCtx {
 } AtomicDecCtx;
 
 
-static WC_INLINE int myMacEncryptCb(WOLFSSL* ssl, unsigned char* macOut,
+static INLINE int myMacEncryptCb(WOLFSSL* ssl, unsigned char* macOut,
        const unsigned char* macIn, unsigned int macInSz, int macContent,
        int macVerify, unsigned char* encOut, const unsigned char* encIn,
        unsigned int encSz, void* ctx)
@@ -1970,7 +1754,7 @@ static WC_INLINE int myMacEncryptCb(WOLFSSL* ssl, unsigned char* macOut,
 }
 
 
-static WC_INLINE int myDecryptVerifyCb(WOLFSSL* ssl,
+static INLINE int myDecryptVerifyCb(WOLFSSL* ssl,
        unsigned char* decOut, const unsigned char* decIn,
        unsigned int decSz, int macContent, int macVerify,
        unsigned int* padSz, void* ctx)
@@ -2068,7 +1852,7 @@ static WC_INLINE int myDecryptVerifyCb(WOLFSSL* ssl,
 }
 
 
-static WC_INLINE void SetupAtomicUser(WOLFSSL_CTX* ctx, WOLFSSL* ssl)
+static INLINE void SetupAtomicUser(WOLFSSL_CTX* ctx, WOLFSSL* ssl)
 {
     AtomicEncCtx* encCtx;
     AtomicDecCtx* decCtx;
@@ -2093,7 +1877,7 @@ static WC_INLINE void SetupAtomicUser(WOLFSSL_CTX* ctx, WOLFSSL* ssl)
 }
 
 
-static WC_INLINE void FreeAtomicUser(WOLFSSL* ssl)
+static INLINE void FreeAtomicUser(WOLFSSL* ssl)
 {
     AtomicEncCtx* encCtx = (AtomicEncCtx*)wolfSSL_GetMacEncryptCtx(ssl);
     AtomicDecCtx* decCtx = (AtomicDecCtx*)wolfSSL_GetDecryptVerifyCtx(ssl);
@@ -2105,7 +1889,7 @@ static WC_INLINE void FreeAtomicUser(WOLFSSL* ssl)
 #endif /* ATOMIC_USER */
 
 #ifdef WOLFSSL_STATIC_MEMORY
-static WC_INLINE int wolfSSL_PrintStats(WOLFSSL_MEM_STATS* stats)
+static INLINE int wolfSSL_PrintStats(WOLFSSL_MEM_STATS* stats)
 {
     word16 i;
 
@@ -2134,75 +1918,11 @@ static WC_INLINE int wolfSSL_PrintStats(WOLFSSL_MEM_STATS* stats)
 
 typedef struct PkCbInfo {
     const char* ourKey;
-#ifdef TEST_PK_PRIVKEY
-    union {
-    #ifdef HAVE_ECC
-        ecc_key ecc;
-    #endif
-    #ifdef HAVE_CURVE25519
-        curve25519_key curve;
-    #endif
-    } keyGen;
-#endif
 } PkCbInfo;
-
-#if defined(DEBUG_PK_CB) || defined(TEST_PK_PRIVKEY)
-    #define WOLFSSL_PKMSG(_f_, ...) printf(_f_, ##__VA_ARGS__)
-#else
-    #define WOLFSSL_PKMSG(_f_, ...)
-#endif
 
 #ifdef HAVE_ECC
 
-static WC_INLINE int myEccKeyGen(WOLFSSL* ssl, ecc_key* key, word32 keySz,
-    int ecc_curve, void* ctx)
-{
-    int       ret;
-    WC_RNG    rng;
-    PkCbInfo* cbInfo = (PkCbInfo*)ctx;
-    ecc_key*  new_key = key;
-#ifdef TEST_PK_PRIVKEY
-    byte qx[MAX_ECC_BYTES], qy[MAX_ECC_BYTES];
-    word32 qxLen = sizeof(qx), qyLen = sizeof(qy);
-    new_key = &cbInfo->keyGen.ecc;
-#endif
-
-    (void)ssl;
-    (void)cbInfo;
-
-    WOLFSSL_PKMSG("PK ECC KeyGen: keySz %d, Curve ID %d\n", keySz, ecc_curve);
-
-    ret = wc_InitRng(&rng);
-    if (ret != 0)
-        return ret;
-
-    ret = wc_ecc_init(new_key);
-    if (ret == 0) {
-        /* create new key */
-        ret = wc_ecc_make_key_ex(&rng, keySz, new_key, ecc_curve);
-
-    #ifdef TEST_PK_PRIVKEY
-        if (ret == 0) {
-            /* extract public portion from new key into `key` arg */
-            ret = wc_ecc_export_public_raw(new_key, qx, &qxLen, qy, &qyLen);
-            if (ret == 0) {
-                /* load public portion only into key */
-                ret = wc_ecc_import_unsigned(key, qx, qy, NULL, ecc_curve);
-            }
-            (void)qxLen;
-            (void)qyLen;
-        }
-    #endif
-    }
-
-    WOLFSSL_PKMSG("PK ECC KeyGen: ret %d\n", ret);
-
-    wc_FreeRng(&rng);
-
-    return ret;
-}
-
-static WC_INLINE int myEccSign(WOLFSSL* ssl, const byte* in, word32 inSz,
+static INLINE int myEccSign(WOLFSSL* ssl, const byte* in, word32 inSz,
         byte* out, word32* outSz, const byte* key, word32 keySz, void* ctx)
 {
     int       ret;
@@ -2214,8 +1934,6 @@ static WC_INLINE int myEccSign(WOLFSSL* ssl, const byte* in, word32 inSz,
 
     (void)ssl;
     (void)cbInfo;
-
-    WOLFSSL_PKMSG("PK ECC Sign: inSz %d, keySz %d\n", inSz, keySz);
 
 #ifdef TEST_PK_PRIVKEY
     ret = load_key_file(cbInfo->ourKey, &keyBuf, &keySz);
@@ -2230,10 +1948,8 @@ static WC_INLINE int myEccSign(WOLFSSL* ssl, const byte* in, word32 inSz,
     ret = wc_ecc_init(&myKey);
     if (ret == 0) {
         ret = wc_EccPrivateKeyDecode(keyBuf, &idx, &myKey, keySz);
-        if (ret == 0) {
-            WOLFSSL_PKMSG("PK ECC Sign: Curve ID %d\n", myKey.dp->id);
+        if (ret == 0)
             ret = wc_ecc_sign_hash(in, inSz, out, outSz, &rng, &myKey);
-        }
         wc_ecc_free(&myKey);
     }
     wc_FreeRng(&rng);
@@ -2242,13 +1958,11 @@ static WC_INLINE int myEccSign(WOLFSSL* ssl, const byte* in, word32 inSz,
     free(keyBuf);
 #endif
 
-    WOLFSSL_PKMSG("PK ECC Sign: ret %d outSz %d\n", ret, *outSz);
-
     return ret;
 }
 
 
-static WC_INLINE int myEccVerify(WOLFSSL* ssl, const byte* sig, word32 sigSz,
+static INLINE int myEccVerify(WOLFSSL* ssl, const byte* sig, word32 sigSz,
         const byte* hash, word32 hashSz, const byte* key, word32 keySz,
         int* result, void* ctx)
 {
@@ -2260,8 +1974,6 @@ static WC_INLINE int myEccVerify(WOLFSSL* ssl, const byte* sig, word32 sigSz,
     (void)ssl;
     (void)cbInfo;
 
-    WOLFSSL_PKMSG("PK ECC Verify: sigSz %d, hashSz %d, keySz %d\n", sigSz, hashSz, keySz);
-
     ret = wc_ecc_init(&myKey);
     if (ret == 0) {
         ret = wc_EccPublicKeyDecode(key, &idx, &myKey, keySz);
@@ -2270,12 +1982,10 @@ static WC_INLINE int myEccVerify(WOLFSSL* ssl, const byte* sig, word32 sigSz,
         wc_ecc_free(&myKey);
     }
 
-    WOLFSSL_PKMSG("PK ECC Verify: ret %d, result %d\n", ret, *result);
-
     return ret;
 }
 
-static WC_INLINE int myEccSharedSecret(WOLFSSL* ssl, ecc_key* otherKey,
+static INLINE int myEccSharedSecret(WOLFSSL* ssl, ecc_key* otherKey,
         unsigned char* pubKeyDer, unsigned int* pubKeySz,
         unsigned char* out, unsigned int* outlen,
         int side, void* ctx)
@@ -2288,9 +1998,6 @@ static WC_INLINE int myEccSharedSecret(WOLFSSL* ssl, ecc_key* otherKey,
 
     (void)ssl;
     (void)cbInfo;
-
-    WOLFSSL_PKMSG("PK ECC PMS: Side %s, Peer Curve %d\n",
-        side == WOLFSSL_CLIENT_END ? "client" : "server", otherKey->dp->id);
 
     ret = wc_ecc_init(&tmpKey);
     if (ret != 0) {
@@ -2320,11 +2027,7 @@ static WC_INLINE int myEccSharedSecret(WOLFSSL* ssl, ecc_key* otherKey,
 
     /* for server: import public key */
     else if (side == WOLFSSL_SERVER_END) {
-    #ifdef TEST_PK_PRIVKEY
-        privKey = &cbInfo->keyGen.ecc;
-    #else
         privKey = otherKey;
-    #endif
         pubKey = &tmpKey;
 
         ret = wc_ecc_import_x963_ex(pubKeyDer, *pubKeySz, pubKey,
@@ -2345,21 +2048,13 @@ static WC_INLINE int myEccSharedSecret(WOLFSSL* ssl, ecc_key* otherKey,
     #endif
     }
 
-#ifdef TEST_PK_PRIVKEY
-    if (side == WOLFSSL_SERVER_END) {
-        wc_ecc_free(&cbInfo->keyGen.ecc);
-    }
-#endif
-
     wc_ecc_free(&tmpKey);
-
-    WOLFSSL_PKMSG("PK ECC PMS: ret %d, PubKeySz %d, OutLen %d\n", ret, *pubKeySz, *outlen);
 
     return ret;
 }
 
 #ifdef HAVE_ED25519
-static WC_INLINE int myEd25519Sign(WOLFSSL* ssl, const byte* in, word32 inSz,
+static INLINE int myEd25519Sign(WOLFSSL* ssl, const byte* in, word32 inSz,
         byte* out, word32* outSz, const byte* key, word32 keySz, void* ctx)
 {
     int         ret;
@@ -2370,8 +2065,6 @@ static WC_INLINE int myEd25519Sign(WOLFSSL* ssl, const byte* in, word32 inSz,
 
     (void)ssl;
     (void)cbInfo;
-
-    WOLFSSL_PKMSG("PK 25519 Sign: inSz %d, keySz %d\n", inSz, keySz);
 
 #ifdef TEST_PK_PRIVKEY
     ret = load_key_file(cbInfo->ourKey, &keyBuf, &keySz);
@@ -2391,13 +2084,11 @@ static WC_INLINE int myEd25519Sign(WOLFSSL* ssl, const byte* in, word32 inSz,
     free(keyBuf);
 #endif
 
-    WOLFSSL_PKMSG("PK 25519 Sign: ret %d, outSz %d\n", ret, *outSz);
-
     return ret;
 }
 
 
-static WC_INLINE int myEd25519Verify(WOLFSSL* ssl, const byte* sig, word32 sigSz,
+static INLINE int myEd25519Verify(WOLFSSL* ssl, const byte* sig, word32 sigSz,
         const byte* msg, word32 msgSz, const byte* key, word32 keySz,
         int* result, void* ctx)
 {
@@ -2408,8 +2099,6 @@ static WC_INLINE int myEd25519Verify(WOLFSSL* ssl, const byte* sig, word32 sigSz
     (void)ssl;
     (void)cbInfo;
 
-    WOLFSSL_PKMSG("PK 25519 Verify: sigSz %d, msgSz %d, keySz %d\n", sigSz, msgSz, keySz);
-
     ret = wc_ed25519_init(&myKey);
     if (ret == 0) {
         ret = wc_ed25519_import_public(key, keySz, &myKey);
@@ -2419,39 +2108,12 @@ static WC_INLINE int myEd25519Verify(WOLFSSL* ssl, const byte* sig, word32 sigSz
         wc_ed25519_free(&myKey);
     }
 
-    WOLFSSL_PKMSG("PK 25519 Verify: ret %d, result %d\n", ret, *result);
-
     return ret;
 }
 #endif /* HAVE_ED25519 */
 
 #ifdef HAVE_CURVE25519
-static WC_INLINE int myX25519KeyGen(WOLFSSL* ssl, curve25519_key* key,
-    unsigned int keySz, void* ctx)
-{
-    int       ret;
-    WC_RNG    rng;
-    PkCbInfo* cbInfo = (PkCbInfo*)ctx;
-
-    (void)ssl;
-    (void)cbInfo;
-
-    WOLFSSL_PKMSG("PK 25519 KeyGen: keySz %d\n", keySz);
-
-    ret = wc_InitRng(&rng);
-    if (ret != 0)
-        return ret;
-
-    ret = wc_curve25519_make_key(&rng, keySz, key);
-
-    wc_FreeRng(&rng);
-
-    WOLFSSL_PKMSG("PK 25519 KeyGen: ret %d\n", ret);
-
-    return ret;
-}
-
-static WC_INLINE int myX25519SharedSecret(WOLFSSL* ssl, curve25519_key* otherKey,
+static INLINE int myX25519SharedSecret(WOLFSSL* ssl, curve25519_key* otherKey,
         unsigned char* pubKeyDer, unsigned int* pubKeySz,
         unsigned char* out, unsigned int* outlen,
         int side, void* ctx)
@@ -2464,9 +2126,6 @@ static WC_INLINE int myX25519SharedSecret(WOLFSSL* ssl, curve25519_key* otherKey
 
     (void)ssl;
     (void)cbInfo;
-
-    WOLFSSL_PKMSG("PK 25519 PMS: side %s\n",
-        side == WOLFSSL_CLIENT_END ? "client" : "server");
 
     ret = wc_curve25519_init(&tmpKey);
     if (ret != 0) {
@@ -2511,9 +2170,6 @@ static WC_INLINE int myX25519SharedSecret(WOLFSSL* ssl, curve25519_key* otherKey
 
     wc_curve25519_free(&tmpKey);
 
-    WOLFSSL_PKMSG("PK 25519 PMS: ret %d, pubKeySz %d, outLen %d\n",
-        ret, *pubKeySz, *outlen);
-
     return ret;
 }
 #endif /* HAVE_CURVE25519 */
@@ -2521,32 +2177,26 @@ static WC_INLINE int myX25519SharedSecret(WOLFSSL* ssl, curve25519_key* otherKey
 #endif /* HAVE_ECC */
 
 #ifndef NO_DH
-static WC_INLINE int myDhCallback(WOLFSSL* ssl, struct DhKey* key,
+static INLINE int myDhCallback(WOLFSSL* ssl, struct DhKey* key,
         const unsigned char* priv, unsigned int privSz,
         const unsigned char* pubKeyDer, unsigned int pubKeySz,
         unsigned char* out, unsigned int* outlen,
         void* ctx)
 {
-    int ret;
     PkCbInfo* cbInfo = (PkCbInfo*)ctx;
 
     (void)ssl;
     (void)cbInfo;
 
     /* return 0 on success */
-    ret = wc_DhAgree(key, out, outlen, priv, privSz, pubKeyDer, pubKeySz);
-
-    WOLFSSL_PKMSG("PK ED Agree: ret %d, privSz %d, pubKeySz %d, outlen %d\n",
-        ret, privSz, pubKeySz, *outlen);
-
-    return ret;
+    return wc_DhAgree(key, out, outlen, priv, privSz, pubKeyDer, pubKeySz);
 };
 
 #endif /* !NO_DH */
 
 #ifndef NO_RSA
 
-static WC_INLINE int myRsaSign(WOLFSSL* ssl, const byte* in, word32 inSz,
+static INLINE int myRsaSign(WOLFSSL* ssl, const byte* in, word32 inSz,
         byte* out, word32* outSz, const byte* key, word32 keySz, void* ctx)
 {
     WC_RNG  rng;
@@ -2558,8 +2208,6 @@ static WC_INLINE int myRsaSign(WOLFSSL* ssl, const byte* in, word32 inSz,
 
     (void)ssl;
     (void)cbInfo;
-
-    WOLFSSL_PKMSG("PK RSA Sign: inSz %d, keySz %d\n", inSz, keySz);
 
 #ifdef TEST_PK_PRIVKEY
     ret = load_key_file(cbInfo->ourKey, &keyBuf, &keySz);
@@ -2588,13 +2236,11 @@ static WC_INLINE int myRsaSign(WOLFSSL* ssl, const byte* in, word32 inSz,
     free(keyBuf);
 #endif
 
-    WOLFSSL_PKMSG("PK RSA Sign: ret %d, outSz %d\n", ret, *outSz);
-
     return ret;
 }
 
 
-static WC_INLINE int myRsaVerify(WOLFSSL* ssl, byte* sig, word32 sigSz,
+static INLINE int myRsaVerify(WOLFSSL* ssl, byte* sig, word32 sigSz,
         byte** out, const byte* key, word32 keySz, void* ctx)
 {
     int     ret;
@@ -2605,8 +2251,6 @@ static WC_INLINE int myRsaVerify(WOLFSSL* ssl, byte* sig, word32 sigSz,
     (void)ssl;
     (void)cbInfo;
 
-    WOLFSSL_PKMSG("PK RSA Verify: sigSz %d, keySz %d\n", sigSz, keySz);
-
     ret = wc_InitRsaKey(&myKey, NULL);
     if (ret == 0) {
         ret = wc_RsaPublicKeyDecode(key, &idx, &myKey, keySz);
@@ -2615,12 +2259,10 @@ static WC_INLINE int myRsaVerify(WOLFSSL* ssl, byte* sig, word32 sigSz,
         wc_FreeRsaKey(&myKey);
     }
 
-    WOLFSSL_PKMSG("PK RSA Verify: ret %d\n", ret);
-
     return ret;
 }
 
-static WC_INLINE int myRsaSignCheck(WOLFSSL* ssl, byte* sig, word32 sigSz,
+static INLINE int myRsaSignCheck(WOLFSSL* ssl, byte* sig, word32 sigSz,
         byte** out, const byte* key, word32 keySz, void* ctx)
 {
     int     ret;
@@ -2631,8 +2273,6 @@ static WC_INLINE int myRsaSignCheck(WOLFSSL* ssl, byte* sig, word32 sigSz,
 
     (void)ssl;
     (void)cbInfo;
-
-    WOLFSSL_PKMSG("PK RSA SignCheck: sigSz %d, keySz %d\n", sigSz, keySz);
 
 #ifdef TEST_PK_PRIVKEY
     ret = load_key_file(cbInfo->ourKey, &keyBuf, &keySz);
@@ -2651,13 +2291,11 @@ static WC_INLINE int myRsaSignCheck(WOLFSSL* ssl, byte* sig, word32 sigSz,
     free(keyBuf);
 #endif
 
-    WOLFSSL_PKMSG("PK RSA SignCheck: ret %d\n", ret);
-
     return ret;
 }
 
 #ifdef WC_RSA_PSS
-static WC_INLINE int myRsaPssSign(WOLFSSL* ssl, const byte* in, word32 inSz,
+static INLINE int myRsaPssSign(WOLFSSL* ssl, const byte* in, word32 inSz,
         byte* out, word32* outSz, int hash, int mgf, const byte* key,
         word32 keySz, void* ctx)
 {
@@ -2671,9 +2309,6 @@ static WC_INLINE int myRsaPssSign(WOLFSSL* ssl, const byte* in, word32 inSz,
 
     (void)ssl;
     (void)cbInfo;
-
-    WOLFSSL_PKMSG("PK RSA PSS Sign: inSz %d, hash %d, mgf %d, keySz %d\n",
-        inSz, hash, mgf, keySz);
 
 #ifdef TEST_PK_PRIVKEY
     ret = load_key_file(cbInfo->ourKey, &keyBuf, &keySz);
@@ -2722,13 +2357,11 @@ static WC_INLINE int myRsaPssSign(WOLFSSL* ssl, const byte* in, word32 inSz,
     free(keyBuf);
 #endif
 
-    WOLFSSL_PKMSG("PK RSA PSS Sign: ret %d, outSz %d\n", ret, *outSz);
-
     return ret;
 }
 
 
-static WC_INLINE int myRsaPssVerify(WOLFSSL* ssl, byte* sig, word32 sigSz,
+static INLINE int myRsaPssVerify(WOLFSSL* ssl, byte* sig, word32 sigSz,
         byte** out, int hash, int mgf, const byte* key, word32 keySz, void* ctx)
 {
     int       ret;
@@ -2739,9 +2372,6 @@ static WC_INLINE int myRsaPssVerify(WOLFSSL* ssl, byte* sig, word32 sigSz,
 
     (void)ssl;
     (void)cbInfo;
-
-    WOLFSSL_PKMSG("PK RSA PSS Verify: sigSz %d, hash %d, mgf %d, keySz %d\n",
-        sigSz, hash, mgf, keySz);
 
     switch (hash) {
 #ifndef NO_SHA256
@@ -2771,12 +2401,10 @@ static WC_INLINE int myRsaPssVerify(WOLFSSL* ssl, byte* sig, word32 sigSz,
         wc_FreeRsaKey(&myKey);
     }
 
-    WOLFSSL_PKMSG("PK RSA PSS Verify: ret %d\n", ret);
-
     return ret;
 }
 
-static WC_INLINE int myRsaPssSignCheck(WOLFSSL* ssl, byte* sig, word32 sigSz,
+static INLINE int myRsaPssSignCheck(WOLFSSL* ssl, byte* sig, word32 sigSz,
         byte** out, int hash, int mgf, const byte* key, word32 keySz, void* ctx)
 {
     int       ret;
@@ -2788,9 +2416,6 @@ static WC_INLINE int myRsaPssSignCheck(WOLFSSL* ssl, byte* sig, word32 sigSz,
 
     (void)ssl;
     (void)cbInfo;
-
-    WOLFSSL_PKMSG("PK RSA PSS SignCheck: sigSz %d, hash %d, mgf %d, keySz %d\n",
-        sigSz, hash, mgf, keySz);
 
 #ifdef TEST_PK_PRIVKEY
     ret = load_key_file(cbInfo->ourKey, &keyBuf, &keySz);
@@ -2830,14 +2455,12 @@ static WC_INLINE int myRsaPssSignCheck(WOLFSSL* ssl, byte* sig, word32 sigSz,
     free(keyBuf);
 #endif
 
-    WOLFSSL_PKMSG("PK RSA PSS SignCheck: ret %d\n", ret);
-
     return ret;
 }
 #endif
 
 
-static WC_INLINE int myRsaEnc(WOLFSSL* ssl, const byte* in, word32 inSz,
+static INLINE int myRsaEnc(WOLFSSL* ssl, const byte* in, word32 inSz,
                            byte* out, word32* outSz, const byte* key,
                            word32 keySz, void* ctx)
 {
@@ -2849,8 +2472,6 @@ static WC_INLINE int myRsaEnc(WOLFSSL* ssl, const byte* in, word32 inSz,
 
     (void)ssl;
     (void)cbInfo;
-
-    WOLFSSL_PKMSG("PK RSA Enc: inSz %d, keySz %d\n", inSz, keySz);
 
     ret = wc_InitRng(&rng);
     if (ret != 0)
@@ -2870,12 +2491,10 @@ static WC_INLINE int myRsaEnc(WOLFSSL* ssl, const byte* in, word32 inSz,
     }
     wc_FreeRng(&rng);
 
-    WOLFSSL_PKMSG("PK RSA Enc: ret %d, outSz %d\n", ret, *outSz);
-
     return ret;
 }
 
-static WC_INLINE int myRsaDec(WOLFSSL* ssl, byte* in, word32 inSz,
+static INLINE int myRsaDec(WOLFSSL* ssl, byte* in, word32 inSz,
                            byte** out,
                            const byte* key, word32 keySz, void* ctx)
 {
@@ -2887,8 +2506,6 @@ static WC_INLINE int myRsaDec(WOLFSSL* ssl, byte* in, word32 inSz,
 
     (void)ssl;
     (void)cbInfo;
-
-    WOLFSSL_PKMSG("PK RSA Dec: inSz %d, keySz %d\n", inSz, keySz);
 
 #ifdef TEST_PK_PRIVKEY
     ret = load_key_file(cbInfo->ourKey, &keyBuf, &keySz);
@@ -2916,19 +2533,16 @@ static WC_INLINE int myRsaDec(WOLFSSL* ssl, byte* in, word32 inSz,
     free(keyBuf);
 #endif
 
-    WOLFSSL_PKMSG("PK RSA Dec: ret %d\n", ret);
-
     return ret;
 }
 
 #endif /* NO_RSA */
 
-static WC_INLINE void SetupPkCallbacks(WOLFSSL_CTX* ctx)
+static INLINE void SetupPkCallbacks(WOLFSSL_CTX* ctx)
 {
     (void)ctx;
 
     #ifdef HAVE_ECC
-        wolfSSL_CTX_SetEccKeyGenCb(ctx, myEccKeyGen);
         wolfSSL_CTX_SetEccSignCb(ctx, myEccSign);
         wolfSSL_CTX_SetEccVerifyCb(ctx, myEccVerify);
         wolfSSL_CTX_SetEccSharedSecretCb(ctx, myEccSharedSecret);
@@ -2941,7 +2555,6 @@ static WC_INLINE void SetupPkCallbacks(WOLFSSL_CTX* ctx)
         wolfSSL_CTX_SetEd25519VerifyCb(ctx, myEd25519Verify);
     #endif
     #ifdef HAVE_CURVE25519
-        wolfSSL_CTX_SetX25519KeyGenCb(ctx, myX25519KeyGen);
         wolfSSL_CTX_SetX25519SharedSecretCb(ctx, myX25519SharedSecret);
     #endif
     #ifndef NO_RSA
@@ -2958,10 +2571,9 @@ static WC_INLINE void SetupPkCallbacks(WOLFSSL_CTX* ctx)
     #endif /* NO_RSA */
 }
 
-static WC_INLINE void SetupPkCallbackContexts(WOLFSSL* ssl, void* myCtx)
+static INLINE void SetupPkCallbackContexts(WOLFSSL* ssl, void* myCtx)
 {
     #ifdef HAVE_ECC
-        wolfSSL_SetEccKeyGenCtx(ssl, myCtx);
         wolfSSL_SetEccSignCtx(ssl, myCtx);
         wolfSSL_SetEccVerifyCtx(ssl, myCtx);
         wolfSSL_SetEccSharedSecretCtx(ssl, myCtx);
@@ -2974,7 +2586,6 @@ static WC_INLINE void SetupPkCallbackContexts(WOLFSSL* ssl, void* myCtx)
         wolfSSL_SetEd25519VerifyCtx(ssl, myCtx);
     #endif
     #ifdef HAVE_CURVE25519
-        wolfSSL_SetX25519KeyGenCtx(ssl, myCtx);
         wolfSSL_SetX25519SharedSecretCtx(ssl, myCtx);
     #endif
     #ifndef NO_RSA
@@ -2998,7 +2609,7 @@ static WC_INLINE void SetupPkCallbackContexts(WOLFSSL* ssl, void* myCtx)
                       || defined(_MSC_VER)
 
 /* HP/UX doesn't have strsep, needed by test/suites.c */
-static WC_INLINE char* strsep(char **stringp, const char *delim)
+static INLINE char* strsep(char **stringp, const char *delim)
 {
     char* start;
     char* end;
@@ -3022,7 +2633,7 @@ static WC_INLINE char* strsep(char **stringp, const char *delim)
 /* Create unique filename, len is length of tempfn name, assuming
    len does not include null terminating character,
    num is number of characters in tempfn name to randomize */
-static WC_INLINE const char* mymktemp(char *tempfn, int len, int num)
+static INLINE const char* mymktemp(char *tempfn, int len, int num)
 {
     int x, size;
     static const char alphanum[] = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"
@@ -3052,7 +2663,6 @@ static WC_INLINE const char* mymktemp(char *tempfn, int len, int num)
     tempfn[len] = '\0';
 
     wc_FreeRng(&rng);
-    (void)rng; /* for WC_NO_RNG case */
 
     return tempfn;
 }
@@ -3069,10 +2679,10 @@ static WC_INLINE const char* mymktemp(char *tempfn, int len, int num)
         byte key[CHACHA20_POLY1305_AEAD_KEYSIZE]; /* cipher key */
     } key_ctx;
 
-    static THREAD_LS_T key_ctx myKey_ctx;
-    static THREAD_LS_T WC_RNG myKey_rng;
+    static key_ctx myKey_ctx;
+    static WC_RNG myKey_rng;
 
-    static WC_INLINE int TicketInit(void)
+    static INLINE int TicketInit(void)
     {
         int ret = wc_InitRng(&myKey_rng);
         if (ret != 0) return ret;
@@ -3086,12 +2696,12 @@ static WC_INLINE const char* mymktemp(char *tempfn, int len, int num)
         return 0;
     }
 
-    static WC_INLINE void TicketCleanup(void)
+    static INLINE void TicketCleanup(void)
     {
         wc_FreeRng(&myKey_rng);
     }
 
-    static WC_INLINE int myTicketEncCb(WOLFSSL* ssl,
+    static INLINE int myTicketEncCb(WOLFSSL* ssl,
                              byte key_name[WOLFSSL_TICKET_NAME_SZ],
                              byte iv[WOLFSSL_TICKET_IV_SZ],
                              byte mac[WOLFSSL_TICKET_MAC_SZ],
@@ -3157,19 +2767,17 @@ static WC_INLINE const char* mymktemp(char *tempfn, int len, int num)
 
 #endif  /* HAVE_SESSION_TICKET && CHACHA20 && POLY1305 */
 
-static WC_INLINE word16 GetRandomPort(void)
+static INLINE word16 GetRandomPort(void)
 {
     word16 port = 0;
 
     /* Generate random port for testing */
     WC_RNG rng;
     if (wc_InitRng(&rng) == 0) {
-        if (wc_RNG_GenerateBlock(&rng, (byte*)&port, sizeof(port)) == 0) {
-            port |= 0xC000; /* Make sure its in the 49152 - 65535 range */
-        }
+        wc_RNG_GenerateBlock(&rng, (byte*)&port, sizeof(port));
+        port |= 0xC000; /* Make sure its in the 49152 - 65535 range */
         wc_FreeRng(&rng);
     }
-    (void)rng; /* for WC_NO_RNG case */
     return port;
 }
 

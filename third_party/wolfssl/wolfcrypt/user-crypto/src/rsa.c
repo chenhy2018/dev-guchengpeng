@@ -833,61 +833,32 @@ static int GetLength(const byte* input, word32* inOutIdx, int* len,
     return length;
 }
 
-static int GetASNHeader(const byte* input, byte tag, word32* inOutIdx, int* len,
-                        word32 maxIdx)
-{
-    word32 idx = *inOutIdx;
-    byte   b;
-    int    length;
-
-    if ((idx + 1) > maxIdx)
-        return USER_CRYPTO_ERROR;
-
-    b = input[idx++];
-    if (b != tag)
-        return USER_CRYPTO_ERROR;
-
-    if (GetLength(input, &idx, &length, maxIdx) < 0)
-        return USER_CRYPTO_ERROR;
-
-    *len      = length;
-    *inOutIdx = idx;
-    return length;
-}
-
-static int GetASNInt(const byte* input, word32* inOutIdx, int* len,
-                     word32 maxIdx)
-{
-    int    ret;
-
-    ret = GetASNHeader(input, ASN_INTEGER, inOutIdx, len, maxIdx);
-    if (ret < 0)
-        return ret;
-
-    if (*len > 0) {
-        /* remove leading zero, unless there is only one 0x00 byte */
-        if ((input[*inOutIdx] == 0x00) && (*len > 1)) {
-            (*inOutIdx)++;
-            (*len)--;
-
-            if (*len > 0 && (input[*inOutIdx] & 0x80) == 0)
-                return USER_CRYPTO_ERROR;
-        }
-    }
-
-    return 0;
-}
 
 static int GetInt(IppsBigNumState** mpi, const byte* input, word32* inOutIdx,
                   word32 maxIdx)
 {
     IppStatus ret;
     word32 idx = *inOutIdx;
+    byte   b;
     int    length;
     int    ctxSz;
 
-    if (GetASNInt(input, &idx, &length, maxIdx) < 0) {
+    if ((idx + 1) > maxIdx)
         return USER_CRYPTO_ERROR;
+
+    b = input[idx++];
+    if (b != 0x02)
+        return USER_CRYPTO_ERROR;
+
+    if (GetLength(input, &idx, &length, maxIdx) < 0)
+        return USER_CRYPTO_ERROR;
+
+    if (length > 0) {
+        /* remove leading zero */
+        if ( (b = input[idx++]) == 0x00)
+            length--;
+        else
+            idx--;
     }
 
     ret = ippsBigNumGetSize(length, &ctxSz);
@@ -1090,23 +1061,27 @@ int wc_RsaPrivateKeyDecode(const byte* input, word32* inOutIdx, RsaKey* key,
 }
 
 
-int wc_RsaPublicKeyDecode_ex(const byte* input, word32* inOutIdx,
-        word32 inSz, const byte** n, word32* nSz, const byte** e, word32* eSz)
+/* read in a public RSA key */
+int wc_RsaPublicKeyDecode(const byte* input, word32* inOutIdx, RsaKey* key,
+                       word32 inSz)
 {
-    IppStatus ret = 0;
-    int length;
+    int  length;
+    int  ctxSz;
+    IppStatus ret;
 #if defined(OPENSSL_EXTRA) || defined(RSA_DECODE_EXTRA)
     byte b;
 #endif
 
-    if (input == NULL || inOutIdx == NULL) {
+    if (input == NULL || inOutIdx == NULL || key == NULL) {
         return USER_CRYPTO_ERROR;
     }
 
-    USER_DEBUG(("Entering wc_RsaPublicKeyDecode_ex\n"));
+    USER_DEBUG(("Entering wc_RsaPublicKeyDecode\n"));
 
     if (GetSequence(input, inOutIdx, &length, inSz) < 0)
         return USER_CRYPTO_ERROR;
+
+    key->type = RSA_PUBLIC;
 
 #if defined(OPENSSL_EXTRA) || defined(RSA_DECODE_EXTRA)
     if ((*inOutIdx + 1) > inSz)
@@ -1158,55 +1133,62 @@ int wc_RsaPublicKeyDecode_ex(const byte* input, word32* inOutIdx,
     }
 #endif /* OPENSSL_EXTRA || RSA_DECODE_EXTRA */
 
-    /* Get modulus */
-    ret = GetASNInt(input, inOutIdx, &length, inSz);
-    if (ret < 0) {
+    if (GetInt(&key->n,  input, inOutIdx, inSz) < 0 ||
+        GetInt(&key->e,  input, inOutIdx, inSz) < 0) {
         return USER_CRYPTO_ERROR;
     }
-    if (nSz)
-        *nSz = length;
-    if (n)
-        *n = &input[*inOutIdx];
-    *inOutIdx += length;
 
-    /* Get exponent */
-    ret = GetASNInt(input, inOutIdx, &length, inSz);
-    if (ret < 0) {
+    /* get sizes set for IPP BN states */
+    ret = ippsGetSize_BN(key->n, &key->nSz);
+    if (ret != ippStsNoErr) {
+        USER_DEBUG(("ippsGetSize_BN error %s\n", ippGetStatusString(ret)));
         return USER_CRYPTO_ERROR;
     }
-    if (eSz)
-        *eSz = length;
-    if (e)
-        *e = &input[*inOutIdx];
-    *inOutIdx += length;
 
-    USER_DEBUG(("\tExit wc_RsaPublicKeyDecode_ex\n"));
+    ret = ippsGetSize_BN(key->e, &key->eSz);
+    if (ret != ippStsNoErr) {
+        USER_DEBUG(("ippsGetSize_BN error %s\n", ippGetStatusString(ret)));
+        return USER_CRYPTO_ERROR;
+    }
 
-    return ret;
-}
+    key->sz = key->nSz; /* set modulus size */
 
-/* read in a public RSA key */
-int wc_RsaPublicKeyDecode(const byte* input, word32* inOutIdx, RsaKey* key,
-                       word32 inSz)
-{
-    IppStatus ret;
-    const byte *n = NULL, *e = NULL;
-    word32 nSz = 0, eSz = 0;
+    /* convert to size in bits */
+    key->nSz = key->nSz * 8;
+    key->eSz = key->eSz * 8;
 
-    if (key == NULL)
+    /* set up public key state */
+    ret = ippsRSA_GetSizePublicKey(key->nSz, key->eSz, &ctxSz);
+    if (ret != ippStsNoErr) {
+        USER_DEBUG(("ippsRSA_GetSizePublicKey error %s\n",
+                ippGetStatusString(ret)));
+        return USER_CRYPTO_ERROR;
+    }
+
+    key->pPub = (IppsRSAPublicKeyState*)XMALLOC(ctxSz, NULL,
+                                                      DYNAMIC_TYPE_USER_CRYPTO);
+    if (key->pPub == NULL)
         return USER_CRYPTO_ERROR;
 
-    USER_DEBUG(("Entering wc_RsaPublicKeyDecode\n"));
+    ret = ippsRSA_InitPublicKey(key->nSz, key->eSz, key->pPub, ctxSz);
+    if (ret != ippStsNoErr) {
+        USER_DEBUG(("ippsRSA_InitPublicKey error %s\n",
+                    ippGetStatusString(ret)));
+        return USER_CRYPTO_ERROR;
+    }
 
-    ret = wc_RsaPublicKeyDecode_ex(input, inOutIdx, inSz, &n, &nSz, &e, &eSz);
-    if (ret == 0) {
-        ret = wc_RsaPublicKeyDecodeRaw(n, nSz, e, eSz, key);
+    ret = ippsRSA_SetPublicKey(key->n, key->e, key->pPub);
+    if (ret != ippStsNoErr) {
+        USER_DEBUG(("ippsRSA_SetPublicKey error %s\n",
+                    ippGetStatusString(ret)));
+        return USER_CRYPTO_ERROR;
     }
 
     USER_DEBUG(("\tExit RsaPublicKeyDecode\n"));
 
-    return ret;
+    return 0;
 }
+
 
 /* import RSA public key elements (n, e) into RsaKey structure (key) */
 int wc_RsaPublicKeyDecodeRaw(const byte* n, word32 nSz, const byte* e,
@@ -2635,7 +2617,7 @@ static IppsBigNumState* GetRsaInt(RsaKey* key, int idx)
 
 
 /* Release Tmp RSA resources */
-static WC_INLINE void FreeTmpRsas(byte** tmps, void* heap)
+static INLINE void FreeTmpRsas(byte** tmps, void* heap)
 {
     int i;
 

@@ -44,28 +44,18 @@
 
 #ifndef NO_WOLFSSL_CLIENT
 
-#ifdef USE_FAST_MATH
-    /* included to inspect the size of FP_MAX_BITS */
-    #include <wolfssl/wolfcrypt/tfm.h>
-#endif
-
 #ifdef WOLFSSL_ASYNC_CRYPT
     static int devId = INVALID_DEVID;
 #endif
 
 #define DEFAULT_TIMEOUT_SEC 2
 
-#define OCSP_STAPLING 1
-#define OCSP_STAPLINGV2 2
-#define OCSP_STAPLINGV2_MULTI 3
-#define OCSP_STAPLING_OPT_MAX OCSP_STAPLINGV2_MULTI
-
 /* Note on using port 0: the client standalone example doesn't utilize the
  * port 0 port sharing; that is used by (1) the server in external control
  * test mode and (2) the testsuite which uses this code and sets up the correct
  * port numbers when the internal thread using the server code using port 0. */
 
-static int lng_index = 0;
+
 #ifdef WOLFSSL_CALLBACKS
     Timeval timeout;
     static int handShakeCB(HandShakeInfo* info)
@@ -172,7 +162,7 @@ static int NonBlockingSSL_Connect(WOLFSSL* ssl)
 
 static void ShowCiphers(void)
 {
-    static char ciphers[4096];
+    char ciphers[4096];
 
     int ret = wolfSSL_get_ciphers(ciphers, (int)sizeof(ciphers));
 
@@ -197,10 +187,6 @@ static void ShowVersions(void)
 #endif
 #ifdef WOLFSSL_TLS13
     printf("4:");
-#endif
-    printf("d(downgrade):");
-#if defined(OPENSSL_EXTRA) || defined(WOLFSSL_EITHER_SIDE)
-    printf("e(either):");
 #endif
     printf("\n");
 }
@@ -251,22 +237,6 @@ static void SetKeyShare(WOLFSSL* ssl, int onlyKeyShare, int useX25519)
 
 /* Measures average time to create, connect and disconnect a connection (TPS).
 Benchmark = number of connections. */
-static const char* client_bench_conmsg[][5] = {
-    /* English */
-    {
-        "wolfSSL_resume  avg took:", "milliseconds\n",
-        "wolfSSL_connect avg took:", "milliseconds\n",
-        NULL
-    },
-    #ifndef NO_MULTIBYTE_PRINT
-    /* Japanese */
-    {
-        "wolfSSL_resume  平均時間:", "ミリ秒\n",
-        "wolfSSL_connect 平均時間:", "ミリ秒\n",
-    }
-    #endif
-};
-
 static int ClientBenchmarkConnections(WOLFSSL_CTX* ctx, char* host, word16 port,
     int dtlsUDP, int dtlsSCTP, int benchmark, int resumeSession, int useX25519,
     int helloRetry, int onlyKeyShare, int version)
@@ -282,7 +252,6 @@ static int ClientBenchmarkConnections(WOLFSSL_CTX* ctx, char* host, word16 port,
     byte* reply[80];
     static const char msg[] = "GET /index.html HTTP/1.0\r\n\r\n";
 #endif
-    const char** words = client_bench_conmsg[lng_index];
 
     (void)resumeSession;
     (void)useX25519;
@@ -344,12 +313,7 @@ static int ClientBenchmarkConnections(WOLFSSL_CTX* ctx, char* host, word16 port,
             }
 
     #ifdef WOLFSSL_TLS13
-        #ifndef NO_SESSION_CACHE
-            if (version >= 4 && resumeSession && !benchResume)
-        #else
-            if (version >= 4 && resumeSession)
-        #endif
-            {
+            if (version >= 4 && resumeSession && !benchResume) {
                 if (wolfSSL_write(ssl, msg, sizeof(msg)-1) <= 0)
                     err_sys("SSL_write failed");
 
@@ -365,7 +329,7 @@ static int ClientBenchmarkConnections(WOLFSSL_CTX* ctx, char* host, word16 port,
                 benchSession = wolfSSL_get_session(ssl);
             }
     #endif
-            wolfSSL_free(ssl); ssl = NULL;
+            wolfSSL_free(ssl);
             CloseSocket(sockfd);
         }
         avg = current_time(0) - start;
@@ -373,10 +337,10 @@ static int ClientBenchmarkConnections(WOLFSSL_CTX* ctx, char* host, word16 port,
         avg *= 1000;   /* milliseconds */
     #ifndef NO_SESSION_CACHE
         if (benchResume)
-            printf("%s %8.3f %s\n", words[0],avg, words[1]);
+            printf("wolfSSL_resume  avg took: %8.3f milliseconds\n", avg);
         else
     #endif
-            printf("%s %8.3f %s\n", words[2],avg, words[3]);
+            printf("wolfSSL_connect avg took: %8.3f milliseconds\n", avg);
 
         WOLFSSL_TIME(times);
     }
@@ -531,7 +495,6 @@ static int ClientBenchmarkThroughput(WOLFSSL_CTX* ctx, char* host, word16 port,
             else {
                 err_sys("wc_InitRng failed");
             }
-            (void)rng; /* for WC_NO_RNG case */
         }
         else {
             err_sys("Client buffer malloc failed");
@@ -544,7 +507,7 @@ static int ClientBenchmarkThroughput(WOLFSSL_CTX* ctx, char* host, word16 port,
     }
 
     wolfSSL_shutdown(ssl);
-    wolfSSL_free(ssl); ssl = NULL;
+    wolfSSL_free(ssl);
     CloseSocket(sockfd);
 
     printf("wolfSSL Client Benchmark %d bytes\n"
@@ -743,499 +706,126 @@ static void ClientRead(WOLFSSL* ssl, char* reply, int replyLen, int mustRead)
     }
 }
 
-#ifdef WOLFSSL_EARLY_DATA
-static void EarlyData(WOLFSSL_CTX* ctx, WOLFSSL* ssl, char* msg, int msgSz,
-                      char* buffer)
-{
-    int err;
-    int ret;
-
-    do {
-        err = 0; /* reset error */
-        ret = wolfSSL_write_early_data(ssl, msg, msgSz, &msgSz);
-        if (ret <= 0) {
-            err = wolfSSL_get_error(ssl, 0);
-        #ifdef WOLFSSL_ASYNC_CRYPT
-            if (err == WC_PENDING_E) {
-                ret = wolfSSL_AsyncPoll(ssl, WOLF_POLL_FLAG_CHECK_HW);
-                if (ret < 0) break;
-            }
-        #endif
-        }
-    } while (err == WC_PENDING_E);
-    if (ret != msgSz) {
-        printf("SSL_write_early_data msg error %d, %s\n", err,
-                                         wolfSSL_ERR_error_string(err, buffer));
-        wolfSSL_free(ssl); ssl = NULL;
-        wolfSSL_CTX_free(ctx); ctx = NULL;
-        err_sys("SSL_write_early_data failed");
-    }
-    do {
-        err = 0; /* reset error */
-        ret = wolfSSL_write_early_data(ssl, msg, msgSz, &msgSz);
-        if (ret <= 0) {
-            err = wolfSSL_get_error(ssl, 0);
-        #ifdef WOLFSSL_ASYNC_CRYPT
-            if (err == WC_PENDING_E) {
-                ret = wolfSSL_AsyncPoll(ssl, WOLF_POLL_FLAG_CHECK_HW);
-                if (ret < 0) break;
-            }
-        #endif
-        }
-    } while (err == WC_PENDING_E);
-    if (ret != msgSz) {
-        printf("SSL_write_early_data msg error %d, %s\n", err,
-                                         wolfSSL_ERR_error_string(err, buffer));
-        wolfSSL_free(ssl); ssl = NULL;
-        wolfSSL_CTX_free(ctx); ctx = NULL;
-        err_sys("SSL_write_early_data failed");
-    }
-}
-#endif
-
-/* when adding new option, please follow the steps below: */
-/*  1. add new option message in English section          */
-/*  2. increase the number of the second dimention        */
-/*  3. add the same message into Japanese section         */
-/*     (will be translated later)                         */
-/*  4. add printf() into suitable position of Usage()     */
-static const char* client_usage_msg[][59] = {
-    /* English */
-    {
-        " NOTE: All files relative to wolfSSL home dir\n",          /* 0 */
-        "Max RSA key size in bits for build is set at : ",          /* 1 */
-#ifdef NO_RSA
-        "RSA not supported\n",                                      /* 2 */
-#elif defined(WOLFSSL_SP_MATH) /* case of SP math only */
-#ifndef WOLFSSL_SP_NO_3072
-        "3072\n",                                                   /* 2 */
-#elif !defined(WOLFSSL_SP_NO_2048)
-        "2048\n",                                                   /* 2 */
-#else
-        "0\n",                                                      /* 2 */
-#endif
-#elif defined(USE_FAST_MATH)
-#else
-        "INFINITE\n",                                               /* 2 */
-#endif
-        "-? <num>    Help, print this usage\n"
-        "            0: English, 1: Japanese\n",                    /* 3 */
-        "-h <host>   Host to connect to, default",                  /* 4 */
-        "-p <num>    Port to connect on, not 0, default",           /* 5 */
-
-#ifndef WOLFSSL_TLS13
-        "-v <num>    SSL version [0-3], SSLv3(0) - TLS1.2(3)), default", /* 6 */
-        "-V          Prints valid ssl version numbers"
-                                             ", SSLv3(0) - TLS1.2(3)\n", /* 7 */
-#else
-        "-v <num>    SSL version [0-4], SSLv3(0) - TLS1.3(4)), default", /* 6 */
-        "-V          Prints valid ssl version numbers,"
-                                            " SSLv3(0) - TLS1.3(4)\n",   /* 7 */
-#endif
-        "-l <str>    Cipher suite list (: delimited)\n",                /* 8 */
-        "-c <file>   Certificate file,           default",              /* 9 */
-        "-k <file>   Key file,                   default",              /* 10 */
-        "-A <file>   Certificate Authority file, default",              /* 11 */
-#ifndef NO_DH
-        "-Z <num>    Minimum DH key bits,        default",              /* 12 */
-#endif
-        "-b <num>    Benchmark <num> connections and print stats\n",    /* 13 */
-#ifdef HAVE_ALPN
-        "-L <str>    Application-Layer Protocol"
-                                      " Negotiation ({C,F}:<list>)\n",  /* 14 */
-#endif
-        "-B <num>    Benchmark throughput"
-                                " using <num> bytes and print stats\n", /* 15 */
-        "-s          Use pre Shared keys\n",                            /* 16 */
-        "-d          Disable peer checks\n",                            /* 17 */
-        "-D          Override Date Errors example\n",                   /* 18 */
-        "-e          List Every cipher suite available, \n",            /* 19 */
-        "-g          Send server HTTP GET\n",                           /* 20 */
-        "-u          Use UDP DTLS,"
-                 " add -v 2 for DTLSv1, -v 3 for DTLSv1.2 (default)\n", /* 21 */
-#ifdef WOLFSSL_SCTP
-        "-G          Use SCTP DTLS,"
-                " add -v 2 for DTLSv1, -v 3 for DTLSv1.2 (default)\n",  /* 22 */
-#endif
-        "-m          Match domain name in cert\n",                      /* 23 */
-        "-N          Use Non-blocking sockets\n",                       /* 24 */
-#ifndef NO_SESSION_CACHE
-        "-r          Resume session\n",                                 /* 25 */
-#endif 
-        "-w          Wait for bidirectional shutdown\n",                /* 26 */
-        "-M <prot>   Use STARTTLS, using <prot> protocol (smtp)\n",     /* 27 */
-#ifdef HAVE_SECURE_RENEGOTIATION
-        "-R          Allow Secure Renegotiation\n",                     /* 28 */
-        "-i          Force client Initiated Secure Renegotiation\n",    /* 29 */
-#endif
-        "-f          Fewer packets/group messages\n",                   /* 30 */
-        "-x          Disable client cert/key loading\n",                /* 31 */
-        "-X          Driven by eXternal test case\n",                   /* 32 */
-        "-j          Use verify callback override\n",                   /* 33 */
-#ifdef SHOW_SIZES
-        "-z          Print structure sizes\n",                          /* 34 */
-#endif
-#ifdef HAVE_SNI
-        "-S <str>    Use Host Name Indication\n",                       /* 35 */
-#endif
-#ifdef HAVE_MAX_FRAGMENT
-        "-F <num>    Use Maximum Fragment Length [1-6]\n",              /* 36 */
-#endif
-#ifdef HAVE_TRUNCATED_HMAC
-        "-T          Use Truncated HMAC\n",                             /* 37 */
-#endif
-#ifdef HAVE_EXTENDED_MASTER
-        "-n          Disable Extended Master Secret\n",                 /* 38 */
-#endif
-#ifdef HAVE_OCSP
-        "-o          Perform OCSP lookup on peer certificate\n",        /* 39 */
-        "-O <url>    Perform OCSP lookup using <url> as responder\n",   /* 40 */
-#endif
-#if defined(HAVE_CERTIFICATE_STATUS_REQUEST) \
- || defined(HAVE_CERTIFICATE_STATUS_REQUEST_V2)
-        "-W <num>    Use OCSP Stapling (1 v1, 2 v2, 3 v2 multi)\n",     /* 41 */
-#endif
-#ifdef ATOMIC_USER
-        "-U          Atomic User Record Layer Callbacks\n",             /* 42 */
-#endif
-#ifdef HAVE_PK_CALLBACKS
-        "-P          Public Key Callbacks\n",                           /* 43 */
-#endif
-#ifdef HAVE_ANON
-        "-a          Anonymous client\n",                               /* 44 */
-#endif
-#ifdef HAVE_CRL
-        "-C          Disable CRL\n",                                    /* 45 */
-#endif
-#ifdef WOLFSSL_TRUST_PEER_CERT
-        "-E <file>   Path to load trusted peer cert\n",                 /* 46 */
-#endif
-#ifdef HAVE_WNR
-        "-q <file>   Whitewood config file,      defaults\n",           /* 47 */      
-#endif
-        "-H <arg>    Internal tests"
-                  " [defCipherList, exitWithRet, verifyFail]\n",        /* 48 */
-#ifdef WOLFSSL_TLS13
-        "-J          Use HelloRetryRequest to choose group for KE\n",   /* 49 */
-        "-K          Key Exchange for PSK not using (EC)DHE\n",         /* 50 */
-        "-I          Update keys and IVs before sending data\n",        /* 51 */
-#ifndef NO_DH
-        "-y          Key Share with FFDHE named groups only\n",         /* 52 */
-#endif
-#ifdef HAVE_ECC
-        "-Y          Key Share with ECC named groups only\n",           /* 53 */
-#endif
-#endif /* WOLFSSL_TLS13 */
-#ifdef HAVE_CURVE25519
-        "-t          Use X25519 for key exchange\n",                    /* 54 */
-#endif
-#if defined(WOLFSSL_TLS13) && defined(WOLFSSL_POST_HANDSHAKE_AUTH)
-        "-Q          Support requesting certificate post-handshake\n",  /* 55 */
-#endif
-#ifdef WOLFSSL_EARLY_DATA
-        "-0          Early data sent to server (0-RTT handshake)\n",    /* 56 */
-#endif
-#ifdef WOLFSSL_MULTICAST
-        "-3 <grpid>  Multicast, grpid < 256\n",                         /* 57 */
-#endif
-        "-1 <num>    Display a result by specified language.\n"
-                               "            0: English, 1: Japanese\n", /* 58 */
-        NULL,
-    },
-#ifndef NO_MULTIBYTE_PRINT
-    /* Japanese */
-        {
-        " 注意 : 全てのファイルは wolfSSL ホーム・ディレクトリからの相対です。"
-                                                               "\n",     /* 0 */
-        "RSAの最大ビットは次のように設定されています: ",                 /* 1 */
-#ifdef NO_RSA
-        "RSAはサポートされていません。\n",                               /* 2 */
-#elif defined(WOLFSSL_SP_MATH) /* case of SP math only */
-#ifndef WOLFSSL_SP_NO_3072
-        "3072\n",                                                        /* 2 */
-#elif !defined(WOLFSSL_SP_NO_2048)
-        "2048\n",                                                        /* 2 */
-#else
-        "0\n",                                                           /* 2 */
-#endif
-#elif defined(USE_FAST_MATH)
-#else
-        "無限\n",                                                        /* 2 */
-#endif
-        "-? <num>    ヘルプ, 使い方を表示\n"
-                            "            0: 英語、 1: 日本語\n",         /* 3 */
-        "-h <host>   接続先ホスト, 既定値",                              /* 4 */
-        "-p <num>    接続先ポート, 0は無効, 既定値",                     /* 5 */
-
-#ifndef WOLFSSL_TLS13
-        "-v <num>    SSL バージョン [0-3], SSLv3(0) - TLS1.2(3)),"
-                                                              " 既定値", /* 6 */
-        "-V          有効な ssl バージョン番号を出力, SSLv3(0) -"
-                                                 " TLS1.2(3)\n",         /* 7 */
-#else
-        "-v <num>    SSL バージョン [0-4], SSLv3(0) - TLS1.3(4)),"
-                                                    " 既定値",           /* 6 */
-        "-V          有効な ssl バージョン番号を出力, SSLv3(0) -"
-                                                 " TLS1.3(4)\n",         /* 7 */
-#endif
-        "-l <str>    暗号スイートリスト (区切り文字 :)\n",               /* 8 */
-        "-c <file>   証明書ファイル,  既定値",                           /* 9 */
-        "-k <file>   鍵ファイル,      既定値",                          /* 10 */
-        "-A <file>   認証局ファイル,  既定値",                          /* 11 */
-#ifndef NO_DH
-        "-Z <num>    最小 DH 鍵 ビット, 既定値",                        /* 12 */
-#endif
-        "-b <num>    ベンチマーク <num> 接続及び結果出力する\n",        /* 13 */
-#ifdef HAVE_ALPN
-        "-L <str>    アプリケーション層プロトコルネゴシエーションを行う"
-                                                 " ({C,F}:<list>)\n",   /* 14 */
-#endif
-        "-B <num>    <num> バイトを用いてのベンチマーク・スループット測定"
-                                                  "と結果を出力する\n", /* 15 */
-        "-s          事前共有鍵を使用する\n",                           /* 16 */
-        "-d          ピア確認を無効とする\n",                           /* 17 */
-        "-D          日付エラー用コールバック例の上書きを行う\n",       /* 18 */
-        "-e          利用可能な全ての暗号スイートをリスト, \n",         /* 19 */
-        "-g          サーバーへ HTTP GET を送信\n",                     /* 20 */
-        "-u          UDP DTLSを使用する。-v 2 を追加指定すると"
-               " DTLSv1, -v 3 を追加指定すると DTLSv1.2 (既定値)\n",    /* 21 */
-#ifdef WOLFSSL_SCTP
-        "-G          SCTP DTLSを使用する。-v 2 を追加指定すると"
-                " DTLSv1, -v 3 を追加指定すると DTLSv1.2 (既定値)\n",   /* 22 */
-#endif
-        "-m          証明書内のドメイン名一致を確認する\n",             /* 23 */
-        "-N          ノンブロッキング・ソケットを使用する\n",           /* 24 */
-#ifndef NO_SESSION_CACHE
-        "-r          セッションを継続する\n",                           /* 25 */
-#endif 
-        "-w          双方向シャットダウンを待つ\n",                     /* 26 */
-        "-M <prot>   STARTTLSを使用する, <prot>プロトコル(smtp)を"
-                                              "使用する\n",             /* 27 */
-#ifdef HAVE_SECURE_RENEGOTIATION
-        "-R          セキュアな再ネゴシエーションを許可する\n",         /* 28 */
-        "-i          クライアント主導のネゴシエーションを強制する\n",   /* 29 */
-#endif
-        "-f          より少ないパケット/グループメッセージを使用する\n",/* 30 */
-        "-x          クライアントの証明書/鍵のロードを無効する\n",      /* 31 */
-        "-X          外部テスト・ケースにより動作する\n",               /* 32 */
-        "-j          コールバック・オーバーライドの検証を使用する\n",   /* 33 */
-#ifdef SHOW_SIZES
-        "-z          構造体のサイズを表示する\n",                       /* 34 */
-#endif
-#ifdef HAVE_SNI
-        "-S <str>    ホスト名表示を使用する\n",                         /* 35 */
-#endif
-#ifdef HAVE_MAX_FRAGMENT
-        "-F <num>    最大フラグメント長[1-6]を設定する\n",              /* 36 */
-#endif
-#ifdef HAVE_TRUNCATED_HMAC
-        "-T          Truncated HMACを使用する\n",                       /* 37 */
-#endif
-#ifdef HAVE_EXTENDED_MASTER
-        "-n          マスターシークレット拡張を無効にする\n",           /* 38 */
-#endif
-#ifdef HAVE_OCSP
-        "-o          OCSPルックアップをピア証明書で実施する\n",         /* 39 */
-        "-O <url>    OCSPルックアップを、<url>を使用し"
-                                   "応答者として実施する\n",            /* 40 */
-#endif
-#if defined(HAVE_CERTIFICATE_STATUS_REQUEST) \
- || defined(HAVE_CERTIFICATE_STATUS_REQUEST_V2)
-        "-W <num>    OCSP Staplingを使用する"
-                                         " (1 v1, 2 v2, 3 v2 multi)\n", /* 41 */
-#endif
-#ifdef ATOMIC_USER
-        "-U          アトミック・ユーザー記録の"
-                                           "コールバックを利用する\n",  /* 42 */
-#endif
-#ifdef HAVE_PK_CALLBACKS
-        "-P          公開鍵コールバック\n",                             /* 43 */
-#endif
-#ifdef HAVE_ANON
-        "-a          匿名クライアント\n",                               /* 44 */
-#endif
-#ifdef HAVE_CRL
-        "-C          CRLを無効\n",                                      /* 45 */
-#endif
-#ifdef WOLFSSL_TRUST_PEER_CERT
-        "-E <file>   信頼出来るピアの証明書ロードの為のパス\n",         /* 46 */
-#endif
-#ifdef HAVE_WNR
-        "-q <file>   Whitewood コンフィグファイル,      既定値\n",      /* 47 */      
-#endif
-        "-H <arg>    内部テスト"
-               " [defCipherList, exitWithRet, verifyFail]\n",           /* 48 */
-#ifdef WOLFSSL_TLS13
-        "-J          HelloRetryRequestをKEのグループ選択に使用する\n",  /* 49 */
-        "-K          鍵交換にPSKを使用、(EC)DHEは使用しない\n",         /* 50 */
-        "-I          データ送信前に、鍵とIVを更新する\n",               /* 51 */
-#ifndef NO_DH
-        "-y          FFDHE名前付きグループとの鍵共有のみ\n",            /* 52 */
-#endif
-#ifdef HAVE_ECC
-        "-Y          ECC名前付きグループとの鍵共有のみ\n",              /* 53 */
-#endif
-#endif /* WOLFSSL_TLS13 */
-#ifdef HAVE_CURVE25519
-        "-t          X25519を鍵交換に使用する\n",                       /* 54 */
-#endif
-#if defined(WOLFSSL_TLS13) && defined(WOLFSSL_POST_HANDSHAKE_AUTH)
-        "-Q          ポストハンドシェークの証明要求をサポートする\n",   /* 55 */
-#endif
-#ifdef WOLFSSL_EARLY_DATA
-        "-0          Early data をサーバーへ送信する"
-                            "（0-RTTハンドシェイク）\n",                /* 56 */
-#endif
-#ifdef WOLFSSL_MULTICAST
-        "-3 <grpid>  マルチキャスト, grpid < 256\n",                    /* 57 */
-#endif
-        "-1 <num>    指定された言語で結果を表示します。\n"
-                                   "            0: 英語、 1: 日本語\n", /* 58 */
-        NULL,
-    },
-#endif
-
-};
-
 static void Usage(void)
 {
-    int msgid = 0;
-    const char** msg = client_usage_msg[lng_index];
-
-    printf("%s%s%s", "wolfSSL client ",    LIBWOLFSSL_VERSION_STRING,
-           msg[msgid]);
-
-    /* print out so that scripts can know what the max supported key size is */
-    printf("%s", msg[++msgid]);
-#ifdef NO_RSA
-    printf("%s", msg[++msgid]);
-#elif defined(WOLFSSL_SP_MATH) /* case of SP math only */
-    #ifndef WOLFSSL_SP_NO_3072
-        printf("%s", msg[++msgid]);
-    #elif !defined(WOLFSSL_SP_NO_2048)
-        printf("%s", msg[++msgid]);
-    #else
-        printf("%s", msg[++msgid]);
-    #endif
-#elif defined(USE_FAST_MATH)
-    printf("%d\n", FP_MAX_BITS/2);
-#else
-    /* normal math has unlimited max size */
-    printf("%s", msg[++msgid]);
-#endif
-
-    printf("%s", msg[++msgid]); /* ? */
-    printf("%s %s\n", msg[++msgid], wolfSSLIP);   /* -h */
-    printf("%s %d\n", msg[++msgid], wolfSSLPort); /* -p */
+    printf("client "    LIBWOLFSSL_VERSION_STRING
+           " NOTE: All files relative to wolfSSL home dir\n");
+    printf("-?          Help, print this usage\n");
+    printf("-h <host>   Host to connect to, default %s\n", wolfSSLIP);
+    printf("-p <num>    Port to connect on, not 0, default %d\n", wolfSSLPort);
 #ifndef WOLFSSL_TLS13
-    printf("%s %d\n", msg[++msgid], CLIENT_DEFAULT_VERSION); /* -v */
-    printf("%s", msg[++msgid]); /* -V */
+    printf("-v <num>    SSL version [0-3], SSLv3(0) - TLS1.2(3)), default %d\n",
+                                 CLIENT_DEFAULT_VERSION);
+    printf("-V          Prints valid ssl version numbers, SSLv3(0) - TLS1.2(3)\n");
 #else
-    printf("%s %d\n", msg[++msgid], CLIENT_DEFAULT_VERSION); /* -v */
-    printf("%s", msg[++msgid]);                              /* -V */
+    printf("-v <num>    SSL version [0-4], SSLv3(0) - TLS1.3(4)), default %d\n",
+                                 CLIENT_DEFAULT_VERSION);
+    printf("-V          Prints valid ssl version numbers, SSLv3(0) - TLS1.3(4)\n");
 #endif
-    printf("%s", msg[++msgid]); /* -l */
-    printf("%s %s\n", msg[++msgid], cliCertFile); /* -c */
-    printf("%s %s\n", msg[++msgid], cliKeyFile);  /* -k */
-    printf("%s %s\n", msg[++msgid], caCertFile);  /* -A */
+    printf("-l <str>    Cipher suite list (: delimited)\n");
+    printf("-c <file>   Certificate file,           default %s\n", cliCertFile);
+    printf("-k <file>   Key file,                   default %s\n", cliKeyFile);
+    printf("-A <file>   Certificate Authority file, default %s\n", caCertFile);
 #ifndef NO_DH
-    printf("%s %d\n", msg[++msgid], DEFAULT_MIN_DHKEY_BITS);
+    printf("-Z <num>    Minimum DH key bits,        default %d\n",
+                                 DEFAULT_MIN_DHKEY_BITS);
 #endif
-    printf("%s", msg[++msgid]); /* -b */
+    printf("-b <num>    Benchmark <num> connections and print stats\n");
 #ifdef HAVE_ALPN
-    printf("%s", msg[++msgid]); /* -L <str> */
+    printf("-L <str>    Application-Layer Protocol Negotiation ({C,F}:<list>)\n");
 #endif
-    printf("%s", msg[++msgid]); /* -B <num> */
-    printf("%s", msg[++msgid]); /* -s */
-    printf("%s", msg[++msgid]); /* -d */
-    printf("%s", msg[++msgid]); /* -D */
-    printf("%s", msg[++msgid]); /* -e */
-    printf("%s", msg[++msgid]); /* -g */
-    printf("%s", msg[++msgid]); /* -u */
+    printf("-B <num>    Benchmark throughput using <num> bytes and print stats\n");
+    printf("-s          Use pre Shared keys\n");
+    printf("-d          Disable peer checks\n");
+    printf("-D          Override Date Errors example\n");
+    printf("-e          List Every cipher suite available, \n");
+    printf("-g          Send server HTTP GET\n");
+    printf("-u          Use UDP DTLS,"
+           " add -v 2 for DTLSv1, -v 3 for DTLSv1.2 (default)\n");
 #ifdef WOLFSSL_SCTP
-    printf("%s", msg[++msgid]); /* -G */
+    printf("-G          Use SCTP DTLS,"
+           " add -v 2 for DTLSv1, -v 3 for DTLSv1.2 (default)\n");
 #endif
-    printf("%s", msg[++msgid]); /* -m */
-    printf("%s", msg[++msgid]); /* -N */
+    printf("-m          Match domain name in cert\n");
+    printf("-N          Use Non-blocking sockets\n");
 #ifndef NO_SESSION_CACHE
-    printf("%s", msg[++msgid]); /* -r */
+    printf("-r          Resume session\n");
 #endif
-    printf("%s", msg[++msgid]); /* -w */
-    printf("%s", msg[++msgid]); /* -M */
+    printf("-w          Wait for bidirectional shutdown\n");
+    printf("-M <prot>   Use STARTTLS, using <prot> protocol (smtp)\n");
 #ifdef HAVE_SECURE_RENEGOTIATION
-    printf("%s", msg[++msgid]); /* -R */
-    printf("%s", msg[++msgid]); /* -i */
+    printf("-R          Allow Secure Renegotiation\n");
+    printf("-i          Force client Initiated Secure Renegotiation\n");
 #endif
-    printf("%s", msg[++msgid]); /* -f */
-    printf("%s", msg[++msgid]); /* -x */
-    printf("%s", msg[++msgid]); /* -X */
-    printf("%s", msg[++msgid]); /* -j */
+    printf("-f          Fewer packets/group messages\n");
+    printf("-x          Disable client cert/key loading\n");
+    printf("-X          Driven by eXternal test case\n");
+    printf("-j          Use verify callback override\n");
 #ifdef SHOW_SIZES
-    printf("%s", msg[++msgid]); /* -z */
+    printf("-z          Print structure sizes\n");
 #endif
 #ifdef HAVE_SNI
-    printf("%s", msg[++msgid]); /* -S */
+    printf("-S <str>    Use Host Name Indication\n");
 #endif
 #ifdef HAVE_MAX_FRAGMENT
-    printf("%s", msg[++msgid]); /* -F */
+    printf("-F <num>    Use Maximum Fragment Length [1-5]\n");
 #endif
 #ifdef HAVE_TRUNCATED_HMAC
-    printf("%s", msg[++msgid]); /* -T */
+    printf("-T          Use Truncated HMAC\n");
 #endif
 #ifdef HAVE_EXTENDED_MASTER
-    printf("%s", msg[++msgid]); /* -n */
+    printf("-n          Disable Extended Master Secret\n");
 #endif
 #ifdef HAVE_OCSP
-    printf("%s", msg[++msgid]); /* -o */
-    printf("%s", msg[++msgid]); /* -O */
+    printf("-o          Perform OCSP lookup on peer certificate\n");
+    printf("-O <url>    Perform OCSP lookup using <url> as responder\n");
 #endif
 #if defined(HAVE_CERTIFICATE_STATUS_REQUEST) \
  || defined(HAVE_CERTIFICATE_STATUS_REQUEST_V2)
-    printf("%s", msg[++msgid]); /* -W */
+    printf("-W          Use OCSP Stapling\n");
 #endif
 #ifdef ATOMIC_USER
-    printf("%s", msg[++msgid]); /* -U */
+    printf("-U          Atomic User Record Layer Callbacks\n");
 #endif
 #ifdef HAVE_PK_CALLBACKS
-    printf("%s", msg[++msgid]); /* -P */
+    printf("-P          Public Key Callbacks\n");
 #endif
 #ifdef HAVE_ANON
-    printf("%s", msg[++msgid]); /* -a */
+    printf("-a          Anonymous client\n");
 #endif
 #ifdef HAVE_CRL
-    printf("%s", msg[++msgid]); /* -C */
+    printf("-C          Disable CRL\n");
 #endif
 #ifdef WOLFSSL_TRUST_PEER_CERT
-    printf("%s", msg[++msgid]); /* -E */
+    printf("-E <file>   Path to load trusted peer cert\n");
 #endif
 #ifdef HAVE_WNR
-    printf("%s %s\n", msg[++msgid], wnrConfig); /* -q */
+    printf("-q <file>   Whitewood config file,      default %s\n", wnrConfig);
 #endif
-    printf("%s", msg[++msgid]);                /* -H  */
+    printf("-H <arg>    Internal tests [defCipherList, exitWithRet]\n");
 #ifdef WOLFSSL_TLS13
-    printf("%s", msg[++msgid]); /* -J */
-    printf("%s", msg[++msgid]); /* -K */
-    printf("%s", msg[++msgid]); /* -I */
+    printf("-J          Use HelloRetryRequest to choose group for KE\n");
+    printf("-K          Key Exchange for PSK not using (EC)DHE\n");
+    printf("-I          Update keys and IVs before sending data\n");
 #ifndef NO_DH
-    printf("%s", msg[++msgid]); /* -y */
+    printf("-y          Key Share with FFDHE named groups only\n");
 #endif
 #ifdef HAVE_ECC
-    printf("%s", msg[++msgid]); /* -Y */
+    printf("-Y          Key Share with ECC named groups only\n");
 #endif
 #endif /* WOLFSSL_TLS13 */
 #ifdef HAVE_CURVE25519
-    printf("%s", msg[++msgid]); /* -t */
+    printf("-t          Use X25519 for key exchange\n");
 #endif
 #if defined(WOLFSSL_TLS13) && defined(WOLFSSL_POST_HANDSHAKE_AUTH)
-    printf("%s", msg[++msgid]); /* -Q */
+    printf("-Q          Support requesting certificate post-handshake\n");
 #endif
 #ifdef WOLFSSL_EARLY_DATA
-    printf("%s", msg[++msgid]); /* -0 */
+    printf("-0          Early data sent to server (0-RTT handshake)\n");
 #endif
 #ifdef WOLFSSL_MULTICAST
-    printf("%s", msg[++msgid]); /* -3 */
+    printf("-3 <grpid>  Multicast, grpid < 256\n");
 #endif
-    printf("%s", msg[++msgid]);  /* -1 */
 }
 
 THREAD_RETURN WOLFSSL_THREAD client_test(void* args)
@@ -1314,9 +904,6 @@ THREAD_RETURN WOLFSSL_THREAD client_test(void* args)
     int   doSTARTTLS    = 0;
     char* starttlsProt = NULL;
     int   useVerifyCb = 0;
-#ifdef HAVE_ECC
-    int   useSupCurve = 0;
-#endif
 
 #ifdef WOLFSSL_TRUST_PEER_CERT
     const char* trustCert  = NULL;
@@ -1358,7 +945,6 @@ THREAD_RETURN WOLFSSL_THREAD client_test(void* args)
 #endif
     int useX25519 = 0;
     int exitWithRet = 0;
-    int loadCertKeyIntoSSLObj = 0;
 
 #ifdef HAVE_WNR
     const char* wnrConfigFile = wnrConfig;
@@ -1387,15 +973,9 @@ THREAD_RETURN WOLFSSL_THREAD client_test(void* args)
     ((func_args*)args)->return_code = -1; /* error state */
 
 #ifdef NO_RSA
-    #ifdef HAVE_ECC
-        verifyCert = (char*)caEccCertFile;
-        ourCert    = (char*)cliEccCertFile;
-        ourKey     = (char*)cliEccKeyFile;
-    #elif defined(HAVE_ED25519)
-        verifyCert = (char*)caEdCertFile;
-        ourCert    = (char*)cliEdCertFile;
-        ourKey     = (char*)cliEdKeyFile;
-    #endif
+    verifyCert = (char*)caEccCertFile;
+    ourCert    = (char*)cliEccCertFile;
+    ourKey     = (char*)cliEccKeyFile;
 #endif
     (void)resumeSz;
     (void)session;
@@ -1416,29 +996,19 @@ THREAD_RETURN WOLFSSL_THREAD client_test(void* args)
     (void)useX25519;
     (void)helloRetry;
     (void)onlyKeyShare;
-#ifdef HAVE_ECC
-    (void)useSupCurve;
-#endif
-    (void)loadCertKeyIntoSSLObj;
 
     StackTrap();
 
 #ifndef WOLFSSL_VXWORKS
     /* Not used: All used */
-    while ((ch = mygetopt(argc, argv, "?:"
+    while ((ch = mygetopt(argc, argv, "?"
             "ab:c:defgh:ijk:l:mnop:q:rstuv:wxyz"
             "A:B:CDE:F:GH:IJKL:M:NO:PQRS:TUVW:XYZ:"
-            "01:3:")) != -1) {
+            "03:")) != -1) {
         switch (ch) {
             case '?' :
-                if(myoptarg!=NULL) {
-                    lng_index = atoi(myoptarg);
-                    if(lng_index<0||lng_index>1){
-                        lng_index = 0;
-                    }
-                }
                 Usage();
-                XEXIT_T(EXIT_SUCCESS);
+                exit(EXIT_SUCCESS);
 
             case 'g' :
                 sendGET = 1;
@@ -1450,7 +1020,7 @@ THREAD_RETURN WOLFSSL_THREAD client_test(void* args)
 
             case 'e' :
                 ShowCiphers();
-                XEXIT_T(EXIT_SUCCESS);
+                exit(EXIT_SUCCESS);
 
             case 'D' :
                 overrideDateErrors = 1;
@@ -1530,23 +1100,16 @@ THREAD_RETURN WOLFSSL_THREAD client_test(void* args)
                     version = CLIENT_DOWNGRADE_VERSION;
                     break;
                 }
-            #if defined(OPENSSL_EXTRA) || defined(WOLFSSL_EITHER_SIDE)
-                else if (myoptarg[0] == 'e') {
-                    version = EITHER_DOWNGRADE_VERSION;
-                    loadCertKeyIntoSSLObj = 1;
-                    break;
-                }
-            #endif
                 version = atoi(myoptarg);
                 if (version < 0 || version > 4) {
                     Usage();
-                    XEXIT_T(MY_EX_USAGE);
+                    exit(MY_EX_USAGE);
                 }
                 break;
 
             case 'V' :
                 ShowVersions();
-                XEXIT_T(EXIT_SUCCESS);
+                exit(EXIT_SUCCESS);
 
             case 'l' :
                 cipherList = myoptarg;
@@ -1557,27 +1120,13 @@ THREAD_RETURN WOLFSSL_THREAD client_test(void* args)
                     printf("Using default cipher list for testing\n");
                     useDefCipherList = 1;
                 }
-                else if (XSTRNCMP(myoptarg, "exitWithRet", 11) == 0) {
+                else if (XSTRNCMP(myoptarg, "exitWithRet", 7) == 0) {
                     printf("Skip exit() for testing\n");
                     exitWithRet = 1;
                 }
-                else if (XSTRNCMP(myoptarg, "verifyFail", 10) == 0) {
-                    printf("Verify should fail\n");
-                    myVerifyFail = 1;
-                }
-            #ifdef HAVE_ECC
-                else if (XSTRNCMP(myoptarg, "useSupCurve", 11) == 0) {
-                    printf("Test use supported curve\n");
-                    useSupCurve = 1;
-                }
-            #endif
-                else if (XSTRNCMP(myoptarg, "loadSSL", 7) == 0) {
-                    printf("Load cert/key into wolfSSL object\n");
-                    loadCertKeyIntoSSLObj = 1;
-                }
                 else {
                     Usage();
-                    XEXIT_T(MY_EX_USAGE);
+                    exit(MY_EX_USAGE);
                 }
                 break;
 
@@ -1598,7 +1147,7 @@ THREAD_RETURN WOLFSSL_THREAD client_test(void* args)
                     minDhKeyBits = atoi(myoptarg);
                     if (minDhKeyBits <= 0 || minDhKeyBits > 16000) {
                         Usage();
-                        XEXIT_T(MY_EX_USAGE);
+                        exit(MY_EX_USAGE);
                     }
                 #endif
                 break;
@@ -1607,7 +1156,7 @@ THREAD_RETURN WOLFSSL_THREAD client_test(void* args)
                 benchmark = atoi(myoptarg);
                 if (benchmark < 0 || benchmark > 1000000) {
                     Usage();
-                    XEXIT_T(MY_EX_USAGE);
+                    exit(MY_EX_USAGE);
                 }
                 break;
 
@@ -1621,7 +1170,7 @@ THREAD_RETURN WOLFSSL_THREAD client_test(void* args)
                 }
                 if (throughput <= 0 || block <= 0) {
                     Usage();
-                    XEXIT_T(MY_EX_USAGE);
+                    exit(MY_EX_USAGE);
                 }
                 break;
 
@@ -1657,14 +1206,6 @@ THREAD_RETURN WOLFSSL_THREAD client_test(void* args)
                 break;
 
             case 'S' :
-                if (XSTRNCMP(myoptarg, "check", 5) == 0) {
-                #ifdef HAVE_SNI
-                    printf("SNI is: ON\n");
-                #else
-                    printf("SNI is: OFF\n");
-                #endif
-                    XEXIT_T(EXIT_SUCCESS);
-                }
                 #ifdef HAVE_SNI
                     sniHostName = myoptarg;
                 #endif
@@ -1673,10 +1214,10 @@ THREAD_RETURN WOLFSSL_THREAD client_test(void* args)
             case 'F' :
                 #ifdef HAVE_MAX_FRAGMENT
                     maxFragment = atoi(myoptarg);
-                    if (maxFragment < WOLFSSL_MFL_MIN ||
-                                               maxFragment > WOLFSSL_MFL_MAX) {
+                    if (maxFragment < WOLFSSL_MFL_2_9 ||
+                                               maxFragment > WOLFSSL_MFL_2_13) {
                         Usage();
-                        XEXIT_T(MY_EX_USAGE);
+                        exit(MY_EX_USAGE);
                     }
                 #endif
                 break;
@@ -1697,10 +1238,6 @@ THREAD_RETURN WOLFSSL_THREAD client_test(void* args)
                 #if defined(HAVE_CERTIFICATE_STATUS_REQUEST) \
                  || defined(HAVE_CERTIFICATE_STATUS_REQUEST_V2)
                     statusRequest = atoi(myoptarg);
-                    if (statusRequest > OCSP_STAPLING_OPT_MAX) {
-                        Usage();
-                        XEXIT_T(MY_EX_USAGE);
-                    }
                 #endif
                 break;
 
@@ -1733,7 +1270,7 @@ THREAD_RETURN WOLFSSL_THREAD client_test(void* args)
                         alpn_opt = WOLFSSL_ALPN_FAILED_ON_MISMATCH;
                     else {
                         Usage();
-                        XEXIT_T(MY_EX_USAGE);
+                        exit(MY_EX_USAGE);
                     }
 
                     alpnList += 2;
@@ -1747,7 +1284,7 @@ THREAD_RETURN WOLFSSL_THREAD client_test(void* args)
 
                 if (XSTRNCMP(starttlsProt, "smtp", 4) != 0) {
                     Usage();
-                    XEXIT_T(MY_EX_USAGE);
+                    exit(MY_EX_USAGE);
                 }
 
                 break;
@@ -1795,11 +1332,8 @@ THREAD_RETURN WOLFSSL_THREAD client_test(void* args)
             case 't' :
                 #ifdef HAVE_CURVE25519
                     useX25519 = 1;
-                    #ifdef HAVE_ECC
-                    useSupCurve = 1;
-                        #ifdef WOLFSSL_TLS13
+                    #if defined(WOLFSSL_TLS13) && defined(HAVE_ECC)
                         onlyKeyShare = 2;
-                        #endif
                     #endif
                 #endif
                 break;
@@ -1816,12 +1350,7 @@ THREAD_RETURN WOLFSSL_THREAD client_test(void* args)
                 earlyData = 1;
             #endif
                 break;
-            case '1' :
-                lng_index = atoi(myoptarg);
-                if(lng_index<0||lng_index>1){
-                      lng_index = 0;
-                }
-                break;
+
             case '3' :
                 #ifdef WOLFSSL_MULTICAST
                     doMcast = 1;
@@ -1831,7 +1360,7 @@ THREAD_RETURN WOLFSSL_THREAD client_test(void* args)
 
             default:
                 Usage();
-                XEXIT_T(MY_EX_USAGE);
+                exit(MY_EX_USAGE);
         }
     }
 
@@ -1914,10 +1443,10 @@ THREAD_RETURN WOLFSSL_THREAD client_test(void* args)
         #endif
 
         if (done) {
-            printf("external test can't be run in this mode\n");
+            printf("external test can't be run in this mode");
 
             ((func_args*)args)->return_code = 0;
-            XEXIT_T(EXIT_SUCCESS);
+            exit(EXIT_SUCCESS);
         }
     }
 
@@ -1932,10 +1461,6 @@ THREAD_RETURN WOLFSSL_THREAD client_test(void* args)
         if (doDTLS) {
             if (version == 3)
                 version = -2;
-        #if defined(OPENSSL_EXTRA) || defined(WOLFSSL_EITHER_SIDE)
-            else if (version == EITHER_DOWNGRADE_VERSION)
-                version = -3;
-        #endif
             else
                 version = -1;
         }
@@ -1983,11 +1508,6 @@ THREAD_RETURN WOLFSSL_THREAD client_test(void* args)
         case CLIENT_DOWNGRADE_VERSION:
             method = wolfSSLv23_client_method_ex;
             break;
-    #if defined(OPENSSL_EXTRA) || defined(WOLFSSL_EITHER_SIDE)
-        case EITHER_DOWNGRADE_VERSION:
-            method = wolfSSLv23_method_ex;
-            break;
-    #endif
 #endif /* NO_TLS */
 
 #ifdef WOLFSSL_DTLS
@@ -2000,11 +1520,6 @@ THREAD_RETURN WOLFSSL_THREAD client_test(void* args)
     #ifndef WOLFSSL_NO_TLS12
         case -2:
             method = wolfDTLSv1_2_client_method_ex;
-            break;
-    #endif
-    #if defined(OPENSSL_EXTRA) || defined(WOLFSSL_EITHER_SIDE)
-        case -3:
-            method = wolfDTLSv1_2_method_ex;
             break;
     #endif
 #endif
@@ -2048,14 +1563,14 @@ THREAD_RETURN WOLFSSL_THREAD client_test(void* args)
 
 #ifdef SINGLE_THREADED
     if (wolfSSL_CTX_new_rng(ctx) != WOLFSSL_SUCCESS) {
-        wolfSSL_CTX_free(ctx); ctx = NULL;
+        wolfSSL_CTX_free(ctx);
         err_sys("Single Threaded new rng at CTX failed");
     }
 #endif
 
     if (cipherList && !useDefCipherList) {
         if (wolfSSL_CTX_set_cipher_list(ctx, cipherList) != WOLFSSL_SUCCESS) {
-            wolfSSL_CTX_free(ctx); ctx = NULL;
+            wolfSSL_CTX_free(ctx);
             err_sys("client can't set cipher list 1");
         }
     }
@@ -2066,7 +1581,7 @@ THREAD_RETURN WOLFSSL_THREAD client_test(void* args)
     }
 #endif
 
-#if defined(NO_RSA) && !defined(HAVE_ECC) && !defined(HAVE_ED25519)
+#if defined(NO_RSA) && !defined(HAVE_ECC)
     if (!usePsk) {
         usePsk = 1;
     }
@@ -2082,9 +1597,6 @@ THREAD_RETURN WOLFSSL_THREAD client_test(void* args)
     if (usePsk) {
 #ifndef NO_PSK
         wolfSSL_CTX_set_psk_client_callback(ctx, my_psk_client_cb);
-    #ifdef WOLFSSL_TLS13
-        wolfSSL_CTX_set_psk_client_tls13_callback(ctx, my_psk_client_tls13_cb);
-    #endif
         if (cipherList == NULL) {
             const char *defaultCipherList;
         #if defined(HAVE_AESGCM) && !defined(NO_DH)
@@ -2101,7 +1613,7 @@ THREAD_RETURN WOLFSSL_THREAD client_test(void* args)
         #endif
             if (wolfSSL_CTX_set_cipher_list(ctx,defaultCipherList)
                                                             !=WOLFSSL_SUCCESS) {
-                wolfSSL_CTX_free(ctx); ctx = NULL;
+                wolfSSL_CTX_free(ctx);
                 err_sys("client can't set cipher list 2");
             }
         }
@@ -2120,7 +1632,7 @@ THREAD_RETURN WOLFSSL_THREAD client_test(void* args)
                                 "ADH-AES128-SHA";
             if (wolfSSL_CTX_set_cipher_list(ctx,defaultCipherList)
                                                            != WOLFSSL_SUCCESS) {
-                wolfSSL_CTX_free(ctx); ctx = NULL;
+                wolfSSL_CTX_free(ctx);
                 err_sys("client can't set cipher list 4");
             }
         }
@@ -2143,7 +1655,7 @@ THREAD_RETURN WOLFSSL_THREAD client_test(void* args)
     if (cipherList == NULL) {
         /* don't use EDH, can't sniff tmp keys */
         if (wolfSSL_CTX_set_cipher_list(ctx, "AES128-SHA") != WOLFSSL_SUCCESS) {
-            wolfSSL_CTX_free(ctx); ctx = NULL;
+            wolfSSL_CTX_free(ctx);
             err_sys("client can't set cipher list 3");
         }
     }
@@ -2181,31 +1693,28 @@ THREAD_RETURN WOLFSSL_THREAD client_test(void* args)
 #endif
 
 #ifndef NO_CERTS
-    if (useClientCert && !loadCertKeyIntoSSLObj){
-    #ifndef TEST_LOAD_BUFFER
+    if (useClientCert){
+    #ifndef NO_FILESYSTEM
         if (wolfSSL_CTX_use_certificate_chain_file(ctx, ourCert)
                                                            != WOLFSSL_SUCCESS) {
-            wolfSSL_CTX_free(ctx); ctx = NULL;
+            wolfSSL_CTX_free(ctx);
             err_sys("can't load client cert file, check file and run from"
                     " wolfSSL home dir");
         }
     #else
         load_buffer(ctx, ourCert, WOLFSSL_CERT_CHAIN);
     #endif
-    }
 
     #ifdef HAVE_PK_CALLBACKS
         pkCbInfo.ourKey = ourKey;
+        #ifdef TEST_PK_PRIVKEY
+        if (!pkCallbacks)
+        #endif
     #endif
-    if (useClientCert && !loadCertKeyIntoSSLObj
-    #if defined(HAVE_PK_CALLBACKS) && defined(TEST_PK_PRIVKEY)
-        && !pkCallbacks
-    #endif
-    ) {
-    #ifndef TEST_LOAD_BUFFER
+    #ifndef NO_FILESYSTEM
         if (wolfSSL_CTX_use_PrivateKey_file(ctx, ourKey, WOLFSSL_FILETYPE_PEM)
                                          != WOLFSSL_SUCCESS) {
-            wolfSSL_CTX_free(ctx); ctx = NULL;
+            wolfSSL_CTX_free(ctx);
             err_sys("can't load client private key file, check file and run "
                     "from wolfSSL home dir");
         }
@@ -2214,40 +1723,39 @@ THREAD_RETURN WOLFSSL_THREAD client_test(void* args)
     #endif
     }
 
-    if (!usePsk && !useAnon && !useVerifyCb && !myVerifyFail) {
-    #ifndef TEST_LOAD_BUFFER
-        if (wolfSSL_CTX_load_verify_locations(ctx, verifyCert, 0)
+    if (!usePsk && !useAnon && !useVerifyCb) {
+    #if !defined(NO_FILESYSTEM)
+        if (wolfSSL_CTX_load_verify_locations(ctx, verifyCert,0)
                                                            != WOLFSSL_SUCCESS) {
-            wolfSSL_CTX_free(ctx); ctx = NULL;
+            wolfSSL_CTX_free(ctx);
             err_sys("can't load ca file, Please run from wolfSSL home dir");
         }
     #else
         load_buffer(ctx, verifyCert, WOLFSSL_CA);
     #endif  /* !NO_FILESYSTEM */
-
     #ifdef HAVE_ECC
         /* load ecc verify too, echoserver uses it by default w/ ecc */
-        #ifndef TEST_LOAD_BUFFER
+        #ifndef NO_FILESYSTEM
         if (wolfSSL_CTX_load_verify_locations(ctx, eccCertFile, 0)
                                                            != WOLFSSL_SUCCESS) {
-            wolfSSL_CTX_free(ctx); ctx = NULL;
+            wolfSSL_CTX_free(ctx);
             err_sys("can't load ecc ca file, Please run from wolfSSL home dir");
         }
         #else
         load_buffer(ctx, eccCertFile, WOLFSSL_CA);
-        #endif /* !TEST_LOAD_BUFFER */
+        #endif /* !NO_FILESYSTEM */
     #endif /* HAVE_ECC */
     #if defined(WOLFSSL_TRUST_PEER_CERT) && !defined(NO_FILESYSTEM)
         if (trustCert) {
             if ((ret = wolfSSL_CTX_trust_peer_cert(ctx, trustCert,
                                     WOLFSSL_FILETYPE_PEM)) != WOLFSSL_SUCCESS) {
-                wolfSSL_CTX_free(ctx); ctx = NULL;
+                wolfSSL_CTX_free(ctx);
                 err_sys("can't load trusted peer cert file");
             }
         }
     #endif /* WOLFSSL_TRUST_PEER_CERT && !NO_FILESYSTEM */
     }
-    if (useVerifyCb || myVerifyFail)
+    if (useVerifyCb)
         wolfSSL_CTX_set_verify(ctx, WOLFSSL_VERIFY_PEER, myVerify);
     else if (!usePsk && !useAnon && doPeerCheck == 0)
         wolfSSL_CTX_set_verify(ctx, WOLFSSL_VERIFY_NONE, 0);
@@ -2267,65 +1775,53 @@ THREAD_RETURN WOLFSSL_THREAD client_test(void* args)
     if (sniHostName)
         if (wolfSSL_CTX_UseSNI(ctx, 0, sniHostName,
                     (word16) XSTRLEN(sniHostName)) != WOLFSSL_SUCCESS) {
-            wolfSSL_CTX_free(ctx); ctx = NULL;
+            wolfSSL_CTX_free(ctx);
             err_sys("UseSNI failed");
     }
 #endif
 #ifdef HAVE_MAX_FRAGMENT
     if (maxFragment)
         if (wolfSSL_CTX_UseMaxFragment(ctx, maxFragment) != WOLFSSL_SUCCESS) {
-            wolfSSL_CTX_free(ctx); ctx = NULL;
+            wolfSSL_CTX_free(ctx);
             err_sys("UseMaxFragment failed");
         }
 #endif
 #ifdef HAVE_TRUNCATED_HMAC
     if (truncatedHMAC)
         if (wolfSSL_CTX_UseTruncatedHMAC(ctx) != WOLFSSL_SUCCESS) {
-            wolfSSL_CTX_free(ctx); ctx = NULL;
+            wolfSSL_CTX_free(ctx);
             err_sys("UseTruncatedHMAC failed");
         }
 #endif
 #ifdef HAVE_SESSION_TICKET
     if (wolfSSL_CTX_UseSessionTicket(ctx) != WOLFSSL_SUCCESS) {
-        wolfSSL_CTX_free(ctx); ctx = NULL;
+        wolfSSL_CTX_free(ctx);
         err_sys("UseSessionTicket failed");
     }
 #endif
 #ifdef HAVE_EXTENDED_MASTER
     if (disableExtMasterSecret)
         if (wolfSSL_CTX_DisableExtendedMasterSecret(ctx) != WOLFSSL_SUCCESS) {
-            wolfSSL_CTX_free(ctx); ctx = NULL;
+            wolfSSL_CTX_free(ctx);
             err_sys("DisableExtendedMasterSecret failed");
         }
 #endif
-#if defined(HAVE_SUPPORTED_CURVES)
-    #if defined(HAVE_CURVE25519)
+#if defined(HAVE_CURVE25519) && defined(HAVE_SUPPORTED_CURVES)
     if (useX25519) {
         if (wolfSSL_CTX_UseSupportedCurve(ctx, WOLFSSL_ECC_X25519)
                                                            != WOLFSSL_SUCCESS) {
             err_sys("unable to support X25519");
         }
-    }
-    #endif /* HAVE_CURVE25519 */
-    #ifdef HAVE_ECC
-    if (useSupCurve) {
-        #if !defined(NO_ECC_SECP) && \
-            (defined(HAVE_ECC384) || defined(HAVE_ALL_CURVES))
-        if (wolfSSL_CTX_UseSupportedCurve(ctx, WOLFSSL_ECC_SECP384R1)
-                                                           != WOLFSSL_SUCCESS) {
-            err_sys("unable to support secp384r1");
-        }
-        #endif
-        #if !defined(NO_ECC_SECP) && \
-            (!defined(NO_ECC256) || defined(HAVE_ALL_CURVES))
         if (wolfSSL_CTX_UseSupportedCurve(ctx, WOLFSSL_ECC_SECP256R1)
                                                            != WOLFSSL_SUCCESS) {
             err_sys("unable to support secp256r1");
         }
-        #endif
+        if (wolfSSL_CTX_UseSupportedCurve(ctx, WOLFSSL_ECC_SECP384R1)
+                                                           != WOLFSSL_SUCCESS) {
+            err_sys("unable to support secp384r1");
+        }
     }
-    #endif /* HAVE_ECC */
-#endif /* HAVE_SUPPORTED_CURVES */
+#endif /* HAVE_CURVE25519 && HAVE_SUPPORTED_CURVES */
 
 #ifdef WOLFSSL_TLS13
     if (noPskDheKe)
@@ -2341,16 +1837,16 @@ THREAD_RETURN WOLFSSL_THREAD client_test(void* args)
             ClientBenchmarkConnections(ctx, host, port, dtlsUDP, dtlsSCTP,
                                        benchmark, resumeSession, useX25519,
                                        helloRetry, onlyKeyShare, version);
-        wolfSSL_CTX_free(ctx); ctx = NULL;
-        XEXIT_T(EXIT_SUCCESS);
+        wolfSSL_CTX_free(ctx);
+        exit(EXIT_SUCCESS);
     }
 
     if(throughput) {
         ((func_args*)args)->return_code =
             ClientBenchmarkThroughput(ctx, host, port, dtlsUDP, dtlsSCTP,
                                       block, throughput, useX25519);
-        wolfSSL_CTX_free(ctx); ctx = NULL;
-        XEXIT_T(EXIT_SUCCESS);
+        wolfSSL_CTX_free(ctx);
+        exit(EXIT_SUCCESS);
     }
 
     #if defined(WOLFSSL_MDK_ARM)
@@ -2359,11 +1855,11 @@ THREAD_RETURN WOLFSSL_THREAD client_test(void* args)
 
     #if defined(OPENSSL_EXTRA)
     if (wolfSSL_CTX_get_read_ahead(ctx) != 0) {
-        wolfSSL_CTX_free(ctx); ctx = NULL;
+        wolfSSL_CTX_free(ctx);
         err_sys("bad read ahead default value");
     }
     if (wolfSSL_CTX_set_read_ahead(ctx, 1) != WOLFSSL_SUCCESS) {
-        wolfSSL_CTX_free(ctx); ctx = NULL;
+        wolfSSL_CTX_free(ctx);
         err_sys("error setting read ahead value");
     }
     #endif
@@ -2381,7 +1877,7 @@ THREAD_RETURN WOLFSSL_THREAD client_test(void* args)
         wolfSSL_CTX_mcast_set_member_id(ctx, mcastID);
         if (wolfSSL_CTX_set_cipher_list(ctx, "WDM-NULL-SHA256")
                                                            != WOLFSSL_SUCCESS) {
-            wolfSSL_CTX_free(ctx); ctx = NULL;
+            wolfSSL_CTX_free(ctx);
             err_sys("Couldn't set multicast cipher list.");
         }
 #endif
@@ -2394,56 +1890,23 @@ THREAD_RETURN WOLFSSL_THREAD client_test(void* args)
 
     ssl = wolfSSL_new(ctx);
     if (ssl == NULL) {
-        wolfSSL_CTX_free(ctx); ctx = NULL;
+        wolfSSL_CTX_free(ctx);
         err_sys("unable to get SSL object");
     }
 
-
-#ifndef NO_CERTS
-    if (useClientCert && loadCertKeyIntoSSLObj){
-    #ifndef TEST_LOAD_BUFFER
-        if (wolfSSL_use_certificate_chain_file(ssl, ourCert)
-                                                           != WOLFSSL_SUCCESS) {
-            wolfSSL_CTX_free(ctx); ctx = NULL;
-            err_sys("can't load client cert file, check file and run from"
-                    " wolfSSL home dir");
-        }
-    #else
-        load_ssl_buffer(ssl, ourCert, WOLFSSL_CERT_CHAIN);
-    #endif
-    }
-
-    if (loadCertKeyIntoSSLObj
-    #if defined(HAVE_PK_CALLBACKS) && defined(TEST_PK_PRIVKEY)
-        && !pkCallbacks
-    #endif
-    ) {
-    #ifndef TEST_LOAD_BUFFER
-        if (wolfSSL_use_PrivateKey_file(ssl, ourKey, WOLFSSL_FILETYPE_PEM)
-                                         != WOLFSSL_SUCCESS) {
-            wolfSSL_CTX_free(ctx); ctx = NULL;
-            err_sys("can't load client private key file, check file and run "
-                    "from wolfSSL home dir");
-        }
-    #else
-        load_ssl_buffer(ssl, ourKey, WOLFSSL_KEY);
-    #endif
-    }
-#endif /* !NO_CERTS */
-
-#ifdef OPENSSL_EXTRA
+    #ifdef OPENSSL_EXTRA
     wolfSSL_KeepArrays(ssl);
-#endif
+    #endif
 
 #if defined(WOLFSSL_STATIC_MEMORY) && defined(DEBUG_WOLFSSL)
-    fprintf(stderr, "After creating SSL\n");
-    if (wolfSSL_CTX_is_static_memory(ctx, &mem_stats) != 1)
-        err_sys("ctx not using static memory");
-    if (wolfSSL_PrintStats(&mem_stats) != 1) /* function in test.h */
+        fprintf(stderr, "After creating SSL\n");
+        if (wolfSSL_CTX_is_static_memory(ctx, &mem_stats) != 1)
+            err_sys("ctx not using static memory");
+        if (wolfSSL_PrintStats(&mem_stats) != 1) /* function in test.h */
             err_sys("error printing out memory stats");
 #endif
 
-#ifdef WOLFSSL_TLS13
+    #ifdef WOLFSSL_TLS13
     if (!helloRetry) {
         if (onlyKeyShare == 0 || onlyKeyShare == 2) {
         #ifdef HAVE_CURVE25519
@@ -2461,6 +1924,12 @@ THREAD_RETURN WOLFSSL_THREAD client_test(void* args)
                 err_sys("unable to use curve secp256r1");
             }
             #endif
+            #if defined(HAVE_ECC384) || defined(HAVE_ALL_CURVES)
+            if (wolfSSL_UseKeyShare(ssl, WOLFSSL_ECC_SECP384R1)
+                                                           != WOLFSSL_SUCCESS) {
+                err_sys("unable to use curve secp384r1");
+            }
+            #endif
         #endif
         }
         if (onlyKeyShare == 0 || onlyKeyShare == 1) {
@@ -2475,7 +1944,7 @@ THREAD_RETURN WOLFSSL_THREAD client_test(void* args)
     else {
         wolfSSL_NoKeyShares(ssl);
     }
-#endif
+    #endif
 
     if (doMcast) {
 #ifdef WOLFSSL_MULTICAST
@@ -2490,7 +1959,7 @@ THREAD_RETURN WOLFSSL_THREAD client_test(void* args)
 
         if (wolfSSL_set_secret(ssl, 1, pms, sizeof(pms), cr, sr, suite)
                                                            != WOLFSSL_SUCCESS) {
-            wolfSSL_CTX_free(ctx); ctx = NULL;
+            wolfSSL_CTX_free(ctx);
             err_sys("unable to set mcast secret");
         }
 #endif
@@ -2506,52 +1975,51 @@ THREAD_RETURN WOLFSSL_THREAD client_test(void* args)
        wolfSSL_UseALPN(ssl, alpnList, (word32)XSTRLEN(alpnList), alpn_opt);
     }
 #endif
-
-#if defined(HAVE_CERTIFICATE_STATUS_REQUEST) || \
-    defined(HAVE_CERTIFICATE_STATUS_REQUEST_V2)
+#ifdef HAVE_CERTIFICATE_STATUS_REQUEST
     if (statusRequest) {
-        if (version == 4 &&
-            (statusRequest == OCSP_STAPLINGV2 || \
-             statusRequest == OCSP_STAPLINGV2_MULTI)) {
-            err_sys("Cannot use OCSP Stapling V2 with TLSv1.3");
-        }
-
         if (wolfSSL_CTX_EnableOCSPStapling(ctx) != WOLFSSL_SUCCESS)
             err_sys("can't enable OCSP Stapling Certificate Manager");
 
         switch (statusRequest) {
-        #ifdef HAVE_CERTIFICATE_STATUS_REQUEST
-            case OCSP_STAPLING:
+            case WOLFSSL_CSR_OCSP:
                 if (wolfSSL_UseOCSPStapling(ssl, WOLFSSL_CSR_OCSP,
                                WOLFSSL_CSR_OCSP_USE_NONCE) != WOLFSSL_SUCCESS) {
-                    wolfSSL_free(ssl); ssl = NULL;
-                    wolfSSL_CTX_free(ctx); ctx = NULL;
+                    wolfSSL_free(ssl);
+                    wolfSSL_CTX_free(ctx);
                     err_sys("UseCertificateStatusRequest failed");
                 }
+
             break;
-        #endif
-        #ifdef HAVE_CERTIFICATE_STATUS_REQUEST_V2
-            case OCSP_STAPLINGV2:
+        }
+
+        wolfSSL_CTX_EnableOCSP(ctx, 0);
+    }
+#endif
+#ifdef HAVE_CERTIFICATE_STATUS_REQUEST_V2
+    if (statusRequest) {
+        if (wolfSSL_CTX_EnableOCSPStapling(ctx) != WOLFSSL_SUCCESS)
+            err_sys("can't enable OCSP Stapling Certificate Manager");
+
+        switch (statusRequest) {
+            case WOLFSSL_CSR2_OCSP:
                 if (wolfSSL_UseOCSPStaplingV2(ssl,
                     WOLFSSL_CSR2_OCSP, WOLFSSL_CSR2_OCSP_USE_NONCE)
                                                            != WOLFSSL_SUCCESS) {
-                    wolfSSL_free(ssl); ssl = NULL;
-                    wolfSSL_CTX_free(ctx); ctx = NULL;
+                    wolfSSL_free(ssl);
+                    wolfSSL_CTX_free(ctx);
                     err_sys("UseCertificateStatusRequest failed");
                 }
             break;
-            case OCSP_STAPLINGV2_MULTI:
+            case WOLFSSL_CSR2_OCSP_MULTI:
                 if (wolfSSL_UseOCSPStaplingV2(ssl,
                     WOLFSSL_CSR2_OCSP_MULTI, 0)
                                                            != WOLFSSL_SUCCESS) {
-                    wolfSSL_free(ssl); ssl = NULL;
-                    wolfSSL_CTX_free(ctx); ctx = NULL;
+                    wolfSSL_free(ssl);
+                    wolfSSL_CTX_free(ctx);
                     err_sys("UseCertificateStatusRequest failed");
                 }
             break;
-        #endif
-            default:
-                err_sys("Invalid OCSP Stapling option");
+
         }
 
         wolfSSL_CTX_EnableOCSP(ctx, 0);
@@ -2560,16 +2028,16 @@ THREAD_RETURN WOLFSSL_THREAD client_test(void* args)
 
     tcp_connect(&sockfd, host, port, dtlsUDP, dtlsSCTP, ssl);
     if (wolfSSL_set_fd(ssl, sockfd) != WOLFSSL_SUCCESS) {
-        wolfSSL_free(ssl); ssl = NULL;
-        wolfSSL_CTX_free(ctx); ctx = NULL;
+        wolfSSL_free(ssl);
+        wolfSSL_CTX_free(ctx);
         err_sys("error in setting fd");
     }
 
     /* STARTTLS */
     if (doSTARTTLS) {
         if (StartTLS_Init(&sockfd) != WOLFSSL_SUCCESS) {
-            wolfSSL_free(ssl); ssl = NULL;
-            wolfSSL_CTX_free(ctx); ctx = NULL;
+            wolfSSL_free(ssl);
+            wolfSSL_CTX_free(ctx);
             err_sys("error during STARTTLS protocol");
         }
     }
@@ -2581,19 +2049,19 @@ THREAD_RETURN WOLFSSL_THREAD client_test(void* args)
     #endif
 
         if (wolfSSL_EnableCRL(ssl, WOLFSSL_CRL_CHECKALL) != WOLFSSL_SUCCESS) {
-            wolfSSL_free(ssl); ssl = NULL;
-            wolfSSL_CTX_free(ctx); ctx = NULL;
+            wolfSSL_free(ssl);
+            wolfSSL_CTX_free(ctx);
             err_sys("can't enable crl check");
         }
         if (wolfSSL_LoadCRL(ssl, crlPemDir, WOLFSSL_FILETYPE_PEM, 0)
                                                            != WOLFSSL_SUCCESS) {
-            wolfSSL_free(ssl); ssl = NULL;
-            wolfSSL_CTX_free(ctx); ctx = NULL;
+            wolfSSL_free(ssl);
+            wolfSSL_CTX_free(ctx);
             err_sys("can't load crl, check crlfile and date validity");
         }
         if (wolfSSL_SetCRL_Cb(ssl, CRL_CallBack) != WOLFSSL_SUCCESS) {
-            wolfSSL_free(ssl); ssl = NULL;
-            wolfSSL_CTX_free(ctx); ctx = NULL;
+            wolfSSL_free(ssl);
+            wolfSSL_CTX_free(ctx);
             err_sys("can't set crl callback");
         }
     }
@@ -2601,8 +2069,8 @@ THREAD_RETURN WOLFSSL_THREAD client_test(void* args)
 #ifdef HAVE_SECURE_RENEGOTIATION
     if (scr) {
         if (wolfSSL_UseSecureRenegotiation(ssl) != WOLFSSL_SUCCESS) {
-            wolfSSL_free(ssl); ssl = NULL;
-            wolfSSL_CTX_free(ctx); ctx = NULL;
+            wolfSSL_free(ssl);
+            wolfSSL_CTX_free(ctx);
             err_sys("can't enable secure renegotiation");
         }
     }
@@ -2628,10 +2096,6 @@ THREAD_RETURN WOLFSSL_THREAD client_test(void* args)
         ret = NonBlockingSSL_Connect(ssl);
     }
     else {
-#ifdef WOLFSSL_EARLY_DATA
-        if (usePsk && earlyData)
-            EarlyData(ctx, ssl, msg, msgSz, buffer);
-#endif
         do {
             err = 0; /* reset error */
             ret = wolfSSL_connect(ssl);
@@ -2657,8 +2121,8 @@ THREAD_RETURN WOLFSSL_THREAD client_test(void* args)
             wolfSSL_ERR_error_string(err, buffer));
 
         /* cleanup */
-        wolfSSL_free(ssl); ssl = NULL;
-        wolfSSL_CTX_free(ctx); ctx = NULL;
+        wolfSSL_free(ssl);
+        wolfSSL_CTX_free(ctx);
         CloseSocket(sockfd);
 
         if (!exitWithRet)
@@ -2670,7 +2134,7 @@ THREAD_RETURN WOLFSSL_THREAD client_test(void* args)
         goto exit;
     }
 
-    showPeerEx(ssl, lng_index);
+    showPeer(ssl);
 
 #ifdef OPENSSL_EXTRA
     {
@@ -2681,23 +2145,23 @@ THREAD_RETURN WOLFSSL_THREAD client_test(void* args)
         /* get size of buffer then print */
         size = wolfSSL_get_client_random(NULL, NULL, 0);
         if (size == 0) {
-            wolfSSL_free(ssl); ssl = NULL;
-            wolfSSL_CTX_free(ctx); ctx = NULL;
+            wolfSSL_free(ssl);
+            wolfSSL_CTX_free(ctx);
             err_sys("error getting client random buffer size");
         }
 
         rnd = (byte*)XMALLOC(size, NULL, DYNAMIC_TYPE_TMP_BUFFER);
         if (rnd == NULL) {
-            wolfSSL_free(ssl); ssl = NULL;
-            wolfSSL_CTX_free(ctx); ctx = NULL;
+            wolfSSL_free(ssl);
+            wolfSSL_CTX_free(ctx);
             err_sys("error creating client random buffer");
         }
 
         size = wolfSSL_get_client_random(ssl, rnd, size);
         if (size == 0) {
             XFREE(rnd, NULL, DYNAMIC_TYPE_TMP_BUFFER);
-            wolfSSL_free(ssl); ssl = NULL;
-            wolfSSL_CTX_free(ctx); ctx = NULL;
+            wolfSSL_free(ssl);
+            wolfSSL_CTX_free(ctx);
             err_sys("error getting client random buffer");
         }
 
@@ -2711,16 +2175,16 @@ THREAD_RETURN WOLFSSL_THREAD client_test(void* args)
     if (doSTARTTLS) {
         if (XSTRNCMP(starttlsProt, "smtp", 4) == 0) {
             if (SMTP_Shutdown(ssl, wc_shutdown) != WOLFSSL_SUCCESS) {
-                wolfSSL_free(ssl); ssl = NULL;
-                wolfSSL_CTX_free(ctx); ctx = NULL;
+                wolfSSL_free(ssl);
+                wolfSSL_CTX_free(ctx);
                 err_sys("error closing STARTTLS connection");
             }
         }
 
-        wolfSSL_free(ssl); ssl = NULL;
+        wolfSSL_free(ssl);
         CloseSocket(sockfd);
 
-        wolfSSL_CTX_free(ctx); ctx = NULL;
+        wolfSSL_CTX_free(ctx);
 
         ((func_args*)args)->return_code = 0;
         return 0;
@@ -2752,8 +2216,8 @@ THREAD_RETURN WOLFSSL_THREAD client_test(void* args)
                 err = wolfSSL_get_error(ssl, 0);
                 printf("err = %d, %s\n", err,
                                 wolfSSL_ERR_error_string(err, buffer));
-                wolfSSL_free(ssl); ssl = NULL;
-                wolfSSL_CTX_free(ctx); ctx = NULL;
+                wolfSSL_free(ssl);
+                wolfSSL_CTX_free(ctx);
                 err_sys("wolfSSL_Rehandshake failed");
             }
         }
@@ -2830,14 +2294,14 @@ THREAD_RETURN WOLFSSL_THREAD client_test(void* args)
     fprintf(stderr, "total connection frees    = %d\n\n", ssl_stats.totalFr);
 #endif
 
-    wolfSSL_free(ssl); ssl = NULL;
+    wolfSSL_free(ssl);
     CloseSocket(sockfd);
 
 #ifndef NO_SESSION_CACHE
     if (resumeSession) {
         sslResume = wolfSSL_new(ctx);
         if (sslResume == NULL) {
-            wolfSSL_CTX_free(ctx); ctx = NULL;
+            wolfSSL_CTX_free(ctx);
             err_sys("unable to get SSL object");
         }
 
@@ -2852,8 +2316,8 @@ THREAD_RETURN WOLFSSL_THREAD client_test(void* args)
         }
         tcp_connect(&sockfd, host, port, dtlsUDP, dtlsSCTP, sslResume);
         if (wolfSSL_set_fd(sslResume, sockfd) != WOLFSSL_SUCCESS) {
-            wolfSSL_free(sslResume); sslResume = NULL;
-            wolfSSL_CTX_free(ctx); ctx = NULL;
+            wolfSSL_free(sslResume);
+            wolfSSL_CTX_free(ctx);
             err_sys("error in setting fd");
         }
 #ifdef HAVE_ALPN
@@ -2866,8 +2330,8 @@ THREAD_RETURN WOLFSSL_THREAD client_test(void* args)
 #ifdef HAVE_SECURE_RENEGOTIATION
         if (scr) {
             if (wolfSSL_UseSecureRenegotiation(sslResume) != WOLFSSL_SUCCESS) {
-                wolfSSL_free(sslResume); sslResume = NULL;
-                wolfSSL_CTX_free(ctx); ctx = NULL;
+                wolfSSL_free(sslResume);
+                wolfSSL_CTX_free(ctx);
                 err_sys("can't enable secure renegotiation");
             }
         }
@@ -2896,7 +2360,50 @@ THREAD_RETURN WOLFSSL_THREAD client_test(void* args)
             else
         #endif
             if (earlyData) {
-                EarlyData(ctx, sslResume, msg, msgSz, buffer);
+                do {
+                    err = 0; /* reset error */
+                    ret = wolfSSL_write_early_data(sslResume, msg, msgSz,
+                                                                        &msgSz);
+                    if (ret <= 0) {
+                        err = wolfSSL_get_error(sslResume, 0);
+                    #ifdef WOLFSSL_ASYNC_CRYPT
+                        if (err == WC_PENDING_E) {
+                            ret = wolfSSL_AsyncPoll(sslResume,
+                                                       WOLF_POLL_FLAG_CHECK_HW);
+                            if (ret < 0) break;
+                        }
+                    #endif
+                    }
+                } while (err == WC_PENDING_E);
+                if (ret != msgSz) {
+                    printf("SSL_write_early_data msg error %d, %s\n", err,
+                                         wolfSSL_ERR_error_string(err, buffer));
+                    wolfSSL_free(sslResume);
+                    wolfSSL_CTX_free(ctx);
+                    err_sys("SSL_write_early_data failed");
+                }
+                do {
+                    err = 0; /* reset error */
+                    ret = wolfSSL_write_early_data(sslResume, msg, msgSz,
+                                                                        &msgSz);
+                    if (ret <= 0) {
+                        err = wolfSSL_get_error(sslResume, 0);
+                    #ifdef WOLFSSL_ASYNC_CRYPT
+                        if (err == WC_PENDING_E) {
+                            ret = wolfSSL_AsyncPoll(sslResume,
+                                                       WOLF_POLL_FLAG_CHECK_HW);
+                            if (ret < 0) break;
+                        }
+                    #endif
+                    }
+                } while (err == WC_PENDING_E);
+                if (ret != msgSz) {
+                    printf("SSL_write_early_data msg error %d, %s\n", err,
+                                         wolfSSL_ERR_error_string(err, buffer));
+                    wolfSSL_free(sslResume);
+                    wolfSSL_CTX_free(ctx);
+                    err_sys("SSL_write_early_data failed");
+                }
             }
     #endif
             do {
@@ -2922,12 +2429,12 @@ THREAD_RETURN WOLFSSL_THREAD client_test(void* args)
         if (ret != WOLFSSL_SUCCESS) {
             printf("wolfSSL_connect resume error %d, %s\n", err,
                 wolfSSL_ERR_error_string(err, buffer));
-            wolfSSL_free(sslResume); sslResume = NULL;
-            wolfSSL_CTX_free(ctx); ctx = NULL;
+            wolfSSL_free(sslResume);
+            wolfSSL_CTX_free(ctx);
             err_sys("wolfSSL_connect resume failed");
         }
 
-        showPeerEx(sslResume, lng_index);
+        showPeer(sslResume);
 
         if (wolfSSL_session_reused(sslResume))
             printf("reused session id\n");
@@ -2979,8 +2486,8 @@ THREAD_RETURN WOLFSSL_THREAD client_test(void* args)
         if (ret != resumeSz) {
             printf("SSL_write resume error %d, %s\n", err,
                     wolfSSL_ERR_error_string(err, buffer));
-            wolfSSL_free(sslResume); sslResume = NULL;
-            wolfSSL_CTX_free(ctx); ctx = NULL;
+            wolfSSL_free(sslResume);
+            wolfSSL_CTX_free(ctx);
             err_sys("SSL_write failed");
         }
 
@@ -3041,8 +2548,8 @@ THREAD_RETURN WOLFSSL_THREAD client_test(void* args)
             if (err != WOLFSSL_ERROR_WANT_READ) {
                 printf("SSL_read resume error %d, %s\n", err,
                     wolfSSL_ERR_error_string(err, buffer));
-                wolfSSL_free(sslResume); sslResume = NULL;
-                wolfSSL_CTX_free(ctx); ctx = NULL;
+                wolfSSL_free(sslResume);
+                wolfSSL_CTX_free(ctx);
                 err_sys("SSL_read failed");
             }
         }
@@ -3081,12 +2588,12 @@ THREAD_RETURN WOLFSSL_THREAD client_test(void* args)
         fprintf(stderr, "total connection frees    = %d\n\n", ssl_stats.totalFr);
     #endif
 
-        wolfSSL_free(sslResume); sslResume = NULL;
+        wolfSSL_free(sslResume);
         CloseSocket(sockfd);
     }
 #endif /* NO_SESSION_CACHE */
 
-    wolfSSL_CTX_free(ctx); ctx = NULL;
+    wolfSSL_CTX_free(ctx);
 
     ((func_args*)args)->return_code = 0;
 
