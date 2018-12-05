@@ -66,20 +66,36 @@ endif (${WITH_UUID} STREQUAL ON)
 
 option(WITH_SRV "Include SRV lookup support?" OFF)
 
-if ($ENV{WITH_OPENSSL} STREQUAL "ON")
-SET(GCC_INCLUDE_PATH "-I../../third_party/mosquitto-1.5/lib/ -I../../third_party/mosquitto-1.5/ -I ../../third_party/openssl-1.1.0h/prefix/$ENV{ARCH}/include/")
+if ($ENV{WITH_MOSQUITTO} STREQUAL "ON")
+        add_definitions("-DWITH_MOSQUITTO")
+        if ($ENV{WITH_OPENSSL} STREQUAL "ON")
+        SET(GCC_INCLUDE_PATH "-I../../third_party/mosquitto-1.5/lib/ -I../../third_party/mosquitto-1.5/ -I ../../third_party/openssl-1.1.0h/prefix/$ENV{ARCH}/include/ -I ./mosquitto")
+        else()
+        SET(GCC_INCLUDE_PATH "-I../../third_party/mosquitto-1.5/lib/ -I../../third_party/mosquitto-1.5/ -I ./mosquitto")
+        endif()
 else()
-SET(GCC_INCLUDE_PATH "-I../../third_party/mosquitto-1.5/lib/ -I../../third_party/mosquitto-1.5/")
+        add_definitions("-DWITH_WOLFMQTT")
+        if ($ENV{WITH_OPENSSL} STREQUAL "ON")
+        SET(GCC_INCLUDE_PATH "-I./wolfmqtt/include/ -I./wolfmqtt/include/wolfmqtt/ -I./wolfmqtt/include/cyassl/ -I./wolfmqtt/include/wolfssl/ -I./wolfmqtt")
+        else()
+        SET(GCC_INCLUDE_PATH "-I./wolfmqtt/include/ -I./wolfmqtt/include/wolfmqtt/ -I./wolfmqtt")
+        endif()
 endif()
 
 SET(CMAKE_C_FLAGS "${GCC_INCLUDE_PATH} ${GCC_COVERAGE_COMPILE_FLAGS}")
 
-aux_source_directory(. LIB_MOSQUITTO_SRC)
+aux_source_directory(. LIB_MQTT)
+
+if ($ENV{WITH_MOSQUITTO} STREQUAL "ON")
 aux_source_directory(../../third_party/mosquitto-1.5/lib/ MOSQUITTO_SRC)
+aux_source_directory(./mosquitto MOSQUITTO_SRC)
+else()
+aux_source_directory(./wolfmqtt MOSQUITTO_SRC)
+endif()
 
-add_library (mqtt-$ENV{LIBPREFIX} STATIC ${LIB_MOSQUITTO_SRC} ${MOSQUITTO_SRC})
+add_library (mqtt-$ENV{LIBPREFIX} STATIC ${LIB_MQTT} ${MOSQUITTO_SRC})
 
-add_library(mqtt_dy-$ENV{LIBPREFIX} SHARED ${LIB_MOSQUITTO_SRC} ${MOSQUITTO_SRC})
+add_library(mqtt_dy-$ENV{LIBPREFIX} SHARED ${LIB_MQTT} ${MOSQUITTO_SRC})
 set_target_properties(mqtt_dy-$ENV{LIBPREFIX} PROPERTIES OUTPUT_NAME "mqtt")
 set_target_properties(mqtt_dy-$ENV{LIBPREFIX} PROPERTIES VERSION 1.0  SOVERSION 1)
 

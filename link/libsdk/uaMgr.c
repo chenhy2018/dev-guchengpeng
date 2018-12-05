@@ -73,7 +73,7 @@ UA* UARegister(const char* _pId, const char* _pPassword, const char* _pSigHost,
         }
         //mqtt create instance.
         _pOptions->nAccountId = nSdkAccountId;
-        if (_pOptions->primaryUserInfo.pHostname) {
+        if (_pOptions->userInfo.pHostname) {
                 pUA->pMqttInstance = MqttCreateInstance(_pOptions);
         }
         pUA->id = nSdkAccountId;
