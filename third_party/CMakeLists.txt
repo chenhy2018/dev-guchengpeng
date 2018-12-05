@@ -86,14 +86,3 @@ endif()
 #        BUILD_IN_SOURCE 1
 #)
 #add_dependencies(ffmpeg fdkaac x264)
-
-if ($ENV{ARCH} STREQUAL "x86")
-        include(ExternalProject)
-        ExternalProject_Add(apigate
-                SOURCE_DIR apigate
-                BUILD_COMMAND  make
-                CONFIGURE_COMMAND ""
-                INSTALL_COMMAND ""
-                BUILD_IN_SOURCE 1
-        )
-endif()

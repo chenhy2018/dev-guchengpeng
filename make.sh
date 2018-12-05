@@ -6,10 +6,11 @@ fi
 
 source env.sh
 export ARCH=$1
-export WITH_P2P="OFF"
+export WITH_P2P="ON"
 export WITH_OPENSSL="OFF"
 export WITH_FFMPEG="OFF"
-export WITH_PJSIP="OFF"
+export WITH_PJSIP="ON"
+export WITH_MOSQUITTO="OFF"
 
 prefix=
 if [ "$1" = "mstar" ];then

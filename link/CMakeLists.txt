@@ -14,14 +14,6 @@ add_subdirectory(librtp)
 endif()
 
 if ($ENV{ARCH} STREQUAL "x86")
-        include(ExternalProject)
-        ExternalProject_Add(vod
-                SOURCE_DIR vod
-                BUILD_COMMAND  make
-                CONFIGURE_COMMAND ""
-                INSTALL_COMMAND ""
-                BUILD_IN_SOURCE 1
-        )
 
         include(ExternalProject)
         ExternalProject_Add(fastfwd

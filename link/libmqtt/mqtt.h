@@ -62,8 +62,7 @@ struct MqttOptions
         char* pId;
         int nAccountId;
         bool bCleanSession;
-        struct MqttUserInfo primaryUserInfo;
-        struct MqttUserInfo secondaryUserInfo;
+        struct MqttUserInfo userInfo;
         int nKeepalive;
         struct MqttCallback callbacks; // A user pointer that will be passed as an argument to any callbacks that are specified.
         int nQos;
@@ -71,21 +70,21 @@ struct MqttOptions
 };
 
 /* step 1 : Init mosquitto lib */
-extern int MqttLibInit();
+extern int LinkMqttLibInit();
 
-extern int MqttLibCleanup();
+extern int LinkMqttLibCleanup();
 
 /* step 2 : create mosquitto instance */
-extern void* MqttCreateInstance(IN const struct MqttOptions* _pOption);
+extern void* LinkMqttCreateInstance(IN const struct MqttOptions* _pOption);
 
-extern void MqttDestroy(IN const void* _pInstance);
+extern void LinkMqttDestroy(IN const void* _pInstance);
 
 /* step 3 : mosquitto pub/sub */
 
-extern int MqttPublish(IN const void* _pInstance, IN const char* _pTopic, IN int _nPayloadlen, IN const void* _pPayload);
+extern int LinkMqttPublish(IN const void* _pInstance, IN const char* _pTopic, IN int _nPayloadlen, IN const void* _pPayload);
 
-extern int MqttSubscribe(IN const void* _pInstance, IN const char* _pTopic);
+extern int LinkMqttSubscribe(IN const void* _pInstance, IN const char* _pTopic);
 
-extern int MqttUnsubscribe(IN const void* _pInstance, IN const char* _pTopic);
+extern int LinkMqttUnsubscribe(IN const void* _pInstance, IN const char* _pTopic);
 
 #endif
