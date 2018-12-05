@@ -7,6 +7,9 @@ if ($ENV{WITH_P2P} STREQUAL "ON")
         add_definitions("-DWITH_P2P")
 endif()
 
+add_definitions("-DWITH_MOSQUITTO")
+add_definitions("-DWITH_OPENSSL")
+
 aux_source_directory(. LIB_SDK_SRC)
 
 add_library (sdk-$ENV{LIBPREFIX} ${LIB_SDK_SRC})
