@@ -9,7 +9,7 @@ export ARCH=$1
 export WITH_P2P="ON"
 export WITH_OPENSSL="OFF"
 export WITH_FFMPEG="OFF"
-export WITH_PJSIP="ON"
+export WITH_PJSIP="OFF"
 export WITH_MOSQUITTO="OFF"
 
 prefix=
