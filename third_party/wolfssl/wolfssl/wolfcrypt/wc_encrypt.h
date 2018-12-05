@@ -51,7 +51,7 @@
 #endif
 
 
-#if !defined(NO_AES) && defined(HAVE_AES_CBC)
+#ifndef NO_AES
 WOLFSSL_API int wc_AesCbcEncryptWithKey(byte* out, const byte* in, word32 inSz,
                                         const byte* key, word32 keySz,
                                         const byte* iv);

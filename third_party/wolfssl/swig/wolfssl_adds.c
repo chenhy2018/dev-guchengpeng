@@ -207,16 +207,15 @@ RsaKey* GetRsaPrivateKey(const char* keyFile)
         size_t bytes;
         int    ret;
         word32 idx = 0;
-        XFILE  file = XFOPEN(keyFile, "rb");
+        FILE*  file = fopen(keyFile, "rb");
 
-        if (file != XBADFILE)
-        {
+        if (!file) {
             free(key);
             return 0;
         }
 
-        bytes = XFREAD(tmp, 1, sizeof(tmp), file);
-        XFCLOSE(file);
+        bytes = fread(tmp, 1, sizeof(tmp), file);
+        fclose(file);
         wc_InitRsaKey(key, 0);
 
         ret = wc_RsaPrivateKeyDecode(tmp, &idx, key, (word32)bytes);

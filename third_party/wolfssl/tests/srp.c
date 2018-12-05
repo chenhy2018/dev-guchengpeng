@@ -817,7 +817,6 @@ static void test_SrpKeyGenFunc_cb(void)
 void SrpTest(void)
 {
 #if defined(WOLFCRYPT_HAVE_SRP) && defined(WOLFSSL_SHA512)
-    wolfCrypt_Init();
     test_SrpInit();
     test_SrpSetUsername();
     test_SrpSetParams();
@@ -826,6 +825,5 @@ void SrpTest(void)
     test_SrpComputeKey();
     test_SrpGetProofAndVerify();
     test_SrpKeyGenFunc_cb();
-    wolfCrypt_Cleanup();
 #endif
 }
