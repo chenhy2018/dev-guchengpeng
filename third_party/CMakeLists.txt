@@ -40,7 +40,8 @@ SET(WOLFSSL_PREFIX_PATH "${CMAKE_CURRENT_SOURCE_DIR}/wolfssl/prefix/$ENV{ARCH}")
 include(ExternalProject)
 ExternalProject_Add(wolfssl
         SOURCE_DIR wolfssl
-        CONFIGURE_COMMAND ./configure --prefix=${WOLFSSL_PREFIX_PATH} --enable-static --disable-shared
+
+        CONFIGURE_COMMAND ./autogen.sh  && ./configure --prefix=${WOLFSSL_PREFIX_PATH} --enable-static --disable-shared
         BUILD_COMMAND make
         BUILD_IN_SOURCE 1
 )
@@ -50,7 +51,7 @@ SET(WOLFMQTT_PREFIX_PATH "${CMAKE_CURRENT_SOURCE_DIR}/wolfMQTT/prefix/$ENV{ARCH}
 include(ExternalProject)
 ExternalProject_Add(wolfMQTT
         SOURCE_DIR wolfMQTT
-        CONFIGURE_COMMAND ./configure --prefix=${WOLFMQTT_PREFIX_PATH} --enable-static --disable-shared --disable-examples --with-lib-prefix=${WOLFSSL_PREFIX_PATH}
+        CONFIGURE_COMMAND  ./autogen.sh  && ./configure --prefix=${WOLFMQTT_PREFIX_PATH} --enable-static --disable-shared --disable-examples --with-lib-prefix=${WOLFSSL_PREFIX_PATH}
         BUILD_COMMAND make
         BUILD_IN_SOURCE 1
 )
