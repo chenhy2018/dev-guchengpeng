@@ -74,7 +74,7 @@ UA* UARegister(const char* _pId, const char* _pPassword, const char* _pSigHost,
         //mqtt create instance.
         _pOptions->nAccountId = nSdkAccountId;
         if (_pOptions->userInfo.pHostname) {
-                pUA->pMqttInstance = MqttCreateInstance(_pOptions);
+                pUA->pMqttInstance = LinkMqttCreateInstance(_pOptions);
         }
         pUA->id = nSdkAccountId;
         strncpy(pUA->userId, _pId, MAX_USER_ID_SIZE - 1);
@@ -115,7 +115,7 @@ ErrorID UAUnRegister(UA* _pUa)
                 code = SipUnRegAccount(_pUa->id);
         }
         if (_pUa->pMqttInstance) {
-                MqttDestroy(_pUa->pMqttInstance);
+                LinkMqttDestroy(_pUa->pMqttInstance);
                 _pUa->pMqttInstance = NULL;
         }
         DestroyMessageQueue(&_pUa->pQueue);
@@ -246,7 +246,7 @@ ErrorID UAReport(UA* _pUa, const char* topic, const char* message, int length)
         if (_pUa->pMqttInstance == NULL) {
                 return RET_PARAM_ERROR;
         }
-        MQTT_ERR_STATUS res = MqttPublish(_pUa->pMqttInstance, topic, length, message);
+        MQTT_ERR_STATUS res = LinkMqttPublish(_pUa->pMqttInstance, topic, length, message);
         if (res == MQTT_SUCCESS) {
                 return RET_OK;
         } else {
@@ -259,7 +259,7 @@ ErrorID UASubscribe(UA* _pUa, const char* topic)
         if (_pUa->pMqttInstance == NULL) {
                 return RET_PARAM_ERROR;
         }
-        MQTT_ERR_STATUS res = MqttSubscribe(_pUa->pMqttInstance, topic);
+        MQTT_ERR_STATUS res = LinkMqttSubscribe(_pUa->pMqttInstance, topic);
         if (res == MQTT_SUCCESS) {
                 return RET_OK;
         } else {
@@ -272,7 +272,7 @@ ErrorID UAUnsubscribe(UA* _pUa, const char* topic)
         if (_pUa->pMqttInstance == NULL) {
                 return RET_PARAM_ERROR;
         }
-        MQTT_ERR_STATUS res = MqttUnsubscribe(_pUa->pMqttInstance, topic);
+        MQTT_ERR_STATUS res = LinkMqttUnsubscribe(_pUa->pMqttInstance, topic);
         if (res == MQTT_SUCCESS) {
                 return RET_OK;
         } else {

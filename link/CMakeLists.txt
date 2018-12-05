@@ -27,8 +27,9 @@ endif()
 
 if ($ENV{WITH_PJSIP} STREQUAL "ON")
         add_subdirectory(libsip)
-        add_subdirectory(libmqtt)
         add_subdirectory(libsdk)
 endif()
+
+add_subdirectory(libmqtt)
 
 add_subdirectory(libtsuploader)

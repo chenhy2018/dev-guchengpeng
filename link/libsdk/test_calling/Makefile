@@ -2,9 +2,17 @@ LIBUA=../../../output/lib/$(ARCH)/libua.a
 THIRD_PARTY_PATH=../../../third_party
 
 ifeq ($(WITH_OPENSSL), ON)
-OPENSSL_PATH=$(THIRD_PARTY_PATH)/openssl-1.1.0h
-OPENSSL_LIB=${OPENSSL_PATH}/prefix/$(ARCH)/lib
-LDFLAGS=-L../../../output/lib/$(ARCH) -L$(OPENSSL_LIB) -lua -lpthread -lm  -lssl -lcrypto
+ifeq ($(WITH_MOSQUITTO), ON)
+SSL_PATH=$(THIRD_PARTY_PATH)/openssl-1.1.0h
+SSL_LIB=${OPENSSL_PATH}/prefix/$(ARCH)/lib
+LDFLAGS=-L../../../output/lib/$(ARCH) -L$(SSL_LIB) -lua -lpthread -lm -lcrypto -lssl    
+else
+SSL_PATH=$(THIRD_PARTY_PATH)/wolfssl
+MQTT_PATH=$(THIRD_PARTY_PATH)/wolfMQTT
+SSL_LIB=${SSL_PATH}/prefix/$(ARCH)/lib
+MQTT_LIB=${MQTT_PATH}/prefix/$(ARCH)/lib
+LDFLAGS=-L../../../output/lib/$(ARCH) -L$(SSL_LIB) -L$(MQTT_LIB) -lua -lpthread -lm -lwolfssl -lwolfmqtt
+endif
 else
 LDFLAGS=-L../../../output/lib/$(ARCH) -lua -lpthread -lm
 endif

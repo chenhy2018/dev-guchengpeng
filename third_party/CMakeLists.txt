@@ -15,8 +15,8 @@ SET(PJ_PREFIX_PATH "${CMAKE_CURRENT_SOURCE_DIR}/pjproject-2.7.2/prefix/$ENV{ARCH
 include(ExternalProject)
 
 if ($ENV{WITH_PJSIP} STREQUAL "ON")
-if ($ENV{WITH_OPENSSL} STREQUAL "ON")
-ExternalProject_Add(pjsip
+        if ($ENV{WITH_OPENSSL} STREQUAL "ON")
+        ExternalProject_Add(pjsip
 		DEPENDS openssl-1.1.0h
 		SOURCE_DIR pjproject-2.7.2
 		CONFIGURE_COMMAND ./configure  --host=$ENV{HOST}  --with-ssl=${OPENSSL_PREFIX_PATH} --prefix=${PJ_PREFIX_PATH} --disable-sdl --disable-ffmpeg --disable-v4l2 --disable-openh264 --disable-libwebrtc --disable-sound --disable-oss --disable-video --disable-speex-aec --disable-g711-code --disable-l16-codec --disable-gsm-codec --disable-g722-codec --disable-g7221-codec --disable-speex-codec --disable-ilbc-codec --disable-bcg729 --disable-libyuv
@@ -36,7 +36,25 @@ add_definitions(-DPJMEDIA_HAS_SRTP=0)
 	endif()
 endif()
 
-SET(PJ_PREFIX_PATH "${CMAKE_CURRENT_SOURCE_DIR}/curl-7.61.0/prefix/$ENV{ARCH}")
+SET(WOLFSSL_PREFIX_PATH "${CMAKE_CURRENT_SOURCE_DIR}/wolfssl/prefix/$ENV{ARCH}")
+include(ExternalProject)
+ExternalProject_Add(wolfssl
+        SOURCE_DIR wolfssl
+        CONFIGURE_COMMAND ./configure --prefix=${WOLFSSL_PREFIX_PATH} --enable-static --disable-shared
+        BUILD_COMMAND make
+        BUILD_IN_SOURCE 1
+)
+
+SET(WOLFMQTT_PREFIX_PATH "${CMAKE_CURRENT_SOURCE_DIR}/wolfMQTT/prefix/$ENV{ARCH}")
+
+include(ExternalProject)
+ExternalProject_Add(wolfMQTT
+        SOURCE_DIR wolfMQTT
+        CONFIGURE_COMMAND ./configure --prefix=${WOLFMQTT_PREFIX_PATH} --enable-static --disable-shared --disable-examples --with-lib-prefix=${WOLFSSL_PREFIX_PATH}
+        BUILD_COMMAND make
+        BUILD_IN_SOURCE 1
+)
+
 include(ExternalProject)
 ExternalProject_Add(curl-7.61.0
         SOURCE_DIR curl-7.61.0
