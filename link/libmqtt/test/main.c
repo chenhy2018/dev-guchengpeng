@@ -109,9 +109,9 @@ int main()
         LinkMqttLibCleanup();
         printf("try third \n");
         options.userInfo.pCafile = "./test/ca.crt";
-        options.userInfo.nPort = 1883;
-        options.userInfo.nAuthenicatinMode = MQTT_AUTHENTICATION_USER;
-        //options.userInfo.nAuthenicatinMode = MQTT_AUTHENTICATION_USER | MQTT_AUTHENTICATION_ONEWAY_SSL;
+        options.userInfo.nPort = 8883;
+        //options.userInfo.nAuthenicatinMode = MQTT_AUTHENTICATION_USER;
+        options.userInfo.nAuthenicatinMode = MQTT_AUTHENTICATION_USER | MQTT_AUTHENTICATION_ONEWAY_SSL;
         LinkMqttLibInit();
         Status[1].pInstance = NULL;
         Status[1].status = 0;

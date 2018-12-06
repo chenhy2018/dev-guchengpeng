@@ -39,6 +39,7 @@ typedef struct MQTTCtx {
 
         byte *tx_buf, *rx_buf;
         word32 cmd_timeout_ms;
+	int use_tls;
 	int timeoutCount;
 } MQTTCtx;
 

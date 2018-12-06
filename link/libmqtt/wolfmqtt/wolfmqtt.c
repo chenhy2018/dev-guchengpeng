@@ -155,25 +155,25 @@ int LinkMqttLibCleanup()
 
 static int OnDisconnectCallback(MqttClient* client, int error_code, void* ctx)
 {
-	struct MQTTCtx *mqtt_ctx = container_of(client, struct MQTTCtx, client);
-	struct MqttInstance *pInstance = mqtt_ctx->pInstance;
-	if (error_code == MQTT_CODE_ERROR_TIMEOUT) {
+        struct MQTTCtx *mqtt_ctx = container_of(client, struct MQTTCtx, client);
+        struct MqttInstance *pInstance = mqtt_ctx->pInstance;
+        if (error_code == MQTT_CODE_ERROR_TIMEOUT) {
                 return 0;
-	}
-	printf("OnDisconnectCallback result %d %p \n", error_code, pInstance);
+        }
+        printf("OnDisconnectCallback result %d %p \n", error_code, pInstance);
         OnEventCallback(pInstance,
-               (error_code == MQTT_CODE_SUCCESS) ? MQTT_SUCCESS : MqttErrorStatusChange(error_code),
-               (error_code == 0) ? "on disconnect success" : MqttClient_ReturnCodeToString(error_code));
+                (error_code == MQTT_CODE_SUCCESS) ? MQTT_SUCCESS : MqttErrorStatusChange(error_code),
+                (error_code == 0) ? "on disconnect success" : MqttClient_ReturnCodeToString(error_code));
         pInstance->connected = false;
-	LinkMqttDisconnect(pInstance);
+        LinkMqttDisconnect(pInstance);
         if (error_code == MQTT_CODE_SUCCESS) {
                 pInstance->status = STATUS_IDLE;
         }
         else {
                 pInstance->status = STATUS_CONNECT_ERROR;
         }
-	LinkMqttInit(pInstance);
-	return 0;
+        LinkMqttInit(pInstance);
+        return 0;
 }
 
 
@@ -216,7 +216,7 @@ int mqtt_tls_cb(MqttClient* client)
         pInstance = mqtt_ctx->pInstance;
         int rc = WOLFSSL_SUCCESS;
 
-        if (pInstance->options.userInfo.nAuthenicatinMode ==  MQTT_AUTHENTICATION_ONEWAY_SSL && pInstance->options.userInfo.nAuthenicatinMode == MQTT_AUTHENTICATION_TWOWAY_SSL) {
+        if (mqtt_ctx->use_tls > 0) {
 
                 client->tls.ctx = wolfSSL_CTX_new(wolfTLSv1_2_client_method());
                 if (client->tls.ctx) {
@@ -298,12 +298,15 @@ MQTT_ERR_STATUS LinkMqttConnect(struct MqttInstance* _pInstance)
 		// to do
         }
 
+        if ((_pInstance->options.userInfo.nAuthenicatinMode & MQTT_AUTHENTICATION_ONEWAY_SSL) || (_pInstance->options.userInfo.nAuthenicatinMode & MQTT_AUTHENTICATION_TWOWAY_SSL)) {
+                ctx->use_tls = 1;
+        }
         /* Optional authentication */
         ctx->connect.username = _pInstance->options.userInfo.pUsername;
         ctx->connect.password = _pInstance->options.userInfo.pPassword;
-	printf("MqttConnect username %s, password %s \n", ctx->connect.username, ctx->connect.password); 
+	printf("MqttConnect username %s, password %s  tls %d\n", ctx->connect.username, ctx->connect.password, ctx->use_tls); 
 	rc = MqttClient_NetConnect(client, _pInstance->options.userInfo.pHostname, _pInstance->options.userInfo.nPort,
-                                   5000, 0, mqtt_tls_cb);
+                                   5000, ctx->use_tls, mqtt_tls_cb);
         if (rc != MQTT_CODE_SUCCESS) {
             sleep(1);
             printf("EstablishConnect failed rc %d %s \n", rc, MqttClient_ReturnCodeToString(rc));
