@@ -86,7 +86,7 @@ int main()
         options.userInfo.pPassword = "gAs2Bpg2";
         instance = LinkMqttCreateInstance(&options);
         Status[1].pInstance = instance;
-        while (Status[1].status != 3000) {
+        while (Status[1].status != 3000 && Status[1].status != 3001 && Status[1].status != 3002) {
                 sleep(1);
         }
         int rc = 0;
@@ -94,6 +94,7 @@ int main()
                 int rc3 = LinkMqttSubscribe(instance, "sensor/room3/#");
                 int rc2 = LinkMqttSubscribe(instance, "sensor/room2/#");
                 int rc1 = LinkMqttSubscribe(instance, "sensor/room1/#");
+                printf("%d %d %d", rc1, rc2, rc3);
                 if (rc1 == 3000 && rc2 == 3000 && rc3 == 3000) {
                         rc = 3000;
                 }
@@ -101,7 +102,7 @@ int main()
         }
         //usleep(100000);
         for (int i = 0 ; i < 100; ++i) {
-              LinkMqttPublish(instance, "sensor/room1/temperature", 10, "test1234456");
+                LinkMqttPublish(instance, "sensor/room1/temperature", 10, "test1234456");
         }
         sleep(5);
         Status[1].pInstance = NULL;
@@ -118,9 +119,10 @@ int main()
 
         while(1) {
                 //LinkMqttLibInit();
+                options.pId = "test123";
                 instance = LinkMqttCreateInstance(&options);
                 Status[0].pInstance = instance;
-                while ((Status[0].status != 3000)) {
+                while (Status[0].status != 3000 && Status[0].status != 3001 && Status[0].status != 3002) {
                         sleep(1);
                 }
                 rc = 0;
@@ -129,7 +131,7 @@ int main()
                         sleep(1);
                 }
                 for (int i = 0; i < 1000000; ++ i) {
-                        LinkMqttPublish(instance, "sensor/room1/temperature", 10, "test1234456");
+                        LinkMqttPublish(instance, "sensor/room1/temperature", 10, "1test1234456");
                         usleep(100000);
                 }
                 sleep(3);
