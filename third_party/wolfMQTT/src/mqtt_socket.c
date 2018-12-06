@@ -208,11 +208,13 @@ static int MqttSocket_ReadDo(MqttClient *client, byte* buf, int buf_len,
             int error = wolfSSL_get_error(client->tls.ssl, 0);
             if (error != WOLFSSL_ERROR_WANT_READ) {
                 PRINTF("MqttSocket_Read: SSL Error=%d", error);
+		/* return code from net callback */
+                rc = client->tls.sockRc;
+            }
+	    else {
+		rc = MQTT_CODE_ERROR_TIMEOUT;
             }
         #endif
-
-            /* return code from net callback */
-            rc = client->tls.sockRc;
         }
     }
     else
@@ -233,7 +235,6 @@ static int MqttSocket_ReadDo(MqttClient *client, byte* buf, int buf_len,
 int MqttSocket_Read(MqttClient *client, byte* buf, int buf_len, int timeout_ms)
 {
     int rc;
-
     /* Validate arguments */
     if (client == NULL || client->net == NULL || client->net->read == NULL ||
         buf == NULL || buf_len <= 0) {
