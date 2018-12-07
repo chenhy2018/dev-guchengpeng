@@ -9,6 +9,8 @@
 #include <string.h>
 #include <unistd.h>
 
+#include "wolfmqtt/wolfmqtt.h"
+
 #define STATUS_IDLE 0
 #define STATUS_CONNECTING 1
 #define STATUS_CONNACK_RECVD 2

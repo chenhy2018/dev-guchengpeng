@@ -8,7 +8,7 @@
 #include "../mqtt.h"
 #include "../mqtt_internal.h"
 
-typedef struct MQTTCtx MqttCtx;
+#define MqttCtx MQTTCtx
 
 #define SOCK_ADDR_IN    struct sockaddr_in
 

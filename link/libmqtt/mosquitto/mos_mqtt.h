@@ -7,7 +7,7 @@
 #include "../mqtt.h"
 #include "../mqtt_internal.h"
 
-typedef struct MQTTCtx mosquitto;
+#define MQTTCtx mosquitto
 
 int ClientOptSet(struct MqttInstance* _pInstance, struct MqttUserInfo info);
 
