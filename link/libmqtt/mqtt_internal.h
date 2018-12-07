@@ -9,8 +9,6 @@
 #include <string.h>
 #include <unistd.h>
 
-#include "wolfmqtt/wolfmqtt.h"
-
 #define STATUS_IDLE 0
 #define STATUS_CONNECTING 1
 #define STATUS_CONNACK_RECVD 2
@@ -18,6 +16,13 @@
 #define STATUS_CONNECT_ERROR 4
 #define MAX_MQTT_TOPIC_SIZE 128
 
+#ifdef WITH_MOSQUITTO
+#include <mosquitto.h>
+#define MqttCtx mosquitto
+#else
+#include "wolfmqtt/wolfmqtt.h"
+#define MqttCtx MQTTCtx
+#endif
 typedef struct Node
 {
         char topic[MAX_MQTT_TOPIC_SIZE];
