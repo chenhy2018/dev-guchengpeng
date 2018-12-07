@@ -8,8 +8,6 @@
 #include "../mqtt.h"
 #include "../mqtt_internal.h"
 
-#define MqttCtx MQTTCtx
-
 #define SOCK_ADDR_IN    struct sockaddr_in
 
 typedef enum {
