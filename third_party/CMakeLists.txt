@@ -41,7 +41,7 @@ include(ExternalProject)
 ExternalProject_Add(wolfssl
         SOURCE_DIR wolfssl
 
-        CONFIGURE_COMMAND ./autogen.sh  && ./configure --prefix=${WOLFSSL_PREFIX_PATH} --enable-static --disable-shared
+        CONFIGURE_COMMAND ./configure --prefix=${WOLFSSL_PREFIX_PATH} --enable-static --disable-shared
         BUILD_COMMAND make
         BUILD_IN_SOURCE 1
 )

@@ -52,32 +52,45 @@ int main()
         options.callbacks.OnEvent = &OnEvent;
         void* instance = NULL;
         printf("try first sub \n");
-        instance = LinkMqttCreateInstance(&options);
-        Status[0].pInstance = instance;
-        while (!(Status[0].status & 3000)) {
-                sleep(1);
-        }
-        LinkMqttSubscribe(instance, "test/#");
-        printf("try pub %p \n", instance);
+        //instance = LinkMqttCreateInstance(&options);
+        //Status[0].pInstance = instance;
+        //while (!(Status[0].status & 3000)) {
+        //        sleep(1);
+        //}
+        //LinkMqttSubscribe(instance, "test/#");
+        //printf("try pub %p \n", instance);
         options.pId = "pubtest";
         options.userInfo.pUsername = "1002";
         options.userInfo.pPassword = "gAs2Bpg2";
-        void* pubInstance = LinkMqttCreateInstance(&options);
-        Status[1].pInstance = pubInstance;
-        while (!(Status[1].status & 3000)) {
-                sleep(1);
+        
+        for (int i = 0; i < 10; ++i) {
+                options.pId = "test";
+                instance = LinkMqttCreateInstance(&options);
+                Status[0].pInstance = instance;
+                Status[0].status = 0;
+                Status[1].status = 0;
+                while ((Status[0].status != 3000 && Status[0].status != 3001 && Status[0].status != 3002)) {
+                        sleep(1);
+                }
+                LinkMqttSubscribe(instance, "test/#");
+		options.pId = "pubtest";
+                void* pubInstance = LinkMqttCreateInstance(&options);
+                Status[1].pInstance = pubInstance;
+                while ((Status[1].status != 3000 && Status[1].status != 3001 && Status[1].status != 3002)) {
+                        sleep(1);
+                }
+                for (int i = 0 ; i < 10; ++i) {
+                        LinkMqttPublish(pubInstance, "test/pub", 10, "test_pub");
+                        LinkMqttPublish(pubInstance, "test/pub3", 10, "test_pub3");
+                }
+	        sleep(10);
+                Status[1].pInstance = NULL;
+     	        Status[0].pInstance = NULL;
+                Status[1].status = 0;
+                Status[0].status = 0;
+                LinkMqttDestroy(instance);
+                LinkMqttDestroy(pubInstance);
         }
-        for (int i = 0 ; i < 10; ++i) {
-            LinkMqttPublish(pubInstance, "test/pub", 10, "test_pub");
-            LinkMqttPublish(pubInstance, "test/pub3", 10, "test_pub3");
-        }
-        sleep(10);
-        Status[1].pInstance = NULL;
-        Status[0].pInstance = NULL;
-        Status[1].status = 0;
-        Status[0].status = 0;
-        LinkMqttDestroy(instance);
-        LinkMqttDestroy(pubInstance);
         printf("try second \n");
         options.userInfo.nAuthenicatinMode = MQTT_AUTHENTICATION_USER;
         options.userInfo.pHostname = "39.107.247.14";
@@ -86,7 +99,7 @@ int main()
         options.userInfo.pPassword = "gAs2Bpg2";
         instance = LinkMqttCreateInstance(&options);
         Status[1].pInstance = instance;
-        while (Status[1].status != 3000) {
+        while (Status[1].status != 3000 && Status[1].status != 3001 && Status[1].status != 3002) {
                 sleep(1);
         }
         int rc = 0;
@@ -94,6 +107,7 @@ int main()
                 int rc3 = LinkMqttSubscribe(instance, "sensor/room3/#");
                 int rc2 = LinkMqttSubscribe(instance, "sensor/room2/#");
                 int rc1 = LinkMqttSubscribe(instance, "sensor/room1/#");
+                printf("%d %d %d", rc1, rc2, rc3);
                 if (rc1 == 3000 && rc2 == 3000 && rc3 == 3000) {
                         rc = 3000;
                 }
@@ -101,7 +115,7 @@ int main()
         }
         //usleep(100000);
         for (int i = 0 ; i < 100; ++i) {
-              LinkMqttPublish(instance, "sensor/room1/temperature", 10, "test1234456");
+                LinkMqttPublish(instance, "sensor/room1/temperature", 10, "test1234456");
         }
         sleep(5);
         Status[1].pInstance = NULL;
@@ -109,18 +123,18 @@ int main()
         LinkMqttLibCleanup();
         printf("try third \n");
         options.userInfo.pCafile = "./test/ca.crt";
-        options.userInfo.nPort = 1883;
-        options.userInfo.nAuthenicatinMode = MQTT_AUTHENTICATION_USER;
-        //options.userInfo.nAuthenicatinMode = MQTT_AUTHENTICATION_USER | MQTT_AUTHENTICATION_ONEWAY_SSL;
+        options.userInfo.nPort = 8883;
+        options.userInfo.nAuthenicatinMode = MQTT_AUTHENTICATION_USER | MQTT_AUTHENTICATION_ONEWAY_SSL;
         LinkMqttLibInit();
         Status[1].pInstance = NULL;
         Status[1].status = 0;
 
         while(1) {
                 //LinkMqttLibInit();
+                options.pId = "test123";
                 instance = LinkMqttCreateInstance(&options);
                 Status[0].pInstance = instance;
-                while ((Status[0].status != 3000)) {
+                while (Status[0].status != 3000 && Status[0].status != 3001 && Status[0].status != 3002) {
                         sleep(1);
                 }
                 rc = 0;
@@ -129,7 +143,7 @@ int main()
                         sleep(1);
                 }
                 for (int i = 0; i < 1000000; ++ i) {
-                        LinkMqttPublish(instance, "sensor/room1/temperature", 10, "test1234456");
+                        LinkMqttPublish(instance, "sensor/room1/temperature", 10, "1test1234456");
                         usleep(100000);
                 }
                 sleep(3);

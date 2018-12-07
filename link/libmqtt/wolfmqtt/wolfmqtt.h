@@ -8,7 +8,7 @@
 #include "../mqtt.h"
 #include "../mqtt_internal.h"
 
-typedef struct MQTTCtx MqttCtx;
+#define MqttCtx MQTTCtx
 
 #define SOCK_ADDR_IN    struct sockaddr_in
 
@@ -39,6 +39,7 @@ typedef struct MQTTCtx {
 
         byte *tx_buf, *rx_buf;
         word32 cmd_timeout_ms;
+	int use_tls;
 	int timeoutCount;
 } MQTTCtx;
 
