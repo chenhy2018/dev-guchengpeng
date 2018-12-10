@@ -8,24 +8,15 @@
 #include "../mqtt.h"
 #include "../mqtt_internal.h"
 
-#define SOCK_ADDR_IN    struct sockaddr_in
-
-typedef enum {
-        SOCK_BEGIN = 0,
-        SOCK_CONN,
-} NB_Stat;
-
-typedef struct _SocketContext {
-        SOCKET_T fd;
-        NB_Stat stat;
-        SOCK_ADDR_IN addr;
-}SocketContext;
+#define MAX_MQTT_TOPIC_LEN 128
+#define MAX_MQTT_MESSAGE_LEN 1024
+#define MAX_BUFFER_SIZE 1024
 
 typedef struct MQTTCtx {
         /* client and net containers */
         MqttClient client;
         MqttNet net;
-	void* pInstance;
+	void *pInstance;
         /* temp mqtt containers */
         MqttConnect connect;
         MqttMessage lwt_msg;
@@ -36,6 +27,8 @@ typedef struct MQTTCtx {
         MqttDisconnect disconnect;
 
         byte *tx_buf, *rx_buf;
+	char *message;
+	char message_topic[MAX_MQTT_TOPIC_LEN];
         word32 cmd_timeout_ms;
 	int use_tls;
 	int timeoutCount;
