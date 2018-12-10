@@ -142,12 +142,13 @@ int main()
                         rc = LinkMqttSubscribe(instance, "sensor/room1/#");
                         sleep(1);
                 }
-                for (int i = 0; i < 1000000; ++ i) {
+                for (int i = 0; i < 100; ++ i) {
                         LinkMqttPublish(instance, "sensor/room1/temperature", 10, "1test1234456");
                         usleep(100000);
                 }
                 sleep(3);
                 Status[0].pInstance = NULL;
+		Status[0].status = 0;
                 LinkMqttDestroy(instance);
                 //LinkMqttLibCleanup();
         }
