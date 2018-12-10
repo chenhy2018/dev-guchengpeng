@@ -48,11 +48,11 @@ bool DeleteNode(Node* PHead, const char * pval)
         int i = 0;
         Node* p = PHead;
         while (p->pNext != NULL) {
-               if (strcmp(p->pNext->topic, pval) == 0) {
-                       Node* temp = p->pNext;
-                       p->pNext = temp->pNext;
-                       free(temp);
-                       return true;
+                if (strcmp(p->pNext->topic, pval) == 0) {
+                        Node* temp = p->pNext;
+                        p->pNext = temp->pNext;
+                        free(temp);
+                        return true;
                }
         }
         printf("Can't find node \n");
@@ -103,42 +103,41 @@ static void LinkMqttInstanceInit(struct MqttInstance* _pInstance, const struct M
 void * LinkMqttThread(void* _pData)
 {
         int rc;
-        
+
         struct MqttInstance* pInstance = (struct MqttInstance*)(_pData);
 
-	int ret = LinkMqttInit(pInstance);
+        int ret = LinkMqttInit(pInstance);
         if (ret != MQTT_SUCCESS) {
-		OnEventCallback(pInstance, MQTT_ERR_INVAL, "MQTT_ERR_INVAL");
-		LinkMqttDestroy(pInstance);
-		return NULL;
-	}
+                OnEventCallback(pInstance, MQTT_ERR_INVAL, "MQTT_ERR_INVAL");
+                LinkMqttDestroy(pInstance);
+                return NULL;
+        }
         do {
-                 if (!pInstance->connected && pInstance->status != STATUS_CONNECTING) {
+                if (!pInstance->connected && pInstance->status != STATUS_CONNECTING) {
                          pInstance->status = STATUS_CONNECTING;
                          rc = ClientOptSet(pInstance, pInstance->options.userInfo);
                          if (rc == MQTT_SUCCESS) {
-				 rc = LinkMqttConnect(pInstance);
+                                 rc = LinkMqttConnect(pInstance);
                          }
                          if (rc != MQTT_SUCCESS) {
                                  OnEventCallback(pInstance, rc, "STATUS_CONNECT_ERROR");
                                  printf("connecting pInstance->status = STATUS_CONNECT_ERROR \n");
                                  pInstance->status = STATUS_CONNECT_ERROR;
                          }
-                 }
-                 else if (pInstance->status == STATUS_CONNECTING) {
+                } else if (pInstance->status == STATUS_CONNECTING) {
                          sleep(1);
-                 }
-                 rc = LinkMqttLoop(pInstance);
-		 if (rc >= MQTT_ERR_NOMEM) {
+                }
+                rc = LinkMqttLoop(pInstance);
+                if (rc >= MQTT_ERR_NOMEM) {
                          sleep(1);
-                 }
+                }
         } while (!pInstance->isDestroying);
         printf("quite !!! \n");
         if (pInstance->connected) {
                 LinkMqttDisconnect(pInstance);
         }
-	LinkMqttDinit(pInstance);
-	LinkMqttDestroyInstance(pInstance);
+        LinkMqttDinit(pInstance);
+        LinkMqttDestroyInstance(pInstance);
         if (rc) {
                 fprintf(stderr, "Error: %d\n", rc);
         }
@@ -147,7 +146,7 @@ void * LinkMqttThread(void* _pData)
 
 void LinkMqttDestroyInstance(IN const void* _pInstance)
 {
-	struct MqttInstance* pInstance = (struct MqttInstance*) (_pInstance);
+        struct MqttInstance* pInstance = (struct MqttInstance*) (_pInstance);
         ClearNode(&pInstance->pSubsribeList);
         SafeFree(pInstance->options.pId);
         SafeFree(pInstance->options.userInfo.pUsername);
@@ -167,7 +166,7 @@ void* LinkMqttCreateInstance(IN const struct MqttOptions* pOption)
         if (pInstance == NULL) {
                 return NULL;
         }
-        
+
         LinkMqttInstanceInit(pInstance, pOption);
         pthread_t t;
         pthread_attr_t attr;
@@ -181,6 +180,4 @@ void LinkMqttDestroy(IN const void* _pInstance)
 {	
         struct MqttInstance* pInstance = (struct MqttInstance*)(_pInstance);
         pInstance->isDestroying = true;
-        pInstance->options.callbacks.OnMessage = NULL;
-        pInstance->options.callbacks.OnEvent = NULL;
 }

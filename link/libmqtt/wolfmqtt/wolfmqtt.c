@@ -5,8 +5,9 @@
 #include "mqtt_client.h"
 #include "mqttnet.h"
 #define MAX_PACKET_ID ((1<<16) -1)
-#define MAX_BUFFER_SIZE 512
 #define DEFAULT_CON_TIMEOUT_MS 500
+
+#define min(a,b) ((a)>(b)? (b):(a))
 
 static int mPacketIdLast;
 
@@ -74,13 +75,13 @@ int LinkMqttPublish(IN const void* _pInstance, IN const char* _pTopic, IN int _n
         publish.packet_id = mqtt_get_packetid();
         publish.buffer = (byte *)_pPayload;
         publish.total_len = (word16)_nPayloadlen;
-	pthread_mutex_lock(&pInstance->listMutex);
+        pthread_mutex_lock(&pInstance->listMutex);
         int rc = MqttClient_Publish(client, &publish);
         if (rc != MQTT_CODE_SUCCESS) {
                 printf("MQTT Publish fail, %s(%d)\n“", MqttClient_ReturnCodeToString(rc), rc);
         }
-	pthread_mutex_unlock(&pInstance->listMutex);
-	usleep(1000);
+        pthread_mutex_unlock(&pInstance->listMutex);
+        usleep(1000);
         return MqttErrorStatusChange(rc);
 }
 
@@ -91,14 +92,14 @@ int LinkMqttSubscribe(IN const void* _pInstance, IN const char* _pTopic)
                 return MQTT_ERR_INVAL;
         }
         struct MQTTCtx* ctx = (struct MQTTCtx*)(pInstance->mosq);
-	memset(&ctx->subscribe, 0, sizeof(MqttSubscribe));
+        memset(&ctx->subscribe, 0, sizeof(MqttSubscribe));
         MqttClient* client = &ctx->client;
         ctx->subscribe.packet_id = mqtt_get_packetid();
         ctx->subscribe.topic_count = 1; //in current time, we support 1 topic in on time.
-	ctx->topics[0].qos = pInstance->options.nQos;
-	ctx->topics[0].topic_filter = _pTopic;
-	ctx->subscribe.topics = &ctx->topics[0];
-	pthread_mutex_lock(&pInstance->listMutex);
+        ctx->topics[0].qos = pInstance->options.nQos;
+        ctx->topics[0].topic_filter = _pTopic;
+        ctx->subscribe.topics = &ctx->topics[0];
+        pthread_mutex_lock(&pInstance->listMutex);
         int rc = MqttClient_Subscribe(client, &ctx->subscribe);
         if (rc == MQTT_CODE_SUCCESS) {
                 InsertNode(&pInstance->pSubsribeList, _pTopic);
@@ -106,8 +107,8 @@ int LinkMqttSubscribe(IN const void* _pInstance, IN const char* _pTopic)
         else {
                 printf("MQTT Subscribe: %s (%d)\n", MqttClient_ReturnCodeToString(rc), rc);
         }
-	pthread_mutex_unlock(&pInstance->listMutex);
-	usleep(1000);
+        pthread_mutex_unlock(&pInstance->listMutex);
+        usleep(1000);
         return MqttErrorStatusChange(rc);
 }
 
@@ -125,7 +126,7 @@ int LinkMqttUnsubscribe(IN const void* _pInstance, IN const char* _pTopic)
         ctx->unsubscribe.packet_id = mqtt_get_packetid();
         ctx->unsubscribe.topic_count = 1; //in current time, we support 1 topic in on time.
         ctx->unsubscribe.topics = &ctx->topics[0];
-	pthread_mutex_lock(&pInstance->listMutex);
+        pthread_mutex_lock(&pInstance->listMutex);
         int rc = MqttClient_Unsubscribe(client, &ctx->unsubscribe);
         if (rc == MQTT_CODE_SUCCESS) {
                 DeleteNode(&pInstance->pSubsribeList, _pTopic);
@@ -133,8 +134,8 @@ int LinkMqttUnsubscribe(IN const void* _pInstance, IN const char* _pTopic)
         else {
                 printf("MQTT Unsubscribe: %s (%d)\n", MqttClient_ReturnCodeToString(rc), rc);
         }
-	pthread_mutex_unlock(&pInstance->listMutex);
-	usleep(1000);
+        pthread_mutex_unlock(&pInstance->listMutex);
+        usleep(1000);
         return MqttErrorStatusChange(rc);
 }
 
@@ -154,10 +155,9 @@ static int OnDisconnectCallback(MqttClient* client, int error_code, void* ctx)
         if (error_code == MQTT_CODE_ERROR_TIMEOUT) {
                 return 0;
         }
-        //if (error_code == MQTT_CODE_ERROR_BAD_ARG) {
-        //        printf("OnDisconnectCallback result %d \n", error_code);
-        //        return 0;
-        //}
+        if (pInstance == NULL) {
+                 return 0;
+        }
         printf("OnDisconnectCallback result %d %p \n", error_code, pInstance);
         OnEventCallback(pInstance,
                 (error_code == MQTT_CODE_SUCCESS) ? MQTT_SUCCESS : MqttErrorStatusChange(error_code),
@@ -179,29 +179,33 @@ static int OnMessageCallback(struct _MqttClient *client, MqttMessage *_pMessage,
 {
         struct MqttInstance *pInstance = client->ctx;
         if (pInstance->options.callbacks.OnMessage) {
-                pInstance->options.callbacks.OnMessage(pInstance, pInstance->options.nAccountId, _pMessage->topic_name, (const char *)_pMessage->buffer, _pMessage->buffer_len);
+                memset(pInstance->mosq->message_topic, 0, MAX_MQTT_TOPIC_LEN);
+                memset(pInstance->mosq->message, 0, MAX_MQTT_MESSAGE_LEN);
+                memcpy(pInstance->mosq->message_topic, _pMessage->topic_name, min((MAX_MQTT_TOPIC_LEN - 1), _pMessage->topic_name_len));
+                memcpy(pInstance->mosq->message, _pMessage->buffer, min((MAX_MQTT_MESSAGE_LEN - 1), _pMessage->buffer_len));
+                pInstance->options.callbacks.OnMessage(pInstance, pInstance->options.nAccountId, pInstance->mosq->message_topic, (const char *)pInstance->mosq->message, min((MAX_MQTT_MESSAGE_LEN - 1), _pMessage->buffer_len));
         }
-	return MQTT_CODE_SUCCESS;
+        return MQTT_CODE_SUCCESS;
 }
 
 static int mqtt_tls_verify_cb(int preverify, WOLFSSL_X509_STORE_CTX* store)
 {
-    char buffer[WOLFSSL_MAX_ERROR_SZ];
-    MQTTCtx *mqttCtx = NULL;
-    char appName[MAX_BUFFER_SIZE] = {0};
+        char buffer[WOLFSSL_MAX_ERROR_SZ];
+        MQTTCtx *mqttCtx = NULL;
+        char appName[MAX_BUFFER_SIZE] = {0};
 
-    printf("MQTT TLS Verify  PreVerify %d, Error %d (%s) \n",
-        preverify,
-        store->error, store->error != 0 ?
-            wolfSSL_ERR_error_string(store->error, buffer) : "none");
-    printf("Subject's domain name is %s \n", store->domain);
+        printf("MQTT TLS Verify  PreVerify %d, Error %d (%s) \n",
+                preverify,
+                store->error, store->error != 0 ?
+                wolfSSL_ERR_error_string(store->error, buffer) : "none");
+        printf("Subject's domain name is %s \n", store->domain);
 
-    if (store->error != 0) {
-        /* Allowing to continue */
-        /* Should check certificate and return 0 if not okay */
-        printf("Allowing cert anyways \n");
-    }
-    return 1;
+        if (store->error != 0) {
+                /* Allowing to continue */
+                /* Should check certificate and return 0 if not okay */
+                printf("Allowing cert anyways \n");
+        }
+        return 1;
 }
 
 /* Use this callback to setup TLS certificates and verify callbacks */
@@ -210,17 +214,17 @@ int mqtt_tls_cb(MqttClient* client)
         struct MqttInstance *pInstance;
         pInstance = client->ctx;
         int rc = WOLFSSL_SUCCESS;
-        
+
         if ((pInstance->options.userInfo.nAuthenicatinMode & MQTT_AUTHENTICATION_ONEWAY_SSL) || (pInstance->options.userInfo.nAuthenicatinMode & MQTT_AUTHENTICATION_TWOWAY_SSL)) {
-                client->tls.ctx = wolfSSL_CTX_new(wolfTLSv1_2_client_method());
-                if (client->tls.ctx) {
-                        wolfSSL_CTX_set_verify(client->tls.ctx, WOLFSSL_VERIFY_PEER,
-                                               mqtt_tls_verify_cb);
-                        if (pInstance->options.userInfo.pCafile) {
-                                /* Load CA certificate file */
-                                rc = wolfSSL_CTX_load_verify_locations(client->tls.ctx,
-                                                                       pInstance->options.userInfo.pCafile, NULL);
-                        }
+                 client->tls.ctx = wolfSSL_CTX_new(wolfTLSv1_2_client_method());
+                 if (client->tls.ctx) {
+                          wolfSSL_CTX_set_verify(client->tls.ctx, WOLFSSL_VERIFY_PEER,
+                                                 mqtt_tls_verify_cb);
+                          if (pInstance->options.userInfo.pCafile) {
+                                  /* Load CA certificate file */
+                                  rc = wolfSSL_CTX_load_verify_locations(client->tls.ctx,
+                                                                         pInstance->options.userInfo.pCafile, NULL);
+                          }
                 }
         }
         printf("MQTT TLS Setup (%d)", rc);
@@ -237,6 +241,9 @@ int LinkMqttInit(struct MqttInstance* _pInstance)
 {
         int rc = MQTT_SUCCESS;
         struct MQTTCtx *mqtt_ctx = (struct MQTTCtx*)malloc(sizeof(MQTTCtx));
+	if (mqtt_ctx == NULL) {
+                return MQTT_ERR_NOMEM;
+        }
         memset(mqtt_ctx, 0, sizeof(MQTTCtx));
         _pInstance->mosq = mqtt_ctx;
         rc = MqttClientNet_Init(&(mqtt_ctx->net));
@@ -245,34 +252,44 @@ int LinkMqttInit(struct MqttInstance* _pInstance)
         }
         mqtt_ctx->tx_buf = (byte *)malloc(MAX_BUFFER_SIZE);
         mqtt_ctx->rx_buf = (byte *)malloc(MAX_BUFFER_SIZE);
-        if (mqtt_ctx->tx_buf == NULL || mqtt_ctx->rx_buf == NULL) {
+        mqtt_ctx->message = (char *)malloc(MAX_MQTT_MESSAGE_LEN); 
+        if (mqtt_ctx->tx_buf == NULL || mqtt_ctx->rx_buf == NULL || mqtt_ctx->message== NULL) {
+                free(mqtt_ctx);
                 return MQTT_ERR_NOMEM;
         }
         rc = MqttClient_Init(&mqtt_ctx->client, &mqtt_ctx->net, OnMessageCallback, mqtt_ctx->tx_buf, MAX_BUFFER_SIZE,
                              mqtt_ctx->rx_buf, MAX_BUFFER_SIZE, DEFAULT_CON_TIMEOUT_MS);
         mqtt_ctx->client.ctx = _pInstance;
-         printf(" _pInstance->mosq %p _pInstance %p client  %p\n", _pInstance->mosq, _pInstance, &mqtt_ctx->client);
+        printf(" _pInstance->mosq %p _pInstance %p client  %p\n", _pInstance->mosq, _pInstance, &mqtt_ctx->client);
         MqttClient_SetDisconnectCallback(&mqtt_ctx->client, OnDisconnectCallback, NULL);
         return MqttErrorStatusChange(rc);
 }
 
 void LinkMqttDinit(struct MqttInstance* _pInstance)
 {
+	if (_pInstance == NULL || _pInstance->mosq == NULL) {
+                return;
+        }
         struct MQTTCtx *mqtt_ctx = (struct MQTTCtx*)(_pInstance->mosq);
-	if (mqtt_ctx->tx_buf)
+        if (mqtt_ctx->tx_buf)
                 free(mqtt_ctx->tx_buf);
         if (mqtt_ctx->rx_buf)
                 free(mqtt_ctx->rx_buf);
+        if (mqtt_ctx->message)
+                free(mqtt_ctx->message);
         MqttClientNet_DeInit(&mqtt_ctx->net);
         free(_pInstance->mosq);
 }
 
 MQTT_ERR_STATUS LinkMqttConnect(struct MqttInstance* _pInstance)
 {
-	struct MQTTCtx* ctx = (struct MQTTCtx*)(_pInstance->mosq);
+	if (_pInstance == NULL || _pInstance->mosq == NULL) {
+                return MQTT_ERR_NOMEM;
+        }
+        struct MQTTCtx* ctx = (struct MQTTCtx*)(_pInstance->mosq);
         MqttClient* client = &ctx->client;
 
- 	printf("MqttConnect host %s port %d keepalive %d \n", _pInstance->options.userInfo.pHostname, _pInstance->options.userInfo.nPort, _pInstance->options.nKeepalive);
+        printf("MqttConnect host %s port %d keepalive %d \n", _pInstance->options.userInfo.pHostname, _pInstance->options.userInfo.nPort, _pInstance->options.nKeepalive);
         int rc = 0;
         MqttMessage lwt_msg;
         /* Define connect parameters */
@@ -323,6 +340,9 @@ MQTT_ERR_STATUS LinkMqttConnect(struct MqttInstance* _pInstance)
 
 void LinkMqttDisconnect(struct MqttInstance* _pInstance)
 {
+        if (_pInstance == NULL || _pInstance->mosq == NULL) {
+                return;
+        }
 	struct MQTTCtx* ctx = (struct MQTTCtx*)(_pInstance->mosq);
         MqttClient* client = &ctx->client;
 	int rc = MqttClient_Disconnect(client);
@@ -338,6 +358,9 @@ void LinkMqttDisconnect(struct MqttInstance* _pInstance)
 
 MQTT_ERR_STATUS LinkMqttLoop(struct MqttInstance* _pInstance)
 {
+        if (_pInstance == NULL || _pInstance->mosq == NULL) {
+                return MQTT_ERR_NOMEM;
+        }
 	struct MQTTCtx* ctx = (struct MQTTCtx*)(_pInstance->mosq);
         MqttClient client = ctx->client;
 	pthread_mutex_lock(&_pInstance->listMutex);
@@ -353,7 +376,8 @@ MQTT_ERR_STATUS LinkMqttLoop(struct MqttInstance* _pInstance)
                         }
                         else if (rc != MQTT_CODE_SUCCESS) {
                                 printf("MQTT Ping Keep Alive Error: %s (%d)",
-                                       MqttClient_ReturnCodeToString(rc), rc);
+                                        MqttClient_ReturnCodeToString(rc), rc);
+                                ctx->timeoutCount = 0;
                         }
 			ctx->timeoutCount = 0;
                 }
