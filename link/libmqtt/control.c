@@ -164,9 +164,11 @@ void LinkDinitIOCtrl(int nSession)
                 return;
         }
         if (Session[nSession].isUsed) {
-                Session[nSession].pInstance = 0;
+                Session[nSession].pInstance = NULL;
                 memset(Session[nSession].pubTopic, 0, sizeof(Session[nSession].pubTopic));
+                memset(Session[nSession].subTopic, 0, sizeof(Session[nSession].subTopic));
                 Session[nSession].isUsed = false;
+                DestroyMessageQueue(&Session[nSession].pQueue);
 	}
 }
 
@@ -174,19 +176,25 @@ void LinkDinitIOCtrl(int nSession)
 void * LinkLogThread(void* _pData)
 {       
         int rc;
-        struct _LinkIOCrtlInfo* log = (struct _LinkIOCrtlInfo*)(_pData); 
+        struct _LinkIOCrtlInfo* log = (struct _LinkIOCrtlInfo*)(_pData);
+        MessageQueue* pQueue = NULL;
         do {
-                Message *pMessage = ReceiveMessageTimeout(log->pQueue, 5000);
+                pQueue = log->pQueue;
+                Message *pMessage = ReceiveMessageTimeout(log->pQueue, 1000);
                 if (pMessage) {
                          char topic[128] = {0};
                          sprintf(topic, "%s/%d",log->pubTopic, pMessage->nMessageID);
                          LinkMqttPublish(log->pInstance, topic, strlen(pMessage->pMessage), pMessage->pMessage);
+                         free(pMessage->pMessage);
+                         free(pMessage);
                 }
 
         } while(log->isUsed);
+
         return NULL;
 }
 
+static pthread_t t;
 int LinkInitLog(const char *_pAppId, const char *_pEncodeDeviceName, void *_pInstance)
 {
         if (LogSession.isUsed) {
@@ -204,11 +212,7 @@ int LinkInitLog(const char *_pAppId, const char *_pEncodeDeviceName, void *_pIns
         sprintf(LogSession.pubTopic, "/linking/v1/%s/%s/log/", _pAppId, _pEncodeDeviceName);
         LogSession.pInstance = _pInstance;
         LogSession.isUsed = true;
-        pthread_t t;
-        pthread_attr_t attr;
-        pthread_attr_init(&attr);
-        pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
-        pthread_create(&t, &attr, LinkLogThread, &LogSession);
+        pthread_create(&t, NULL, LinkLogThread, &LogSession);
         return 1;
 }
 
@@ -231,7 +235,12 @@ int LinkSendLog(int level, const char *pLog, int nLength)
         return 1;
 }
 
-void LinkDInitLog()
+void LinkDinitLog()
 {
        LogSession.isUsed = false;
+       pthread_join(t, NULL);
+       DestroyMessageQueue(&LogSession.pQueue);
+       memset(LogSession.pubTopic, 0, sizeof(LogSession.pubTopic));
+       memset(LogSession.subTopic, 0, sizeof(LogSession.subTopic));
+       LogSession.pInstance = NULL;
 }
