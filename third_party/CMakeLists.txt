@@ -36,6 +36,7 @@ add_definitions(-DPJMEDIA_HAS_SRTP=0)
 	endif()
 endif()
 
+if ($ENV{ARCH} STREQUAL "x86")
 SET(WOLFSSL_PREFIX_PATH "${CMAKE_CURRENT_SOURCE_DIR}/wolfssl/prefix/$ENV{ARCH}")
 include(ExternalProject)
 ExternalProject_Add(wolfssl
@@ -45,9 +46,22 @@ ExternalProject_Add(wolfssl
         BUILD_COMMAND make
         BUILD_IN_SOURCE 1
 )
+else()
+SET(WOLFSSL_PREFIX_PATH "${CMAKE_CURRENT_SOURCE_DIR}/wolfssl/prefix/$ENV{ARCH}")
+include(ExternalProject)
+ExternalProject_Add(wolfssl
+        SOURCE_DIR wolfssl
+
+		CONFIGURE_COMMAND ./configure --prefix=${WOLFSSL_PREFIX_PATH} --enable-static --disable-shared --host=$ENV{HOST}
+        BUILD_COMMAND make
+        BUILD_IN_SOURCE 1
+)
+endif()
 
 SET(WOLFMQTT_PREFIX_PATH "${CMAKE_CURRENT_SOURCE_DIR}/wolfMQTT/prefix/$ENV{ARCH}")
 
+
+if ($ENV{ARCH} STREQUAL "x86")
 include(ExternalProject)
 ExternalProject_Add(wolfMQTT
         SOURCE_DIR wolfMQTT
@@ -55,6 +69,15 @@ ExternalProject_Add(wolfMQTT
         BUILD_COMMAND make
         BUILD_IN_SOURCE 1
 )
+else()
+include(ExternalProject)
+ExternalProject_Add(wolfMQTT
+        SOURCE_DIR wolfMQTT
+		CONFIGURE_COMMAND  ./autogen.sh  && ./configure --prefix=${WOLFMQTT_PREFIX_PATH} --host=$ENV{HOST} --enable-tls --enable-static --disable-shared --disable-examples --with-lib-prefix=${WOLFSSL_PREFIX_PATH}
+        BUILD_COMMAND make
+        BUILD_IN_SOURCE 1
+)
+endif()
 
 include(ExternalProject)
 ExternalProject_Add(curl-7.61.0
