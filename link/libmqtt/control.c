@@ -7,11 +7,6 @@
 #include "queue.h"
 #include "cJSON/cJSON.h"
 
-struct connect_status {
-        int status;
-        void* pInstance;
-} connect_status;
-
 struct _LinkIOCrtlInfo Session[10] = {0};
 struct _LinkIOCrtlInfo LogSession = {0};
 
@@ -22,35 +17,35 @@ void OnIOCtrlMessage(IN const void* _pInstance, IN int _nAccountId, IN const cha
         if ( !pMessage || !message ) {
                 return;
         }
-	pMessage->nMessageID = -1;
-	for (int i = 0; i < 10; ++ i) {
+        pMessage->nMessageID = -1;
+        for (int i = 0; i < 10; ++ i) {
                 if (Session[i].isUsed && _pInstance == Session[i].pInstance) {
                         pMessage->nMessageID = i;
                         break;
                 }
         }
-	if (pMessage->nMessageID == -1) {
-                 free(pMessage);
-                 return;
+        if (pMessage->nMessageID == -1) {
+                free(pMessage);
+                return;
         }
         memset(message, 0, nLength);
         memcpy(message, _pMessage, nLength);
-	pMessage->pMessage = message;
+        pMessage->pMessage = message;
         SendMessage(Session[pMessage->nMessageID].pQueue, pMessage);
 }
 
 int LinkInitIOCtrl(const char *_pAppId, const char *_pEncodeDeviceName, void *_pInstance)
 {
-	int index = MAX_SESSION_ID;
-	for (int i = 0; i < MAX_SESSION_ID; ++i) {
+        int index = MAX_SESSION_ID;
+        for (int i = 0; i < MAX_SESSION_ID; ++i) {
                 Session[i].isUsed = false;
                 index = i;
-		break;
+                break;
 	}
-	if (index == MAX_SESSION_ID) {
+        if (index == MAX_SESSION_ID) {
                 return MQTT_ERR_INVAL;
         }
-	if (_pInstance == NULL) {
+        if (_pInstance == NULL) {
                 return MQTT_ERR_INVAL;
         }
         Session[index].pQueue = CreateMessageQueue(MESSAGE_QUEUE_MAX);
@@ -58,35 +53,35 @@ int LinkInitIOCtrl(const char *_pAppId, const char *_pEncodeDeviceName, void *_p
                 printf("queue malloc fail\n");
                 return MQTT_ERR_NOMEM;
         }
-	memset(Session[index].pubTopic, 0, sizeof(Session[index].pubTopic));
+        memset(Session[index].pubTopic, 0, sizeof(Session[index].pubTopic));
         sprintf(Session[index].pubTopic, "/linking/v1/%s/%s/rpc/request", _pAppId, _pEncodeDeviceName);
         memset(Session[index].subTopic, 0, sizeof(Session[index].subTopic));
         sprintf(Session[index].subTopic, "/linking/v1/%s/%s/rpc/response/#", _pAppId, _pEncodeDeviceName);
-	Session[index].pInstance = _pInstance;
-	Session[index].isUsed = true;
-	int ret = LinkMqttSubscribe(_pInstance, Session[index].subTopic);
-	if (ret != MQTT_SUCCESS) {
+        Session[index].pInstance = _pInstance;
+        Session[index].isUsed = true;
+        int ret = LinkMqttSubscribe(_pInstance, Session[index].subTopic);
+        if (ret != MQTT_SUCCESS) {
                 return ret;
-	}
+        }
         return index;
 }
 
 cJSON* CreateResponse(unsigned int _nIOErrorCode, const char *_pIOCtrlData, int _nIOCtrlDataSize)
 {
         cJSON *json = cJSON_CreateObject();
-	if (json == NULL) {
+        if (json == NULL) {
                 return NULL;
         }
         cJSON *item = cJSON_CreateNumber(_nIOErrorCode);
         if (item == NULL) {
                 cJSON_Delete(json);
                 return NULL;
-	}
-	cJSON_AddItemToObject(json, RESPONSE_ERROR_CODE, item);
-	if (_nIOErrorCode == LINKING_RESPONSE_SUCCESS) {
+        }
+        cJSON_AddItemToObject(json, RESPONSE_ERROR_CODE, item);
+        if (_nIOErrorCode == LINKING_RESPONSE_SUCCESS) {
                 cJSON_AddStringToObject(json, RESPONSE_VALUE, _pIOCtrlData);
         } else {
-	        cJSON_AddStringToObject(json, RESPONSE_ERROR_STRING, _pIOCtrlData);
+                cJSON_AddStringToObject(json, RESPONSE_ERROR_STRING, _pIOCtrlData);
         }
         return json;
 }
@@ -164,29 +159,36 @@ void LinkDinitIOCtrl(int nSession)
                 return;
         }
         if (Session[nSession].isUsed) {
-                Session[nSession].pInstance = 0;
+                Session[nSession].pInstance = NULL;
                 memset(Session[nSession].pubTopic, 0, sizeof(Session[nSession].pubTopic));
+                memset(Session[nSession].subTopic, 0, sizeof(Session[nSession].subTopic));
                 Session[nSession].isUsed = false;
-	}
+                DestroyMessageQueue(&Session[nSession].pQueue);
+        }
 }
 
 
 void * LinkLogThread(void* _pData)
-{       
-        int rc;
-        struct _LinkIOCrtlInfo* log = (struct _LinkIOCrtlInfo*)(_pData); 
+{
+        struct _LinkIOCrtlInfo* log = (struct _LinkIOCrtlInfo*)(_pData);
+        MessageQueue* pQueue = NULL;
         do {
-                Message *pMessage = ReceiveMessageTimeout(log->pQueue, 5000);
+                pQueue = log->pQueue;
+                Message *pMessage = ReceiveMessageTimeout(log->pQueue, 1000);
                 if (pMessage) {
                          char topic[128] = {0};
                          sprintf(topic, "%s/%d",log->pubTopic, pMessage->nMessageID);
                          LinkMqttPublish(log->pInstance, topic, strlen(pMessage->pMessage), pMessage->pMessage);
+                         free(pMessage->pMessage);
+                         free(pMessage);
                 }
 
         } while(log->isUsed);
+
         return NULL;
 }
 
+static pthread_t t;
 int LinkInitLog(const char *_pAppId, const char *_pEncodeDeviceName, void *_pInstance)
 {
         if (LogSession.isUsed) {
@@ -204,11 +206,7 @@ int LinkInitLog(const char *_pAppId, const char *_pEncodeDeviceName, void *_pIns
         sprintf(LogSession.pubTopic, "/linking/v1/%s/%s/log/", _pAppId, _pEncodeDeviceName);
         LogSession.pInstance = _pInstance;
         LogSession.isUsed = true;
-        pthread_t t;
-        pthread_attr_t attr;
-        pthread_attr_init(&attr);
-        pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
-        pthread_create(&t, &attr, LinkLogThread, &LogSession);
+        pthread_create(&t, NULL, LinkLogThread, &LogSession);
         return 1;
 }
 
@@ -231,7 +229,12 @@ int LinkSendLog(int level, const char *pLog, int nLength)
         return 1;
 }
 
-void LinkDInitLog()
+void LinkDinitLog()
 {
        LogSession.isUsed = false;
+       pthread_join(t, NULL);
+       DestroyMessageQueue(&LogSession.pQueue);
+       memset(LogSession.pubTopic, 0, sizeof(LogSession.pubTopic));
+       memset(LogSession.subTopic, 0, sizeof(LogSession.subTopic));
+       LogSession.pInstance = NULL;
 }

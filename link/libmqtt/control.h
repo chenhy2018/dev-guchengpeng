@@ -103,4 +103,5 @@ int LinkSendIOResponse(int nSession, unsigned int _nIOCtrlType, const char *_pIO
 
 int LinkRecvIOCtrl(int nSession, unsigned int *_pIOCtrlType, char *_pIOCtrlData, int *_nIOCtrlMaxDataSize, unsigned int _nTimeout);
 
+void LinkDinitIOCtrl(int nSession);
 #endif

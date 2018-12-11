@@ -67,7 +67,7 @@ int main()
                         sleep(1);
                 }
                 LinkMqttSubscribe(instance, "test/#");
-		options.pId = "pubtestaaa";
+                options.pId = "pubtestaaa";
                 void* pubInstance = LinkMqttCreateInstance(&options);
                 Status[1].pInstance = pubInstance;
                 while (Status[1].status != 3000) {
@@ -78,12 +78,13 @@ int main()
                         LinkMqttPublish(pubInstance, "test/pub3", 10, "test_pub3");
                 }
 
-
-		int session = LinkInitIOCtrl("test", "ctrl001", instance);
-		int ret = LinkSendIOResponse(session, 0, "ctr", 3);
-		LinkInitLog("test", "ctrl0013333", instance);
-		LinkSendLog(5, "ctrl0013333testest", 13);
-	        sleep(10);
+                int session = LinkInitIOCtrl("test", "ctrl001", instance);
+                int ret = LinkSendIOResponse(session, 0, "ctr", 3);
+                LinkDinitIOCtrl(session);
+                LinkInitLog("test", "ctrl0013333", instance);
+                LinkSendLog(5, "ctrl0013333testest", 13);
+                LinkDinitLog();
+                sleep(10);
                 Status[1].pInstance = NULL;
                 Status[0].pInstance = NULL;
                 Status[1].status = 0;

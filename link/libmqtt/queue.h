@@ -19,21 +19,21 @@
 
 typedef struct
 {
-	int       nMessageID;
-	void*     pMessage;
+        int       nMessageID;
+        void*     pMessage;
 } Message;
 
 typedef struct
 {
-	Message**          pAlloc;
-	int                nNextIn;
-	int                nNextOut;
-	int                nCapacity;
-	int                nSize;
+        Message**          pAlloc;
+        int                nNextIn;
+        int                nNextOut;
+        int                nCapacity;
+        int                nSize;
         bool               bIsValid;
-	pthread_mutex_t    mutex;
+        pthread_mutex_t    mutex;
         pthread_mutex_t    destroyMutex;
-	pthread_cond_t     consumerCond;
+        pthread_cond_t     consumerCond;
 } MessageQueue;
 
 #define MESSAGE_QUEUE_UNIT_TEST 0
