@@ -81,6 +81,7 @@ endif()
 SET(CMAKE_C_FLAGS "${GCC_INCLUDE_PATH} ${GCC_COVERAGE_COMPILE_FLAGS}")
 
 aux_source_directory(. LIB_MQTT)
+aux_source_directory(./cJSON LIB_MQTT)
 
 if ($ENV{WITH_MOSQUITTO} STREQUAL "ON")
 aux_source_directory(../../third_party/mosquitto-1.5/lib/ MOSQUITTO_SRC)

@@ -6,6 +6,7 @@
 #include <mosquitto.h>
 #include "../mqtt.h"
 #include "../mqtt_internal.h"
+#include "../control_internal.h"
 
 int ClientOptSet(struct MqttInstance* _pInstance, struct MqttUserInfo info);
 
