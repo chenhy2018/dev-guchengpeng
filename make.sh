@@ -6,7 +6,7 @@ fi
 
 source env.sh
 export ARCH=$1
-export WITH_P2P="ON"
+export WITH_P2P="OFF"
 export WITH_OPENSSL="OFF"
 export WITH_FFMPEG="OFF"
 export WITH_PJSIP="OFF"
@@ -17,11 +17,13 @@ if [ "$1" = "mstar" ];then
    export CC=arm-linux-gnueabihf-gcc
    export CXX=arm-linux-gnueabihf-g++
    export HOST=arm-linux-gnueabihf
-   export LIBPREFIX=arm-unknown-linux-gnueabihf
+   export LIBPREFIX=arm-linux-gnueabihf
+
 elif [ "$1" == "hi" ];then
-    export CC=arm-hisiv300-linux-uclibcgnueabi-gcc
-    export CXX=arm-hisiv300-linux-uclibcgnueabi-g++
-    export HOST=arm-hisiv300-linux-uclibcgnueabi
+    export CC=arm-hisiv300-linux-gcc
+    export CXX=arm-hisiv300-linux-g++
+    export LIBPREFIX=arm-hisiv300-linux
+    export HOST=arm-hisiv300-linux
 elif [ "$1" == "80386" ];then
      export CC=gcc
      export CXX=g++
@@ -61,4 +63,3 @@ fi
 if [ "$ARCH" = "hi" ] || [ "$ARCH" = "80386" ];then
     ./make-link-sdk.sh
 fi
-
