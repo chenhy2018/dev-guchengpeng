@@ -2,6 +2,8 @@
 #include <unistd.h>
 #include <string.h>
 #include <stdio.h>
+#include "control.h"
+#include "control_internal.h"
 
 struct connect_status {
         int status;
@@ -55,8 +57,8 @@ int main()
         options.userInfo.pUsername = "1002";
         options.userInfo.pPassword = "gAs2Bpg2";
         
-        for (int i = 0; i < 10; ++i) {
-                options.pId = "test";
+        for (int i = 0; i < 100; ++i) {
+                options.pId = "test111";
                 instance = LinkMqttCreateInstance(&options);
                 Status[0].pInstance = instance;
                 Status[0].status = 0;
@@ -65,7 +67,7 @@ int main()
                         sleep(1);
                 }
                 LinkMqttSubscribe(instance, "test/#");
-		options.pId = "pubtest";
+		options.pId = "pubtestaaa";
                 void* pubInstance = LinkMqttCreateInstance(&options);
                 Status[1].pInstance = pubInstance;
                 while (Status[1].status != 3000) {
@@ -75,6 +77,12 @@ int main()
                         LinkMqttPublish(pubInstance, "test/pub", 10, "test_pub");
                         LinkMqttPublish(pubInstance, "test/pub3", 10, "test_pub3");
                 }
+
+
+		int session = LinkInitIOCtrl("test", "ctrl001", instance);
+		int ret = LinkSendIOResponse(session, 0, "ctr", 3);
+		LinkInitLog("test", "ctrl0013333", instance);
+		LinkSendLog(5, "ctrl0013333testest", 13);
 	        sleep(10);
                 Status[1].pInstance = NULL;
                 Status[0].pInstance = NULL;
@@ -123,7 +131,7 @@ int main()
 
         while(1) {
                 //LinkMqttLibInit();
-                options.pId = "test123";
+                options.pId = "test12333333";
                 instance = LinkMqttCreateInstance(&options);
                 Status[0].pInstance = instance;
                 while (Status[0].status != 3000) {

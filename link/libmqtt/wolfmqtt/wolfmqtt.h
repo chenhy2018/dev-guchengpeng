@@ -7,6 +7,7 @@
 #include "mqttnet.h"
 #include "../mqtt.h"
 #include "../mqtt_internal.h"
+#include "../control_internal.h"
 
 #define MAX_MQTT_TOPIC_LEN 128
 #define MAX_MQTT_MESSAGE_LEN 1024

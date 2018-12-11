@@ -1,5 +1,6 @@
 #include "mos_mqtt.h"
 
+
 static int MqttErrorStatusChange(int nStatus)
 {       
         switch (nStatus) {
@@ -55,7 +56,12 @@ void OnMessageCallback(struct mosquitto* _pMosq, void* _pObj, const struct mosqu
         int rc = MOSQ_ERR_SUCCESS;
         struct MqttInstance* pInstance = (struct MqttInstance*)(_pObj);
         if (pInstance->options.callbacks.OnMessage) {
-                pInstance->options.callbacks.OnMessage(_pObj, pInstance->options.nAccountId,  _pMessage->topic, _pMessage->payload, _pMessage->payloadlen);
+                if (memcmp(pInstance->mosq->message_topic, IO_CTR_MESSAGE, IO_CTR_MESSAGE_LENGTH) == 0) {
+                        OnIOCtrlMessage(pInstance, pInstance->options.nAccountId, pInstance->mosq->message_topic,
+                                        (const char *)pInstance->mosq->message, min((MAX_MQTT_MESSAGE_LEN - 1), _pMessage->buffer_len));
+                } else {
+                        pInstance->options.callbacks.OnMessage(_pObj, pInstance->options.nAccountId,  _pMessage->topic, _pMessage->payload, _pMessage->payloadlen);
+                }
         }
 }
 
@@ -275,7 +281,6 @@ int LinkMqttInit(struct MqttInstance* _pInstance)
                                 fprintf(stderr, "Error: Invalid id.\n");
                                 break;
                 }
-                mosquitto_lib_cleanup();
                 return MQTT_ERR_INVAL;
         }
 	printf("LinkMqttInit *********** %d\n", MQTT_SUCCESS);

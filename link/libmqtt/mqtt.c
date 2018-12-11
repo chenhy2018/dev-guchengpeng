@@ -109,7 +109,7 @@ void * LinkMqttThread(void* _pData)
         int ret = LinkMqttInit(pInstance);
         if (ret != MQTT_SUCCESS) {
                 OnEventCallback(pInstance, MQTT_ERR_INVAL, "MQTT_ERR_INVAL");
-                LinkMqttDestroy(pInstance);
+                LinkMqttDestroyInstance(pInstance);
                 return NULL;
         }
         do {

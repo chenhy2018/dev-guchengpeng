@@ -17,8 +17,6 @@ static int MqttErrorStatusChange(int nStatus)
         switch (nStatus) {
         case MQTT_CODE_SUCCESS:
                 return MQTT_SUCCESS;
-        case MQTT_CODE_CONTINUE:
-                return MQTT_ERR_CONN_PENDING;
         case MQTT_CODE_STDIN_WAKE:
                 return MQTT_ERR_INVAL;;
         case MQTT_CODE_ERROR_BAD_ARG:
@@ -47,6 +45,8 @@ static int MqttErrorStatusChange(int nStatus)
                 return MQTT_ERR_ERRNO;
         case MQTT_CODE_ERROR_CALLBACK:
                 return MQTT_ERR_ERRNO;
+        case MQTT_CODE_CONTINUE:
+                return MQTT_CONTINUE;
         default:
                 return MQTT_ERR_OTHERS;
     }
@@ -170,6 +170,7 @@ static int OnDisconnectCallback(MqttClient* client, int error_code, void* ctx)
         else {
                 pInstance->status = STATUS_CONNECT_ERROR;
         }
+        LinkMqttDinit(pInstance);
         LinkMqttInit(pInstance);
         return 0;
 }
@@ -183,7 +184,14 @@ static int OnMessageCallback(struct _MqttClient *client, MqttMessage *_pMessage,
                 memset(pInstance->mosq->message, 0, MAX_MQTT_MESSAGE_LEN);
                 memcpy(pInstance->mosq->message_topic, _pMessage->topic_name, min((MAX_MQTT_TOPIC_LEN - 1), _pMessage->topic_name_len));
                 memcpy(pInstance->mosq->message, _pMessage->buffer, min((MAX_MQTT_MESSAGE_LEN - 1), _pMessage->buffer_len));
-                pInstance->options.callbacks.OnMessage(pInstance, pInstance->options.nAccountId, pInstance->mosq->message_topic, (const char *)pInstance->mosq->message, min((MAX_MQTT_MESSAGE_LEN - 1), _pMessage->buffer_len));
+                printf("topic %s \n", pInstance->mosq->message_topic);
+                if (memcmp(pInstance->mosq->message_topic, IO_CTR_MESSAGE, IO_CTR_MESSAGE_LENGTH) == 0) {
+                        OnIOCtrlMessage(pInstance, pInstance->options.nAccountId, pInstance->mosq->message_topic,
+                                        (const char *)pInstance->mosq->message, min((MAX_MQTT_MESSAGE_LEN - 1), _pMessage->buffer_len));
+                } else {
+                        pInstance->options.callbacks.OnMessage(pInstance, pInstance->options.nAccountId, pInstance->mosq->message_topic,
+                               (const char *)pInstance->mosq->message, min((MAX_MQTT_MESSAGE_LEN - 1), _pMessage->buffer_len));
+                }
         }
         return MQTT_CODE_SUCCESS;
 }
@@ -372,7 +380,7 @@ MQTT_ERR_STATUS LinkMqttLoop(struct MqttInstance* _pInstance)
 		if (ctx->timeoutCount * DEFAULT_CON_TIMEOUT_MS > 5000) {
                         rc = MqttClient_Ping(&client);
                         if (rc == MQTT_CODE_CONTINUE) {
-                                return rc;
+                                return MqttErrorStatusChange(rc);
                         }
                         else if (rc != MQTT_CODE_SUCCESS) {
                                 printf("MQTT Ping Keep Alive Error: %s (%d)",
