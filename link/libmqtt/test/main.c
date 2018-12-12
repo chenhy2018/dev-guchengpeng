@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include "control.h"
 #include "control_internal.h"
+#include <signal.h>
 
 struct connect_status {
         int status;
@@ -33,6 +34,7 @@ void OnEvent(IN const void* _pInstance, IN int _nAccountId, IN int _nId,  IN con
 int main()
 {
         struct MqttOptions options;
+        signal(SIGPIPE, SIG_IGN);
         LinkMqttLibInit();
         options.pId = "test";
         options.bCleanSession = false;
@@ -57,7 +59,7 @@ int main()
         options.userInfo.pUsername = "1002";
         options.userInfo.pPassword = "gAs2Bpg2";
         
-        for (int i = 0; i < 100; ++i) {
+        for (int i = 0; i < 1; ++i) {
                 options.pId = "test111";
                 instance = LinkMqttCreateInstance(&options);
                 Status[0].pInstance = instance;
