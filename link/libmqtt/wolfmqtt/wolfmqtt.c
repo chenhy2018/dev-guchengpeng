@@ -170,8 +170,10 @@ static int OnDisconnectCallback(MqttClient* client, int error_code, void* ctx)
         else {
                 pInstance->status = STATUS_CONNECT_ERROR;
         }
-        LinkMqttDinit(pInstance);
-        LinkMqttInit(pInstance);
+	if (!pInstance->isDestroying) {
+                LinkMqttDinit(pInstance);
+                LinkMqttInit(pInstance);
+        }
         return 0;
 }
 
