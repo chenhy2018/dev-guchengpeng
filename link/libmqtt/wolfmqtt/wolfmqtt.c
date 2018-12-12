@@ -4,6 +4,9 @@
 #include "mqtt_socket.h"
 #include "mqtt_client.h"
 #include "mqttnet.h"
+
+#include <signal.h>
+
 #define MAX_PACKET_ID ((1<<16) -1)
 #define DEFAULT_CON_TIMEOUT_MS 500
 
@@ -141,6 +144,14 @@ int LinkMqttUnsubscribe(IN const void* _pInstance, IN const char* _pTopic)
 
 int LinkMqttLibInit()
 {
+        signal(SIGPIPE, SIG_IGN);
+        sigset_t signal_mask;
+        sigemptyset(&signal_mask);
+        sigaddset(&signal_mask, SIGPIPE);
+        int rc = pthread_sigmask(SIG_BLOCK, &signal_mask, NULL);
+        if (rc != 0) {
+                printf("block sigpipe error\n");
+        } 
         return MQTT_SUCCESS;
 }
 
@@ -162,8 +173,8 @@ static int OnDisconnectCallback(MqttClient* client, int error_code, void* ctx)
         OnEventCallback(pInstance,
                 (error_code == MQTT_CODE_SUCCESS) ? MQTT_SUCCESS : MqttErrorStatusChange(error_code),
                 (error_code == 0) ? "on disconnect success" : MqttClient_ReturnCodeToString(error_code));
-        pInstance->connected = false;
         LinkMqttDisconnect(pInstance);
+        pInstance->connected = false;
         if (error_code == MQTT_CODE_SUCCESS) {
                 pInstance->status = STATUS_IDLE;
         }
@@ -355,6 +366,10 @@ void LinkMqttDisconnect(struct MqttInstance* _pInstance)
         }
 	struct MQTTCtx* ctx = (struct MQTTCtx*)(_pInstance->mosq);
         MqttClient* client = &ctx->client;
+        if (client->tls.ctx) {
+                wolfSSL_CTX_free(client->tls.ctx);
+                client->tls.ctx = NULL;
+        }
 	int rc = MqttClient_Disconnect(client);
         if (rc != MQTT_CODE_SUCCESS) {
                 printf("MQTT Disconnect: %s (%d)\n", MqttClient_ReturnCodeToString(rc), rc);
@@ -389,7 +404,7 @@ MQTT_ERR_STATUS LinkMqttLoop(struct MqttInstance* _pInstance)
                                         MqttClient_ReturnCodeToString(rc), rc);
                                 ctx->timeoutCount = 0;
                         }
-			ctx->timeoutCount = 0;
+                        ctx->timeoutCount = 0;
                 }
         }
 	pthread_mutex_unlock(&_pInstance->listMutex);

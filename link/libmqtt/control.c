@@ -18,7 +18,8 @@ void OnIOCtrlMessage(IN const void* _pInstance, IN int _nAccountId, IN const cha
                 return;
         }
         pMessage->nMessageID = -1;
-        for (int i = 0; i < 10; ++ i) {
+	int i;
+        for (i = 0; i < 10; ++ i) {
                 if (Session[i].isUsed && _pInstance == Session[i].pInstance) {
                         pMessage->nMessageID = i;
                         break;
