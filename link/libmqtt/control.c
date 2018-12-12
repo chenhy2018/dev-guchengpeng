@@ -38,10 +38,12 @@ void OnIOCtrlMessage(IN const void* _pInstance, IN int _nAccountId, IN const cha
 int LinkInitIOCtrl(const char *_pAppId, const char *_pEncodeDeviceName, void *_pInstance)
 {
         int index = MAX_SESSION_ID;
-        for (int i = 0; i < MAX_SESSION_ID; ++i) {
-                Session[i].isUsed = false;
-                index = i;
-                break;
+        int i;
+        for (i = 0; i < MAX_SESSION_ID; ++i) {
+                if (Session[i].isUsed == false) {
+                        index = i;
+                        break;
+                 }
 	}
         if (index == MAX_SESSION_ID) {
                 return MQTT_ERR_INVAL;
